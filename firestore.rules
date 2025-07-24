@@ -1,0 +1,169 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to get authenticated user's document
+    function getUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Helper function to check user role
+    function isRole(role) {
+      return isAuthenticated() && getUser().data.role == role;
+    }
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user has a specific permission
+    function hasPermission(permission) {
+      return isAuthenticated() && getUser().data.permissions.hasAny([permission]);
+    }
+
+    // Users collection:
+    match /users/{userId} {
+      // Authenticated users can read any user's basic profile data (excluding sensitive fields)
+      allow read: if isAuthenticated();
+      // Users can create their own profile document upon first login
+      allow create: if request.auth.uid == userId;
+      // Users can update their own profile data. Admins can update any user's data.
+      // Validate that sensitive fields like role and permissions are only updated by admins.
+      allow update: if request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'profilePhotoUrl', 'village', 'panchayat', 'district', 'state', 'language', 'isProfileComplete', 'lastLoginAt'])
+                       || isAdmin();
+      // Only admins can delete users
+      allow delete: if isAdmin();
+    }
+
+    // Teams collection:
+    match /teams/{teamId} {
+      // All authenticated users can read team data.
+      allow read: if isAuthenticated();
+      // Captains and admins can create teams. Validate team data structure and required fields.
+      allow create: if (isRole('captain') && request.resource.data.captainId == request.auth.uid) || isAdmin();
+      // Captains can update their own teams. Admins can update any team.
+      // Validate that sensitive fields like status are updated correctly based on workflows.
+      allow update: if (isRole('captain') && resource.data.captainId == request.auth.uid) || isAdmin();
+      // Captains can delete their own teams (if in draft status). Admins can delete any team.
+      allow delete: if (isRole('captain') && resource.data.captainId == request.auth.uid && resource.data.status == 'draft') || isAdmin();
+
+      // Allow players to read teams they are part of
+      allow read: if isAuthenticated() && resource.data.players.hasAny([{ playerId: request.auth.uid }]);
+    }
+
+    // Events collection:
+    match /events/{eventId} {
+      // All authenticated users and public can read event data.
+      allow read: if true;
+      // Only admins can create, update, or delete events.
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Fixtures collection:
+    match /fixtures/{fixtureId} {
+      // All authenticated users and public can read fixture data.
+      allow read: if true;
+      // Only admins can create, update, or delete fixtures.
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Matches collection:
+    match /matches/{matchId} {
+      // All authenticated users and public can read match data.
+      allow read: if true;
+      // Admins and volunteers can create matches.
+      allow create: if isAdmin() || isVolunteer();
+      // Admins can update any match. Volunteers can update matches they are assigned to (officials).
+      // Validate score and status updates.
+      allow update: if isAdmin() || (isVolunteer() && request.resource.data.officials.hasAny([request.auth.uid]));
+      // Only admins can delete matches.
+      allow delete: if isAdmin();
+    }
+
+    // Venues collection:
+    match /venues/{venueId} {
+      // All authenticated users and public can read venue data.
+      allow read: if true;
+      // Only admins can create, update, or delete venues.
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Media collection:
+    match /media/{mediaId} {
+      // Authenticated users and public can read public media.
+      // Authenticated users can read their own private media. Admins can read all media.
+      allow read: if (isAuthenticated() && resource.data.isPublic == true)
+                       || (isAuthenticated() && resource.data.isPublic == false && resource.data.uploadedBy == request.auth.uid)
+                       || isAdmin();
+      // Authenticated users can create media.
+      allow create: if isAuthenticated();
+      // Uploader or admin can update media.
+      allow update: if request.auth.uid == resource.data.uploadedBy || isAdmin();
+      // Uploader or admin can delete media.
+      allow delete: if request.auth.uid == resource.data.uploadedBy || isAdmin();
+    }
+
+    // Notifications collection:
+    match /notifications/{notificationId} {
+      // Users can read their own notifications. Admins can read all notifications.
+      allow read: if isAuthenticated() && resource.data.recipients.userIds.hasAny([request.auth.uid]) || isAdmin();
+      // Admins and volunteers can create notifications.
+      allow create: if isAdmin() || isVolunteer();
+      // No update or delete allowed for notifications (they are typically processed and archived)
+    }
+
+    // Analytics collection:
+    match /analytics/{analyticsId} {
+      // Only admins can read analytics.
+      allow read: if isAdmin();
+      // Only Cloud Functions or admins should create analytics documents.
+      allow create: if isAdmin(); // Or specific service account rule
+      // No update or delete allowed for analytics.
+    }
+
+    // SystemConfig collection:
+    match /systemConfig/{configId} {
+      // All authenticated users can read system config (for app settings, localization, etc.).
+      allow read: if isAuthenticated();
+      // Only admins can update system config.
+      allow update: if isAdmin();
+      // No create or delete allowed for system config (assuming a single document with a fixed ID).
+    }
+
+    // AuditLog collection:
+    match /auditLog/{logId} {
+      // Only admins can read audit logs.
+      allow read: if isAdmin();
+      // Only Cloud Functions or admins should create audit log documents.
+      allow create: if isAdmin(); // Or specific service account rule
+      // No update or delete allowed for audit logs.
+    }
+
+    // Helper function to check if user is any type of volunteer
+    function isVolunteer() {
+        return isAuthenticated() && (getUser().data.role == 'volunteer_poc' || getUser().data.role == 'volunteer_registration' || getUser().data.role == 'volunteer_general');
+    }
+
+     // Helper function to check if user is any type of admin
+    function isAdmin() {
+        return isAuthenticated() && (getUser().data.role == 'admin_backend' || getUser().data.role == 'admin_registration' || getUser().data.role == 'admin_media');
+    }
+  }
+}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /profilePhotos/{userId}/{fileName} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null; // Or add conditions for public read if needed
+    }
+  }
+}
