@@ -1,19 +1,30 @@
 // src/app/login/page.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 'use client'; // This is a client component
 
 import React, { useState, useEffect } from 'react';
-import { auth, db } from '../../../utils/firebase'; // Adjust the import path as needed, import db
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { useRouter } from 'next/navigation'; // Import useRouter
-import { doc, getDoc } from 'firebase/firestore'; // Import firestore functions
+import { auth, db } from '../../../utils/firebase'; 
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult} from 'firebase/auth';
+import { useRouter } from 'next/navigation'; 
+import { doc, getDoc } from 'firebase/firestore';
 
-function LoginPage() {
+
+declare global {
+  interface Window {
+    recaptchaVerifier: RecaptchaVerifier | undefined; // <--- This line is the key change
+    // If you are also using the RecaptchaVerifier constructor directly on window, add this:
+    // RecaptchaVerifier: typeof RecaptchaVerifier;
+  }
+}
+
+export default function LoginPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState(null);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter(); 
 
   // Initialize RecaptchaVerifier when the component mounts
   useEffect(() => {
@@ -27,7 +38,7 @@ function LoginPage() {
     if (!window.recaptchaVerifier) {
         window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
             'size': 'invisible',
-            'callback': (response) => {
+            'callback': () => {
               console.log('reCAPTCHA solved');
             },
             'expired-callback': () => {
@@ -141,5 +152,3 @@ function LoginPage() {
     </div>
   );
 }
-
-export default LoginPage;

@@ -31,7 +31,7 @@ service cloud.firestore {
       allow create: if request.auth.uid == userId;
       // Users can update their own profile data. Admins can update any user's data.
       // Validate that sensitive fields like role and permissions are only updated by admins.
-      allow update: if request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'profilePhotoUrl', 'village', 'panchayat', 'district', 'state', 'language', 'isProfileComplete', 'lastLoginAt'])
+      allow update: if request.auth.uid == userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'profilePhotoUrl', 'village', 'panchayat', 'district', 'state', 'language', 'isProfileComplete', 'lastLoginAt', 'updatedAt'])
                        || isAdmin();
       // Only admins can delete users
       allow delete: if isAdmin();
