@@ -1,8 +1,5 @@
-import { Inter } from "next/font/google";
-import "./globals.css";
 import ClientProviders from "@/components/system/ClientProviders"; // New client component
-
-const inter = Inter({ subsets: ["latin"] });
+import "@/styles/globals.css";
 
 export const metadata = {
   title: "Isha Gramotsavam",
@@ -24,12 +21,12 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
           rel="stylesheet"
         />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes"></meta>
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Isha Gramotsavam" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2, user-scalable=yes" />
       </head>
-      <body className={`${inter.className} bg-gray-50 min-h-screen font-roboto`}>
+      <body className={`min-h-screen font-fira`}>
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>

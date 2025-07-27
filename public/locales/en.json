@@ -1,5 +1,6 @@
 {
   "welcome": "Welcome Back!",
+  "namaskaram":"Namaskaram",
   "phone_number_placeholder": "Enter phone number (e.g., 9876543210)",
   "send_otp": "Send OTP",
   "verify_otp": "Verify OTP",

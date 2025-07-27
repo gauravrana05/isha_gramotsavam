@@ -1,6 +1,27 @@
+import type { ReactNode } from "react";
+import type { Metadata } from "next";
+
 type LanguageCode = "en" | "ta" | "hi" | "ml" | "te" | "kn" | "or";
 
-export async function generateStaticParams() {
+// Define SegmentParams to match your route's params
+interface SegmentParams {
+  lang: LanguageCode;
+}
+
+// Use the LayoutProps interface compatible with node_modules
+interface LayoutProps {
+  children: ReactNode;
+  params: Promise<SegmentParams>;
+}
+
+export default async function LangLayout({ children, params }: LayoutProps) {
+  // Await the params Promise to get the actual object
+  const { lang } = await params;
+  console.log("Rendering [lang]/layout.tsx for", lang);
+  return <>{children}</>;
+}
+
+export async function generateStaticParams(): Promise<{ lang: LanguageCode }[]> {
   console.log("Generating static params for [lang]");
   return [
     { lang: "en" },
@@ -13,9 +34,14 @@ export async function generateStaticParams() {
   ];
 }
 
-export async function generateMetadata({ params }: { params: { lang: LanguageCode } }) {
-  console.log("Generating metadata for lang:", params.lang);
-  const lang = params.lang || "en";
+export async function generateMetadata({
+  params,
+}: LayoutProps): Promise<Metadata> {
+  // Await the params Promise
+  const { lang } = await params;
+  console.log("Generating metadata for lang:", lang);
+  const resolvedLang = (lang ?? "en") as LanguageCode;
+
   const translations: Record<LanguageCode, { title: string; description: string }> = {
     en: { title: "Isha Gramotsavam", description: "Annual Rural Sports Festival Management Platform" },
     ta: { title: "இஷா கிராமோத்சவம்", description: "ஆண்டு கிராம விளையாட்டு விழா மேலாண்மை தளம்" },
@@ -27,19 +53,8 @@ export async function generateMetadata({ params }: { params: { lang: LanguageCod
   };
 
   return {
-    title: translations[lang]?.title || translations.en.title,
-    description: translations[lang]?.description || translations.en.description,
+    title: translations[resolvedLang]?.title || translations.en.title,
+    description: translations[resolvedLang]?.description || translations.en.description,
     manifest: "/manifest.json",
   };
-}
-
-export default function LangLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: { lang: LanguageCode };
-}) {
-  console.log("Rendering [lang]/layout.tsx for", params.lang);
-  return <>{children}</>;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
@@ -8,10 +8,9 @@ import { useAuth } from "@/context/AuthContext";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import { Phone, MessageSquare, ArrowLeft } from "lucide-react";
 import { useTranslation } from "@/lib/utils/i18n";
 import { useServiceWorker } from "@/lib/utils/registerServiceWorker";
-import ThemeToggle from "@/components/common/ThemeToggle";
+import Image from "next/image";
 
 declare global {
   interface Window {
@@ -21,26 +20,27 @@ declare global {
 
 export default function LoginPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [otp, setOtp] = useState("");
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [canResend, setCanResend] = useState(false);
+  const [resendTimer, setResendTimer] = useState(30);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile } = useAuth();
   const { t } = useTranslation();
   useServiceWorker();
 
-  console.log("Rendering [lang]/(auth)/login/page.tsx for", lang);
 
   useEffect(() => {
     if (user && userProfile) {
       if (!userProfile.isProfileComplete) {
-        console.log("Redirecting to", `/${lang}/complete-profile`);
         router.push(`/${lang}/complete-profile`);
       } else {
-        const role = userProfile.role || "player";
+        const role = userProfile.role || "public";
         console.log("User role:", role, "Redirecting to", `/${lang}/${role}/dashboard`);
         switch (role) {
           case "admin":
@@ -48,6 +48,9 @@ export default function LoginPage() {
             break;
           case "captain":
             router.push(`/${lang}/captain/dashboard`);
+            break;
+          case "player":
+            router.push(`/${lang}/player/dashboard`);
             break;
           case "volunteer_general":
             router.push(`/${lang}/volunteer/dashboard`);
@@ -59,11 +62,21 @@ export default function LoginPage() {
             router.push(`/${lang}/guest/dashboard`);
             break;
           default:
-            router.push(`/${lang}/player/dashboard`);
+            router.push(`/${lang}/public`);
         }
       }
     }
   }, [user, userProfile, router, lang]);
+
+  // Timer for resend OTP
+  useEffect(() => {
+    if (step === "otp" && resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (resendTimer === 0) {
+      setCanResend(true);
+    }
+  }, [resendTimer, step]);
 
   const setUpRecaptcha = () => {
     if (!window.recaptchaVerifier) {
@@ -104,6 +117,8 @@ export default function LoginPage() {
       const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
       setConfirmationResult(result);
       setStep("otp");
+      setCanResend(false);
+      setResendTimer(30);
       console.log("OTP sent successfully");
     } catch (err: any) {
       console.error("Error sending OTP:", err);
@@ -121,9 +136,69 @@ export default function LoginPage() {
     }
   };
 
+  const handleOtpChange = (index: number, value: string) => {
+    // Only allow digits
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly.length > 1) return;
+
+    const newOtp = [...otp];
+    newOtp[index] = digitsOnly;
+    setOtp(newOtp);
+
+    // Auto focus next input
+    if (digitsOnly && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleFocus = (index: number) => {
+    // Select all text when input is focused (for better UX when replacing)
+    inputRefs.current[index]?.select();
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    // Handle backspace
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+    // Handle tab navigation
+    else if (e.key === 'Tab' && !e.shiftKey && index < 5) {
+      e.preventDefault();
+      inputRefs.current[index + 1]?.focus();
+    }
+    // Handle shift+tab navigation
+    else if (e.key === 'Tab' && e.shiftKey && index > 0) {
+      e.preventDefault();
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent, startIndex: number) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, ''); // Only digits
+
+    if (pastedData.length > 0) {
+      const newOtp = [...otp];
+      const remainingSlots = 6 - startIndex;
+      const digitsToPaste = Math.min(pastedData.length, remainingSlots);
+
+      // Fill from the current index onwards
+      for (let i = 0; i < digitsToPaste; i++) {
+        newOtp[startIndex + i] = pastedData[i];
+      }
+
+      setOtp(newOtp);
+
+      // Focus the next empty input or the last filled input
+      const nextFocusIndex = Math.min(startIndex + digitsToPaste, 5);
+      inputRefs.current[nextFocusIndex]?.focus();
+    }
+  };
+
   const handleVerifyCode = async () => {
-    if (!otp.trim()) {
-      setError(t("error_no_otp"));
+    const otpValue = otp.join('');
+    if (otpValue.length !== 6) {
+      setError('Please enter complete OTP');
       return;
     }
     if (!confirmationResult) {
@@ -133,7 +208,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await confirmationResult.confirm(otp);
+      await confirmationResult.confirm(otpValue);
       console.log("Phone number verified successfully");
     } catch (err: any) {
       console.error("Error verifying OTP:", err);
@@ -148,9 +223,47 @@ export default function LoginPage() {
   };
 
   const handleResendCode = async () => {
-    setOtp("");
+    if (!canResend) return;
+
+    setOtp(['', '', '', '', '', '']);
+    setConfirmationResult(null);
+    setCanResend(false);
+    setResendTimer(30);
+    setError('');
+    setLoading(true);
+
+    try {
+      // Clear existing recaptcha first
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = undefined;
+      }
+
+      // Set up fresh recaptcha
+      setUpRecaptcha();
+      const formattedPhone = formatPhoneNumber(phoneNumber);
+      const appVerifier = window.recaptchaVerifier!;
+      const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+      setConfirmationResult(result);
+      console.log("OTP resent successfully");
+    } catch (err: any) {
+      console.error("Error resending OTP:", err);
+      setError('Failed to resend OTP. Please try again.');
+      setCanResend(true);
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = undefined;
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeNumber = () => {
+    setOtp(['', '', '', '', '', '']);
     setConfirmationResult(null);
     setStep("phone");
+    setError('');
     if (window.recaptchaVerifier) {
       window.recaptchaVerifier.clear();
       window.recaptchaVerifier = undefined;
@@ -159,90 +272,26 @@ export default function LoginPage() {
 
   if (step === "phone") {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md">
-          <div className="flex justify-end mb-4">
-            <ThemeToggle />
-          </div>
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Phone className="w-8 h-8 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 font-roboto mb-2">
-              {t("welcome")}
-            </h2>
-            <p className="text-gray-600 font-roboto">{t("phone_number_placeholder")}</p>
-          </div>
-          <div className="space-y-4">
-            <Input
-              type="tel"
-              placeholder={t("phone_number_placeholder")}
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              disabled={loading}
-              className="text-center text-lg"
-              variant="large"
-              maxLength={13}
-              aria-label={t("phone_number_placeholder")}
-            />
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-600 text-sm font-roboto">{error}</p>
-              </div>
-            )}
-            <Button
-              onClick={handleSendCode}
-              disabled={loading || phoneNumber.length < 10}
-              className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-medium"
-              variant="large"
-              aria-label={t("send_otp")}
-            >
-              {loading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <LoadingSpinner size="small" />
-                  <span>{t("loading")}</span>
-                </div>
-              ) : (
-                t("send_otp")
-              )}
-            </Button>
-            <div id="recaptcha-container" className="hidden" />
-          </div>
-          <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500 font-roboto">{t("terms_privacy")}</p>
+      <div className="bg-isha p-6 w-full max-w-md">
+        <div className="flex justify-center items-center mb-4">
+          <div className="logo-container">
+            <Image src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" alt="Logo" width={80} height={80} />
           </div>
         </div>
-      </div>
-    );
-  }
+        <div className="mb-6 text-center"><div className="font-fira text-3xl font-semibold ">Namaskaram</div>
+          <div className="font-fira pt-4 font-small text-sm">We'll check if you have an account, and help create one if you don't.</div></div>
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md">
-        <div className="flex justify-end mb-4">
-          <ThemeToggle />
-        </div>
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <MessageSquare className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 font-roboto mb-2">
-            {t("verify_otp")}
-          </h2>
-          <p className="text-gray-600 font-roboto">{t("otp_placeholder")}</p>
-          <p className="text-orange-600 font-medium font-roboto">{phoneNumber}</p>
-        </div>
         <div className="space-y-4">
           <Input
-            type="number"
-            placeholder={t("otp_placeholder_text")}
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
+            type="tel"
+            placeholder={"Phone"}
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
             disabled={loading}
-            className="text-center text-xl tracking-widest"
+            className="text-lg font-fira"
             variant="large"
-            maxLength={6}
-            aria-label={t("otp_placeholder_text")}
+            maxLength={10}
+            aria-label={t("phone_number_placeholder")}
           />
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -250,32 +299,166 @@ export default function LoginPage() {
             </div>
           )}
           <Button
-            onClick={handleVerifyCode}
-            disabled={loading || otp.length < 6}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg font-medium"
-            variant="large"
-            aria-label={t("verify_otp")}
+            onClick={handleSendCode}
+            disabled={loading || phoneNumber.length < 10}
+            className="w-full bg-[#CE4520] disabled:hover:bg-[#CE4520] hover:bg-[#1565C0] text-white py-3 text-lg font-firo"
+            size="large"
+            aria-label={t("send_otp")}
           >
             {loading ? (
               <div className="flex items-center justify-center space-x-2">
                 <LoadingSpinner size="small" />
-                <span>{t("loading")}</span>
               </div>
-            ) : (
-              t("verify_otp")
-            )}
+            ) : <div className="flex items-center justify-center space-x-2">
+              Continue
+            </div>}
           </Button>
-          <Button
-            onClick={handleResendCode}
-            className="w-full bg-transparent border border-gray-300 text-gray-700 py-3 text-lg font-medium hover:bg-gray-100"
-            variant="large"
-            aria-label={t("resend_otp")}
-          >
-            <ArrowLeft className="w-5 h-5 inline mr-2" />
-            {t("resend_otp")}
-          </Button>
+          <div className="hr-sect">or</div>
+          <div className="text-center">
+            <button
+              onClick={() => router.push(`/${lang}/public/`)}
+              className="text-[#1976D2] font-fira other-login-button text-sm"
+              aria-label={t("continue_as_guest")}
+            >
+              Continue as Guest
+            </button>
+          </div>
+          <div id="recaptcha-container" className="hidden" />
+        </div>
+        <div className="mt-6 text-center">
+          <p className="text-sm font-fira">
+            By clicking on continue, you accept our{" "}
+            <a href="/terms" className="text-[#CE4520] hover:underline" target="_blank">
+              Terms of Service
+            </a>{" "}
+            and{" "}
+            <a href="/privacy" className="text-[#CE4520] hover:underline" target="_blank">
+              Privacy Policy
+            </a>
+          </p>
         </div>
       </div>
+    );
+  }
+
+  const isVerifyDisabled = otp.some(digit => !digit) || loading;
+
+  return (
+    <div className="bg-isha p-6 w-full max-w-md">
+      <div className="flex justify-center items-center mb-4">
+        <div className="logo-container">
+          <Image
+            src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg"
+            alt="Logo"
+            width={80}
+            height={80}
+          />
+        </div>
+      </div>
+
+      <div className="mb-6 text-center">
+        <div className="font-fira text-2xl font-semibold mb-2">
+          Verify your Mobile Number
+        </div>
+        <div className="font-fira text-sm text-gray-600 mb-3">
+          An OTP (One Time Password) has been sent to {formatPhoneNumber(phoneNumber)}
+        </div>
+        <div className="text-center">
+          <button
+            onClick={handleChangeNumber}
+            tabIndex={9}
+            className="text-[#CE4520] font-fira text-sm hover:underline"
+          >
+            Change Number
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {/* OTP Input Container */}
+        <div className="mb-4">
+          <div className="flex justify-center items-center space-x-2 mb-4">
+            {otp.map((digit, index) => (
+              <input
+                key={index}
+                ref={(el) => { inputRefs.current[index] = el; }}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
+                aria-label={`Please enter OTP character ${index + 1}`}
+                className="w-12 h-12 text-center text-xl font-semibold border-2 border-gray-300 rounded-lg focus:border-[#CE4520] focus:outline-none focus:ring-2 focus:ring-[#CE4520] focus:ring-opacity-20 transition-colors caret-transparent selection:bg-[#CE4520] selection:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                value={digit}
+                onChange={(e) => handleOtpChange(index, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(index, e)}
+                onFocus={() => handleFocus(index)}
+                onPaste={(e) => handlePaste(e, index)}
+                maxLength={1}
+                disabled={loading}
+                tabIndex={index + 1}
+              />
+            ))}
+          </div>
+
+          {/* Resend OTP */}
+          <div className="text-center">
+            {canResend ? (
+              <button
+                onClick={handleResendCode}
+                className="text-[#CE4520] font-fira text-sm hover:underline"
+              >
+                Resend OTP
+              </button>
+            ) : (
+              <span className="text-gray-500 font-fira text-sm">
+                Resend OTP in {resendTimer}s
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 text-sm font-fira">{error}</p>
+          </div>
+        )}
+
+        {/* Verify Button */}
+        <button
+          onClick={handleVerifyCode}
+          disabled={isVerifyDisabled}
+          tabIndex={7}
+          className={`w-full py-3 text-lg font-fira rounded-lg transition-colors ${isVerifyDisabled
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-[#CE4520] hover:bg-[#1565C0] text-white'
+            }`}
+        >
+          {loading ? (
+            <div className="flex items-center justify-center space-x-2">
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Verifying...</span>
+            </div>
+          ) : (
+            'Verify'
+          )}
+        </button>
+      </div>
+
+      {/* Terms and Privacy */}
+      <div className="mt-6 text-center">
+        <p className="text-sm font-fira text-gray-600">
+          By clicking on verify, you accept our{" "}
+          <a href="/terms" className="text-[#CE4520] hover:underline" target="_blank">
+            Terms of Service
+          </a>{" "}
+          and{" "}
+          <a href="/privacy" className="text-[#CE4520] hover:underline" target="_blank">
+            Privacy Policy
+          </a>
+        </p>
+      </div>
+      <div id="recaptcha-container" className="hidden" />
     </div>
   );
 }

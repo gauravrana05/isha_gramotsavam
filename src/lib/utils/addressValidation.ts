@@ -8,6 +8,7 @@ export interface ProfileFormData {
   village: string;
   panchayat: string;
   district: string;
+  taluk: string;
   state: string;
   language: string;
   aadharPhotoFront: File | null;
@@ -23,19 +24,11 @@ export interface AddressValidationError {
 export const validateAddress = (formData: ProfileFormData): AddressValidationError[] => {
   const errors: AddressValidationError[] = [];
 
-  // Required field validations
-  if (!formData.name.trim()) {
-    errors.push({ field: 'name', message: 'Name is required' });
-  }
 
   if (!formData.pincode.trim()) {
     errors.push({ field: 'pincode', message: 'Pincode is required' });
   } else if (!/^\d{6}$/.test(formData.pincode)) {
     errors.push({ field: 'pincode', message: 'Pincode must be 6 digits' });
-  }
-
-  if (!formData.village.trim()) {
-    errors.push({ field: 'village', message: 'Village is required' });
   }
 
   if (!formData.district.trim()) {
@@ -61,10 +54,9 @@ export const formatAddressForDisplay = (addressData: AddressData | null): string
   if (!addressData) return '';
 
   const parts = [
-    addressData.name,
+    addressData.taluk,
     addressData.district,
     addressData.state,
-    addressData.pincode
   ].filter(Boolean);
 
   return parts.join(', ');
@@ -74,7 +66,7 @@ export const normalizeAddressData = (addressData: AddressData): Partial<ProfileF
   return {
     district: addressData.district || '',
     state: addressData.state || '',
-    panchayat: addressData.panchayat || '',
+    taluk: addressData.taluk || '',
   };
 };
 

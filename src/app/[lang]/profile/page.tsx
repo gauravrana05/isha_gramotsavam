@@ -1,51 +1,1174 @@
 "use client";
 
-import { useAuth } from "@/context/AuthContext";
+import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
+import { uploadFile } from "@/lib/firebase/storage";
+import { pincodeService } from "@/lib/services/pincodeService";
 import { useTranslation } from "@/lib/utils/i18n";
-import Button from "@/components/ui/Button";
-import ThemeToggle from "@/components/common/ThemeToggle";
+import Image from "next/image";
+import {
+  MapPin,
+  CheckCircle,
+  User,
+  Edit,
+  Save,
+  X,
+  Trash2,
+  Upload,
+  Check,
+  Loader2,
+  ArrowLeft,
+  LogOut,
+  Camera,
+  Phone,
+  Mail,
+  Globe,
+  Building,
+  CreditCard,
+  Briefcase,
+  Plus,
+  Calendar,
+  UserCheck
+} from "lucide-react";
+
+interface EditState {
+  basicProfile: boolean;
+  addressDetails: boolean;
+  otherDetails: boolean;
+  identityVerification: boolean;
+}
+
+interface FormData {
+  firstName: string;
+  lastName: string;
+  whatsappNumber: string;
+  dob: string;
+  instagramHandle: string;
+  gender: string;
+  pincode: string;
+  state: string;
+  district: string;
+  taluk: string;
+  panchayat: string;
+  preferredLanguage: string;
+  profilePhoto?: File;
+  aadhaarFront?: File;
+  aadhaarBack?: File;
+}
 
 export default function ProfilePage() {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, loading, logout } = useAuth();
   const router = useRouter();
   const { lang } = useParams();
   const { t } = useTranslation();
 
+  const [editState, setEditState] = useState<EditState>({
+    basicProfile: false,
+    addressDetails: false,
+    otherDetails: false,
+    identityVerification: false,
+  });
+
+  const [formData, setFormData] = useState<FormData>({
+    firstName: "",
+    lastName: "",
+    whatsappNumber: "",
+    dob: "",
+    instagramHandle: "",
+    gender: "",
+    pincode: "",
+    state: "",
+    district: "",
+    taluk: "",
+    panchayat: "",
+    preferredLanguage: "en",
+  });
+
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [formLoading, setFormLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+  const [addressVerified, setAddressVerified] = useState(false);
+  const [isWhatsAppSame, setIsWhatsAppSame] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState({
+    profile: 0,
+    aadhaarFront: 0,
+    aadhaarBack: 0,
+  });
+
+  const languages = [
+    { code: "en", name: "English" },
+    { code: "ta", name: "Tamil" },
+    { code: "hi", name: "Hindi" },
+    { code: "ml", name: "Malayalam" },
+    { code: "te", name: "Telugu" },
+    { code: "kn", name: "Kannada" },
+    { code: "or", name: "Odia" },
+  ];
+
+  // Extract phone number from user (remove country code)
+  const phoneNumber = user?.phoneNumber?.replace(/^\+91/, '') || '';
+
+  // Initialize form data with userProfile data when available
   useEffect(() => {
-    if (!user) {
-      router.push(`/${lang}/auth/login`);
+    if (userProfile) {
+      setFormData({
+        firstName: userProfile.firstName || "",
+        lastName: userProfile.lastName || "",
+        whatsappNumber: userProfile.whatsappNumber || phoneNumber,
+        dob: userProfile.dob || "",
+        instagramHandle: userProfile.instagramHandle || "",
+        gender: userProfile.gender || "",
+        pincode: userProfile.pincode || "",
+        state: userProfile.state || "",
+        district: userProfile.district || "",
+        taluk: userProfile.taluk || "",
+        panchayat: userProfile.panchayat || "",
+        preferredLanguage: userProfile.preferredLanguage || "en",
+      });
+
+      // Check if WhatsApp number is same as phone number
+      if (userProfile.whatsappNumber && userProfile.whatsappNumber === phoneNumber) {
+        setIsWhatsAppSame(true);
+      } else if (userProfile.whatsappNumber && userProfile.whatsappNumber !== phoneNumber) {
+        setIsWhatsAppSame(false);
+      }
+
+      // Assume address is verified if pincode exists in profile
+      setAddressVerified(!!userProfile.pincode);
     }
-  }, [user, router, lang]);
+  }, [userProfile, phoneNumber]);
+
+  // Handle auth state and redirects
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/${lang}/login`);
+    }
+  }, [user, userProfile, loading, router, lang]);
+
+  const handleInputChange = (field: keyof FormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setError("");
+    setSuccess("");
+
+    if (field === "pincode") {
+      setAddressVerified(false);
+      if (value.length < 6) {
+        setFormData((prev) => ({
+          ...prev,
+          district: "",
+          state: "",
+          taluk: "",
+          panchayat: ""
+        }));
+      }
+    }
+  };
+
+  const handleWhatsAppSameChange = (checked: boolean) => {
+    setIsWhatsAppSame(checked);
+    if (checked) {
+      setFormData(prev => ({ ...prev, whatsappNumber: phoneNumber }));
+    } else {
+      setFormData(prev => ({ ...prev, whatsappNumber: "" }));
+    }
+  };
+
+  const toggleEdit = (section: keyof EditState) => {
+    setEditState(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+    setError("");
+    setSuccess("");
+  };
+
+  const handlePincodeBlur = async () => {
+    if (formData.pincode.length === 6) {
+      setPincodeLoading(true);
+      setError("");
+      try {
+        const addressData = await pincodeService.getAddressByPincode(formData.pincode);
+        if (addressData) {
+          setFormData((prev) => ({
+            ...prev,
+            district: addressData.district,
+            state: addressData.state,
+            taluk: addressData.taluk || prev.taluk,
+            panchayat: addressData.taluk || prev.panchayat,
+          }));
+          setAddressVerified(true);
+        }
+      } catch (err: any) {
+        setError(err.message || "Invalid pincode. Please check and try again.");
+        setAddressVerified(false);
+      } finally {
+        setPincodeLoading(false);
+      }
+    }
+  };
+
+  const handleProfilePhotoUpload = async (file: File) => {
+    if (!user) return;
+
+    setUploading(true);
+    try {
+      const downloadURL = await uploadFile(
+        file,
+        `profilePhotos/${user.uid}/profile_photo`,
+        (progress) => setUploadProgress(prev => ({ ...prev, profile: progress }))
+      );
+
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        profilePhotoURL: downloadURL,
+        updatedAt: new Date().toISOString()
+      });
+
+      setSuccess("Profile photo updated successfully!");
+    } catch (error) {
+      console.error("Error uploading profile photo:", error);
+      setError("Failed to upload profile photo. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSave = async (section: keyof EditState) => {
+    if (!user) return;
+
+    // Validation based on section
+    if (section === 'basicProfile') {
+      if (!formData.firstName.trim()) {
+        setError("Please enter your first name");
+        return;
+      }
+      if (!formData.lastName.trim()) {
+        setError("Please enter your last name");
+        return;
+      }
+      if (!formData.whatsappNumber.trim()) {
+        setError("Please enter your WhatsApp number");
+        return;
+      }
+      if (!formData.dob) {
+        setError("Please enter your date of birth");
+        return;
+      }
+      if (!formData.gender) {
+        setError("Please select your gender");
+        return;
+      }
+    }
+
+    if (section === 'addressDetails' && formData.pincode.length === 6 && !addressVerified) {
+      setError("Please verify your address by entering a valid pincode");
+      return;
+    }
+
+    if (section === 'identityVerification') {
+      // Ensure both Aadhaar photos are uploaded if one is
+      if ((formData.aadhaarFront && !formData.aadhaarBack) || (!formData.aadhaarFront && formData.aadhaarBack)) {
+        setError("Please upload both front and back sides of Aadhaar card");
+        return;
+      }
+    }
+
+    setFormLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const userRef = doc(db, "users", user.uid);
+      let updateData: any = {};
+
+      switch (section) {
+        case 'basicProfile':
+          updateData = {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            whatsappNumber: formData.whatsappNumber,
+            dob: formData.dob,
+            gender: formData.gender,
+            preferredLanguage: formData.preferredLanguage,
+          };
+          break;
+        case 'addressDetails':
+          updateData = {
+            pincode: formData.pincode,
+            district: formData.district,
+            state: formData.state,
+            taluk: formData.taluk,
+            panchayat: formData.panchayat,
+          };
+          break;
+        case 'otherDetails':
+          updateData = {
+            instagramHandle: formData.instagramHandle,
+          };
+          break;
+        case 'identityVerification':
+          if (formData.aadhaarFront) {
+            updateData.aadhaarFrontURL = await uploadFile(
+              formData.aadhaarFront,
+              `aadhaar/${user.uid}/front_${Date.now()}`,
+              (progress) => setUploadProgress(prev => ({ ...prev, aadhaarFront: progress }))
+            );
+          }
+          if (formData.aadhaarBack) {
+            updateData.aadhaarBackURL = await uploadFile(
+              formData.aadhaarBack,
+              `aadhaar/${user.uid}/back_${Date.now()}`,
+              (progress) => setUploadProgress(prev => ({ ...prev, aadhaarBack: progress }))
+            );
+          }
+          break;
+      }
+
+      await updateDoc(userRef, {
+        ...updateData,
+        updatedAt: new Date().toISOString(),
+      });
+
+      toggleEdit(section);
+      setSuccess("Profile updated successfully!");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      setError("Failed to update profile. Please try again.");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push(`/${lang}/login`);
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
+
+  const handleCompleteProfile = () => {
+    router.push(`/${lang}/complete-profile`);
+  };
+
+  // Check if profile is complete
+  const isProfileComplete = userProfile?.isProfileComplete || false;
+  const hasAddress = userProfile?.pincode && userProfile?.state && userProfile?.district;
+  const hasAadhaar = userProfile?.aadhaarFrontURL && userProfile?.aadhaarBackURL;
+  console.log(userProfile);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#CE4520]" />
+      </div>
+    );
+  }
 
   if (!user || !userProfile) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 safe-area-inset-top safe-area-inset-bottom">
-      <div className="bg-white rounded-2xl shadow-lg p-6 elevation-2 w-full max-w-md">
-        <div className="flex justify-end mb-4">
-          <ThemeToggle />
+    <div className="min-h-screen bg-isha">
+      <div className="max-w-4xl mx-auto p-4 py-8 bg-isha">
+        {/* Header with Back and Logout buttons */}
+        <div className="mb-6 flex justify-between">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center space-x-2 text-gray-600 hover:text-[#CE4520] transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-fira">Back</span>
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="font-fira">Logout</span>
+          </button>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 font-roboto mb-4">
-          {t("edit_profile")}
-        </h2>
-        <p className="text-gray-600 font-roboto mb-6">
-          {t("profile_description")}
-        </p>
-        <p className="text-gray-600 font-roboto mb-4">
-          Role: {userProfile.role || "player"}
-        </p>
-        <Button
-          onClick={() => router.push(`/${lang}/auth/logout`)}
-          className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-medium ripple"
-          variant="large"
-          aria-label={t("logout")}
-        >
-          {t("logout")}
-        </Button>
+
+        {/* Profile Header */}
+        <div className="text-center mb-8">
+          <div className="mb-4">
+            <Image
+              src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg"
+              alt="Isha Logo"
+              width={63}
+              height={63}
+              className="mx-auto"
+            />
+          </div>
+          <h1 className="text-3xl font-semibold font-fira flex items-center justify-center space-x-2">
+            <User className="w-8 h-8" />
+            <span>Profile</span>
+          </h1>
+        </div>
+
+        {/* Complete Profile Button - Show if profile is not complete */}
+        {!isProfileComplete && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+              <div className="flex items-center space-x-2">
+                <UserCheck className="w-5 h-5 text-yellow-600" />
+                <p className="text-yellow-800 font-fira">Your profile is incomplete</p>
+              </div>
+              <button
+                onClick={handleCompleteProfile}
+                className="bg-[#CE4520] sm:w-sm text-white px-4 py-2 rounded-lg hover:bg-[#1565C0] font-fira transition-colors"
+              >
+                Complete Profile
+              </button>
+            </div>
+
+          </div>
+        )}
+
+        {/* Success/Error Messages */}
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <p className="text-green-600 text-sm font-fira">{success}</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-red-600 text-sm font-fira">{error}</p>
+          </div>
+        )}
+
+        {/* Profile Picture Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="text-center">
+            <div className="flex flex-col items-center">
+              <div className="relative mb-4">
+                {formData.profilePhoto ? (
+                  <img
+                    src={URL.createObjectURL(formData.profilePhoto)}
+                    alt="Profile Preview"
+                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+                  />
+                ) : userProfile?.profilePhotoURL ? (
+                  <img
+                    src={userProfile.profilePhotoURL}
+                    alt="Profile"
+                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
+                    <User className="w-12 h-12 text-gray-400" />
+                  </div>
+                )}
+              </div>
+
+              <label className="bg-[#CE4520] text-white px-6 py-2 rounded-lg cursor-pointer hover:bg-[#1565C0] transition-colors font-fira">
+                {uploading ? (
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Uploading...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <Camera className="w-4 h-4" />
+                    <span>Change Profile Pic</span>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      // Validate file size (max 5MB)
+                      if (file.size > 5 * 1024 * 1024) {
+                        setError("File size must be less than 5MB");
+                        return;
+                      }
+                      // Validate file type
+                      if (!file.type.startsWith('image/')) {
+                        setError("Please select a valid image file");
+                        return;
+                      }
+                      handleProfilePhotoUpload(file);
+                    }
+                  }}
+                />
+              </label>
+
+              {uploadProgress.profile > 0 && uploadProgress.profile < 100 && (
+                <div className="w-full mt-2">
+                  <div className="bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-[#CE4520] h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress.profile}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{uploadProgress.profile}% uploaded</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Basic Profile Details */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold font-fira">Personal Details</h3>
+            <button
+              onClick={() => toggleEdit('basicProfile')}
+              className="text-[#CE4520] hover:text-[#1565C0] font-fira text-sm transition-colors"
+            >
+              {editState.basicProfile ? 'Close' : 'Edit'}
+            </button>
+          </div>
+          <hr className="mb-6" />
+
+          {!editState.basicProfile ? (
+            /* View Mode */
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-1 font-fira">First Name</div>
+                <div className="text-gray-900 font-fira">{formData.firstName || 'Not Available'}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Last Name</div>
+                <div className="text-gray-900 font-fira">{formData.lastName || 'Not Available'}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Phone Number</div>
+                <div className="text-gray-900 font-fira">+91 {phoneNumber || 'Not Available'}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-1 font-fira">WhatsApp Number</div>
+                <div className="text-gray-900 font-fira">+91 {formData.whatsappNumber || 'Not Available'}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Date of Birth</div>
+                <div className="text-gray-900 font-fira">{formData.dob || 'Not Available'}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Gender</div>
+                <div className="text-gray-900 font-fira">
+                  {formData.gender === 'M' ? 'Male' : formData.gender === 'F' ? 'Female' : formData.gender === 'O' ? 'Others' : 'Not Available'}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Preferred Language</div>
+                <div className="text-gray-900 font-fira">
+                  {languages.find(lang => lang.code === formData.preferredLanguage)?.name || 'Not Available'}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Role</div>
+                <div className="text-gray-900 font-fira">{userProfile.role || "player"}</div>
+              </div>
+            </div>
+          ) : (
+            /* Edit Mode */
+            <div className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                    placeholder="Enter your first name"
+                    value={formData.firstName}
+                    onChange={(e) => handleInputChange('firstName', e.target.value)}
+                    pattern="^(?=.*[A-Za-z])[A-Za-z\s.\-]{1,50}$"
+                    maxLength={50}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                    Last Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                    placeholder="Enter your last name"
+                    value={formData.lastName}
+                    onChange={(e) => handleInputChange('lastName', e.target.value)}
+                    pattern="^(?=.*[A-Za-z])[A-Za-z\s.\-]{1,50}$"
+                    maxLength={50}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                    Phone Number
+                  </label>
+                  <div className="flex">
+                    <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-3">
+                      <span className="text-sm font-fira">+91</span>
+                    </div>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-r-lg bg-gray-50 font-fira"
+                      value={phoneNumber}
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                    WhatsApp Number <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="isWhatsAppSame"
+                        className="mr-2 form-checkbox text-[#CE4520] focus:ring-[#CE4520]"
+                        checked={isWhatsAppSame}
+                        onChange={(e) => handleWhatsAppSameChange(e.target.checked)}
+                      />
+                      <label htmlFor="isWhatsAppSame" className="text-sm font-fira">
+                        My WhatsApp number is the same as my phone number
+                      </label>
+                    </div>
+                    {isWhatsAppSame ? (
+                      <div className="flex">
+                        <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-3">
+                          <span className="text-sm font-fira">+91</span>
+                        </div>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-r-lg bg-gray-50 font-fira"
+                          value={phoneNumber}
+                          readOnly
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex">
+                        <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-3">
+                          <span className="text-sm font-fira">+91</span>
+                        </div>
+                        <input
+                          type="tel"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                          placeholder="Enter WhatsApp number"
+                          value={formData.whatsappNumber}
+                          onChange={(e) => handleInputChange('whatsappNumber', e.target.value.replace(/\D/g, ''))}
+                          maxLength={10}
+                          minLength={10}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                    value={formData.dob}
+                    onChange={(e) => handleInputChange('dob', e.target.value)}
+                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 14)).toISOString().split('T')[0]}
+                    min="1875-01-01"
+                  />
+                  <small className="text-gray-500 text-xs font-fira">Minimum age for a player is 14.</small>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                    Gender <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                    value={formData.gender}
+                    onChange={(e) => handleInputChange('gender', e.target.value)}
+                  >
+                    <option value="" disabled>Select Gender</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                    <option value="O">Others</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                    Preferred Language
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                    value={formData.preferredLanguage}
+                    onChange={(e) => handleInputChange('preferredLanguage', e.target.value)}
+                  >
+                    {languages.map(lang => (
+                      <option key={lang.code} value={lang.code}>{lang.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => toggleEdit('basicProfile')}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-fira transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleSave('basicProfile')}
+                  disabled={formLoading}
+                  className="px-4 py-2 bg-[#CE4520] text-white rounded-lg hover:bg-[#1565C0] font-fira transition-colors disabled:opacity-50"
+                >
+                  {formLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving...</span>
+                    </div>
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Address Details */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold font-fira">Address Details</h3>
+            <button
+              onClick={() => toggleEdit('addressDetails')}
+              className="text-[#CE4520] hover:text-[#1565C0] font-fira text-sm transition-colors"
+            >
+              {editState.addressDetails ? 'Close' : hasAddress ? 'Edit' : 'Add'}
+            </button>
+          </div>
+          <hr className="mb-6" />
+
+          {!editState.addressDetails ? (
+            /* View Mode */
+            hasAddress ? (
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Pincode</div>
+                  <div className="text-gray-900 font-fira">{formData.pincode || 'Not Available'}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-1 font-fira">State</div>
+                  <div className="text-gray-900 font-fira">{formData.state || 'Not Available'}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-1 font-fira">District</div>
+                  <div className="text-gray-900 font-fira">{formData.district || 'Not Available'}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Taluk</div>
+                  <div className="text-gray-900 font-fira">{formData.taluk || 'Not Available'}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Panchayat</div>
+                  <div className="text-gray-900 font-fira">{formData.panchayat || 'Not Available'}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 font-fira mb-4">No address information added yet</p>
+                <button
+                  onClick={() => toggleEdit('addressDetails')}
+                  className="flex items-center space-x-2 bg-[#CE4520] text-white px-4 py-2 rounded-lg hover:bg-[#1565C0] font-fira transition-colors mx-auto"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Address</span>
+                </button>
+              </div>
+            )
+          ) : (
+            /* Edit Mode */
+            <div className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                    Pincode
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira pr-10"
+                      placeholder="Enter 6-digit pincode"
+                      value={formData.pincode}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        handleInputChange('pincode', value);
+                      }}
+                      onBlur={handlePincodeBlur}
+                    />
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      {pincodeLoading && <Loader2 className="w-4 h-4 animate-spin text-[#CE4520]" />}
+                      {addressVerified && <Check className="w-4 h-4 text-green-500" />}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">State</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-fira"
+                    placeholder="Auto-filled from pincode"
+                    value={formData.state}
+                    readOnly
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">District</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-fira"
+                    placeholder="Auto-filled from pincode"
+                    value={formData.district}
+                    readOnly
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">Taluk</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-fira"
+                    placeholder="Auto-filled from pincode"
+                    value={formData.taluk}
+                    readOnly
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">Panchayat</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-fira"
+                    placeholder="Auto-filled from pincode"
+                    value={formData.panchayat}
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              {/* Address verification status */}
+              {addressVerified && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="w-4 h-4 text-green-600" />
+                    <p className="text-green-600 text-sm font-fira">Address verified successfully</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => toggleEdit('addressDetails')}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-fira transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleSave('addressDetails')}
+                  disabled={formLoading || (formData.pincode.length === 6 && !addressVerified)}
+                  className="px-4 py-2 bg-[#CE4520] text-white rounded-lg hover:bg-[#1565C0] font-fira transition-colors disabled:opacity-50"
+                >
+                  {formLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving...</span>
+                    </div>
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Identity Verification Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold font-fira">Identity Verification</h3>
+            <button
+              onClick={() => toggleEdit('identityVerification')}
+              className="text-[#CE4520] hover:text-[#1565C0] font-fira text-sm transition-colors"
+            >
+              {editState.identityVerification ? 'Close' : hasAadhaar ? 'Edit' : 'Add'}
+            </button>
+          </div>
+          <hr className="mb-6" />
+
+          {!editState.identityVerification ? (
+            hasAadhaar ? (
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <p className="text-gray-600 font-fira font-medium mb-2">Aadhaar Card (Front):</p>
+                  <div className="mt-2">
+                    <img
+                      src={userProfile.aadhaarFrontURL}
+                      alt="Aadhaar Front"
+                      className="w-full max-w-sm h-auto rounded-lg object-cover border shadow-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-fira font-medium mb-2">Aadhaar Card (Back):</p>
+                  <div className="mt-2">
+                    <img
+                      src={userProfile.aadhaarBackURL}
+                      alt="Aadhaar Back"
+                      className="w-full max-w-sm h-auto rounded-lg object-cover border shadow-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 font-fira mb-4">No identity verification documents added yet</p>
+                <button
+                  onClick={() => toggleEdit('identityVerification')}
+                  className="flex items-center space-x-2 bg-[#CE4520] text-white px-4 py-2 rounded-lg hover:bg-[#1565C0] font-fira transition-colors mx-auto"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Aadhaar</span>
+                </button>
+              </div>
+            )
+          ) : (
+            /* Edit Mode */
+            <div className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                    Aadhaar Card (Front)
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                    {formData.aadhaarFront ? (
+                      <div className="space-y-2">
+                        <img
+                          src={URL.createObjectURL(formData.aadhaarFront)}
+                          alt="Aadhaar Front"
+                          className="w-full h-32 object-cover rounded"
+                        />
+                        <p className="text-sm text-green-600 font-fira">✓ Uploaded</p>
+                        {uploadProgress.aadhaarFront > 0 && uploadProgress.aadhaarFront < 100 && (
+                          <div className="w-full">
+                            <div className="bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-[#CE4520] h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress.aadhaarFront}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">{uploadProgress.aadhaarFront}% uploaded</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : userProfile?.aadhaarFrontURL ? (
+                      <div className="space-y-2">
+                        <img
+                          src={userProfile.aadhaarFrontURL}
+                          alt="Current Aadhaar Front"
+                          className="w-full h-32 object-cover rounded"
+                        />
+                        <p className="text-sm text-green-600 font-fira">✓ Already uploaded</p>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer">
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 font-fira">Click to upload front side</p>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setFormData(prev => ({ ...prev, aadhaarFront: file }));
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                    Aadhaar Card (Back)
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                    {formData.aadhaarBack ? (
+                      <div className="space-y-2">
+                        <img
+                          src={URL.createObjectURL(formData.aadhaarBack)}
+                          alt="Aadhaar Back"
+                          className="w-full h-32 object-cover rounded"
+                        />
+                        <p className="text-sm text-green-600 font-fira">✓ Uploaded</p>
+                        {uploadProgress.aadhaarBack > 0 && uploadProgress.aadhaarBack < 100 && (
+                          <div className="w-full">
+                            <div className="bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-[#CE4520] h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress.aadhaarBack}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">{uploadProgress.aadhaarBack}% uploaded</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : userProfile?.aadhaarBackURL ? (
+                      <div className="space-y-2">
+                        <img
+                          src={userProfile.aadhaarBackURL}
+                          alt="Current Aadhaar Back"
+                          className="w-full h-32 object-cover rounded"
+                        />
+                        <p className="text-sm text-green-600 font-fira">✓ Already uploaded</p>
+                      </div>
+                    ) : (
+                      <label className="cursor-pointer">
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 font-fira">Click to upload back side</p>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setFormData(prev => ({ ...prev, aadhaarBack: file }));
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 font-fira">
+                Note: If you upload one side of Aadhaar, both sides are required. This is optional but recommended for verification.
+              </p>
+
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => toggleEdit('identityVerification')}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-fira transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleSave('identityVerification')}
+                  disabled={formLoading}
+                  className="px-4 py-2 bg-[#CE4520] text-white rounded-lg hover:bg-[#1565C0] font-fira transition-colors disabled:opacity-50"
+                >
+                  {formLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving...</span>
+                    </div>
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Other Information */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold font-fira">Other Information</h3>
+            <button
+              onClick={() => toggleEdit('otherDetails')}
+              className="text-[#CE4520] hover:text-[#1565C0] font-fira text-sm transition-colors"
+            >
+              {editState.otherDetails ? 'Close' : 'Edit'}
+            </button>
+          </div>
+          <hr className="mb-6" />
+
+          {!editState.otherDetails ? (
+            /* View Mode */
+            <div>
+              <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Instagram Handle</div>
+              <div className="text-gray-900 font-fira">{formData.instagramHandle || 'Not Available'}</div>
+            </div>
+          ) : (
+            /* Edit Mode */
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+                  Instagram Handle
+                </label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                  placeholder="@username (optional)"
+                  value={formData.instagramHandle}
+                  onChange={(e) => handleInputChange('instagramHandle', e.target.value)}
+                />
+              </div>
+
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => toggleEdit('otherDetails')}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-fira transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleSave('otherDetails')}
+                  disabled={formLoading}
+                  className="px-4 py-2 bg-[#CE4520] text-white rounded-lg hover:bg-[#1565C0] font-fira transition-colors disabled:opacity-50"
+                >
+                  {formLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving...</span>
+                    </div>
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+ 
+
+        {/* Footer */}
+        <div className="mt-12">
+          <Image
+            src="/images/placeholders/footer-mural.png"
+            alt="Footer Mural"
+            width={1200}
+            height={400}
+            className="w-full h-auto rounded-lg"
+          />
+        </div>
       </div>
     </div>
   );

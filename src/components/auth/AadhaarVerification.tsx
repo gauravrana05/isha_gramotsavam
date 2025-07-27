@@ -38,7 +38,7 @@ export const AadhaarVerification: React.FC = () => {
         <Button
           onClick={() => window.location.href = "/dashboard"}
           className="w-full bg-green-600 hover:bg-green-700 text-white py-3 text-lg font-medium ripple"
-          size="large"
+          variant="large"
           aria-label="Go to dashboard"
         >
           Go to Dashboard
@@ -52,7 +52,7 @@ export const AadhaarVerification: React.FC = () => {
           <Button
             onClick={() => window.location.href = "/profile/edit"}
             className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-medium ripple"
-            size="large"
+            variant="large"
             aria-label="Edit profile"
           >
             Edit Profile

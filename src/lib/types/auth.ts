@@ -22,11 +22,17 @@ export interface UserProfile {
   role: UserRole;
   assignedVenues: string[]; // Array of venueIds for volunteers
   name: string;
-  profilePhotoUrl: string;
+  firstName: string;
+  lastName: string;
+  gender: string;
+  dob: string;
+  instagramHandle: string;
+  whatsappNumber: string;
+  profilePhotoURL: string;
   aadhaarStatus: AadhaarStatus;
   // Updated to potentially store URLs for both front and back
-  aadhaarFrontImageUrl?: string; 
-  aadhaarBackImageUrl?: string;  
+  aadhaarFrontURL?: string; 
+  aadhaarBackURL?: string;  
   preferredLanguage: SupportedLanguage;
   isProfileComplete: boolean;
   

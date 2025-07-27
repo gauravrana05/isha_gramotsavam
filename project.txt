@@ -1,4 +1,3 @@
-src:
 app
 components
 context
@@ -7,18 +6,17 @@ lib
 styles
 
 src/app:
+[lang]
 error.tsx
 favicon.ico
-globals.css
-[lang]
 layout.tsx
 loading.tsx
 not-found.tsx
 page.tsx
 
 src/app/[lang]:
-admin
 (auth)
+admin
 captain
 guest
 layout.tsx
@@ -28,6 +26,17 @@ player
 profile
 public
 volunteer
+
+src/app/[lang]/(auth):
+complete-profile
+layout.tsx
+login
+
+src/app/[lang]/(auth)/complete-profile:
+page.tsx
+
+src/app/[lang]/(auth)/login:
+page.tsx
 
 src/app/[lang]/admin:
 analytics
@@ -70,11 +79,8 @@ src/app/[lang]/admin/dashboard:
 page.tsx
 
 src/app/[lang]/admin/events:
-create
 [eventId]
-page.tsx
-
-src/app/[lang]/admin/events/create:
+create
 page.tsx
 
 src/app/[lang]/admin/events/[eventId]:
@@ -88,12 +94,12 @@ page.tsx
 src/app/[lang]/admin/events/[eventId]/sports-config:
 page.tsx
 
-src/app/[lang]/admin/fixtures:
-create
-[fixtureId]
+src/app/[lang]/admin/events/create:
 page.tsx
 
-src/app/[lang]/admin/fixtures/create:
+src/app/[lang]/admin/fixtures:
+[fixtureId]
+create
 page.tsx
 
 src/app/[lang]/admin/fixtures/[fixtureId]:
@@ -101,6 +107,9 @@ draw
 page.tsx
 
 src/app/[lang]/admin/fixtures/[fixtureId]/draw:
+page.tsx
+
+src/app/[lang]/admin/fixtures/create:
 page.tsx
 
 src/app/[lang]/admin/matches:
@@ -130,15 +139,15 @@ src/app/[lang]/admin/media/moderation:
 page.tsx
 
 src/app/[lang]/admin/notifications:
-create
 [notificationId]
+create
 page.tsx
 templates
 
-src/app/[lang]/admin/notifications/create:
+src/app/[lang]/admin/notifications/[notificationId]:
 page.tsx
 
-src/app/[lang]/admin/notifications/[notificationId]:
+src/app/[lang]/admin/notifications/create:
 page.tsx
 
 src/app/[lang]/admin/notifications/templates:
@@ -160,8 +169,8 @@ src/app/[lang]/admin/system/config:
 page.tsx
 
 src/app/[lang]/admin/teams:
-page.tsx
 [teamId]
+page.tsx
 verification
 
 src/app/[lang]/admin/teams/[teamId]:
@@ -171,8 +180,8 @@ src/app/[lang]/admin/teams/verification:
 page.tsx
 
 src/app/[lang]/admin/users:
-page.tsx
 [userId]
+page.tsx
 verification
 volunteers
 
@@ -194,11 +203,8 @@ src/app/[lang]/admin/users/volunteers/assign-venues:
 page.tsx
 
 src/app/[lang]/admin/venues:
-create
-page.tsx
 [venueId]
-
-src/app/[lang]/admin/venues/create:
+create
 page.tsx
 
 src/app/[lang]/admin/venues/[venueId]:
@@ -212,19 +218,7 @@ page.tsx
 src/app/[lang]/admin/venues/[venueId]/schedule:
 page.tsx
 
-src/app/[lang]/(auth):
-complete-profile
-layout.tsx
-login
-verify-phone
-
-src/app/[lang]/(auth)/complete-profile:
-page.tsx
-
-src/app/[lang]/(auth)/login:
-page.tsx
-
-src/app/[lang]/(auth)/verify-phone:
+src/app/[lang]/admin/venues/create:
 page.tsx
 
 src/app/[lang]/captain:
@@ -240,11 +234,8 @@ src/app/[lang]/captain/fixtures:
 page.tsx
 
 src/app/[lang]/captain/teams:
-create
-page.tsx
 [teamId]
-
-src/app/[lang]/captain/teams/create:
+create
 page.tsx
 
 src/app/[lang]/captain/teams/[teamId]:
@@ -264,6 +255,9 @@ src/app/[lang]/captain/teams/[teamId]/players/invite:
 page.tsx
 
 src/app/[lang]/captain/teams/[teamId]/verification:
+page.tsx
+
+src/app/[lang]/captain/teams/create:
 page.tsx
 
 src/app/[lang]/guest:
@@ -314,11 +308,8 @@ src/app/[lang]/player/profile/edit:
 page.tsx
 
 src/app/[lang]/player/teams:
-join
-page.tsx
 [teamId]
-
-src/app/[lang]/player/teams/join:
+join
 page.tsx
 
 src/app/[lang]/player/teams/[teamId]:
@@ -328,6 +319,9 @@ page.tsx
 src/app/[lang]/player/teams/[teamId]/members:
 page.tsx
 
+src/app/[lang]/player/teams/join:
+page.tsx
+
 src/app/[lang]/profile:
 page.tsx
 
@@ -335,6 +329,7 @@ src/app/[lang]/public:
 events
 layout.tsx
 page.tsx
+sports
 
 src/app/[lang]/public/events:
 [eventId]
@@ -367,6 +362,9 @@ page.tsx
 src/app/[lang]/public/events/[eventId]/venues:
 page.tsx
 
+src/app/[lang]/public/sports:
+page.tsx
+
 src/app/[lang]/volunteer:
 dashboard
 layout.tsx
@@ -380,8 +378,8 @@ src/app/[lang]/volunteer/reports:
 page.tsx
 
 src/app/[lang]/volunteer/venues:
-page.tsx
 [venueId]
+page.tsx
 
 src/app/[lang]/volunteer/venues/[venueId]:
 fixtures
@@ -416,8 +414,8 @@ src/app/[lang]/volunteer/venues/[venueId]/media/upload:
 page.tsx
 
 src/app/[lang]/volunteer/venues/[venueId]/teams:
-page.tsx
 [teamId]
+page.tsx
 
 src/app/[lang]/volunteer/venues/[venueId]/teams/[teamId]:
 check-in
@@ -436,6 +434,7 @@ forms
 matches
 media
 notifications
+public
 system
 teams
 ui
@@ -528,6 +527,21 @@ NotificationItem.tsx
 NotificationSettings.tsx
 NotificationTemplates.tsx
 
+src/components/public:
+AwardsRecognition.tsx
+CelebrityTestimonials.tsx
+CulturalEvents.tsx
+FAQSection.tsx
+GallerySection.tsx
+HeroSection.tsx
+ImpactSection.tsx
+KeyComponents.tsx
+QuoteSection.tsx
+SportsPreview.tsx
+TransformationStories.tsx
+VideoSection.tsx
+VisionSection.tsx
+
 src/components/system:
 AuditLog.tsx
 ClientProviders.tsx
@@ -551,8 +565,11 @@ Badge.tsx
 BottomNavigation.tsx
 Button.tsx
 Card.tsx
+Carousel.tsx
+Container.tsx
 DataTable.tsx
 DateTimePicker.tsx
+DecorativeElement.tsx
 FloatingActionButton.tsx
 ImageUpload.tsx
 index.ts
@@ -561,8 +578,13 @@ LoadingSpinner.tsx
 Modal.tsx
 QRScanner.tsx
 SearchFilter.tsx
+SectionDivider.tsx
 Select.tsx
+SportCard.tsx
+StatCard.tsx
+StoryCard.tsx
 Tabs.tsx
+TestimonialCard.tsx
 
 src/components/users:
 UserCard.tsx
@@ -691,6 +713,7 @@ systemConfig.ts
 teams.ts
 users.ts
 venues.ts
+
 
 src/lib/utils:
 addressValidation.ts
