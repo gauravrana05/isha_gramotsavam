@@ -26,7 +26,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Isha Gramotsavam" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2, user-scalable=yes" />
       </head>
-      <body className={`min-h-screen font-fira`}>
+      <body className="min-h-screen font-fira">
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
