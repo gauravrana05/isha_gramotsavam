@@ -7,6 +7,7 @@ export type UserRole =
   | 'captain' 
   | 'volunteer_general' 
   | 'volunteer_technical' 
+  | 'verification_volunteer'
   | 'admin' 
   | 'guest' 
   | 'public';
@@ -35,6 +36,7 @@ export interface UserProfile {
   aadhaarBackURL?: string;  
   preferredLanguage: SupportedLanguage;
   isProfileComplete: boolean;
+  isVerified?: boolean;
   
   // Address information
   village: string;

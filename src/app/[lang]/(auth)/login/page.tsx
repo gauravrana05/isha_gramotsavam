@@ -278,7 +278,7 @@ export default function LoginPage() {
           </div>
         </div>
         <div className="mb-6 text-center"><div className="font-fira text-3xl font-semibold ">Namaskaram</div>
-          <div className="font-fira pt-4 font-small text-sm">We'll check if you have an account, and help create one if you don't.</div></div>
+          <div className="font-fira pt-4 font-small text-sm">We&apos;ll check if you have an account, and help create one if you don&apos;t.</div></div>
 
         <div className="space-y-4">
           <Input

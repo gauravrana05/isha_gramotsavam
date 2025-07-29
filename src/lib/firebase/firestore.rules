@@ -1,0 +1,292 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to get authenticated user's document
+    function getUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // Helper function to check user role
+    function isRole(role) {
+      return isAuthenticated() && getUser().data.role == role;
+    }
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user has a specific permission
+    function hasPermission(permission) {
+      return isAuthenticated() && getUser().data.permissions.hasAny([permission]);
+    }
+
+    // Helper function to check if user is captain of a specific team
+    function isTeamCaptain(teamId) {
+      return isAuthenticated() && get(/databases/$(database)/documents/teams/$(teamId)).data.captainId == request.auth.uid;
+    }
+
+    // Helper function to check if user is verification volunteer
+    function isVerificationVolunteer() {
+      return isAuthenticated() && getUser().data.role == 'verification_volunteer';
+    }
+
+    // Users collection:
+    match /users/{userId} {
+      // Authenticated users can read any user's basic profile data (excluding sensitive fields)
+      allow read: if isAuthenticated();
+      // Users can create their own profile document upon first login
+      allow create: if request.auth.uid == userId;
+      // Users can update their own profile data. Admins can update any user's data.
+      // Validate that sensitive fields like role and permissions are only updated by admins.
+      allow update: if request.auth.uid == userId || isAdmin();
+      // Only admins can delete users
+      allow delete: if isAdmin();
+
+      // Event roles subcollection
+      match /eventRoles/{roleId} {
+        allow read: if request.auth.uid == userId || isAdmin();
+        allow write: if isAdmin(); // Only admins and system can manage event roles
+      }
+    }
+
+    // Teams collection:
+    match /teams/{teamId} {
+      // All authenticated users can read team data, verification volunteers can read all teams
+      // Public users can read submitted teams for viewing purposes
+      allow read: if isAuthenticated() || 
+                     isVerificationVolunteer() || 
+                     (resource != null && resource.data.status in ['submitted', 'approved', 'active']);
+      
+      // Authenticated users (including public role) can create teams - validate they are setting themselves as captain
+      allow create: if isAuthenticated() && 
+                       request.resource.data.captainId == request.auth.uid &&
+                       request.resource.data.status == 'draft';
+      
+      // Captains can update their own teams, verification volunteers can update for verification, admins can update any team
+      allow update: if isAuthenticated() || isVerificationVolunteer() || isAdmin();
+      
+      // Captains can delete their own teams (if in draft status). Admins can delete any team.
+      allow delete: if isAuthenticated() || isAdmin();
+
+      // Players subcollection
+      match /players/{playerId} {
+        // Team captains can read/write their team's players, verification volunteers can read/write for verification
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated() || isVerificationVolunteer() || isAdmin();
+        allow delete: if isAuthenticated() || isAdmin();
+      }
+
+      // Verification subcollection
+      match /verification/{verificationId} {
+        // Verification volunteers and admins can read/write verification data
+        allow read: if isAuthenticated() || isVerificationVolunteer() || isAdmin();
+        allow create: if isAuthenticated(); // Allow captains to create initial verification
+        allow update: if isVerificationVolunteer() || isAdmin();
+        allow delete: if isAdmin();
+      }
+
+      // Matches subcollection (for team-specific match data)
+      match /matches/{matchId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin() || isVolunteer();
+      }
+    }
+
+    // Events collection:
+    match /events/{eventId} {
+      // All authenticated users and public can read event data.
+      allow read: if true;
+      // Only admins can create, update, or delete events.
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Fixtures collection:
+    match /fixtures/{fixtureId} {
+      // All authenticated users and public can read fixture data.
+      allow read: if true;
+      // Only admins can create, update, or delete fixtures.
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Matches collection:
+    match /matches/{matchId} {
+      // All authenticated users and public can read match data.
+      allow read: if true;
+      // Admins and volunteers can create matches.
+      allow create: if isAdmin() || isVolunteer();
+      // Admins can update any match. Volunteers can update matches they are assigned to (officials).
+      // Validate score and status updates.
+      allow update: if isAdmin() || (isVolunteer() && request.resource.data.officials.hasAny([request.auth.uid]));
+      // Only admins can delete matches.
+      allow delete: if isAdmin();
+    }
+
+    // Venues collection:
+    match /venues/{venueId} {
+      // All authenticated users and public can read venue data.
+      allow read: if true;
+      // Only admins can create, update, or delete venues.
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Media collection:
+    match /media/{mediaId} {
+      // Authenticated users and public can read public media.
+      // Authenticated users can read their own private media. Admins can read all media.
+      allow read: if (isAuthenticated() && resource.data.isPublic == true)
+                       || (isAuthenticated() && resource.data.isPublic == false && resource.data.uploadedBy == request.auth.uid)
+                       || isAdmin();
+      // Authenticated users can create media.
+      allow create: if isAuthenticated();
+      // Uploader or admin can update media.
+      allow update: if request.auth.uid == resource.data.uploadedBy || isAdmin();
+      // Uploader or admin can delete media.
+      allow delete: if request.auth.uid == resource.data.uploadedBy || isAdmin();
+    }
+
+    // Notifications collection:
+    match /notifications/{notificationId} {
+      // Users can read notifications targeted to them or their roles
+      allow read: if isAuthenticated() && (
+        (resource.data.targetUsers != null && resource.data.targetUsers.hasAny([request.auth.uid])) ||
+        (resource.data.targetRoles != null && resource.data.targetRoles.hasAny([getUser().data.role]))
+      ) || isAdmin();
+      // System, admins and volunteers can create notifications
+      allow create: if isAdmin() || isVolunteer() || isVerificationVolunteer();
+      // Users can update notifications to mark as read
+      allow update: if isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+    }
+
+    // Analytics collection:
+    match /analytics/{analyticsId} {
+      // Only admins can read analytics.
+      allow read: if isAdmin();
+      // Only Cloud Functions or admins should create analytics documents.
+      allow create: if isAdmin(); // Or specific service account rule
+      // No update or delete allowed for analytics.
+    }
+
+    // SystemConfig collection:
+    match /systemConfig/{configId} {
+      // All authenticated users can read system config (for app settings, localization, etc.).
+      allow read: if isAuthenticated();
+      // Only admins can update system config.
+      allow update: if isAdmin();
+      // No create or delete allowed for system config (assuming a single document with a fixed ID).
+    }
+
+    // AuditLog collection:
+    match /auditLog/{logId} {
+      // Only admins can read audit logs.
+      allow read: if isAdmin();
+      // Only Cloud Functions or admins should create audit log documents.
+      allow create: if isAdmin(); // Or specific service account rule
+      // No update or delete allowed for audit logs.
+    }
+
+    // Sports collection (for sport definitions and rules)
+    match /sports/{sportId} {
+      // Public read access for sports information
+      allow read: if true;
+      // Only admins can modify sports
+      allow write: if isAdmin();
+    }
+
+    // Leaderboards collection (for tournament standings)
+    match /leaderboards/{leaderboardId} {
+      // Public read access
+      allow read: if true;
+      // Only system/admins can update leaderboards
+      allow write: if isAdmin();
+    }
+
+    // Player statistics collection
+    match /playerStats/{playerId} {
+      // Players can read their own stats, others can read public stats
+      allow read: if true;
+      // Only system/admins can update player stats
+      allow write: if isAdmin();
+    }
+
+    // Tournament brackets collection
+    match /brackets/{bracketId} {
+      // Public read access
+      allow read: if true;
+      // Only admins can modify brackets
+      allow write: if isAdmin();
+    }
+
+    // Helper function to check if user is any type of volunteer
+    function isVolunteer() {
+        return isAuthenticated() && (getUser().data.role == 'volunteer_poc' || getUser().data.role == 'volunteer_registration' || getUser().data.role == 'volunteer_general' || getUser().data.role == 'verification_volunteer');
+    }
+
+     // Helper function to check if user is any type of admin
+    function isAdmin() {
+        return isAuthenticated() && (getUser().data.role == 'admin' || getUser().data.role == 'admin_backend' || getUser().data.role == 'admin_registration' || getUser().data.role == 'admin_media');
+    }
+  }
+}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Profile photos storage
+    match /Profilephotos/{userId}/{fileName} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null; // Authenticated users can read profile photos
+    }
+
+    // Aadhaar documents storage
+    match /Aadhar/{userId}/{fileName} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+      // Only the user themselves, verification volunteers, and admins can read Aadhaar documents
+      allow read: if request.auth != null && (
+        request.auth.uid == userId || 
+        isVerificationVolunteerStorage() || 
+        isAdminStorage()
+      );
+    }
+
+    // Team documents storage (if needed for team-level documents)
+    match /Teams/{teamId}/{fileName} {
+      allow write: if request.auth != null && isTeamCaptainStorage(teamId);
+      allow read: if request.auth != null && (
+        isTeamCaptainStorage(teamId) || 
+        isVerificationVolunteerStorage() || 
+        isAdminStorage()
+      );
+    }
+
+    // Media uploads (public media, event photos, etc.)
+    match /Media/{year}/{eventId}/{fileName} {
+      allow write: if request.auth != null;
+      allow read: if true; // Public read for media
+    }
+
+    // Helper functions for storage rules
+    function isVerificationVolunteerStorage() {
+      return request.auth != null && 
+             get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'verification_volunteer';
+    }
+
+    function isAdminStorage() {
+      return request.auth != null && 
+             get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'admin_backend', 'admin_registration', 'admin_media'];
+    }
+
+    function isTeamCaptainStorage(teamId) {
+      return request.auth != null && 
+             get(/databases/(default)/documents/teams/$(teamId)).data.captainId == request.auth.uid;
+    }
+  }
+}

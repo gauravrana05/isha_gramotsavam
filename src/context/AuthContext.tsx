@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, onSnapshot, DocumentData } from "firebase/firestore"; // Import DocumentData
+import { doc, onSnapshot, DocumentData } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/config";
 import { UserProfile } from "@/lib/types/auth";
 
@@ -20,46 +20,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    let unsubscribeFromDoc: (() => void) | undefined;
+    let profileCreationTimeout: NodeJS.Timeout | undefined;
+
+
+    const unsubscribeFromAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (unsubscribeFromDoc) {
+        unsubscribeFromDoc();
+      }
+      if (profileCreationTimeout) {
+        clearTimeout(profileCreationTimeout);
+      }
+
       if (firebaseUser) {
+        setUser(firebaseUser);
         const userDocRef = doc(db, "users", firebaseUser.uid);
-        const unsubscribeDoc = onSnapshot(
+        
+        unsubscribeFromDoc = onSnapshot(
           userDocRef,
           (docSnap) => {
-            if (docSnap.exists()) {
-              // Explicitly type the data and merge with uid
-              const userData = docSnap.data() as DocumentData; // Get raw data
-              setUserProfile({ 
-                uid: firebaseUser.uid, 
-                ...userData 
-              } as UserProfile); // Cast to UserProfile
-            } else {
-               // Handle case where user document doesn't exist yet
-               // (e.g., right after sign-up but before profile completion)
-               setUserProfile(null); 
+            // If a timeout was set, clear it because we've received a snapshot
+            if (profileCreationTimeout) {
+              clearTimeout(profileCreationTimeout);
             }
-            setUser(firebaseUser);
-            setLoading(false);
+
+            if (docSnap.exists()) {
+              // The user profile exists, update the state
+              const userData = docSnap.data() as DocumentData;
+              setUserProfile({ uid: firebaseUser.uid, ...userData } as UserProfile);
+              setLoading(false);
+            } else {
+              // The user is new and the profile is being created by the backend trigger.
+              // We'll show a loading state and wait.
+              console.log("New user detected. Waiting for server-side profile creation...");
+              setLoading(true);
+              // Set a timeout to prevent infinite loading if profile creation fails
+              profileCreationTimeout = setTimeout(() => {
+                console.error("Profile creation timed out. User document not found.");
+                setLoading(false);
+                setUserProfile(null);
+              }, 10000); // 10-second timeout
+            }
           },
           (err) => {
-            console.error("Error fetching user profile:", err);
-            // Ensure state is updated even on error
-            setUser(firebaseUser); 
-            setUserProfile(null); 
+            console.error("Error listening to user profile:", err);
+            setUserProfile(null);
             setLoading(false);
           }
         );
-        // Return the doc unsubscribe function correctly
-        return () => unsubscribeDoc(); 
       } else {
+        // User is signed out
         setUser(null);
         setUserProfile(null);
         setLoading(false);
       }
     });
 
-    // Return the auth unsubscribe function
-    return () => unsubscribeAuth(); 
+    // Cleanup subscriptions on component unmount
+    return () => {
+      unsubscribeFromAuth();
+      if (unsubscribeFromDoc) {
+        unsubscribeFromDoc();
+      }
+       if (profileCreationTimeout) {
+        clearTimeout(profileCreationTimeout);
+      }
+    };
   }, []);
 
   return (

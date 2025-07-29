@@ -120,3 +120,4 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
       </div>
     </section>
   )
+}

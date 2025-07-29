@@ -83,7 +83,7 @@ export default function ThrowballPage({ params }: ThrowballPageProps) {
                                 </p>
 
                                 <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                                    <Link href={`/${lang}/public/sports`}>
+                                    <Link href={`/${lang}/public/register/team/throwball`}>
                                         <Button size="large" className="min-w-[200px]">
                                             Register Now
                                         </Button>

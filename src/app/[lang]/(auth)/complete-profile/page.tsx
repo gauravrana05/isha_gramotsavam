@@ -355,13 +355,16 @@ export default function CompleteProfilePage() {
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, profileData);
 
-      const role = userProfile?.role || "player";
+      const role = userProfile?.role || "public";
       switch (role) {
         case "admin":
           router.push(`/${lang}/admin/dashboard`);
           break;
         case "captain":
           router.push(`/${lang}/captain/dashboard`);
+          break;
+        case "player":
+          router.push(`/${lang}/player/dashboard`);
           break;
         case "volunteer_general":
         case "volunteer_technical":
@@ -371,7 +374,7 @@ export default function CompleteProfilePage() {
           router.push(`/${lang}/guest/dashboard`);
           break;
         default:
-          router.push(`/${lang}/player/dashboard`);
+          router.push(`/${lang}/public`);
       }
     } catch (err: any) {
       console.error("Error completing profile:", err);
