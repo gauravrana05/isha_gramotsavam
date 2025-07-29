@@ -91,14 +91,17 @@ export default function ProfilePage() {
   const [success, setSuccess] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [pincodeLoading, setPincodeLoading] = useState(false);
-  const [addressVerified, setAddressVerified] = useState(false);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressCaptured, setAddressCaptured] = useState(false);
   const [isWhatsAppSame, setIsWhatsAppSame] = useState(true);
   const [uploadProgress, setUploadProgress] = useState({
     profile: 0,
     aadhaarFront: 0,
     aadhaarBack: 0,
   });
+  const [districts, setDistricts] = useState<string[]>([]);
+  const [taluks, setTaluks] = useState<string[]>([]);
+  const [panchayats, setPanchayats] = useState<string[]>([]);
 
   const languages = [
     { code: "en", name: "English" },
@@ -110,45 +113,53 @@ export default function ProfilePage() {
     { code: "or", name: "Odia" },
   ];
 
-  // Extract phone number from user (remove country code)
   const phoneNumber = user?.phoneNumber?.replace(/^\+91/, '') || '';
 
-  // Initialize form data with userProfile data when available
   useEffect(() => {
-    if (userProfile) {
-      setFormData({
-        firstName: userProfile.firstName || "",
-        lastName: userProfile.lastName || "",
-        whatsappNumber: userProfile.whatsappNumber || phoneNumber,
-        dob: userProfile.dob || "",
-        instagramHandle: userProfile.instagramHandle || "",
-        gender: userProfile.gender || "",
-        pincode: userProfile.pincode || "",
-        state: userProfile.state || "",
-        district: userProfile.district || "",
-        taluk: userProfile.taluk || "",
-        panchayat: userProfile.panchayat || "",
-        preferredLanguage: userProfile.preferredLanguage || "en",
-      });
+    if (loading || !userProfile) return;
 
-      // Check if WhatsApp number is same as phone number
-      if (userProfile.whatsappNumber && userProfile.whatsappNumber === phoneNumber) {
-        setIsWhatsAppSame(true);
-      } else if (userProfile.whatsappNumber && userProfile.whatsappNumber !== phoneNumber) {
-        setIsWhatsAppSame(false);
-      }
+    setFormData({
+      firstName: userProfile.firstName || "",
+      lastName: userProfile.lastName || "",
+      whatsappNumber: userProfile.whatsappNumber || phoneNumber,
+      dob: userProfile.dob || "",
+      instagramHandle: userProfile.instagramHandle || "",
+      gender: userProfile.gender || "",
+      pincode: userProfile.pincode || "",
+      state: userProfile.state || "",
+      district: userProfile.district || "",
+      taluk: userProfile.taluk || "",
+      panchayat: userProfile.panchayat || "",
+      preferredLanguage: userProfile.preferredLanguage || "en",
+    });
 
-      // Assume address is verified if pincode exists in profile
-      setAddressVerified(!!userProfile.pincode);
+    if (userProfile.whatsappNumber && userProfile.whatsappNumber === phoneNumber) {
+      setIsWhatsAppSame(true);
+    } else if (userProfile.whatsappNumber && userProfile.whatsappNumber !== phoneNumber) {
+      setIsWhatsAppSame(false);
     }
-  }, [userProfile, phoneNumber]);
 
-  // Handle auth state and redirects
+    if (userProfile.state && userProfile.district && userProfile.taluk && userProfile.panchayat) {
+      setAddressCaptured(true);
+      if (userProfile.state) {
+        fetchDistricts(userProfile.state).then(() => {
+          if (userProfile.district) {
+            fetchTaluks(userProfile.state, userProfile.district).then(() => {
+              if (userProfile.taluk) {
+                fetchPanchayats(userProfile.state, userProfile.district, userProfile.taluk);
+              }
+            });
+          }
+        });
+      }
+    }
+  }, [userProfile, phoneNumber, loading]);
+
   useEffect(() => {
     if (!loading && !user) {
       router.push(`/${lang}/login`);
     }
-  }, [user, userProfile, loading, router, lang]);
+  }, [user, loading, router, lang]);
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -156,16 +167,55 @@ export default function ProfilePage() {
     setSuccess("");
 
     if (field === "pincode") {
-      setAddressVerified(false);
-      if (value.length < 6) {
-        setFormData((prev) => ({
-          ...prev,
-          district: "",
-          state: "",
-          taluk: "",
-          panchayat: ""
-        }));
+      setAddressCaptured(false);
+      setDistricts([]);
+      setTaluks([]);
+      setPanchayats([]);
+      setFormData((prev) => ({
+        ...prev,
+        state: "",
+        district: "",
+        taluk: "",
+        panchayat: ""
+      }));
+      if (value.length === 6) {
+        fetchState(value);
       }
+    } else if (field === "state") {
+      setDistricts([]);
+      setTaluks([]);
+      setPanchayats([]);
+      setFormData((prev) => ({
+        ...prev,
+        district: "",
+        taluk: "",
+        panchayat: ""
+      }));
+      if (value) {
+        fetchDistricts(value);
+      }
+    } else if (field === "district") {
+      setTaluks([]);
+      setPanchayats([]);
+      setFormData((prev) => ({
+        ...prev,
+        taluk: "",
+        panchayat: ""
+      }));
+      if (value && formData.state) {
+        fetchTaluks(formData.state, value);
+      }
+    } else if (field === "taluk") {
+      setPanchayats([]);
+      setFormData((prev) => ({
+        ...prev,
+        panchayat: ""
+      }));
+      if (value && formData.state && formData.district) {
+        fetchPanchayats(formData.state, formData.district, value);
+      }
+    } else if (field === "panchayat") {
+      setAddressCaptured(!!value);
     }
   };
 
@@ -187,28 +237,64 @@ export default function ProfilePage() {
     setSuccess("");
   };
 
-  const handlePincodeBlur = async () => {
-    if (formData.pincode.length === 6) {
-      setPincodeLoading(true);
-      setError("");
-      try {
-        const addressData = await pincodeService.getAddressByPincode(formData.pincode);
-        if (addressData) {
-          setFormData((prev) => ({
-            ...prev,
-            district: addressData.district,
-            state: addressData.state,
-            taluk: addressData.taluk || prev.taluk,
-            panchayat: addressData.taluk || prev.panchayat,
-          }));
-          setAddressVerified(true);
-        }
-      } catch (err: any) {
-        setError(err.message || "Invalid pincode. Please check and try again.");
-        setAddressVerified(false);
-      } finally {
-        setPincodeLoading(false);
+  const fetchState = async (pincode: string) => {
+    if (pincode.length !== 6) return;
+
+    setAddressLoading(true);
+    setError("");
+
+    try {
+      const addressData = await pincodeService.getAddressByPincode(pincode);
+      setFormData((prev) => ({
+        ...prev,
+        state: addressData.state,
+        district: "",
+        taluk: "",
+        panchayat: ""
+      }));
+      if (addressData.state) {
+        await fetchDistricts(addressData.state);
       }
+    } catch (err: any) {
+      setError(err.message || "Invalid pincode. Please check and try again.");
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const fetchDistricts = async (state: string) => {
+    setAddressLoading(true);
+    try {
+      const districtList = await pincodeService.getDistrictsByState(state);
+      setDistricts(districtList);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch districts. Please try again.");
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const fetchTaluks = async (state: string, district: string) => {
+    setAddressLoading(true);
+    try {
+      const { taluks } = await pincodeService.getTaluksByDistrict(state, district);
+      setTaluks(taluks);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch taluks. Please try again.");
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const fetchPanchayats = async (state: string, district: string, taluk: string) => {
+    setAddressLoading(true);
+    try {
+      const panchayatList = await pincodeService.getPanchayatsByTaluk(state, district, taluk);
+      setPanchayats(panchayatList);
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch panchayats. Please try again.");
+    } finally {
+      setAddressLoading(false);
     }
   };
 
@@ -241,7 +327,6 @@ export default function ProfilePage() {
   const handleSave = async (section: keyof EditState) => {
     if (!user) return;
 
-    // Validation based on section
     if (section === 'basicProfile') {
       if (!formData.firstName.trim()) {
         setError("Please enter your first name");
@@ -265,13 +350,12 @@ export default function ProfilePage() {
       }
     }
 
-    if (section === 'addressDetails' && formData.pincode.length === 6 && !addressVerified) {
-      setError("Please verify your address by entering a valid pincode");
+    if (section === 'addressDetails' && formData.pincode.length === 6 && !addressCaptured) {
+      setError("Please complete the address selection by choosing a panchayat");
       return;
     }
 
     if (section === 'identityVerification') {
-      // Ensure both Aadhaar photos are uploaded if one is
       if ((formData.aadhaarFront && !formData.aadhaarBack) || (!formData.aadhaarFront && formData.aadhaarBack)) {
         setError("Please upload both front and back sides of Aadhaar card");
         return;
@@ -300,8 +384,8 @@ export default function ProfilePage() {
         case 'addressDetails':
           updateData = {
             pincode: formData.pincode,
-            district: formData.district,
             state: formData.state,
+            district: formData.district,
             taluk: formData.taluk,
             panchayat: formData.panchayat,
           };
@@ -357,11 +441,9 @@ export default function ProfilePage() {
     router.push(`/${lang}/complete-profile`);
   };
 
-  // Check if profile is complete
   const isProfileComplete = userProfile?.isProfileComplete || false;
   const hasAddress = userProfile?.pincode && userProfile?.state && userProfile?.district;
   const hasAadhaar = userProfile?.aadhaarFrontURL && userProfile?.aadhaarBackURL;
-  console.log(userProfile);
 
   if (loading) {
     return (
@@ -378,7 +460,6 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-isha">
       <div className="max-w-4xl mx-auto p-4 py-8 bg-isha">
-        {/* Header with Back and Logout buttons */}
         <div className="mb-6 flex justify-between">
           <button
             onClick={() => router.back()}
@@ -396,7 +477,6 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        {/* Profile Header */}
         <div className="text-center mb-8">
           <div className="mb-4">
             <Image
@@ -413,7 +493,6 @@ export default function ProfilePage() {
           </h1>
         </div>
 
-        {/* Complete Profile Button - Show if profile is not complete */}
         {!isProfileComplete && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
@@ -428,11 +507,9 @@ export default function ProfilePage() {
                 Complete Profile
               </button>
             </div>
-
           </div>
         )}
 
-        {/* Success/Error Messages */}
         {success && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
             <p className="text-green-600 text-sm font-fira">{success}</p>
@@ -445,7 +522,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Profile Picture Section */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="text-center">
             <div className="flex flex-col items-center">
@@ -489,12 +565,10 @@ export default function ProfilePage() {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      // Validate file size (max 5MB)
                       if (file.size > 5 * 1024 * 1024) {
                         setError("File size must be less than 5MB");
                         return;
                       }
-                      // Validate file type
                       if (!file.type.startsWith('image/')) {
                         setError("Please select a valid image file");
                         return;
@@ -520,7 +594,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Basic Profile Details */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold font-fira">Personal Details</h3>
@@ -534,7 +607,6 @@ export default function ProfilePage() {
           <hr className="mb-6" />
 
           {!editState.basicProfile ? (
-            /* View Mode */
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <div className="text-sm font-medium text-gray-700 mb-1 font-fira">First Name</div>
@@ -574,7 +646,6 @@ export default function ProfilePage() {
               </div>
             </div>
           ) : (
-            /* Edit Mode */
             <div className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
@@ -745,7 +816,6 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Address Details */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold font-fira">Address Details</h3>
@@ -759,7 +829,6 @@ export default function ProfilePage() {
           <hr className="mb-6" />
 
           {!editState.addressDetails ? (
-            /* View Mode */
             hasAddress ? (
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
@@ -797,7 +866,6 @@ export default function ProfilePage() {
               </div>
             )
           ) : (
-            /* Edit Mode */
             <div className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
@@ -815,11 +883,9 @@ export default function ProfilePage() {
                         const value = e.target.value.replace(/\D/g, '');
                         handleInputChange('pincode', value);
                       }}
-                      onBlur={handlePincodeBlur}
                     />
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      {pincodeLoading && <Loader2 className="w-4 h-4 animate-spin text-[#CE4520]" />}
-                      {addressVerified && <Check className="w-4 h-4 text-green-500" />}
+                      {addressLoading && <Loader2 className="w-4 h-4 animate-spin text-[#CE4520]" />}
                     </div>
                   </div>
                 </div>
@@ -829,52 +895,64 @@ export default function ProfilePage() {
                   <input
                     type="text"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-fira"
-                    placeholder="Auto-filled from pincode"
+                    placeholder="Select pincode first"
                     value={formData.state}
+                    disabled={!formData.pincode}
                     readOnly
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">District</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-fira"
-                    placeholder="Auto-filled from pincode"
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
                     value={formData.district}
-                    readOnly
-                  />
+                    onChange={(e) => handleInputChange('district', e.target.value)}
+                    disabled={!formData.state || !districts.length}
+                  >
+                    <option value="" disabled>Select District</option>
+                    {districts.map(district => (
+                      <option key={district} value={district}>{district}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">Taluk</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-fira"
-                    placeholder="Auto-filled from pincode"
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
                     value={formData.taluk}
-                    readOnly
-                  />
+                    onChange={(e) => handleInputChange('taluk', e.target.value)}
+                    disabled={!formData.district || !taluks.length}
+                  >
+                    <option value="" disabled>Select Taluk</option>
+                    {taluks.map(taluk => (
+                      <option key={taluk} value={taluk}>{taluk}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">Panchayat</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-fira"
-                    placeholder="Auto-filled from pincode"
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
                     value={formData.panchayat}
-                    readOnly
-                  />
+                    onChange={(e) => handleInputChange('panchayat', e.target.value)}
+                    disabled={!formData.taluk || !panchayats.length}
+                  >
+                    <option value="" disabled>Select Panchayat</option>
+                    {panchayats.map(panchayat => (
+                      <option key={panchayat} value={panchayat}>{panchayat}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Address verification status */}
-              {addressVerified && (
+              {addressCaptured && (
                 <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center space-x-2">
                     <MapPin className="w-4 h-4 text-green-600" />
-                    <p className="text-green-600 text-sm font-fira">Address verified successfully</p>
+                    <p className="text-green-600 text-sm font-fira">Address captured successfully</p>
                   </div>
                 </div>
               )}
@@ -888,7 +966,7 @@ export default function ProfilePage() {
                 </button>
                 <button
                   onClick={() => handleSave('addressDetails')}
-                  disabled={formLoading || (formData.pincode.length === 6 && !addressVerified)}
+                  disabled={formLoading || (formData.pincode.length === 6 && !addressCaptured)}
                   className="px-4 py-2 bg-[#CE4520] text-white rounded-lg hover:bg-[#1565C0] font-fira transition-colors disabled:opacity-50"
                 >
                   {formLoading ? (
@@ -905,7 +983,6 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Identity Verification Section */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold font-fira">Identity Verification</h3>
@@ -956,7 +1033,6 @@ export default function ProfilePage() {
               </div>
             )
           ) : (
-            /* Edit Mode */
             <div className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
@@ -1097,7 +1173,6 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Other Information */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold font-fira">Other Information</h3>
@@ -1111,13 +1186,11 @@ export default function ProfilePage() {
           <hr className="mb-6" />
 
           {!editState.otherDetails ? (
-            /* View Mode */
             <div>
               <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Instagram Handle</div>
               <div className="text-gray-900 font-fira">{formData.instagramHandle || 'Not Available'}</div>
             </div>
           ) : (
-            /* Edit Mode */
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
@@ -1157,9 +1230,7 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
- 
 
-        {/* Footer */}
         <div className="mt-12">
           <Image
             src="/images/placeholders/footer-mural.png"

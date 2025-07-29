@@ -41,7 +41,6 @@ export default function LoginPage() {
         router.push(`/${lang}/complete-profile`);
       } else {
         const role = userProfile.role || "public";
-        console.log("User role:", role, "Redirecting to", `/${lang}/${role}/dashboard`);
         switch (role) {
           case "admin":
             router.push(`/${lang}/admin/dashboard`);
