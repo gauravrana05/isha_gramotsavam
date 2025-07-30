@@ -48,6 +48,7 @@ export {
 // Export User Management Functions
 export {
   createUserProfile,
+  createPlayerUser
 } from "./users";
 
 // Export Player Management Functions

@@ -106,7 +106,7 @@ export default function CelebrityTestimonials() {
             onClick={prevSlide}
             className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 bg-white shadow-lg rounded-full p-3 hover:bg-gray-50 transition-colors hidden lg:block"
             aria-label="Previous testimonial"
-          >
+          > 
             <ChevronLeft className="w-6 h-6 text-gray-600" />
           </button>
 

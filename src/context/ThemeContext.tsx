@@ -13,8 +13,10 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>("light");
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
     // Load theme from localStorage or default to light
     const savedTheme = localStorage.getItem("theme") as Theme | null;
     if (savedTheme) {
@@ -25,6 +27,8 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, []);
 
   useEffect(() => {
+    if (!isClient) return;
+    
     // Apply theme to document
     document.documentElement.classList.remove("light", "dark");
     document.documentElement.classList.add(theme);
@@ -43,7 +47,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       root.style.setProperty("--surface-color", "#FFFFFF");
       root.style.setProperty("--text-color", "#212121");
     }
-  }, [theme]);
+  }, [theme, isClient]);
 
   const toggleTheme = () => {
     setTheme((prevTheme) => (prevTheme === "light" ? "dark" : "light"));

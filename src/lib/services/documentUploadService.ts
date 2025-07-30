@@ -8,9 +8,9 @@ interface DocumentUploadPaths {
 }
 
 export const STORAGE_PATHS: DocumentUploadPaths = {
-  profilePhoto: (userId: string) => `Profilephotos/${userId}/profile_photo`,
-  aadhaarFront: (userId: string) => `Aadhar/${userId}/front_${Date.now()}`,
-  aadhaarBack: (userId: string) => `Aadhar/${userId}/back_${Date.now()}`
+  profilePhoto: (userId: string) => `profilePhotos/${userId}/profile_photo`,
+  aadhaarFront: (userId: string) => `aadhaar/${userId}/front_${Date.now()}`,
+  aadhaarBack: (userId: string) => `aadhaar/${userId}/back_${Date.now()}`
 };
 
 export interface UploadProgress {

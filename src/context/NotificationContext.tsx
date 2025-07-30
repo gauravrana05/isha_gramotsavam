@@ -20,7 +20,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const addNotification = (message: string, type: Notification["type"]) => {
-    const id = Math.random().toString(36).substr(2, 9);
+    const id = `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     setNotifications((prev) => [...prev, { id, message, type }]);
     setTimeout(() => removeNotification(id), 5000);
   };

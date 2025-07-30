@@ -1,3 +1,3 @@
 export default function PlaceholderPage() {
-  return null;
+  return <div>This is add</div>;
 }

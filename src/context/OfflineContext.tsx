@@ -12,6 +12,9 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isOffline, setIsOffline] = useState(false);
 
   useEffect(() => {
+    // Set initial offline state
+    setIsOffline(!navigator.onLine);
+    
     const handleOffline = () => setIsOffline(true);
     const handleOnline = () => setIsOffline(false);
 

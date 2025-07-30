@@ -150,6 +150,21 @@ export default function TeamRegistrationPage() {
       const result: any = await createTeam({ teamData });
       console.log("ran successfully");
       if (result.data.success) {
+        console.log("Team created successfully, promoting user to captain...");
+        
+        // Manually trigger captain promotion
+        try {
+          const promoteFunction = httpsCallable(functions, 'promoteToTeamCaptain');
+          await promoteFunction({
+            teamId: result.data.teamId,
+            eventId: "gramotsavam_2025"
+          });
+          console.log("User promoted to captain successfully");
+        } catch (promotionError) {
+          console.error("Error promoting to captain:", promotionError);
+          // Don't fail the whole process if promotion fails - it might have been handled by the trigger
+        }
+        
         router.push(`/${lang}/captain/teams/${result.data.teamId}/players/invite`);
       } else {
         throw new Error(result.data.message || "Failed to create team.");
@@ -194,42 +209,42 @@ export default function TeamRegistrationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-isha">
-      <div className="max-w-4xl mx-auto p-4 py-8">
-        <div className="text-center mb-8">
-          <div className="mb-4">
+    <div className="min-h-screen bg-[#F3F0E5] font-fira">
+      <div className="max-w-4xl mx-auto p-3 sm:p-4 py-6 sm:py-8">
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="mb-3 sm:mb-4">
             <Image 
               src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" 
               alt="Isha Logo" 
-              width={80} 
-              height={80} 
-              className="mx-auto"
+              width={60} 
+              height={60} 
+              className="mx-auto sm:w-20 sm:h-20"
             />
           </div>
-          <h1 className="text-3xl font-semibold font-fira mb-2 capitalize">
+          <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 capitalize">
             Register Team for {sportName}
           </h1>
-          <p className="text-gray-600 font-fira">
+          <p className="text-sm sm:text-base text-gray-600 font-fira">
             {sportName === 'throwball' ? 'For Women' : 'For Men and Women'}
           </p>
-          <p className="text-gray-600 font-fira">Step 1 of 2: Team Details</p>
+          <p className="text-sm sm:text-base text-gray-600 font-fira">Step 1 of 2: Team Details</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center mb-6">
-            <Users className="w-6 h-6 text-[#CE4520] mr-3" />
-            <h3 className="text-xl font-semibold font-fira">Team Information</h3>
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex items-center mb-4 sm:mb-6">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-[#F28C38] mr-2 sm:mr-3" />
+            <h3 className="text-lg sm:text-xl font-semibold font-fira text-[#4A2F1D]">Team Information</h3>
           </div>
-          <hr className="mb-6" />
+          <hr className="mb-4 sm:mb-6" />
           
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6">
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
                 Team Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38] font-fira text-sm sm:text-base"
                 placeholder="Enter your team name"
                 value={formData.teamName}
                 onChange={(e) => handleInputChange('teamName', e.target.value)}
@@ -237,12 +252,12 @@ export default function TeamRegistrationPage() {
               />
             </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
                 Team Description (Optional)
               </label>
               <textarea
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38] font-fira text-sm sm:text-base"
                 placeholder="Brief description about your team"
                 value={formData.teamDescription}
                 onChange={(e) => handleInputChange('teamDescription', e.target.value)}
@@ -253,45 +268,45 @@ export default function TeamRegistrationPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center mb-6">
-            <Users className="w-6 h-6 text-[#CE4520] mr-3" />
-            <h3 className="text-xl font-semibold font-fira">Captain Details</h3>
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex items-center mb-4 sm:mb-6">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-[#F28C38] mr-2 sm:mr-3" />
+            <h3 className="text-lg sm:text-xl font-semibold font-fira text-[#4A2F1D]">Captain Details</h3>
           </div>
-          <hr className="mb-6" />
+          <hr className="mb-4 sm:mb-6" />
           
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
                 Captain Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-fira"
+                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg bg-gray-50 font-fira text-sm sm:text-base"
                 value={formData.captainName}
                 readOnly
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
                 Phone Number <span className="text-red-500">*</span>
               </label>
               <div className="flex">
-                <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-3">
-                  <span className="text-sm font-fira">+91</span>
+                <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-2 sm:px-3">
+                  <span className="text-xs sm:text-sm font-fira">+91</span>
                 </div>
                 <input
                   type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-r-lg bg-gray-50 font-fira"
+                  className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-r-lg bg-gray-50 font-fira text-sm sm:text-base"
                   value={formData.captainPhone}
                   readOnly
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+            <div className="sm:col-span-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
                 WhatsApp Number <span className="text-red-500">*</span>
               </label>
               <div className="space-y-2">
@@ -303,17 +318,17 @@ export default function TeamRegistrationPage() {
                     checked={isWhatsAppSame}
                     onChange={(e) => handleWhatsAppSameChange(e.target.checked)}
                   />
-                  <label htmlFor="isWhatsAppSame" className="text-sm font-fira">
+                  <label htmlFor="isWhatsAppSame" className="text-xs sm:text-sm font-fira">
                     Same as phone number
                   </label>
                 </div>
                 <div className="flex">
-                  <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-3">
-                    <span className="text-sm font-fira">+91</span>
+                  <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-2 sm:px-3">
+                    <span className="text-xs sm:text-sm font-fira">+91</span>
                   </div>
                   <input
                     type="tel"
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-r-lg font-fira ${
+                    className={`w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-r-lg font-fira text-sm sm:text-base ${
                       isWhatsAppSame ? 'bg-gray-50' : ''
                     }`}
                     placeholder="Enter WhatsApp number"
@@ -328,56 +343,53 @@ export default function TeamRegistrationPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center mb-6">
-            <Users className="w-6 h-6 text-[#CE4520] mr-3" />
-            <h3 className="text-xl font-semibold font-fira">Team Location</h3>
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex items-center mb-4 sm:mb-6">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-[#F28C38] mr-2 sm:mr-3" />
+            <h3 className="text-lg sm:text-xl font-semibold font-fira text-[#4A2F1D]">Team Location</h3>
           </div>
-          <hr className="mb-6" />
+          <hr className="mb-4 sm:mb-6" />
           
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
                 Panchayat <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
-                placeholder="Enter panchayat"
+                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg bg-gray-50 font-fira text-sm sm:text-base"
                 value={formData.panchayat}
-                onChange={(e) => handleInputChange('panchayat', e.target.value)}
+                readOnly
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
                 District <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
-                placeholder="Enter district"
+                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg bg-gray-50 font-fira text-sm sm:text-base"
                 value={formData.district}
-                onChange={(e) => handleInputChange('district', e.target.value)}
+                readOnly
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
                 State <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
-                placeholder="Enter state"
+                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg bg-gray-50 font-fira text-sm sm:text-base"
                 value={formData.state}
-                onChange={(e) => handleInputChange('state', e.target.value)}
+                readOnly
               />
             </div>
           </div>
 
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-blue-600 text-sm font-fira">
+            <p className="text-blue-600 text-xs sm:text-sm font-fira">
               <strong>Important:</strong> All team members must be from the same panchayat. 
               This will be verified during the approval process.
             </p>
@@ -385,33 +397,33 @@ export default function TeamRegistrationPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-600 text-sm font-fira">{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+            <p className="text-red-600 text-xs sm:text-sm font-fira">{error}</p>
           </div>
         )}
 
-        <div className="text-center mb-8">
+        <div className="text-center mb-6 sm:mb-8">
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="bg-[#CE4520] hover:bg-[#1565C0] text-white px-8 py-3 rounded-lg font-fira text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center"
+            className="bg-[#F28C38] hover:bg-[#E67A26] text-white px-6 sm:px-8 py-2 sm:py-3 rounded-lg font-fira text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center w-full sm:w-auto justify-center"
           >
             {loading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin mr-2" />
                 Creating Team...
               </>
             ) : (
               <>
                 Save & Continue
-                <ArrowRight className="w-5 h-5 ml-2" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
               </>
             )}
           </button>
         </div>
 
-        <div className="text-center mb-6">
-          <p className="text-sm font-fira text-gray-600">
+        <div className="text-center mb-4 sm:mb-6">
+          <p className="text-xs sm:text-sm font-fira text-gray-600">
             Next: Add team members and complete registration
           </p>
         </div>

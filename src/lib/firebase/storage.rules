@@ -1,82 +1,10 @@
 rules_version = '2';
 
-// Firebase Storage Security Rules for Isha Gramotsavam
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Profile photos storage - Note the lowercase 'p' to match the client-side path
-    match /profilePhotos/{userId}/{fileName} {
-      allow write: if request.auth != null && 
-                      request.auth.uid == userId &&
-                      request.resource.size < 5 * 1024 * 1024 && // 5MB limit
-                      request.resource.contentType.matches('image/.*');
-      allow read: if request.auth != null; // Authenticated users can read profile photos
-    }
-
-    // Aadhaar documents storage - Note the lowercase 'a' to match the client-side path
-    match /aadhaar/{userId}/{fileName} {
-      allow write: if request.auth != null && 
-                      request.auth.uid == userId &&
-                      request.resource.size < 5 * 1024 * 1024 && // 5MB limit
-                      request.resource.contentType.matches('image/.*');
-      // Only the user themselves, verification volunteers, and admins can read Aadhaar documents
-      allow read: if request.auth != null && (
-        request.auth.uid == userId || 
-        isVerificationVolunteerStorage() || 
-        isAdminStorage()
-      );
-    }
-
-    // Team documents storage (if needed for team-level documents)
-    match /Teams/{teamId}/{fileName} {
-      allow write: if request.auth != null && 
-                      isTeamCaptainStorage(teamId) &&
-                      request.resource.size < 10 * 1024 * 1024; // 10MB limit for team docs
-      allow read: if request.auth != null && (
-        isTeamCaptainStorage(teamId) || 
-        isVerificationVolunteerStorage() || 
-        isAdminStorage()
-      );
-    }
-
-    // Media uploads (public media, event photos, etc.) - /Media/{year}/{eventId}/{fileName}
-    match /Media/{year}/{eventId}/{fileName} {
-      allow write: if request.auth != null &&
-                      request.resource.size < 20 * 1024 * 1024; // 20MB limit for media
-      allow read: if true; // Public read for media
-    }
-
-    // Tournament documents and results - /Tournament/{eventId}/{category}/{fileName}
-    match /Tournament/{eventId}/{category}/{fileName} {
-      allow write: if request.auth != null && isAdminStorage();
-      allow read: if true; // Public read for tournament data
-    }
-
-    // Backup and system files (restricted access)
-    match /System/{path=**} {
-      allow read: if isAdminStorage();
-      allow write: if isAdminStorage();
-    }
-
-    // Helper functions for storage rules
-    function isVerificationVolunteerStorage() {
-      return request.auth != null && 
-             get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'verification_volunteer';
-    }
-
-    function isAdminStorage() {
-      return request.auth != null && 
-             get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'admin_backend', 'admin_registration', 'admin_media'];
-    }
-
-    function isTeamCaptainStorage(teamId) {
-      return request.auth != null && 
-             get(/databases/(default)/documents/teams/$(teamId)).data.captainId == request.auth.uid;
-    }
-
-    function isPlayerInTeamStorage(teamId) {
-      return request.auth != null && 
-             exists(/databases/(default)/documents/teams/$(teamId)/players/$(request.auth.uid));
+    // Allow any authenticated user to read and write anything 
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }

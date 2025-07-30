@@ -98,14 +98,39 @@ export default function TeamVerificationPage() {
       const team = { id: teamSnap.id, ...teamSnap.data() } as TeamData;
       setTeamData(team);
       
-      // Initialize player verification status
-      const playersWithStatus = team.players.map(player => ({
-        ...player,
-        verificationStatus: player.verificationStatus || 'pending' as const,
-        verificationComments: player.verificationComments || '',
-      }));
+      // Load player data with documents from users collection
+      const playersWithDocuments = await Promise.all(
+        team.players.map(async (player) => {
+          if (player.userId) {
+            try {
+              const userRef = doc(db, "users", player.userId);
+              const userSnap = await getDoc(userRef);
+              
+              if (userSnap.exists()) {
+                const userData = userSnap.data();
+                return {
+                  ...player,
+                  userId: player.userId,
+                  documents: userData.documents || {},
+                  verificationStatus: player.verificationStatus || 'pending' as const,
+                  verificationComments: player.verificationComments || '',
+                };
+              }
+            } catch (error) {
+              console.error(`Error loading user data for ${player.userId}:`, error);
+            }
+          }
+          
+          return {
+            ...player,
+            documents: {},
+            verificationStatus: player.verificationStatus || 'pending' as const,
+            verificationComments: player.verificationComments || '',
+          };
+        })
+      );
       
-      setPlayers(playersWithStatus);
+      setPlayers(playersWithDocuments);
     } catch (err: any) {
       console.error("Error loading team:", err);
       setError("Failed to load team data");
@@ -132,11 +157,19 @@ export default function TeamVerificationPage() {
     const rejectedCount = players.filter(p => p.verificationStatus === 'rejected').length;
     const pendingCount = players.filter(p => p.verificationStatus === 'pending').length;
 
+    // Check if all players have verified documents
+    const allDocumentsVerified = players.every(player => {
+      const docs = player.documents || {};
+      return docs.profilePhoto?.verified && 
+             docs.aadhaarFront?.verified && 
+             docs.aadhaarBack?.verified;
+    });
+
     if (rejectedCount > 0) {
       return 'rejected';
-    } else if (pendingCount === 0 && approvedCount === players.length) {
+    } else if (pendingCount === 0 && approvedCount === players.length && allDocumentsVerified) {
       return 'verified';
-    } else if (approvedCount > 0) {
+    } else if (approvedCount > 0 || allDocumentsVerified) {
       return 'partial_verification';
     } else {
       return 'pending';
@@ -204,6 +237,14 @@ export default function TeamVerificationPage() {
   const approvedCount = players.filter(p => p.verificationStatus === 'approved').length;
   const rejectedCount = players.filter(p => p.verificationStatus === 'rejected').length;
   const pendingCount = players.filter(p => p.verificationStatus === 'pending').length;
+  
+  // Document verification stats
+  const documentsVerifiedCount = players.filter(player => {
+    const docs = player.documents || {};
+    return docs.profilePhoto?.verified && 
+           docs.aadhaarFront?.verified && 
+           docs.aadhaarBack?.verified;
+  }).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -303,7 +344,7 @@ export default function TeamVerificationPage() {
             {/* Verification Summary */}
             <div className="mt-6 pt-6 border-t border-gray-200">
               <h4 className="font-semibold font-fira text-gray-900 mb-3">Verification Status</h4>
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
                 <div className="bg-green-50 p-3 rounded-lg">
                   <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
                   <p className="font-semibold font-fira text-green-800">{approvedCount}</p>
@@ -318,6 +359,11 @@ export default function TeamVerificationPage() {
                   <Loader2 className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
                   <p className="font-semibold font-fira text-yellow-800">{pendingCount}</p>
                   <p className="text-sm text-yellow-600 font-fira">Pending</p>
+                </div>
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <Users className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                  <p className="font-semibold font-fira text-blue-800">{documentsVerifiedCount}</p>
+                  <p className="text-sm text-blue-600 font-fira">Docs Verified</p>
                 </div>
               </div>
             </div>
