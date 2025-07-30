@@ -63,7 +63,7 @@ export const createUserProfile = beforeUserCreated(async (event) => {
     };
 
     // Set the data in Firestore
-    await admin.firestore().collection("users").doc(uid).set(userProfileData);
+    await admin.firestore().collection("users").doc(uid).create(userProfileData);
 
     console.log(`Successfully created Firestore profile for new user: ${uid}`);
     
@@ -237,7 +237,7 @@ export const createPlayerUser = onCall(async (request: CallableRequest) => {
     };
 
     // Update the user profile with player-specific data
-    await admin.firestore().collection("users").doc(userRecord.uid).update(userProfileData);
+    await admin.firestore().collection("users").doc(userRecord.uid).set(userProfileData, { merge: true });
 
     console.log(`Created Firebase user for player: ${userRecord.uid}`);
 

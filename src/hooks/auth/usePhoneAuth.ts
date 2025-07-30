@@ -23,16 +23,25 @@ export const usePhoneAuth = () => {
   const router = useRouter();
 
   const setUpRecaptcha = () => {
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-        size: "invisible",
-        callback: () => console.log("reCAPTCHA solved"),
-        "expired-callback": () => {
-          console.log("reCAPTCHA expired");
-          setError(t("error_recaptcha_expired"));
-        },
-      });
+    // Always clear the old verifier to ensure a fresh one is created.
+    // This prevents errors from using an expired reCAPTCHA token.
+    if (window.recaptchaVerifier) {
+      window.recaptchaVerifier.clear();
+      window.recaptchaVerifier = undefined;
     }
+
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+      size: "invisible",
+      callback: () => {
+        // reCAPTCHA solved, allow signInWithPhoneNumber.
+        console.log("reCAPTCHA solved");
+      },
+      "expired-callback": () => {
+        // Response expired. Ask user to solve reCAPTCHA again.
+        console.log("reCAPTCHA expired");
+        setError(t("error_recaptcha_expired"));
+      },
+    });
   };
 
   const formatPhoneNumber = (phone: string) => {
@@ -111,10 +120,8 @@ export const usePhoneAuth = () => {
   const resendOtp = async () => {
     setError("");
     setConfirmationResult(null);
-    if (window.recaptchaVerifier) {
-      window.recaptchaVerifier.clear();
-      window.recaptchaVerifier = undefined;
-    }
+    // The setUpRecaptcha function now handles clearing the verifier,
+    // so we can just call sendOtp directly.
     return sendOtp(phoneNumber);
   };
 
