@@ -1,0 +1,14 @@
+// Temporary Firestore Security Rules for Database Initialization
+// WARNING: These rules allow full read/write access - use only for initialization!
+// Replace with proper security rules after initialization is complete
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Temporary rules for initialization - REMOVE AFTER SETUP
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

@@ -2,12 +2,14 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/lib/firebase/config';
 import { UserProfile } from '@/lib/types/auth';
+import { sportsService } from './sportsService';
+import { Sport } from '@/lib/types/sports';
 
 export interface TeamCreationData {
   name: string;
   description: string;
   sportName: string;
-  sport: 'volleyball' | 'throwball';
+  sportId: string;  // Changed from sport to sportId to match database
   captainId: string;
   panchayat: string;
   district: string;
@@ -18,6 +20,12 @@ export interface CreateTeamResult {
   success: boolean;
   teamId?: string;
   error?: string;
+}
+
+export interface SportEligibilityResult {
+  sport: Sport | null;
+  eligible: boolean;
+  reasons: string[];
 }
 
 function calculateAge(dob: string): number {
@@ -38,29 +46,46 @@ export async function createTeamWithSchema(
   userProfile: UserProfile
 ): Promise<CreateTeamResult> {
   try {
-    // Validate gender for throwball
-    if (teamData.sportName === 'Throwball' && userProfile.gender !== 'F') {
+    // Get sport configuration from database
+    const sport = await sportsService.getSportById(teamData.sportId);
+    if (!sport) {
       return {
         success: false,
-        error: 'Throwball registration is only available for women'
+        error: `Sport '${teamData.sportId}' not found`
       };
     }
 
-    // Set sport-specific requirements
-    const sportConfig = {
-      'Volleyball': { 
-        maxPlayers: 6, 
-        maxSubstitutes: 6, 
-        genderCategory: userProfile.gender === 'F' ? 'women' : 'men' 
-      },
-      'Throwball': { 
-        maxPlayers: 7, 
-        maxSubstitutes: 2, 
-        genderCategory: 'women' 
-      }
-    };
+    // Check if sport is active
+    if (sport.status !== 'active') {
+      return {
+        success: false,
+        error: `${sport.name} registration is currently not available`
+      };
+    }
 
-    const config = sportConfig[teamData.sportName as keyof typeof sportConfig];
+    // Calculate user age for eligibility check
+    const userAge = userProfile.dob ? calculateAge(userProfile.dob) : 25;
+    
+    // Check eligibility
+    const eligibilityCheck = await sportsService.checkEligibility(
+      teamData.sportId, 
+      userAge, 
+      userProfile.gender
+    );
+    
+    if (!eligibilityCheck.eligible) {
+      return {
+        success: false,
+        error: `Eligibility requirements not met: ${eligibilityCheck.reasons.join(', ')}`
+      };
+    }
+
+    // Use sport configuration from database
+    const config = {
+      maxPlayers: sport.teamConfig.maxPlayers,
+      maxSubstitutes: sport.teamConfig.maxSubstitutes,
+      genderCategory: sport.category
+    };
 
     // Create team document
     const teamDocData = {
@@ -75,13 +100,15 @@ export async function createTeamWithSchema(
       
       // Event & Sport
       eventId: "gramotsavam_2025",
-      sportId: teamData.sportName.toLowerCase(),
-      sportName: teamData.sportName,
+      sportId: sport.sportId,
+      sportName: sport.name,
       genderCategory: config.genderCategory,
+      sportDisplayName: sport.displayName,
       
-      // Player Requirements
+      // Player Requirements (from sport config)
       maxPlayers: config.maxPlayers,
       maxSubstitutes: config.maxSubstitutes,
+      totalTeamSize: sport.teamConfig.totalTeamSize,
       currentPlayers: 1, // Captain counts as first player
       currentSubstitutes: 0,
       
@@ -212,5 +239,46 @@ export async function createTeamWithSchema(
       success: false,
       error: error.message || 'Failed to create team. Please try again.'
     };
+  }
+}
+
+/**
+ * Get available sports for team creation based on user profile
+ */
+export async function getAvailableSportsForUser(userProfile: UserProfile): Promise<Sport[]> {
+  try {
+    const userAge = userProfile.dob ? calculateAge(userProfile.dob) : 25;
+    return await sportsService.getSportsByGender(userProfile.gender);
+  } catch (error: any) {
+    console.error('Error fetching available sports:', error);
+    throw new Error('Failed to fetch available sports');
+  }
+}
+
+/**
+ * Get sport details with eligibility check for a user
+ */
+export async function getSportWithEligibility(sportId: string, userProfile: UserProfile): Promise<{
+  sport: Sport | null;
+  eligible: boolean;
+  reasons: string[];
+}> {
+  try {
+    const sport = await sportsService.getSportById(sportId);
+    if (!sport) {
+      return { sport: null, eligible: false, reasons: ['Sport not found'] };
+    }
+
+    const userAge = userProfile.dob ? calculateAge(userProfile.dob) : 25;
+    const eligibilityCheck = await sportsService.checkEligibility(sportId, userAge, userProfile.gender);
+    
+    return {
+      sport,
+      eligible: eligibilityCheck.eligible,
+      reasons: eligibilityCheck.reasons
+    };
+  } catch (error: any) {
+    console.error(`Error checking sport eligibility for ${sportId}:`, error);
+    return { sport: null, eligible: false, reasons: ['Error checking eligibility'] };
   }
 }

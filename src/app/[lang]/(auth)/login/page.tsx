@@ -207,8 +207,12 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await confirmationResult.confirm(otpValue);
+      const result = await confirmationResult.confirm(otpValue);
       console.log("Phone number verified successfully");
+      
+      // The useEffect will handle routing once the user and userProfile are loaded
+      // If there's a delay in profile creation, the AuthContext will handle it
+      
     } catch (err: any) {
       console.error("Error verifying OTP:", err);
       setError(

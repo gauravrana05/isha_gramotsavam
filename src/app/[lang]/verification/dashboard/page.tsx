@@ -80,32 +80,36 @@ export default function VerificationDashboardPage() {
 
   const loadTeams = async () => {
     try {
-      const teamsQuery = query(
-        collection(db, "teams"),
-        orderBy("submittedAt", "desc")
-      );
+      // First, get all teams and then filter/sort in memory to avoid index issues
+      const teamsQuery = query(collection(db, "teams"));
       
       const querySnapshot = await getDocs(teamsQuery);
       const teamsData: TeamData[] = [];
       
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        teamsData.push({
-          id: doc.id,
-          teamName: data.teamName || '',
-          sport: data.sport || '',
-          captainName: data.captainName || '',
-          captainPhone: data.captainPhone || '',
-          panchayat: data.panchayat || '',
-          district: data.district || '',
-          state: data.state || '',
-          playersCount: data.players?.length || 0,
-          maxPlayers: data.maxPlayers || 0,
-          status: data.status || 'draft',
-          submittedAt: data.submittedAt || data.createdAt || '',
-          gender: data.gender || '',
-        });
+        // Only include teams that have been submitted for verification
+        if (data.status === 'submitted' || data.status === 'pending' || data.status === 'verified' || data.status === 'rejected' || data.status === 'partial_verification') {
+          teamsData.push({
+            id: doc.id,
+            teamName: data.teamName || '',
+            sport: data.sportId || data.sport || '',
+            captainName: data.captainName || '',
+            captainPhone: data.captainPhone || '',
+            panchayat: data.panchayat || '',
+            district: data.district || '',
+            state: data.state || '',
+            playersCount: data.players?.length || 0,
+            maxPlayers: data.maxPlayers || 12,
+            status: data.status || 'draft',
+            submittedAt: data.submittedAt || data.createdAt || new Date().toISOString(),
+            gender: data.gender || 'M',
+          });
+        }
       });
+
+      // Sort by submission date (most recent first)
+      teamsData.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
 
       setTeams(teamsData);
       calculateStats(teamsData);

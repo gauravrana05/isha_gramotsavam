@@ -8,29 +8,65 @@ interface SportsPreviewProps {
   lang: string
 }
 
+interface SportData {
+  id: string
+  name: string
+  category: string
+  players: string
+  prize: string
+  image: string
+  registrationLink: string
+  learnMoreLink: string
+  eventInfo: {
+    registrationStart: string
+    registrationEnd: string
+  }
+}
+
 export default function SportsPreview({ lang }: SportsPreviewProps) {
-  const sports = [
+  const sports: SportData[] = [
     {
       id: 'volleyball',
       name: 'Volleyball',
       category: 'For Men',
-      players: '6 + 1 Players Per Team',
+      players: '6 + 6 Players Per Team',
       prize: 'INR 5,00,000',
       image: '/images/sports/volleyball_1.jpg',
-      registrationLink: '#',
-      learnMoreLink: `/${lang}/public/sports/volleyball`
+      registrationLink: `/${lang}/auth/register`,
+      learnMoreLink: `/${lang}/public/sports/volleyball`,
+      eventInfo: {
+        registrationStart: '2025-01-01',
+        registrationEnd: '2025-02-15'
+      }
     },
     {
       id: 'throwball',
       name: 'Throwball',
       category: 'For Women',
-      players: '7 + 1 Players Per Team',
+      players: '7 + 5 Players Per Team',
       prize: 'INR 5,00,000',
       image: '/images/sports/throwball_1.jpg',
-      registrationLink: '#',
-      learnMoreLink: `/${lang}/public/sports/throwball`
+      registrationLink: `/${lang}/auth/register`,
+      learnMoreLink: `/${lang}/public/sports/throwball`,
+      eventInfo: {
+        registrationStart: '2025-01-01',
+        registrationEnd: '2025-02-15'
+      }
     }
   ]
+
+  const formatSportsData = (sport: SportData) => {
+    return {
+      id: sport.id,
+      name: sport.name,
+      category: sport.category,
+      players: sport.players,
+      prize: sport.prize,
+      image: sport.image,
+      registrationLink: sport.registrationLink,
+      learnMoreLink: sport.learnMoreLink
+    }
+  }
 
   return (
     <section className="bg-isha py-16 lg:py-24">
@@ -53,16 +89,18 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
 
         {/* Sports Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          {sports.map((sport) => (
+          {sports.map((sport) => {
+            const sportData = formatSportsData(sport);
+            return (
             <div
-              key={sport.id}
+              key={sportData.id}
               className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
             >
               {/* Sport Image */}
               <div className="relative h-64">
                 <Image
-                  src={sport.image}
-                  alt={sport.name}
+                  src={sportData.image}
+                  alt={sportData.name}
                   fill
                   className="object-cover"
                 />
@@ -72,17 +110,22 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
               {/* Sport Content */}
               <div className="p-6">
                 <h3 className="text-2xl font-bold text-[#4A2F1D] mb-2">
-                  {sport.name}
+                  {sportData.name}
                 </h3>
 
                 <div className="mb-4">
                   <p className="text-[#F28C38] font-semibold text-lg mb-2">
-                    {sport.category} | {sport.players}
+                    {sportData.category} | {sportData.players}
                   </p>
                   <p className="text-2xl font-bold text-[#4A2F1D] mb-1">
-                    Winning Prize: {sport.prize}
+                    Winning Prize: {sportData.prize}
                   </p>
                 </div>
+                
+                {/* Registration Period */}
+                <p className="text-gray-600 text-sm mb-2">
+                  Registration: {new Date(sport.eventInfo.registrationStart).toLocaleDateString()} - {new Date(sport.eventInfo.registrationEnd).toLocaleDateString()}
+                </p>
 
                 <p className="text-gray-600 mb-6">
                   Registration is free & mandatory
@@ -90,11 +133,13 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3">
-                <Button size="small" className="min-w-[200px]">
-                    Register Now
-                  </Button>
+                  <Link href={sportData.registrationLink}>
+                    <Button size="small" className="min-w-[200px] w-full">
+                      Register Now
+                    </Button>
+                  </Link>
                   <Link
-                    href={sport.learnMoreLink}
+                    href={sportData.learnMoreLink}
                     className="btn-secondary flex-1 text-center py-3 px-6"
                   >
                     Learn More
@@ -102,7 +147,8 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* View All Sports Link */}

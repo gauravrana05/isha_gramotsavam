@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
-import { uploadFile } from "@/lib/firebase/storage";
+import { documentUploadService } from "@/lib/services/documentUploadService";
 import { pincodeService } from "@/lib/services/pincodeService";
 import { useTranslation } from "@/lib/utils/i18n";
 import Image from "next/image";
@@ -64,6 +64,23 @@ export default function ProfilePage() {
   const router = useRouter();
   const { lang } = useParams();
   const { t } = useTranslation();
+
+  // Clean Firestore data by removing undefined values and converting dates
+  const cleanFirestoreData = (obj: any): any => {
+    if (obj === null || obj === undefined) return null;
+    if (obj instanceof Date) return obj.toISOString();
+    if (Array.isArray(obj)) return obj.map(cleanFirestoreData);
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = cleanFirestoreData(value);
+        }
+      }
+      return cleaned;
+    }
+    return obj;
+  };
 
   const [editState, setEditState] = useState<EditState>({
     basicProfile: false,
@@ -222,7 +239,9 @@ export default function ProfilePage() {
   const handleWhatsAppSameChange = (checked: boolean) => {
     setIsWhatsAppSame(checked);
     if (checked) {
-      setFormData(prev => ({ ...prev, whatsappNumber: phoneNumber }));
+      // Remove +91 prefix if present
+      const cleanPhoneNumber = phoneNumber.replace(/^\+91/, '');
+      setFormData(prev => ({ ...prev, whatsappNumber: cleanPhoneNumber }));
     } else {
       setFormData(prev => ({ ...prev, whatsappNumber: "" }));
     }
@@ -303,17 +322,41 @@ export default function ProfilePage() {
 
     setUploading(true);
     try {
-      const downloadURL = await uploadFile(
+      const downloadURL = await documentUploadService.uploadProfilePhoto(
+        user.uid,
         file,
-        `profilePhotos/${user.uid}/profile_photo`,
-        (progress) => setUploadProgress(prev => ({ ...prev, profile: progress }))
+        (progress) => setUploadProgress(prev => ({ ...prev, profile: progress.progress }))
       );
 
+      // Update with structured document format
       const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, {
-        profilePhotoURL: downloadURL,
+      
+      // Check if profile is now complete after photo upload
+      const hasAllRequiredFields = userProfile?.firstName && 
+        userProfile?.lastName && 
+        userProfile?.whatsappNumber && 
+        userProfile?.dob && 
+        userProfile?.gender && 
+        userProfile?.pincode && 
+        userProfile?.panchayat;
+      
+      const hasAllDocuments = true && // Profile photo will be uploaded
+        userProfile?.documents?.aadhaarFront?.url && 
+        userProfile?.documents?.aadhaarBack?.url;
+      
+      const isComplete = hasAllRequiredFields && hasAllDocuments;
+
+      const updateData = {
+        [`documents.profilePhoto.storagePath`]: documentUploadService.getStoragePath(user.uid, 'profilePhoto'),
+        [`documents.profilePhoto.url`]: downloadURL,
+        [`documents.profilePhoto.verified`]: false,
+        [`documents.profilePhoto.uploadedAt`]: new Date(),
+        [`documents.profilePhoto.uploadedBy`]: user.uid,
+        isProfileComplete: isComplete,
         updatedAt: new Date().toISOString()
-      });
+      };
+      
+      await updateDoc(userRef, cleanFirestoreData(updateData));
 
       setSuccess("Profile photo updated successfully!");
     } catch (error) {
@@ -397,26 +440,53 @@ export default function ProfilePage() {
           break;
         case 'identityVerification':
           if (formData.aadhaarFront) {
-            updateData.aadhaarFrontURL = await uploadFile(
+            const aadhaarFrontURL = await documentUploadService.uploadAadhaarFront(
+              user.uid,
               formData.aadhaarFront,
-              `aadhaar/${user.uid}/front_${Date.now()}`,
-              (progress) => setUploadProgress(prev => ({ ...prev, aadhaarFront: progress }))
+              (progress) => setUploadProgress(prev => ({ ...prev, aadhaarFront: progress.progress }))
             );
+            updateData[`documents.aadhaarFront.storagePath`] = documentUploadService.getStoragePath(user.uid, 'aadhaarFront');
+            updateData[`documents.aadhaarFront.url`] = aadhaarFrontURL;
+            updateData[`documents.aadhaarFront.verified`] = false;
+            updateData[`documents.aadhaarFront.uploadedAt`] = new Date();
+            updateData[`documents.aadhaarFront.uploadedBy`] = user.uid;
           }
           if (formData.aadhaarBack) {
-            updateData.aadhaarBackURL = await uploadFile(
+            const aadhaarBackURL = await documentUploadService.uploadAadhaarBack(
+              user.uid,
               formData.aadhaarBack,
-              `aadhaar/${user.uid}/back_${Date.now()}`,
-              (progress) => setUploadProgress(prev => ({ ...prev, aadhaarBack: progress }))
+              (progress) => setUploadProgress(prev => ({ ...prev, aadhaarBack: progress.progress }))
             );
+            updateData[`documents.aadhaarBack.storagePath`] = documentUploadService.getStoragePath(user.uid, 'aadhaarBack');
+            updateData[`documents.aadhaarBack.url`] = aadhaarBackURL;
+            updateData[`documents.aadhaarBack.verified`] = false;
+            updateData[`documents.aadhaarBack.uploadedAt`] = new Date();
+            updateData[`documents.aadhaarBack.uploadedBy`] = user.uid;
           }
           break;
       }
 
-      await updateDoc(userRef, {
+      // Check if profile is now complete after this update
+      const currentProfile = { ...userProfile, ...updateData };
+      const hasAllRequiredFields = currentProfile.firstName && 
+        currentProfile.lastName && 
+        currentProfile.whatsappNumber && 
+        currentProfile.dob && 
+        currentProfile.gender && 
+        currentProfile.pincode && 
+        currentProfile.panchayat;
+      
+      const hasAllDocuments = currentProfile.documents?.profilePhoto?.url && 
+        currentProfile.documents?.aadhaarFront?.url && 
+        currentProfile.documents?.aadhaarBack?.url;
+      
+      const isComplete = hasAllRequiredFields && hasAllDocuments;
+
+      await updateDoc(userRef, cleanFirestoreData({
         ...updateData,
+        isProfileComplete: isComplete,
         updatedAt: new Date().toISOString(),
-      });
+      }));
 
       toggleEdit(section);
       setSuccess("Profile updated successfully!");
@@ -443,7 +513,7 @@ export default function ProfilePage() {
 
   const isProfileComplete = userProfile?.isProfileComplete || false;
   const hasAddress = userProfile?.pincode && userProfile?.state && userProfile?.district;
-  const hasAadhaar = userProfile?.aadhaarFrontURL && userProfile?.aadhaarBackURL;
+  const hasAadhaar = userProfile?.documents?.aadhaarFront?.url && userProfile?.documents?.aadhaarBack?.url;
 
   if (loading) {
     return (
@@ -532,9 +602,9 @@ export default function ProfilePage() {
                     alt="Profile Preview"
                     className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
                   />
-                ) : userProfile?.profilePhotoURL ? (
+                ) : userProfile?.documents?.profilePhoto?.url ? (
                   <img
-                    src={userProfile.profilePhotoURL}
+                    src={userProfile.documents.profilePhoto.url}
                     alt="Profile"
                     className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
                   />
@@ -907,7 +977,10 @@ export default function ProfilePage() {
                   <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
                     value={formData.district}
-                    onChange={(e) => handleInputChange('district', e.target.value)}
+                    onChange={(e) => {
+                      e.preventDefault();
+                      handleInputChange('district', e.target.value);
+                    }}
                     disabled={!formData.state || !districts.length}
                   >
                     <option value="" disabled>Select District</option>
@@ -922,7 +995,10 @@ export default function ProfilePage() {
                   <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
                     value={formData.taluk}
-                    onChange={(e) => handleInputChange('taluk', e.target.value)}
+                    onChange={(e) => {
+                      e.preventDefault();
+                      handleInputChange('taluk', e.target.value);
+                    }}
                     disabled={!formData.district || !taluks.length}
                   >
                     <option value="" disabled>Select Taluk</option>
@@ -937,7 +1013,10 @@ export default function ProfilePage() {
                   <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
                     value={formData.panchayat}
-                    onChange={(e) => handleInputChange('panchayat', e.target.value)}
+                    onChange={(e) => {
+                      e.preventDefault();
+                      handleInputChange('panchayat', e.target.value);
+                    }}
                     disabled={!formData.taluk || !panchayats.length}
                   >
                     <option value="" disabled>Select Panchayat</option>
@@ -1002,7 +1081,7 @@ export default function ProfilePage() {
                   <p className="text-gray-600 font-fira font-medium mb-2">Aadhaar Card (Front):</p>
                   <div className="mt-2">
                     <img
-                      src={userProfile.aadhaarFrontURL}
+                      src={userProfile.documents?.aadhaarFront?.url}
                       alt="Aadhaar Front"
                       className="w-full max-w-sm h-auto rounded-lg object-cover border shadow-sm"
                     />
@@ -1012,7 +1091,7 @@ export default function ProfilePage() {
                   <p className="text-gray-600 font-fira font-medium mb-2">Aadhaar Card (Back):</p>
                   <div className="mt-2">
                     <img
-                      src={userProfile.aadhaarBackURL}
+                      src={userProfile.documents?.aadhaarBack?.url}
                       alt="Aadhaar Back"
                       className="w-full max-w-sm h-auto rounded-lg object-cover border shadow-sm"
                     />
@@ -1060,10 +1139,10 @@ export default function ProfilePage() {
                           </div>
                         )}
                       </div>
-                    ) : userProfile?.aadhaarFrontURL ? (
+                    ) : userProfile?.documents?.aadhaarFront?.url ? (
                       <div className="space-y-2">
                         <img
-                          src={userProfile.aadhaarFrontURL}
+                          src={userProfile.documents.aadhaarFront.url}
                           alt="Current Aadhaar Front"
                           className="w-full h-32 object-cover rounded"
                         />
@@ -1114,10 +1193,10 @@ export default function ProfilePage() {
                           </div>
                         )}
                       </div>
-                    ) : userProfile?.aadhaarBackURL ? (
+                    ) : userProfile?.documents?.aadhaarBack?.url ? (
                       <div className="space-y-2">
                         <img
-                          src={userProfile.aadhaarBackURL}
+                          src={userProfile.documents.aadhaarBack.url}
                           alt="Current Aadhaar Back"
                           className="w-full h-32 object-cover rounded"
                         />

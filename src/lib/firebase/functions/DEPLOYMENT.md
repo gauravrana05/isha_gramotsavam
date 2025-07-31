@@ -49,9 +49,9 @@ firebase deploy --only functions:processAadhaarImageUpload,functions:processProf
 firebase deploy --only functions:verifyTeam,functions:verifyPlayer,functions:getTeamsPendingVerification,functions:getTeamForVerification
 ```
 
-### User Management Functions
+### User Management Functions (CRITICAL - Deploy First!)
 ```bash
-firebase deploy --only functions:createUserProfile,functions:updateUserProfile,functions:getUserProfile,functions:onUserCreated
+firebase deploy --only functions:createUserProfile,functions:createPlayerUser
 ```
 
 ## Function Categories
@@ -226,21 +226,31 @@ firebase functions:shell
 
 ## Next Steps
 
-1. **Deploy Critical Functions First**:
+1. **Deploy Critical Functions First** (Fix Login Issue):
+   ```bash
+   firebase deploy --only functions:createUserProfile,functions:createPlayerUser
+   ```
+
+2. **Deploy Role Management Functions**:
    ```bash
    firebase deploy --only functions:onTeamCreated,functions:onPlayerAdded,functions:promoteToTeamCaptain,functions:promoteToPlayer
    ```
 
-2. **Test Role Flow**:
+3. **Test Login Flow**:
+   - Test phone number verification
+   - Check user profile creation
+   - Verify routing works
+
+4. **Test Role Flow**:
    - Create team → check captain promotion
    - Add player → check player promotion
 
-3. **Deploy Remaining Functions**:
+5. **Deploy Remaining Functions**:
    ```bash
    firebase deploy --only functions
    ```
 
-4. **Monitor and Debug**:
+6. **Monitor and Debug**:
    ```bash
    firebase functions:log --limit 50
    ```

@@ -47,36 +47,66 @@ export const processAadhaarImageUpload = onObjectFinalized(async (event) => {
     // Update the user document in Firestore
     const userDocRef = admin.firestore().collection("users").doc(userId);
 
+    // Update with structured document format
     const updateData: { [key: string]: any } = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     if (imageType === "front") {
-      updateData.aadhaarFrontURL = url;
+      updateData[`documents.aadhaarFront.storagePath`] = filePath;
+      updateData[`documents.aadhaarFront.url`] = url;
+      updateData[`documents.aadhaarFront.verified`] = false;
+      updateData[`documents.aadhaarFront.uploadedAt`] = admin.firestore.FieldValue.serverTimestamp();
+      updateData[`documents.aadhaarFront.uploadedBy`] = userId;
     } else if (imageType === "back") {
-      updateData.aadhaarBackURL = url;
+      updateData[`documents.aadhaarBack.storagePath`] = filePath;
+      updateData[`documents.aadhaarBack.url`] = url;
+      updateData[`documents.aadhaarBack.verified`] = false;
+      updateData[`documents.aadhaarBack.uploadedAt`] = admin.firestore.FieldValue.serverTimestamp();
+      updateData[`documents.aadhaarBack.uploadedBy`] = userId;
     }
 
     await userDocRef.update(updateData);
 
     console.log(`aadhaar ${imageType} image URL added to user ${userId}: ${url}`);
 
-    // Check if both front and back images are now available
+    // Check if profile is now complete
     const userDoc = await userDocRef.get();
     if (userDoc.exists) {
       const userData = userDoc.data();
+      
+      // Check all required documents are present
+      const hasAadhaarFront = userData?.documents?.aadhaarFront?.url;
+      const hasAadhaarBack = userData?.documents?.aadhaarBack?.url;
+      const hasProfilePhoto = userData?.documents?.profilePhoto?.url;
+      
+      // Check all required profile fields are present
+      const hasRequiredFields = userData?.firstName && 
+                               userData?.lastName && 
+                               userData?.dob && 
+                               userData?.gender && 
+                               userData?.whatsappNumber &&
+                               userData?.state &&
+                               userData?.district &&
+                               userData?.panchayat;
+      
       if (
-        userData?.aadhaarFrontURL &&
-        userData?.aadhaarBackURL &&
+        hasAadhaarFront &&
+        hasAadhaarBack &&
+        hasProfilePhoto &&
+        hasRequiredFields &&
         !userData?.isProfileComplete
       ) {
         await userDocRef.update({
           isProfileComplete: true,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-        console.log(`User ${userId} isProfileComplete set to true.`);
+        console.log(`User ${userId} isProfileComplete set to true - all documents and profile fields complete.`);
       }
     }
+
+    // Check for team verification updates
+    await checkAndUpdateTeamVerification(userId);
 
     return null;
   } catch (error) {
@@ -123,10 +153,56 @@ export const processProfilePhotoUpload = onObjectFinalized(
       });
 
       const userDocRef = admin.firestore().collection("users").doc(userId);
-      await userDocRef.update({
-        profilePhotoURL: url,
+      
+      // Update with structured document format
+      const updateData = {
+        [`documents.profilePhoto.storagePath`]: filePath,
+        [`documents.profilePhoto.url`]: url,
+        [`documents.profilePhoto.verified`]: false,
+        [`documents.profilePhoto.uploadedAt`]: admin.firestore.FieldValue.serverTimestamp(),
+        [`documents.profilePhoto.uploadedBy`]: userId,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      };
+      
+      await userDocRef.update(updateData);
+      
+      // Check if profile is now complete
+      const userDoc = await userDocRef.get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        
+        // Check all required documents are present
+        const hasAadhaarFront = userData?.documents?.aadhaarFront?.url;
+        const hasAadhaarBack = userData?.documents?.aadhaarBack?.url;
+        const hasProfilePhoto = userData?.documents?.profilePhoto?.url;
+        
+        // Check all required profile fields are present
+        const hasRequiredFields = userData?.firstName && 
+                                 userData?.lastName && 
+                                 userData?.dob && 
+                                 userData?.gender && 
+                                 userData?.whatsappNumber &&
+                                 userData?.state &&
+                                 userData?.district &&
+                                 userData?.panchayat;
+        
+        if (
+          hasAadhaarFront &&
+          hasAadhaarBack &&
+          hasProfilePhoto &&
+          hasRequiredFields &&
+          !userData?.isProfileComplete
+        ) {
+          await userDocRef.update({
+            isProfileComplete: true,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          console.log(`User ${userId} isProfileComplete set to true - all documents and profile fields complete.`);
+        }
+      }
+
+      // Check for team verification updates
+      await checkAndUpdateTeamVerification(userId);
 
       console.log(`Profile photo URL added to user ${userId}: ${url}`);
     } catch (error) {
@@ -210,3 +286,69 @@ export const generateMediaThumbnail = onObjectFinalized(async (event) => {
     return null;
   }
 });
+
+// Helper function to check and update team verification status
+async function checkAndUpdateTeamVerification(userId: string) {
+  try {
+    // Find teams where this user is a player or captain
+    const teamsQuery = admin.firestore().collection("teams")
+      .where("players", "array-contains-any", [
+        {userId: userId}
+      ]);
+    
+    const captainQuery = admin.firestore().collection("teams")
+      .where("captainId", "==", userId);
+    
+    const [teamsSnapshot, captainSnapshot] = await Promise.all([
+      teamsQuery.get(),
+      captainQuery.get()
+    ]);
+    
+    const allTeamDocs = [...teamsSnapshot.docs, ...captainSnapshot.docs];
+    
+    for (const teamDoc of allTeamDocs) {
+      const teamData = teamDoc.data();
+      const teamId = teamDoc.id;
+      
+      // Get all players including captain
+      const allPlayers = teamData.players || [];
+      
+      // Add captain to players list for verification check
+      if (teamData.captainId) {
+        const captainDoc = await admin.firestore().collection("users").doc(teamData.captainId).get();
+        if (captainDoc.exists) {
+          const captainData = captainDoc.data();
+          allPlayers.push({
+            userId: teamData.captainId,
+            verificationStatus: captainData?.verificationStatus || 'pending',
+            documents: captainData?.documents || {}
+          });
+        }
+      }
+      
+      // Check if all players are verified
+      const allPlayersVerified = allPlayers.every((player: any) => {
+        const docs = player.documents || {};
+        return (
+          player.verificationStatus === 'verified' &&
+          docs.profilePhoto?.verified &&
+          docs.aadhaarFront?.verified &&
+          docs.aadhaarBack?.verified
+        );
+      });
+      
+      // Update team status if all players are verified
+      if (allPlayersVerified && teamData.status !== 'verified') {
+        await admin.firestore().collection("teams").doc(teamId).update({
+          status: 'verified',
+          verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        console.log(`Team ${teamId} automatically verified - all players have complete documents`);
+      }
+    }
+  } catch (error) {
+    console.error(`Error checking team verification for user ${userId}:`, error);
+  }
+}

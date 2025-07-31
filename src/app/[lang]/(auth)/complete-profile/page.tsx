@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase/config";
 import { doc, updateDoc } from "firebase/firestore";
-import { uploadFile } from "@/lib/firebase/storage";
+import { documentUploadService } from "@/lib/services/documentUploadService";
 import { pincodeService } from "@/lib/services/pincodeService";
 import { useTranslation } from "@/lib/utils/i18n";
 import Image from "next/image";
@@ -38,11 +38,11 @@ export default function CompleteProfilePage() {
     district: "",
     taluk: "",
     panchayat: "",
-    preferredLanguage: "en",
     whatsappNumber: "",
     gender: "",
     dob: "",
-    instagramHandle: ""
+    instagramHandle: "",
+    preferredLanguage: ""
   });
 
   const [loading, setLoading] = useState(false);
@@ -64,17 +64,25 @@ export default function CompleteProfilePage() {
   const { user, userProfile, loading: authLoading } = useAuth();
   const { t } = useTranslation();
 
-  const languages = [
-    { code: "en", name: "English" },
-    { code: "ta", name: "Tamil" },
-    { code: "hi", name: "Hindi" },
-    { code: "ml", name: "Malayalam" },
-    { code: "te", name: "Telugu" },
-    { code: "kn", name: "Kannada" },
-    { code: "or", name: "Odia" },
-  ];
 
   const phoneNumber = user?.phoneNumber?.replace(/^\+91/, '') || '';
+
+  // Clean Firestore data by removing undefined values and converting dates
+  const cleanFirestoreData = (obj: any): any => {
+    if (obj === null || obj === undefined) return null;
+    if (obj instanceof Date) return obj.toISOString();
+    if (Array.isArray(obj)) return obj.map(cleanFirestoreData);
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = cleanFirestoreData(value);
+        }
+      }
+      return cleaned;
+    }
+    return obj;
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -115,14 +123,14 @@ export default function CompleteProfilePage() {
         lastName: userProfile.lastName || "",
         whatsappNumber: userProfile.whatsappNumber || phoneNumber,
         dob: userProfile.dob || "",
-        instagramHandle: userProfile.instagramHandle || "",
         gender: userProfile.gender || "",
         pincode: userProfile.pincode || "",
         state: userProfile.state || "",
         district: userProfile.district || "",
         taluk: userProfile.taluk || "",
         panchayat: userProfile.panchayat || "",
-        preferredLanguage: userProfile.preferredLanguage || "en"
+        instagramHandle: userProfile.instagramHandle || "",
+        preferredLanguage: userProfile.preferredLanguage || ""
       }));
 
       if (userProfile.whatsappNumber && userProfile.whatsappNumber === phoneNumber) {
@@ -208,7 +216,9 @@ export default function CompleteProfilePage() {
   const handleWhatsAppSameChange = (checked: boolean) => {
     setIsWhatsAppSame(checked);
     if (checked) {
-      setFormData(prev => ({ ...prev, whatsappNumber: phoneNumber }));
+      // Remove +91 prefix if present
+      const cleanPhoneNumber = phoneNumber.replace(/^\+91/, '');
+      setFormData(prev => ({ ...prev, whatsappNumber: cleanPhoneNumber }));
     } else {
       setFormData(prev => ({ ...prev, whatsappNumber: "" }));
     }
@@ -298,7 +308,11 @@ export default function CompleteProfilePage() {
       setError("Please select your gender");
       return;
     }
-    if (formData.pincode && formData.pincode.length === 6 && !addressCaptured) {
+    if (!formData.pincode || formData.pincode.length !== 6) {
+      setError("Please enter your 6-digit pincode");
+      return;
+    }
+    if (!addressCaptured) {
       setError("Please complete the address selection by choosing a panchayat");
       return;
     }
@@ -311,49 +325,101 @@ export default function CompleteProfilePage() {
     setError("");
 
     try {
+      // Check if profile is complete (all required fields + documents)
+      const hasAllRequiredFields = formData.firstName.trim() && 
+        formData.lastName.trim() && 
+        formData.whatsappNumber.trim() && 
+        formData.dob && 
+        formData.gender && 
+        formData.pincode && 
+        addressCaptured;
+      
+      const hasAllDocuments = formData.profilePhoto && 
+        formData.aadhaarFront && 
+        formData.aadhaarBack;
+      
+      const isComplete = hasAllRequiredFields && hasAllDocuments;
+
       const profileData: any = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         whatsappNumber: formData.whatsappNumber,
         dob: formData.dob,
-        instagramHandle: formData.instagramHandle,
         gender: formData.gender,
         pincode: formData.pincode,
         state: formData.state,
         district: formData.district,
         taluk: formData.taluk,
         panchayat: formData.panchayat,
+        instagramHandle: formData.instagramHandle,
         preferredLanguage: formData.preferredLanguage,
-        isProfileComplete: true,
+        isProfileComplete: isComplete,
         updatedAt: new Date().toISOString(),
       };
 
+      // Initialize documents structure with new simplified schema
+      const documents: any = {
+        profilePhoto: {
+          storagePath: formData.profilePhoto ? documentUploadService.getStoragePath(user.uid, 'profilePhoto') : "",
+          verified: false,
+          uploadedAt: null,
+          uploadedBy: null
+        },
+        aadhaarFront: {
+          storagePath: formData.aadhaarFront ? documentUploadService.getStoragePath(user.uid, 'aadhaarFront') : "",
+          verified: false,
+          uploadedAt: null,
+          uploadedBy: null
+        },
+        aadhaarBack: {
+          storagePath: formData.aadhaarBack ? documentUploadService.getStoragePath(user.uid, 'aadhaarBack') : "",
+          verified: false,
+          uploadedAt: null,
+          uploadedBy: null
+        }
+      };
+
+      // Upload profile photo if provided
       if (formData.profilePhoto) {
-        profileData.profilePhotoURL = await uploadFile(
+        const profilePhotoURL = await documentUploadService.uploadProfilePhoto(
+          user.uid,
           formData.profilePhoto,
-          `profilePhotos/${user.uid}/profile_photo`,
-          (progress) => setUploadProgress(prev => ({ ...prev, profile: progress }))
+          (progress) => setUploadProgress(prev => ({ ...prev, profile: progress.progress }))
         );
+        documents.profilePhoto.url = profilePhotoURL;
+        documents.profilePhoto.uploadedAt = new Date();
+        documents.profilePhoto.uploadedBy = user.uid;
       }
 
+      // Upload Aadhaar front if provided
       if (formData.aadhaarFront) {
-        profileData.aadhaarFrontURL = await uploadFile(
+        const aadhaarFrontURL = await documentUploadService.uploadAadhaarFront(
+          user.uid,
           formData.aadhaarFront,
-          `aadhaar/${user.uid}/front_${Date.now()}`,
-          (progress) => setUploadProgress(prev => ({ ...prev, aadhaarFront: progress }))
+          (progress) => setUploadProgress(prev => ({ ...prev, aadhaarFront: progress.progress }))
         );
+        documents.aadhaarFront.url = aadhaarFrontURL;
+        documents.aadhaarFront.uploadedAt = new Date();
+        documents.aadhaarFront.uploadedBy = user.uid;
       }
 
+      // Upload Aadhaar back if provided
       if (formData.aadhaarBack) {
-        profileData.aadhaarBackURL = await uploadFile(
+        const aadhaarBackURL = await documentUploadService.uploadAadhaarBack(
+          user.uid,
           formData.aadhaarBack,
-          `aadhaar/${user.uid}/back_${Date.now()}`,
-          (progress) => setUploadProgress(prev => ({ ...prev, aadhaarBack: progress }))
+          (progress) => setUploadProgress(prev => ({ ...prev, aadhaarBack: progress.progress }))
         );
+        documents.aadhaarBack.url = aadhaarBackURL;
+        documents.aadhaarBack.uploadedAt = new Date();
+        documents.aadhaarBack.uploadedBy = user.uid;
       }
+
+      // Add the structured documents to profileData
+      profileData.documents = documents;
 
       const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, profileData);
+      await updateDoc(userRef, cleanFirestoreData(profileData));
 
       const role = userProfile?.role || "public";
       switch (role) {
@@ -428,9 +494,9 @@ export default function CompleteProfilePage() {
                     alt="Profile Preview" 
                     className="w-24 h-24 rounded-full object-cover"
                   />
-                ) : userProfile?.profilePhotoURL ? (
+                ) : userProfile?.documents?.profilePhoto?.storagePath ? (
                   <img 
-                    src={userProfile.profilePhotoURL} 
+                    src={`/api/storage/${userProfile.documents.profilePhoto.storagePath}`} 
                     alt="Current Profile" 
                     className="w-24 h-24 rounded-full object-cover"
                   />
@@ -442,7 +508,7 @@ export default function CompleteProfilePage() {
               </div>
               <label className="btn bg-[#CE4520] text-white px-6 py-2 rounded-lg cursor-pointer hover:bg-[#1565C0] transition-colors">
                 <Upload className="w-4 h-4 inline mr-2" />
-                {userProfile?.profilePhotoURL ? 'Change Profile Photo' : 'Upload Profile Photo'}
+                {userProfile?.documents?.profilePhoto?.storagePath ? 'Change Profile Photo' : 'Upload Profile Photo'}
                 <input
                   type="file"
                   accept="image/*"
@@ -608,13 +674,20 @@ export default function CompleteProfilePage() {
               <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
                 Instagram Handle
               </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
-                placeholder="@username (optional)"
-                value={formData.instagramHandle}
-                onChange={(e) => handleInputChange('instagramHandle', e.target.value)}
-              />
+              <div className="flex">
+                <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-3">
+                  <span className="text-sm font-fira">@</span>
+                </div>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                  placeholder="username"
+                  value={formData.instagramHandle}
+                  onChange={(e) => handleInputChange('instagramHandle', e.target.value)}
+                  maxLength={30}
+                />
+              </div>
+              <small className="text-gray-500 text-xs font-fira">Optional - Enter your Instagram username without @</small>
             </div>
 
             <div>
@@ -626,11 +699,23 @@ export default function CompleteProfilePage() {
                 value={formData.preferredLanguage}
                 onChange={(e) => handleInputChange('preferredLanguage', e.target.value)}
               >
-                {languages.map(lang => (
-                  <option key={lang.code} value={lang.code}>{lang.name}</option>
-                ))}
+                <option value="" disabled>Select Preferred Language</option>
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="ta">Tamil</option>
+                <option value="te">Telugu</option>
+                <option value="kn">Kannada</option>
+                <option value="ml">Malayalam</option>
+                <option value="or">Odia</option>
+                <option value="bn">Bengali</option>
+                <option value="gu">Gujarati</option>
+                <option value="mr">Marathi</option>
+                <option value="pa">Punjabi</option>
+                <option value="as">Assamese</option>
               </select>
+              <small className="text-gray-500 text-xs font-fira">Optional - Choose your preferred language for communication</small>
             </div>
+
           </div>
         </div>
 
@@ -680,7 +765,10 @@ export default function CompleteProfilePage() {
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
                 value={formData.district}
-                onChange={(e) => handleInputChange('district', e.target.value)}
+                onChange={(e) => {
+                  e.preventDefault();
+                  handleInputChange('district', e.target.value);
+                }}
                 disabled={!formData.state || !districts.length}
               >
                 <option value="" disabled>Select District</option>
@@ -695,7 +783,10 @@ export default function CompleteProfilePage() {
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
                 value={formData.taluk}
-                onChange={(e) => handleInputChange('taluk', e.target.value)}
+                onChange={(e) => {
+                  e.preventDefault();
+                  handleInputChange('taluk', e.target.value);
+                }}
                 disabled={!formData.district || !taluks.length}
               >
                 <option value="" disabled>Select Taluk</option>
@@ -710,7 +801,10 @@ export default function CompleteProfilePage() {
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
                 value={formData.panchayat}
-                onChange={(e) => handleInputChange('panchayat', e.target.value)}
+                onChange={(e) => {
+                  e.preventDefault();
+                  handleInputChange('panchayat', e.target.value);
+                }}
                 disabled={!formData.taluk || !panchayats.length}
               >
                 <option value="" disabled>Select Panchayat</option>
@@ -719,6 +813,7 @@ export default function CompleteProfilePage() {
                 ))}
               </select>
             </div>
+
           </div>
 
           {addressCaptured && (
@@ -763,10 +858,10 @@ export default function CompleteProfilePage() {
                       </div>
                     )}
                   </div>
-                ) : userProfile?.aadhaarFrontURL ? (
+                ) : userProfile?.documents?.aadhaarFront?.storagePath ? (
                   <div className="space-y-2">
                     <img 
-                      src={userProfile.aadhaarFrontURL} 
+                      src={`/api/storage/${userProfile.documents.aadhaarFront.storagePath}`} 
                       alt="Current Aadhaar Front" 
                       className="w-full h-32 object-cover rounded"
                     />
@@ -817,10 +912,10 @@ export default function CompleteProfilePage() {
                       </div>
                     )}
                   </div>
-                ) : userProfile?.aadhaarBackURL ? (
+                ) : userProfile?.documents?.aadhaarBack?.storagePath ? (
                   <div className="space-y-2">
                     <img 
-                      src={userProfile.aadhaarBackURL} 
+                      src={`/api/storage/${userProfile.documents.aadhaarBack.storagePath}`} 
                       alt="Current Aadhaar Back" 
                       className="w-full h-32 object-cover rounded"
                     />

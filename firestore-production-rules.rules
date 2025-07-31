@@ -1,0 +1,112 @@
+// Production Firestore Security Rules for Isha Gramotsavam
+// Use these rules after database initialization is complete
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to get user role from users collection
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    // Helper function to check if user is captain
+    function isCaptain() {
+      return isAuthenticated() && getUserRole() == 'captain';
+    }
+    
+    // Helper function to check if user is volunteer
+    function isVolunteer() {
+      return isAuthenticated() && (getUserRole() == 'volunteer_general' || getUserRole() == 'volunteer_technical');
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own data, admins can read all
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      
+      // Users can update their own data, admins can update all
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      
+      // Allow user creation during registration
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Sports collection
+    match /sports/{sportId} {
+      // Everyone can read sports (public information)
+      allow read: if true;
+      
+      // Only admins can modify sports
+      allow write: if isAdmin();
+    }
+    
+    // Events collection
+    match /events/{eventId} {
+      // Everyone can read events (public information)
+      allow read: if true;
+      
+      // Only admins can modify events
+      allow write: if isAdmin();
+    }
+    
+    // Venues collection
+    match /venues/{venueId} {
+      // Everyone can read venue basic info
+      allow read: if true;
+      
+      // Only admins and volunteers can modify venues
+      allow write: if isAdmin() || isVolunteer();
+    }
+    
+    // Teams collection
+    match /teams/{teamId} {
+      // Teams can be read by:
+      // - Anyone (for public viewing)
+      allow read: if true;
+      
+      // Teams can be created by:
+      // - Authenticated captains
+      allow create: if isAuthenticated() && isCaptain();
+      
+      // Teams can be updated by:
+      // - Team captain (if they own the team)
+      // - Admins
+      allow update: if isAuthenticated() && 
+        (resource.data.captainId == request.auth.uid || isAdmin());
+      
+      // Teams can be deleted by:
+      // - Admins only
+      allow delete: if isAdmin();
+    }
+    
+    // Matches collection (when implemented)
+    match /matches/{matchId} {
+      // Everyone can read matches (public scores)
+      allow read: if true;
+      
+      // Only admins and volunteers can modify matches
+      allow write: if isAdmin() || isVolunteer();
+    }
+    
+    // Audit logs collection (when implemented)
+    match /audit_logs/{logId} {
+      // Only admins can read audit logs
+      allow read: if isAdmin();
+      
+      // System can write audit logs (no user restriction)
+      allow write: if true;
+    }
+  }
+}

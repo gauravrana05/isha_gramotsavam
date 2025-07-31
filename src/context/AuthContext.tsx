@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User, signOut } from "firebase/auth";
 import { doc, onSnapshot, DocumentData } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/config";
 import { UserProfile } from "@/lib/types/auth";
@@ -10,6 +10,7 @@ interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  logout: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,6 +19,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setUserProfile(null);
+    } catch (error) {
+      console.error("Error signing out:", error);
+      throw error;
+    }
+  };
 
   useEffect(() => {
     let unsubscribeFromDoc: (() => void) | undefined;
@@ -55,11 +67,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.log("New user detected. Waiting for server-side profile creation...");
               setLoading(true);
               // Set a timeout to prevent infinite loading if profile creation fails
-              profileCreationTimeout = setTimeout(() => {
-                console.error("Profile creation timed out. User document not found.");
-                setLoading(false);
-                setUserProfile(null);
-              }, 10000); // 10-second timeout
+              profileCreationTimeout = setTimeout(async () => {
+                console.warn("Profile creation timed out. Creating fallback profile...");
+                
+                // Create a basic user profile if Cloud Function didn't create it
+                try {
+                  const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
+                  const { db } = await import("@/lib/firebase/config");
+                  
+                  const fallbackProfile = {
+                    uid: firebaseUser.uid,
+                    firstName: "",
+                    lastName: "",
+                    phoneNumber: firebaseUser.phoneNumber || "",
+                    whatsappNumber: firebaseUser.phoneNumber || "",
+                    dob: "",
+                    gender: "",
+                    panchayat: "",
+                    taluk: "",
+                    district: "",
+                    state: "",
+                    pincode: "",
+                    instagramHandle: "",
+                    preferredLanguage: "",
+                    role: "player",
+                    currentTeamId: null,
+                    isProfileComplete: false,
+                    isVerified: false,
+                    documents: {
+                      profilePhoto: {
+                        storagePath: "",
+                        verified: false,
+                        uploadedAt: null,
+                        uploadedBy: null
+                      },
+                      aadhaarFront: {
+                        storagePath: "",
+                        verified: false,
+                        uploadedAt: null,
+                        uploadedBy: null
+                      },
+                      aadhaarBack: {
+                        storagePath: "",
+                        verified: false,
+                        uploadedAt: null,
+                        uploadedBy: null
+                      }
+                    },
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                  };
+                  
+                  await setDoc(doc(db, "users", firebaseUser.uid), fallbackProfile);
+                  console.log("Fallback profile created successfully");
+                  
+                  // The onSnapshot listener will pick up the new document
+                } catch (error) {
+                  console.error("Failed to create fallback profile:", error);
+                  setLoading(false);
+                  setUserProfile(null);
+                }
+              }, 5000); // 5-second timeout
             }
           },
           (err) => {
@@ -89,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, logout }}>
       {children}
     </AuthContext.Provider>
   );

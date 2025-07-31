@@ -1,0 +1,14 @@
+// Development Firestore Security Rules for Isha Gramotsavam
+// WARNING: These rules allow full read/write access for development
+// Use only during development - replace with production rules before going live
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow all reads and writes during development
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

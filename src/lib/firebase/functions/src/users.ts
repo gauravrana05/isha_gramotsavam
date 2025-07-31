@@ -16,8 +16,6 @@ export const createUserProfile = beforeUserCreated(async (event) => {
   try {
     const uid = event.data?.uid;
     const phoneNumber = event.data?.phoneNumber;
-    const email = event.data?.email;
-    const displayName = event.data?.displayName;
 
     if (!uid) {
       console.error("No UID found in event data for user creation.");
@@ -25,41 +23,48 @@ export const createUserProfile = beforeUserCreated(async (event) => {
       throw new HttpsError("invalid-argument", "No UID found in event data, cannot create user.");
     }
 
-    // Default profile data for a new user
+    // Default profile data for a new user using simplified schema
     const userProfileData = {
-      userId: uid,
-      phoneNumber: phoneNumber || null,
-      email: email || null,
-      name: displayName || "",
-      role: "public", // Default role
-      isProfileComplete: false,
-      isVerified: false,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
-      // Add other default fields from your snippet
-      assignedVenues: [],
-      permissions: [],
-      profilePhotoURL: null,
-      aadhaarFrontURL: null,
-      aadhaarBackURL: null,
-      pincode: "",
-      village: "",
+      uid: uid,
+      firstName: "",
+      lastName: "",
+      phoneNumber: phoneNumber || "",
+      whatsappNumber: phoneNumber || "",
+      dob: "", // YYYY-MM-DD format
+      gender: "", // 'M' | 'F' | 'O'
       panchayat: "",
       taluk: "",
       district: "",
       state: "",
-      countryOfResidence: "India",
-      gender: "",
-      dob: "",
-      nationality: "",
-      preferredLanguage: "en",
-      whatsappNumber: "",
-      whatsappCountryCode: "91",
-      company: "",
-      profession: "",
-      passport: "",
-      pan: "",
+      pincode: "",
+      instagramHandle: "",
+      preferredLanguage: "",
+      role: "public", // Default role for new users
+      currentTeamId: null,
+      isProfileComplete: false,
+      isVerified: false,
+      documents: {
+        profilePhoto: {
+          storagePath: "",
+          verified: false,
+          uploadedAt: null,
+          uploadedBy: null
+        },
+        aadhaarFront: {
+          storagePath: "",
+          verified: false,
+          uploadedAt: null,
+          uploadedBy: null
+        },
+        aadhaarBack: {
+          storagePath: "",
+          verified: false,
+          uploadedAt: null,
+          uploadedBy: null
+        }
+      },
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
     };
 
     // Set the data in Firestore

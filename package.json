@@ -6,7 +6,10 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "firebase:init": "node scripts/run-firebase-init.js",
+    "firebase:init-full": "node scripts/firebase-init.js",
+    "firebase:sports": "node scripts/init-sports-data.js"
   },
   "dependencies": {
     "firebase": "^12.0.0",

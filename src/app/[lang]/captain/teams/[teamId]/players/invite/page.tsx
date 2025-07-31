@@ -251,7 +251,7 @@ export default function CaptainPlayerManagement() {
             age: player.age || (player.dob ? calculateAge(player.dob) : 18),
             gender: player.gender || 'M',
             position: player.position || 'main',
-            addedAt: player.addedAt ? new Date(player.addedAt) : new Date(),
+            addedAt: player.addedAt ? (new Date(player.addedAt).getTime() ? new Date(player.addedAt) : new Date()) : new Date(),
             addedBy: player.addedBy || 'captain',
             profileComplete: player.profileComplete || false,
             profileData: {
@@ -270,21 +270,21 @@ export default function CaptainPlayerManagement() {
                 storagePath: player.documents?.profilePhoto?.storagePath || `profilePhotos/${player.userId}/profile_photo`,
                 url: player.documents?.profilePhoto?.url || null,
                 verified: player.documents?.profilePhoto?.verified || false,
-                uploadedAt: player.documents?.profilePhoto?.uploadedAt ? new Date(player.documents.profilePhoto.uploadedAt) : null,
+                uploadedAt: player.documents?.profilePhoto?.uploadedAt ? (new Date(player.documents.profilePhoto.uploadedAt).getTime() ? new Date(player.documents.profilePhoto.uploadedAt) : null) : null,
                 uploadedBy: player.documents?.profilePhoto?.uploadedBy || null
               },
               aadhaarFront: {
                 storagePath: player.documents?.aadhaarFront?.storagePath || `aadhaar/${player.userId}/front_`,
                 url: player.documents?.aadhaarFront?.url || null,
                 verified: player.documents?.aadhaarFront?.verified || false,
-                uploadedAt: player.documents?.aadhaarFront?.uploadedAt ? new Date(player.documents.aadhaarFront.uploadedAt) : null,
+                uploadedAt: player.documents?.aadhaarFront?.uploadedAt ? (new Date(player.documents.aadhaarFront.uploadedAt).getTime() ? new Date(player.documents.aadhaarFront.uploadedAt) : null) : null,
                 uploadedBy: player.documents?.aadhaarFront?.uploadedBy || null
               },
               aadhaarBack: {
                 storagePath: player.documents?.aadhaarBack?.storagePath || `aadhaar/${player.userId}/back_`,
                 url: player.documents?.aadhaarBack?.url || null,
                 verified: player.documents?.aadhaarBack?.verified || false,
-                uploadedAt: player.documents?.aadhaarBack?.uploadedAt ? new Date(player.documents.aadhaarBack.uploadedAt) : null,
+                uploadedAt: player.documents?.aadhaarBack?.uploadedAt ? (new Date(player.documents.aadhaarBack.uploadedAt).getTime() ? new Date(player.documents.aadhaarBack.uploadedAt) : null) : null,
                 uploadedBy: player.documents?.aadhaarBack?.uploadedBy || null
               }
             },
@@ -430,6 +430,11 @@ export default function CaptainPlayerManagement() {
       return null; // Keep null as is
     }
     
+    // Handle Date objects - check if they're valid
+    if (obj instanceof Date) {
+      return isNaN(obj.getTime()) ? null : obj; // Return null for invalid dates, keep valid dates
+    }
+    
     if (Array.isArray(obj)) {
       return obj.map(cleanFirestoreData);
     }
@@ -523,23 +528,46 @@ export default function CaptainPlayerManagement() {
       await updateDoc(playerDocRef, cleanFirestoreData(updateData));
       
       // Update local state
-      setPlayers(prev => prev.map(p => 
-        p.userId === player.userId 
-          ? {
-              ...p,
-              documents: {
-                ...p.documents,
-                [documentType]: {
-                  storagePath: documentUploadService.getStoragePath(player.userId, documentType),
-                  url: downloadURL,
-                  verified: false,
-                  uploadedAt: new Date(),
-                  uploadedBy: user!.uid
+      setPlayers(prev => {
+        const updatedPlayers = prev.map(p => 
+          p.userId === player.userId 
+            ? {
+                ...p,
+                documents: {
+                  ...p.documents,
+                  [documentType]: {
+                    storagePath: documentUploadService.getStoragePath(player.userId, documentType),
+                    url: downloadURL,
+                    verified: false,
+                    uploadedAt: new Date(),
+                    uploadedBy: user!.uid
+                  }
                 }
               }
-            }
-          : p
-      ));
+            : p
+        );
+        
+        // Also update the team document with latest player data
+        const updateTeamWithPlayers = async () => {
+          try {
+            const teamRef = doc(db, "teams", teamIdStr);
+            const playersToSave = updatedPlayers
+              .filter(p => !p.playerId.startsWith('captain_'))
+              .map(cleanFirestoreData);
+            
+            await updateDoc(teamRef, {
+              players: playersToSave,
+              updatedAt: new Date().toISOString()
+            });
+            console.log('Team document updated with latest player data');
+          } catch (error) {
+            console.error('Error updating team document:', error);
+          }
+        };
+        
+        updateTeamWithPlayers();
+        return updatedPlayers;
+      });
       
     } catch (error) {
       console.error(`Error uploading ${documentType}:`, error);
@@ -843,8 +871,14 @@ export default function CaptainPlayerManagement() {
     // Submit team for verification
     try {
       const teamRef = doc(db, "teams", teamIdStr);
+      
+      // Clean the players data before saving to Firestore
+      const playersToSubmit = players
+        .filter(p => !p.playerId.startsWith('captain_')) // Don't save captain in players array
+        .map(cleanFirestoreData); // Clean undefined values and fix dates
+      
       await updateDoc(teamRef, {
-        players: players,
+        players: playersToSubmit,
         status: "submitted",
         updatedAt: new Date().toISOString(),
       });
@@ -852,6 +886,7 @@ export default function CaptainPlayerManagement() {
       router.push(`/${lang}/captain/dashboard`);
     } catch (error) {
       console.error('Error submitting team:', error);
+      alert(`Failed to submit team: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

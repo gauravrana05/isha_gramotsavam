@@ -50,7 +50,43 @@ export const PublicTeamRegistration: React.FC<PublicTeamRegistrationProps> = ({
     }
   };
 
-  const currentSport = sportConfig[sport];
+  if (loadingSport) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
+        <span className="ml-3 text-[#4A2F1D] font-medium">Loading sport information...</span>
+      </div>
+    );
+  }
+
+  if (!sport) {
+    return (
+      <div className="text-center py-12">
+        <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Sport Not Found</h2>
+        <p className="text-gray-600">The requested sport could not be found.</p>
+      </div>
+    );
+  }
+
+  if (!eligible) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="flex items-center mb-4">
+          <AlertCircle className="w-6 h-6 text-red-600 mr-3" />
+          <h3 className="text-lg font-semibold text-red-800">Registration Not Available</h3>
+        </div>
+        <div className="text-red-700">
+          <p className="mb-2">You are not eligible to register for {sport.name}:</p>
+          <ul className="list-disc list-inside space-y-1">
+            {eligibilityReasons.map((reason, index) => (
+              <li key={index} className="text-sm">{reason}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -63,10 +99,7 @@ export const PublicTeamRegistration: React.FC<PublicTeamRegistrationProps> = ({
       newErrors.name = 'Team name must be less than 50 characters';
     }
 
-    // Validate gender for throwball
-    if (sport === 'throwball' && userProfile.gender !== 'F') {
-      newErrors.gender = 'Throwball registration is only available for women';
-    }
+    // Eligibility is already checked in useEffect, no need to re-validate gender here
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -89,8 +122,8 @@ export const PublicTeamRegistration: React.FC<PublicTeamRegistrationProps> = ({
       const teamData: TeamCreationData = {
         name: formData.name.trim(),
         description: formData.description.trim(),
-        sportName: currentSport.displayName,
-        sport: sport,
+        sportName: sport.name,
+        sportId: sport.sportId,
         captainId: userProfile.uid,
         panchayat: userProfile.panchayat,
         district: userProfile.district,
@@ -117,13 +150,21 @@ export const PublicTeamRegistration: React.FC<PublicTeamRegistrationProps> = ({
     <div className="max-w-2xl mx-auto">
       {/* Sport Header */}
       <div className="text-center mb-8">
-        <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${currentSport.color} text-white text-2xl mb-4`}>
-          {currentSport.icon}
+        <div className="relative w-24 h-24 mx-auto mb-4">
+          <img 
+            src={sport.assets.primaryImage} 
+            alt={sport.name}
+            className="w-full h-full object-cover rounded-full"
+          />
         </div>
         <h1 className="text-2xl md:text-3xl font-bold font-fira text-gray-900 mb-2">
-          Register for {currentSport.displayName}
+          Register for {sport.displayName}
         </h1>
-        <p className="text-gray-600 font-fira">{currentSport.description}</p>
+        <p className="text-gray-600 font-fira">{sport.description}</p>
+        <div className="mt-4 flex justify-center space-x-6 text-sm text-gray-600">
+          <span>👥 {sport.teamConfig.maxPlayers} + {sport.teamConfig.maxSubstitutes} Players</span>
+          <span>🏆 ₹{sport.eventInfo.prizePool.first.toLocaleString()}</span>
+        </div>
       </div>
 
       {/* Progress Indicator */}
@@ -164,19 +205,27 @@ export const PublicTeamRegistration: React.FC<PublicTeamRegistrationProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-fira text-[#4A2F1D]">
           <div className="flex items-center">
             <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-            <span>Players: {currentSport.maxPlayers} main</span>
+            <span>Players: {sport.teamConfig.maxPlayers} main</span>
           </div>
           <div className="flex items-center">
             <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-            <span>Substitutes: {currentSport.maxSubstitutes} max</span>
+            <span>Substitutes: {sport.teamConfig.maxSubstitutes} max</span>
           </div>
           <div className="flex items-center">
             <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-            <span>Age: 14-60 years</span>
+            <span>Age: {sport.eligibility.minAge}-{sport.eligibility.maxAge} years</span>
           </div>
           <div className="flex items-center">
             <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
-            <span>Same panchayat required</span>
+            <span>{sport.eligibility.requireSamePanchayat ? 'Same panchayat required' : 'Any location allowed'}</span>
+          </div>
+          <div className="flex items-center">
+            <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
+            <span>Gender: {sport.eligibility.genderRestriction === 'any' ? 'Any' : sport.eligibility.genderRestriction === 'male' ? 'Men only' : 'Women only'}</span>
+          </div>
+          <div className="flex items-center">
+            <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
+            <span>Registration: {new Date(sport.eventInfo.registrationStart).toLocaleDateString()} - {new Date(sport.eventInfo.registrationEnd).toLocaleDateString()}</span>
           </div>
         </div>
       </div>
