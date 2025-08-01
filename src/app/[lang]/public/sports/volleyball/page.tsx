@@ -1,4 +1,4 @@
-// src/app/[lang]/public/sports/throwball/page.tsx
+// src/app/[lang]/public/sports/Volleyball/page.tsx
 import React from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -10,13 +10,13 @@ import TransformationStories from '@/components/public/TransformationStories'
 import FAQSection from '@/components/public/FAQSection'
 import DecorativeElement from '@/components/ui/DecorativeElement'
 
-interface ThrowballPageProps {
+interface VolleyballPageProps {
     params: {
         lang: string
     }
 }
 
-export default function ThrowballPage({ params }: ThrowballPageProps) {
+export default function VolleyballPage({ params }: VolleyballPageProps) {
     const { lang } = params
 
     return (
@@ -71,7 +71,7 @@ export default function ThrowballPage({ params }: ThrowballPageProps) {
                             {/* Actual Text Content */}
                             <div className="relative z-10">
                                 <h1 className="font-fira text-4xl font-extrabold text-black md:text-5xl lg:text-4xl">
-                                    Throwball at Isha Gramotsavam
+                                    Volleyball at Isha Gramotsavam
                                 </h1>
 
                                 <div className="font-fira mb-6 text-xl font-semibold text-black md:text-2xl">
@@ -169,7 +169,7 @@ export default function ThrowballPage({ params }: ThrowballPageProps) {
                             <p className="text-lg text-[#4A2F1D] mb-8 font-fira">
                                 Make sure you read through all the rules carefully.
                             </p>
-                            <Link href={`/${lang}/public/sports/throwball/rules`}>
+                            <Link href={`/${lang}/public/sports/Volleyball/rules`}>
                                 <Button variant="secondary" size="large" className="inline-flex items-center">
                                     <svg viewBox="0 0 27 27" className="w-6 h-6 mr-3" fill="currentColor">
                                         <g clipPath="url(#clip0_2085_23016)">

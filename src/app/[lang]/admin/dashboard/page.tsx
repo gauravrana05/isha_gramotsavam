@@ -2,22 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { db } from '@/lib/firebase/config';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { 
   Users, 
   Trophy, 
-  MapPin, 
-  Calendar,
+  MapPin,
   UserCheck,
-  Shield,
-  TrendingUp,
-  AlertCircle,
   CheckCircle,
   Clock,
-  BarChart3,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 interface DashboardStats {
   totalUsers: number;
@@ -25,26 +23,7 @@ interface DashboardStats {
   totalSports: number;
   totalVenues: number;
   pendingVerifications: number;
-  activeVolunteers: number;
-  todayRegistrations: number;
-  systemHealth: 'healthy' | 'warning' | 'error';
-}
-
-interface QuickAction {
-  title: string;
-  description: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-}
-
-interface RecentActivity {
-  id: string;
-  type: 'registration' | 'verification' | 'system';
-  title: string;
-  description: string;
-  timestamp: Date;
-  status: 'success' | 'warning' | 'error';
+  completedVerifications: number;
 }
 
 export default function AdminDashboard() {
@@ -54,361 +33,249 @@ export default function AdminDashboard() {
     totalSports: 0,
     totalVenues: 0,
     pendingVerifications: 0,
-    activeVolunteers: 0,
-    todayRegistrations: 0,
-    systemHealth: 'healthy'
+    completedVerifications: 0
   });
   const [loading, setLoading] = useState(true);
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [error, setError] = useState('');
 
-  const { userProfile } = useAuth();
+  const { user, userProfile, loading: authLoading } = useAuth();
   const { lang } = useParams();
+  const router = useRouter();
 
-  const quickActions: QuickAction[] = [
-    {
-      title: 'Create New Sport',
-      description: 'Add a new sport to the system',
-      href: `/${lang}/admin/sports/create`,
-      icon: Trophy,
-      color: 'bg-blue-500 hover:bg-blue-600'
-    },
-    {
-      title: 'Add Venue',
-      description: 'Register a new venue',
-      href: `/${lang}/admin/venues/create`,
-      icon: MapPin,
-      color: 'bg-green-500 hover:bg-green-600'
-    },
-    {
-      title: 'Manage Users',
-      description: 'View and manage user accounts',
-      href: `/${lang}/admin/users`,
-      icon: Users,
-      color: 'bg-purple-500 hover:bg-purple-600'
-    },
-    {
-      title: 'Team Verification',
-      description: 'Review pending team verifications',
-      href: `/${lang}/admin/teams/verification`,
-      icon: UserCheck,
-      color: 'bg-orange-500 hover:bg-orange-600'
-    },
-    {
-      title: 'View Reports',
-      description: 'Access analytics and reports',
-      href: `/${lang}/admin/reports`,
-      icon: BarChart3,
-      color: 'bg-indigo-500 hover:bg-indigo-600'
-    },
-    {
-      title: 'System Settings',
-      description: 'Configure system parameters',
-      href: `/${lang}/admin/system/config`,
-      icon: Shield,
-      color: 'bg-gray-500 hover:bg-gray-600'
-    }
-  ];
 
   useEffect(() => {
+    if (authLoading) return;
+    
+    if (!user) {
+      router.push(`/${lang}/login`);
+      return;
+    }
+
+    if (userProfile?.role !== 'admin') {
+      router.push(`/${lang}/player/dashboard`);
+      return;
+    }
+
     loadDashboardData();
-  }, []);
+  }, [user, userProfile, authLoading, lang, router]);
 
   const loadDashboardData = async () => {
     try {
-      // Simulate API calls - replace with actual data fetching
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setLoading(true);
+      
+      // Load users count
+      const usersCollection = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersCollection);
+      const totalUsers = usersSnapshot.size;
+      
+      // Load teams count and verification status
+      const teamsCollection = collection(db, 'teams');
+      const teamsSnapshot = await getDocs(teamsCollection);
+      const totalTeams = teamsSnapshot.size;
+      
+      let pendingVerifications = 0;
+      let completedVerifications = 0;
+      
+      teamsSnapshot.docs.forEach(doc => {
+        const team = doc.data();
+        if (team.status === 'submitted' || team.status === 'pending') {
+          pendingVerifications++;
+        } else if (team.status === 'verified') {
+          completedVerifications++;
+        }
+      });
+      
+      // Load sports count
+      const sportsCollection = collection(db, 'sports');
+      const sportsSnapshot = await getDocs(sportsCollection);
+      const totalSports = sportsSnapshot.size;
+      
+      // Load venues count
+      const venuesCollection = collection(db, 'venues');
+      const venuesSnapshot = await getDocs(venuesCollection);
+      const totalVenues = venuesSnapshot.size;
       
       setStats({
-        totalUsers: 1247,
-        totalTeams: 156,
-        totalSports: 2,
-        totalVenues: 8,
-        pendingVerifications: 23,
-        activeVolunteers: 45,
-        todayRegistrations: 12,
-        systemHealth: 'healthy'
+        totalUsers,
+        totalTeams,
+        totalSports,
+        totalVenues,
+        pendingVerifications,
+        completedVerifications
       });
-
-      setRecentActivity([
-        {
-          id: '1',
-          type: 'registration',
-          title: 'New Team Registration',
-          description: 'Team "Thunder Bolts" registered for Volleyball',
-          timestamp: new Date(Date.now() - 30 * 60 * 1000),
-          status: 'success'
-        },
-        {
-          id: '2',
-          type: 'verification',
-          title: 'Team Verified',
-          description: 'Team "Lightning Strikers" verification completed',
-          timestamp: new Date(Date.now() - 45 * 60 * 1000),
-          status: 'success'
-        },
-        {
-          id: '3',
-          type: 'system',
-          title: 'Database Backup',
-          description: 'Scheduled backup completed successfully',
-          timestamp: new Date(Date.now() - 60 * 60 * 1000),
-          status: 'success'
-        },
-        {
-          id: '4',
-          type: 'verification',
-          title: 'Verification Pending',
-          description: '5 teams awaiting document verification',
-          timestamp: new Date(Date.now() - 90 * 60 * 1000),
-          status: 'warning'
-        }
-      ]);
-
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      
+    } catch (err: any) {
+      console.error('Error loading dashboard data:', err);
+      setError('Failed to load dashboard data. Please check your permissions.');
     } finally {
       setLoading(false);
     }
   };
 
-  const getActivityIcon = (type: string, status: string) => {
-    if (status === 'error') return <AlertCircle className="w-4 h-4 text-red-500" />;
-    if (status === 'warning') return <Clock className="w-4 h-4 text-yellow-500" />;
-    
-    switch (type) {
-      case 'registration':
-        return <Users className="w-4 h-4 text-blue-500" />;
-      case 'verification':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'system':
-        return <Activity className="w-4 h-4 text-gray-500" />;
-      default:
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-    }
-  };
 
-  const formatTimestamp = (timestamp: Date) => {
-    const now = new Date();
-    const diffMs = now.getTime() - timestamp.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    
-    if (diffMins < 60) {
-      return `${diffMins} minutes ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hours ago`;
-    } else {
-      return timestamp.toLocaleDateString();
-    }
-  };
-
-  if (loading) {
+  if (authLoading || loading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse space-y-8">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
-            ))}
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">
+            <Activity className="w-16 h-16 mx-auto" />
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="h-96 bg-gray-200 rounded-lg"></div>
-            <div className="h-96 bg-gray-200 rounded-lg"></div>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Dashboard</h1>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">
-          Welcome back, {userProfile?.firstName}!
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Here's what's happening with Isha Gramotsavam today.
-        </p>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Users className="w-6 h-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</p>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-            <span className="text-green-600">+12%</span>
-            <span className="text-gray-500 ml-2">from last week</span>
-          </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
+            Admin Dashboard
+          </h1>
+          <p className="text-sm sm:text-base text-gray-600 font-fira">
+            Welcome back, {userProfile?.firstName}! Here's your system overview.
+          </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Users className="w-6 h-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Teams</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalTeams}</p>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-            <span className="text-green-600">+8%</span>
-            <span className="text-gray-500 ml-2">from last week</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <UserCheck className="w-6 h-6 text-yellow-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Pending Verifications</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.pendingVerifications}</p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <Link 
-              href={`/${lang}/admin/teams/verification`}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Review pending →
-            </Link>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Activity className="w-6 h-6 text-purple-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Today's Registrations</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.todayRegistrations}</p>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <CheckCircle className="w-4 h-4 text-green-500 mr-1" />
-            <span className="text-gray-500">All systems operational</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions and Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {quickActions.map((action, index) => (
-              <Link
-                key={index}
-                href={action.href}
-                className={`p-4 rounded-lg text-white transition-colors ${action.color}`}
-              >
-                <action.icon className="w-6 h-6 mb-2" />
-                <h3 className="font-medium mb-1">{action.title}</h3>
-                <p className="text-sm opacity-90">{action.description}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
-          <div className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  {getActivityIcon(activity.type, activity.status)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                  <p className="text-sm text-gray-600">{activity.description}</p>
-                  <p className="text-xs text-gray-500 mt-1">{formatTimestamp(activity.timestamp)}</p>
-                </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Total Users</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{stats.totalUsers}</p>
               </div>
-            ))}
+              <Users className="w-8 h-8 text-gray-400" />
+            </div>
           </div>
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <Link
-              href={`/${lang}/admin/system/audit-logs`}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              View all activity →
-            </Link>
+          
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Total Teams</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{stats.totalTeams}</p>
+              </div>
+              <Users className="w-8 h-8 text-gray-400" />
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Pending Verifications</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.pendingVerifications}</p>
+              </div>
+              <Clock className="w-8 h-8 text-orange-400" />
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Verified Teams</p>
+                <p className="text-2xl font-bold text-green-600">{stats.completedVerifications}</p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-green-400" />
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Sports</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.totalSports}</p>
+              </div>
+              <Trophy className="w-8 h-8 text-blue-400" />
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Venues</p>
+                <p className="text-2xl font-bold text-purple-600">{stats.totalVenues}</p>
+              </div>
+              <MapPin className="w-8 h-8 text-purple-400" />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* System Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Sports Available</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalSports}</p>
-            </div>
-            <Trophy className="w-8 h-8 text-gray-400" />
-          </div>
-          <div className="mt-4">
+        {/* Quick Access */}
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <h2 className="text-lg font-semibold text-gray-900 font-fira mb-4">Quick Access</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Link
               href={`/${lang}/admin/sports`}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="p-4 border border-gray-200 rounded-lg hover:border-[#F28C38] hover:bg-orange-50 transition-colors group"
             >
-              Manage sports →
+              <Trophy className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
+              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Sports</h3>
+              <p className="text-sm text-gray-600">Manage sports</p>
             </Link>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Venues</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalVenues}</p>
-            </div>
-            <MapPin className="w-8 h-8 text-gray-400" />
-          </div>
-          <div className="mt-4">
+            
             <Link
               href={`/${lang}/admin/venues`}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="p-4 border border-gray-200 rounded-lg hover:border-[#F28C38] hover:bg-orange-50 transition-colors group"
             >
-              Manage venues →
+              <MapPin className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
+              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Venues</h3>
+              <p className="text-sm text-gray-600">Manage venues</p>
             </Link>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Active Volunteers</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.activeVolunteers}</p>
-            </div>
-            <UserCheck className="w-8 h-8 text-gray-400" />
-          </div>
-          <div className="mt-4">
+            
             <Link
-              href={`/${lang}/admin/volunteers`}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              href={`/${lang}/admin/teams`}
+              className="p-4 border border-gray-200 rounded-lg hover:border-[#F28C38] hover:bg-orange-50 transition-colors group"
             >
-              Manage volunteers →
+              <Users className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
+              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Teams</h3>
+              <p className="text-sm text-gray-600">View teams</p>
+            </Link>
+            
+            <Link
+              href={`/${lang}/admin/users`}
+              className="p-4 border border-gray-200 rounded-lg hover:border-[#F28C38] hover:bg-orange-50 transition-colors group"
+            >
+              <UserCheck className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
+              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Users</h3>
+              <p className="text-sm text-gray-600">Manage users</p>
             </Link>
           </div>
         </div>
+        
+        {/* System Status */}
+        {stats.pendingVerifications > 0 && (
+          <div className="mt-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <Clock className="w-5 h-5 text-orange-500 mr-3" />
+              <div>
+                <h3 className="text-sm font-medium text-orange-800">
+                  {stats.pendingVerifications} teams awaiting verification
+                </h3>
+                <p className="text-sm text-orange-700 mt-1">
+                  Review pending team verifications to keep the system up to date.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

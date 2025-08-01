@@ -26,17 +26,19 @@ import {
 
 interface TeamMembership {
   teamId: string;
-  teamName: string;
-  sportId: string;
-  captainName: string;
-  captainPhone: string;
+  name: string;
+  sportName: string;
+  captainProfile: {
+    name: string;
+    phone: string;
+  };
   position: string;
   status: string;
   verificationStatus: string;
-  joinedAt: string;
+  joinedAt: any;
   panchayat: string;
   district: string;
-  gender: string;
+  genderCategory: string;
 }
 
 interface PlayerStats {
@@ -98,17 +100,19 @@ export default function PlayerDashboard() {
         if (playerData) {
           playerTeams.push({
             teamId: docSnapshot.id,
-            teamName: teamData.teamName || '',
-            sportId: teamData.sportId || teamData.sport || '',
-            captainName: teamData.captainName || '',
-            captainPhone: teamData.captainPhone || '',
+            name: teamData.name || teamData.teamName || '',
+            sportName: teamData.sportName || teamData.sportId || '',
+            captainProfile: {
+              name: teamData.captainProfile?.name || teamData.captainName || '',
+              phone: teamData.captainProfile?.phone || teamData.captainPhone || ''
+            },
             position: playerData.position || 'main',
             status: teamData.status || 'draft',
             verificationStatus: playerData.verificationStatus || 'pending',
             joinedAt: playerData.addedAt || teamData.createdAt || '',
             panchayat: teamData.panchayat || '',
             district: teamData.district || '',
-            gender: teamData.gender || 'M'
+            genderCategory: teamData.genderCategory || teamData.gender || 'mixed'
           });
         }
       });
@@ -225,42 +229,42 @@ export default function PlayerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="mb-4">
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="mb-3 sm:mb-4">
             <Image 
               src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" 
               alt="Isha Logo" 
-              width={80} 
-              height={80} 
-              className="mx-auto"
+              width={60} 
+              height={60} 
+              className="mx-auto sm:w-20 sm:h-20"
             />
           </div>
-          <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">
+          <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
             Player Dashboard
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600 font-fira">
             Welcome back, {userProfile?.firstName || 'Player'}! Track your team memberships and profile.
           </p>
         </div>
 
         {/* Alert for incomplete documents */}
         {!stats.documentsComplete && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
-            <div className="flex items-center">
-              <AlertCircle className="w-5 h-5 text-yellow-600 mr-3" />
-              <div>
-                <h3 className="text-sm font-medium text-yellow-800">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-yellow-800 font-fira">
                   Complete Your Profile
                 </h3>
-                <p className="text-sm text-yellow-700 mt-1">
+                <p className="text-sm text-yellow-700 mt-1 font-fira">
                   Upload your documents (Profile Photo, Aadhaar Front & Back) to participate in teams.
                 </p>
               </div>
               <button
                 onClick={handleUploadDocuments}
-                className="ml-auto bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 Upload Documents
               </button>
@@ -269,141 +273,64 @@ export default function PlayerDashboard() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Users className="w-8 h-8 text-[#F28C38]" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Teams</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{stats.totalTeams}</p>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Teams Joined</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalTeams}</p>
-              </div>
+              <Users className="w-8 h-8 text-gray-400" />
             </div>
           </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CheckCircle className="w-8 h-8 text-green-600" />
+          
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Verified</p>
+                <p className="text-2xl font-bold text-green-600">{stats.verifiedTeams}</p>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Verified</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.verifiedTeams}</p>
-              </div>
+              <CheckCircle className="w-8 h-8 text-green-400" />
             </div>
           </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Clock className="w-8 h-8 text-yellow-600" />
+          
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.pendingTeams}</p>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pendingTeams}</p>
-              </div>
+              <Clock className="w-8 h-8 text-yellow-400" />
             </div>
           </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FileText className={`w-8 h-8 ${stats.documentsComplete ? 'text-green-600' : 'text-red-600'}`} />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Documents</p>
+          
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Documents</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {stats.documentsComplete ? 'Complete' : 'Incomplete'}
+                  {stats.documentsComplete ? '✓' : '✗'}
                 </p>
               </div>
+              <FileText className={`w-8 h-8 ${stats.documentsComplete ? 'text-green-400' : 'text-red-400'}`} />
             </div>
           </div>
         </div>
 
-        {/* Profile Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center mb-4">
-              <User className="w-6 h-6 text-[#F28C38] mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Profile</h3>
-            </div>
-            <div className="space-y-3 text-sm">
-              <div><span className="font-medium">Name:</span> {userProfile?.firstName} {userProfile?.lastName}</div>
-              <div><span className="font-medium">Phone:</span> +91 {userProfile?.phoneNumber}</div>
-              <div><span className="font-medium">Village:</span> {userProfile?.village || 'Not specified'}</div>
-              <div><span className="font-medium">District:</span> {userProfile?.district || 'Not specified'}</div>
-            </div>
-            <button
-              onClick={handleUpdateProfile}
-              className="w-full mt-4 bg-[#F28C38] hover:bg-[#E67A26] text-white py-2 px-4 rounded-lg font-medium transition-colors"
-            >
-              Update Profile
-            </button>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center mb-4">
-              <Upload className="w-6 h-6 text-blue-600 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Documents</h3>
-            </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Profile Photo:</span>
-                <span className={stats.documentsComplete ? 'text-green-600' : 'text-red-600'}>
-                  {stats.documentsComplete ? '✓' : '✗'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Aadhaar Front:</span>
-                <span className={stats.documentsComplete ? 'text-green-600' : 'text-red-600'}>
-                  {stats.documentsComplete ? '✓' : '✗'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Aadhaar Back:</span>
-                <span className={stats.documentsComplete ? 'text-green-600' : 'text-red-600'}>
-                  {stats.documentsComplete ? '✓' : '✗'}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={handleUploadDocuments}
-              className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-            >
-              {stats.documentsComplete ? 'View Documents' : 'Upload Documents'}
-            </button>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center mb-4">
-              <Trophy className="w-6 h-6 text-purple-600 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Event Info</h3>
-            </div>
-            <div className="space-y-2 text-sm text-gray-600">
-              <div>Gramotsavam 2025</div>
-              <div>Rural Sports Festival</div>
-              <div>Karnataka State</div>
-            </div>
-            <button className="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
-              View Event Details
-            </button>
-          </div>
-        </div>
 
         {/* Teams Section */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-[#4A2F1D]">Your Teams</h2>
+          <div className="p-4 sm:p-6 border-b border-gray-200">
+            <h2 className="text-lg sm:text-xl font-semibold text-[#4A2F1D]">Your Teams</h2>
           </div>
 
           {teams.length === 0 ? (
             <div className="text-center py-12">
               <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-gray-900 font-fira mb-2">
                 No team memberships
               </h3>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 font-fira mb-4">
                 You haven't joined any teams yet. Contact team captains to get added to teams.
               </p>
             </div>
@@ -411,63 +338,49 @@ export default function PlayerDashboard() {
             <>
               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Team</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Sport</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Position</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Captain</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Verification</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sport</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Captain</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {teams.map((team) => (
-                      <tr key={team.teamId} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div>
-                            <div className="font-semibold text-gray-900">{team.teamName}</div>
-                            <div className="text-sm text-gray-600">{team.panchayat}</div>
-                          </div>
+                      <tr key={team.teamId} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="font-medium text-gray-900">{team.name}</div>
+                          <div className="text-xs text-gray-500 capitalize">{team.genderCategory}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm">
-                            <div className="text-gray-900 capitalize">{team.sportId}</div>
-                            <div className="text-gray-600">{team.gender === 'F' ? 'Women' : 'Men'}</div>
-                          </div>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {team.sportName}
                         </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            team.position === 'main' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {team.position === 'main' ? 'Main' : 'Substitute'}
-                          </span>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{team.captainProfile.name}</div>
+                          <div className="text-xs text-gray-500">{team.captainProfile.phone}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm">
-                            <div className="text-gray-900">{team.captainName}</div>
-                            <div className="text-gray-600">+91 {team.captainPhone}</div>
-                          </div>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{team.panchayat}</div>
+                          <div className="text-xs text-gray-500">{team.district}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(team.status)}`}>
                             {getStatusIcon(team.status)}
-                            <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(team.status)}`}>
-                              {team.status}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getVerificationStatusColor(team.verificationStatus)}`}>
-                            {team.verificationStatus}
+                            <span className="ml-1 capitalize">{team.status.replace('_', ' ')}</span>
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {team.joinedAt ? team.joinedAt.toDate?.() ? team.joinedAt.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date(team.joinedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unknown'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <button
                             onClick={() => handleViewTeam(team.teamId)}
-                            className="text-[#F28C38] hover:text-[#E67A26] font-medium text-sm transition-colors flex items-center"
+                            className="text-[#F28C38] hover:text-[#E67A26] font-medium text-sm flex items-center"
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             View
@@ -480,33 +393,27 @@ export default function PlayerDashboard() {
               </div>
 
               {/* Mobile Card View */}
-              <div className="md:hidden divide-y divide-gray-200">
+              <div className="md:hidden space-y-4 p-4">
                 {teams.map((team) => (
-                  <div key={team.teamId} className="p-4">
+                  <div key={team.teamId} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h3 className="font-semibold text-gray-900">{team.teamName}</h3>
-                        <p className="text-sm text-gray-600">{team.sportId} • {team.gender === 'F' ? 'Women' : 'Men'}</p>
+                        <h3 className="font-semibold text-gray-900">{team.name}</h3>
+                        <p className="text-sm text-gray-600">{team.sportName} • {team.genderCategory}</p>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(team.status)}`}>
                         {getStatusIcon(team.status)}
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(team.status)}`}>
-                          {team.status}
-                        </span>
-                      </div>
+                        <span className="ml-1 capitalize">{team.status.replace('_', ' ')}</span>
+                      </span>
                     </div>
-                    
-                    <div className="space-y-1 text-sm text-gray-600 mb-3">
-                      <div><span className="font-medium">Position:</span> {team.position}</div>
-                      <div><span className="font-medium">Captain:</span> {team.captainName} (+91 {team.captainPhone})</div>
-                      <div><span className="font-medium">Location:</span> {team.panchayat}</div>
-                      <div><span className="font-medium">Verification:</span> 
-                        <span className={`ml-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getVerificationStatusColor(team.verificationStatus)}`}>
-                          {team.verificationStatus}
-                        </span>
-                      </div>
+
+                    <div className="space-y-2 text-sm text-gray-600 mb-4">
+                      <div><strong>Captain:</strong> {team.captainProfile.name}</div>
+                      <div><strong>Phone:</strong> +91 {team.captainProfile.phone}</div>
+                      <div><strong>Location:</strong> {team.panchayat}, {team.district}</div>
+                      <div><strong>Joined:</strong> {team.joinedAt ? team.joinedAt.toDate?.() ? team.joinedAt.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date(team.joinedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unknown'}</div>
                     </div>
-                    
+
                     <button
                       onClick={() => handleViewTeam(team.teamId)}
                       className="w-full bg-[#F28C38] hover:bg-[#E67A26] text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"

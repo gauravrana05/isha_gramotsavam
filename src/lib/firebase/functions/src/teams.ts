@@ -75,7 +75,7 @@ export const createTeamWithCompleteSchema = onCall(async (request: CallableReque
     // Load sport configuration from database
     let sportConfig = null;
     try {
-      const sportId = teamData.sportName.toLowerCase();
+      const sportId = teamData.sportId || teamData.sportName.toLowerCase();
       const sportDoc = await admin.firestore().collection("sports").doc(sportId).get();
       if (sportDoc.exists) {
         const sportData = sportDoc.data();
@@ -111,9 +111,9 @@ export const createTeamWithCompleteSchema = onCall(async (request: CallableReque
       
       // Event & Sport
       eventId: "gramotsavam_2025", // Could be dynamic
-      sportId: teamData.sportName.toLowerCase(),
+      sportId: teamData.sportId || teamData.sportName.toLowerCase(),
       sportName: teamData.sportName,
-      genderCategories: sportConfig.genderCategories,
+      genderCategory: sportConfig.genderCategories[0] || 'mixed',
       
       // Player Requirements
       maxPlayers: sportConfig.maxPlayers,
@@ -295,15 +295,65 @@ export const addPlayerToTeam = onCall(async (request: CallableRequest) => {
     const playerAge = calculateAge(playerData.dateOfBirth);
 
 
-    // Create player document
-    const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    // Create Firebase user directly 
+    let firebaseUserId = "";
+    try {
+      // Check if user with this phone number already exists
+      try {
+        const existingUser = await admin.auth().getUserByPhoneNumber(`+91${playerData.phone}`);
+        firebaseUserId = existingUser.uid;
+        console.log(`Using existing Firebase user: ${firebaseUserId}`);
+      } catch (error: any) {
+        if (error.code !== 'auth/user-not-found') {
+          console.error("Error checking existing user:", error);
+          throw error;
+        }
+        // Create new Firebase user
+        const userRecord = await admin.auth().createUser({
+          phoneNumber: `+91${playerData.phone}`,
+          displayName: playerData.name,
+          disabled: false
+        });
+        firebaseUserId = userRecord.uid;
+        console.log(`Created new Firebase user: ${firebaseUserId}`);
+      }
+      
+      // Update user profile in Firestore (the createUserProfile trigger handles basic profile)
+      const userProfileData = {
+        firstName: playerData.firstName,
+        lastName: playerData.lastName,
+        phoneNumber: playerData.phone,
+        whatsappNumber: playerData.whatsappNumber || playerData.phone,
+        dob: playerData.dateOfBirth,
+        gender: playerData.gender,
+        village: playerData.village,
+        panchayat: playerData.panchayat,
+        taluk: playerData.taluk,
+        district: playerData.district,
+        state: playerData.state,
+        role: "player",
+        isProfileComplete: false,
+        currentTeamId: teamId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      await admin.firestore().collection("users").doc(firebaseUserId).set(userProfileData, { merge: true });
+      console.log(`Updated user profile for: ${firebaseUserId}`);
+      
+    } catch (error) {
+      console.error("Error creating Firebase user:", error);
+      throw new HttpsError("internal", `Failed to create user account for player: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+    
+    // Use Firebase UID as playerId
+    const playerId = firebaseUserId;
     
     await admin.firestore()
       .collection("teams").doc(teamId)
       .collection("players").doc(playerId)
       .set({
         playerId: playerId,
-        userId: "", // Will be set when user creates account
+        userId: firebaseUserId, // Real Firebase user ID
         teamId: teamId,
         
         // Player Info
@@ -411,7 +461,7 @@ export const submitTeamForVerificationEnhanced = onCall(async (request: Callable
         playerCount: team.currentPlayers,
         panchayat: team.panchayat,
         district: team.district,
-        genderCategories: team.genderCategories
+        genderCategory: team.genderCategory || 'mixed'
       },
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       read: false

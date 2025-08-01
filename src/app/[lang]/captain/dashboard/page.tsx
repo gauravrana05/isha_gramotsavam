@@ -89,8 +89,7 @@ export default function CaptainDashboard() {
       // Load teams where current user is the captain
       const teamsQuery = query(
         collection(db, "teams"),
-        where("captainId", "==", user.uid),
-        orderBy("createdAt", "desc")
+        where("captainId", "==", user.uid)
       );
       
       const querySnapshot = await getDocs(teamsQuery);
@@ -117,10 +116,17 @@ export default function CaptainDashboard() {
         });
       });
 
+      // Sort teams by creation date (newest first)
+      teamsData.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const dateB = b.createdAt?.toDate?.() ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+
       setTeams(teamsData);
       
       // Calculate stats
-      const totalPlayers = teamsData.reduce((sum, team) => sum + team.players.length, 0);
+      const totalPlayers = teamsData.reduce((sum, team) => sum + team.currentPlayers, 0);
       const newStats: DashboardStats = {
         totalTeams: teamsData.length,
         activeTeams: teamsData.filter(t => t.status !== 'draft').length,
@@ -449,48 +455,6 @@ export default function CaptainDashboard() {
               </div>
             </>
           )}
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center mb-4">
-              <Users className="w-6 h-6 text-[#F28C38] mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Team Management</h3>
-            </div>
-            <p className="text-gray-600 mb-4">Create and manage your teams for different sports.</p>
-            <button
-              onClick={handleCreateTeam}
-              className="w-full bg-[#F28C38] hover:bg-[#E67A26] text-white py-2 px-4 rounded-lg font-medium transition-colors"
-            >
-              Create New Team
-            </button>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center mb-4">
-              <Phone className="w-6 h-6 text-green-600 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Support</h3>
-            </div>
-            <p className="text-gray-600 mb-4">Need help? Contact our support team.</p>
-            <a
-              href="tel:+918123456789"
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium transition-colors block text-center"
-            >
-              Call Support
-            </a>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center mb-4">
-              <Calendar className="w-6 h-6 text-blue-600 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Event Info</h3>
-            </div>
-            <p className="text-gray-600 mb-4">Gramotsavam 2025 - Rural Sports Festival</p>
-            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors">
-              View Schedule
-            </button>
-          </div>
         </div>
       </div>
     </div>

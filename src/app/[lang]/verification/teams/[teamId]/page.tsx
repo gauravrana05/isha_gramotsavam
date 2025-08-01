@@ -4,37 +4,28 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase/config";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { useTranslation } from "@/lib/utils/i18n";
+import { doc, getDoc, collection, getDocs, updateDoc } from "firebase/firestore";
+import { auditLogService } from "@/lib/services/auditLogService";
 import Image from "next/image";
-import { ArrowLeft, Users, MapPin, Phone, Loader2, AlertCircle, CheckCircle, Save, Check, X, Eye, Calendar, UserCheck, UserX, Clock } from "lucide-react";
-import { documentUploadService } from "@/lib/services/documentUploadService";
-import Container from "@/components/ui/Container";
-import Button from "@/components/ui/Button";
+import { ArrowLeft, Users, Phone, Calendar, MapPin, Loader2, AlertCircle, CheckCircle, X, Eye, Check, UserCheck } from "lucide-react";
 
 interface TeamPlayer {
   playerId: string;
   userId: string;
-  teamId: string;
   name: string;
   phone: string;
   dob: string;
   age: number;
   gender: 'M' | 'F';
   position: 'main' | 'substitute';
-  addedAt: Date;
-  addedBy: string;
-  profileComplete: boolean;
   profileData: {
     firstName: string;
     lastName: string;
     whatsappNumber: string;
     village: string;
     panchayat: string;
-    taluk: string;
     district: string;
     state: string;
-    pincode: string;
   };
   documents: {
     profilePhoto: DocumentStatus;
@@ -46,7 +37,6 @@ interface TeamPlayer {
 }
 
 interface DocumentStatus {
-  storagePath: string;
   url: string | null;
   verified: boolean;
   uploadedAt: Date | null;
@@ -54,32 +44,32 @@ interface DocumentStatus {
 }
 
 interface TeamData {
-  teamId: string;
-  teamName: string;
+  id: string;
+  name: string;
+  sportName: string;
   sportId: string;
-  captainId: string;
-  captainName: string;
-  captainPhone: string;
+  captainProfile: {
+    name: string;
+    phone: string;
+  };
   panchayat: string;
   district: string;
   state: string;
-  players: TeamPlayer[];
+  currentPlayers: number;
   maxPlayers: number;
   status: string;
-  gender: string;
-  submittedAt: string;
-  eventId: string;
+  submittedAt: any;
+  genderCategory: string;
 }
 
 export default function TeamVerificationPage() {
   const [teamData, setTeamData] = useState<TeamData | null>(null);
   const [players, setPlayers] = useState<TeamPlayer[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayer | null>(null);
-  const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const [showPlayerModal, setShowPlayerModal] = useState(false);
-  const [showDocumentModal, setShowDocumentModal] = useState(false);
-  const [selectedDocumentType, setSelectedDocumentType] = useState<'profilePhoto' | 'aadhaarFront' | 'aadhaarBack' | null>(null);
-  const [selectedDocumentUrl, setSelectedDocumentUrl] = useState<string | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [selectedImageTitle, setSelectedImageTitle] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -87,22 +77,8 @@ export default function TeamVerificationPage() {
   const router = useRouter();
   const { lang, teamId } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
-  const { t } = useTranslation();
 
   const teamIdStr = Array.isArray(teamId) ? teamId[0] : teamId;
-
-  const calculateAge = (dob: string): number => {
-    const birthDate = new Date(dob);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return Math.max(0, age);
-  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -129,6 +105,7 @@ export default function TeamVerificationPage() {
     if (!teamIdStr) return;
 
     try {
+      // Load team data
       const teamRef = doc(db, "teams", teamIdStr);
       const teamSnap = await getDoc(teamRef);
 
@@ -139,154 +116,106 @@ export default function TeamVerificationPage() {
 
       const teamRawData = teamSnap.data();
       const team: TeamData = {
-        teamId: teamSnap.id,
-        teamName: teamRawData.teamName || '',
-        sportId: teamRawData.sportId || teamRawData.sport || '',
-        captainId: teamRawData.captainId || '',
-        captainName: teamRawData.captainName || '',
-        captainPhone: teamRawData.captainPhone || '',
+        id: teamSnap.id,
+        name: teamRawData.name || '',
+        sportName: teamRawData.sportName || '',
+        sportId: teamRawData.sportId || '',
+        captainProfile: {
+          name: teamRawData.captainProfile?.name || '',
+          phone: teamRawData.captainProfile?.phone || ''
+        },
         panchayat: teamRawData.panchayat || '',
         district: teamRawData.district || '',
         state: teamRawData.state || '',
-        players: [],
+        currentPlayers: teamRawData.currentPlayers || 0,
         maxPlayers: teamRawData.maxPlayers || 12,
-        status: teamRawData.status || 'draft',
-        gender: teamRawData.gender || 'M',
-        submittedAt: teamRawData.submittedAt || teamRawData.createdAt || '',
-        eventId: teamRawData.eventId || 'gramotsavam_2025'
+        status: teamRawData.status || 'pending',
+        submittedAt: teamRawData.submittedAt,
+        genderCategory: teamRawData.genderCategory || 'mixed'
       };
       
       setTeamData(team);
       
-      // Load team players - start with captain
-      const teamPlayers: TeamPlayer[] = [];
+      // Load players from subcollection
+      const playersRef = collection(db, "teams", teamIdStr, "players");
+      const playersSnap = await getDocs(playersRef);
       
-      // Add captain as first player if not already in players array
-      if (teamRawData.captainId) {
-        const captainInPlayers = teamRawData.players?.find((p: any) => p.userId === teamRawData.captainId);
+      const loadedPlayers: TeamPlayer[] = [];
+      
+      for (const playerDoc of playersSnap.docs) {
+        const playerData = playerDoc.data();
         
-        if (!captainInPlayers) {
-          // Fetch captain's user data
+        // Skip deleted players
+        if (playerData.isDeleted) continue;
+        
+        // Load user data for documents
+        let userDocuments = playerData.documents || {};
+        if (playerData.userId && !playerData.userId.startsWith('user_')) {
           try {
-            const captainDoc = await getDoc(doc(db, "users", teamRawData.captainId));
-            if (captainDoc.exists()) {
-              const captainData = captainDoc.data();
-              const captainPlayer: TeamPlayer = {
-                playerId: `captain_${teamRawData.captainId}`,
-                userId: teamRawData.captainId,
-                teamId: teamIdStr,
-                name: `${captainData.firstName || ''} ${captainData.lastName || ''}`.trim() || team.captainName,
-                phone: captainData.phoneNumber || team.captainPhone,
-                dob: captainData.dob || '',
-                age: captainData.age || (captainData.dob ? calculateAge(captainData.dob) : 25),
-                gender: captainData.gender || team.gender || 'M',
-                position: 'main',
-                addedAt: new Date(teamRawData.createdAt || Date.now()),
-                addedBy: 'self',
-                profileComplete: captainData.isProfileComplete || false,
-                profileData: {
-                  firstName: captainData.firstName || '',
-                  lastName: captainData.lastName || '',
-                  whatsappNumber: captainData.whatsappNumber || captainData.phoneNumber || '',
-                  village: captainData.village || '',
-                  panchayat: captainData.panchayat || team.panchayat,
-                  taluk: captainData.taluk || '',
-                  district: captainData.district || team.district,
-                  state: captainData.state || team.state,
-                  pincode: captainData.pincode || ''
-                },
-                documents: {
-                  profilePhoto: {
-                    storagePath: `profilePhotos/${teamRawData.captainId}/profile_photo`,
-                    url: captainData.documents?.profilePhoto?.url || null,
-                    verified: captainData.documents?.profilePhoto?.verified || false,
-                    uploadedAt: captainData.documents?.profilePhoto?.uploadedAt ? new Date(captainData.documents.profilePhoto.uploadedAt) : null,
-                    uploadedBy: captainData.documents?.profilePhoto?.uploadedBy || null
-                  },
-                  aadhaarFront: {
-                    storagePath: `aadhaar/${teamRawData.captainId}/front_`,
-                    url: captainData.documents?.aadhaarFront?.url || null,
-                    verified: captainData.documents?.aadhaarFront?.verified || false,
-                    uploadedAt: captainData.documents?.aadhaarFront?.uploadedAt ? new Date(captainData.documents.aadhaarFront.uploadedAt) : null,
-                    uploadedBy: captainData.documents?.aadhaarFront?.uploadedBy || null
-                  },
-                  aadhaarBack: {
-                    storagePath: `aadhaar/${teamRawData.captainId}/back_`,
-                    url: captainData.documents?.aadhaarBack?.url || null,
-                    verified: captainData.documents?.aadhaarBack?.verified || false,
-                    uploadedAt: captainData.documents?.aadhaarBack?.uploadedAt ? new Date(captainData.documents.aadhaarBack.uploadedAt) : null,
-                    uploadedBy: captainData.documents?.aadhaarBack?.uploadedBy || null
-                  }
-                },
-                verificationStatus: 'pending',
-                verificationComments: []
-              };
-              teamPlayers.push(captainPlayer);
+            const userDoc = await getDoc(doc(db, "users", playerData.userId));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              if (userData.documents) {
+                userDocuments = userData.documents;
+              }
             }
           } catch (error) {
-            console.error('Error loading captain data:', error);
+            console.warn(`Could not load user documents for player ${playerData.userId}:`, error);
           }
         }
+        
+        const player: TeamPlayer = {
+          playerId: playerDoc.id,
+          userId: playerData.userId || '',
+          name: playerData.name || `${playerData.firstName || ''} ${playerData.lastName || ''}`.trim(),
+          phone: playerData.phone || '',
+          dob: playerData.dateOfBirth || playerData.dob || '',
+          age: playerData.age || 0,
+          gender: playerData.gender || 'M',
+          position: playerData.position || 'main',
+          profileData: {
+            firstName: playerData.firstName || playerData.profileData?.firstName || '',
+            lastName: playerData.lastName || playerData.profileData?.lastName || '',
+            whatsappNumber: playerData.whatsappNumber || playerData.profileData?.whatsappNumber || '',
+            village: playerData.village || playerData.profileData?.village || '',
+            panchayat: playerData.panchayat || playerData.profileData?.panchayat || team.panchayat,
+            district: playerData.district || playerData.profileData?.district || team.district,
+            state: playerData.state || playerData.profileData?.state || team.state
+          },
+          documents: {
+            profilePhoto: {
+              url: userDocuments?.profilePhoto?.url || null,
+              verified: userDocuments?.profilePhoto?.verified || false,
+              uploadedAt: userDocuments?.profilePhoto?.uploadedAt ? 
+                (userDocuments.profilePhoto.uploadedAt.toDate ? userDocuments.profilePhoto.uploadedAt.toDate() : new Date(userDocuments.profilePhoto.uploadedAt)) 
+                : null,
+              uploadedBy: userDocuments?.profilePhoto?.uploadedBy || null
+            },
+            aadhaarFront: {
+              url: userDocuments?.aadhaarFront?.url || null,
+              verified: userDocuments?.aadhaarFront?.verified || false,
+              uploadedAt: userDocuments?.aadhaarFront?.uploadedAt ? 
+                (userDocuments.aadhaarFront.uploadedAt.toDate ? userDocuments.aadhaarFront.uploadedAt.toDate() : new Date(userDocuments.aadhaarFront.uploadedAt)) 
+                : null,
+              uploadedBy: userDocuments?.aadhaarFront?.uploadedBy || null
+            },
+            aadhaarBack: {
+              url: userDocuments?.aadhaarBack?.url || null,
+              verified: userDocuments?.aadhaarBack?.verified || false,
+              uploadedAt: userDocuments?.aadhaarBack?.uploadedAt ? 
+                (userDocuments.aadhaarBack.uploadedAt.toDate ? userDocuments.aadhaarBack.uploadedAt.toDate() : new Date(userDocuments.aadhaarBack.uploadedAt)) 
+                : null,
+              uploadedBy: userDocuments?.aadhaarBack?.uploadedBy || null
+            }
+          },
+          verificationStatus: playerData.verificationStatus || 'pending',
+          verificationComments: playerData.verificationComments || []
+        };
+        
+        loadedPlayers.push(player);
       }
       
-      if (teamRawData.players && Array.isArray(teamRawData.players)) {
-        for (const player of teamRawData.players) {
-          const teamPlayer: TeamPlayer = {
-            playerId: player.playerId || `player_${Date.now()}`,
-            userId: player.userId || '',
-            teamId: teamIdStr,
-            name: player.name || `${player.firstName || ''} ${player.lastName || ''}`.trim(),
-            phone: player.phone || '',
-            dob: player.dob || '',
-            age: player.age || 18,
-            gender: player.gender || 'M',
-            position: player.position || 'main',
-            addedAt: player.addedAt ? new Date(player.addedAt) : new Date(),
-            addedBy: player.addedBy || 'captain',
-            profileComplete: player.profileComplete || false,
-            profileData: {
-              firstName: player.firstName || player.profileData?.firstName || '',
-              lastName: player.lastName || player.profileData?.lastName || '',
-              whatsappNumber: player.whatsappNumber || player.profileData?.whatsappNumber || '',
-              village: player.village || player.profileData?.village || '',
-              panchayat: player.panchayat || player.profileData?.panchayat || team.panchayat,
-              taluk: player.taluk || player.profileData?.taluk || '',
-              district: player.district || player.profileData?.district || team.district,
-              state: player.state || player.profileData?.state || team.state,
-              pincode: player.pincode || player.profileData?.pincode || ''
-            },
-            documents: {
-              profilePhoto: {
-                storagePath: player.documents?.profilePhoto?.storagePath || `profilePhotos/${player.userId}/profile_photo`,
-                url: player.documents?.profilePhoto?.url || null,
-                verified: player.documents?.profilePhoto?.verified || false,
-                uploadedAt: player.documents?.profilePhoto?.uploadedAt ? new Date(player.documents.profilePhoto.uploadedAt) : null,
-                uploadedBy: player.documents?.profilePhoto?.uploadedBy || null
-              },
-              aadhaarFront: {
-                storagePath: player.documents?.aadhaarFront?.storagePath || `aadhaar/${player.userId}/front_`,
-                url: player.documents?.aadhaarFront?.url || null,
-                verified: player.documents?.aadhaarFront?.verified || false,
-                uploadedAt: player.documents?.aadhaarFront?.uploadedAt ? new Date(player.documents.aadhaarFront.uploadedAt) : null,
-                uploadedBy: player.documents?.aadhaarFront?.uploadedBy || null
-              },
-              aadhaarBack: {
-                storagePath: player.documents?.aadhaarBack?.storagePath || `aadhaar/${player.userId}/back_`,
-                url: player.documents?.aadhaarBack?.url || null,
-                verified: player.documents?.aadhaarBack?.verified || false,
-                uploadedAt: player.documents?.aadhaarBack?.uploadedAt ? new Date(player.documents.aadhaarBack.uploadedAt) : null,
-                uploadedBy: player.documents?.aadhaarBack?.uploadedBy || null
-              }
-            },
-            verificationStatus: player.verificationStatus || 'pending',
-            verificationComments: player.verificationComments || []
-          };
-          
-          teamPlayers.push(teamPlayer);
-        }
-      }
-      
-      setPlayers(teamPlayers);
+      setPlayers(loadedPlayers);
     } catch (err: any) {
       console.error("Error loading team:", err);
       setError("Failed to load team data");
@@ -295,9 +224,11 @@ export default function TeamVerificationPage() {
     }
   };
 
-  const handlePlayerStatusChange = async (playerId: string, status: 'approved' | 'rejected', comments: string) => {
+  const handlePlayerStatusChange = async (playerId: string, status: 'approved' | 'rejected', comments?: string) => {
     try {
-      // Update local state first
+      setSaving(true);
+      
+      // Update local state
       const updatedPlayers = players.map(player => 
         player.playerId === playerId 
           ? {
@@ -310,489 +241,191 @@ export default function TeamVerificationPage() {
       
       setPlayers(updatedPlayers);
       
-      // Save individual player verification
-      await savePlayerVerification(playerId, status, comments, updatedPlayers);
+      // Update in database
+      const player = players.find(p => p.playerId === playerId);
+      if (player && player.userId) {
+        // Update user document
+        const userRef = doc(db, "users", player.userId);
+        await updateDoc(userRef, {
+          [`teams.${teamIdStr}.verificationStatus`]: status,
+          [`teams.${teamIdStr}.verificationComments`]: comments ? [comments] : [],
+          [`teams.${teamIdStr}.verifiedAt`]: new Date().toISOString(),
+          [`teams.${teamIdStr}.verifiedBy`]: user?.uid,
+        });
+        
+        // Update player in team subcollection
+        const playerRef = doc(db, "teams", teamIdStr, "players", playerId);
+        await updateDoc(playerRef, {
+          verificationStatus: status,
+          verificationComments: comments ? [comments] : [],
+          verifiedAt: new Date().toISOString(),
+          verifiedBy: user?.uid,
+        });
+
+        // Log the verification action
+        if (teamData && user && userProfile) {
+          await auditLogService.logPlayerVerification(
+            {
+              uid: user.uid,
+              name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+              role: userProfile.role
+            },
+            {
+              id: teamData.id,
+              name: teamData.name
+            },
+            {
+              id: player.playerId,
+              name: player.name
+            },
+            player.verificationStatus,
+            status,
+            status === 'rejected' ? comments : undefined,
+            comments
+          );
+        }
+      }
       
       // Update team status
-      await saveTeamVerificationStatus(updatedPlayers);
+      await updateTeamStatus(updatedPlayers);
       
     } catch (error) {
       console.error('Error updating player status:', error);
       alert('Failed to save verification. Please try again.');
-      // Revert local state on error
-      await loadTeamData();
-    }
-  };
-
-  const handleBulkVerifyAll = async () => {
-    const unverifiedPlayers = players.filter(p => p.verificationStatus !== 'approved');
-    
-    if (unverifiedPlayers.length === 0) {
-      alert('All players are already verified!');
-      return;
-    }
-
-    setSaving(true);
-    const errors: string[] = [];
-    const successes: string[] = [];
-
-    try {
-      // Update local state first
-      const updatedPlayers = players.map(player => 
-        player.verificationStatus !== 'approved' 
-          ? {
-              ...player,
-              verificationStatus: 'approved' as const,
-              verificationComments: ['Bulk verified by volunteer']
-            }
-          : player
-      );
-      
-      setPlayers(updatedPlayers);
-
-      // Save individual player verifications in parallel with error handling
-      const verificationPromises = unverifiedPlayers.map(async (player) => {
-        try {
-          await savePlayerVerification(player.playerId, 'approved', 'Bulk verified by volunteer', updatedPlayers);
-          successes.push(player.name);
-          return { success: true, playerName: player.name };
-        } catch (error) {
-          errors.push(`${player.name}: ${error}`);
-          console.error(`Failed to verify player ${player.name}:`, error);
-          return { success: false, playerName: player.name, error };
-        }
-      });
-
-      const results = await Promise.allSettled(verificationPromises);
-      
-      // Update team status after all individual verifications
-      try {
-        await saveTeamVerificationStatus(updatedPlayers);
-      } catch (teamError) {
-        console.error('Failed to update team status:', teamError);
-        errors.push(`Team status update failed: ${teamError}`);
-      }
-
-      // Show results
-      if (errors.length > 0) {
-        alert(`Bulk verification completed with errors:\n\nSuccessful (${successes.length}): ${successes.join(', ')}\n\nFailed (${errors.length}): ${errors.join(', ')}`);
-      } else {
-        alert(`Successfully verified all ${successes.length} players!`);
-      }
-
-    } catch (error) {
-      console.error('Bulk verification failed:', error);
-      alert(`Bulk verification failed: ${error}`);
+      loadTeamData(); // Reload data on error
     } finally {
       setSaving(false);
     }
   };
 
-  const handlePlayerSelect = (playerId: string) => {
-    setSelectedPlayers(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(playerId)) {
-        newSet.delete(playerId);
-      } else {
-        newSet.add(playerId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleSelectAll = () => {
-    // Only select unverified players
-    const selectablePlayers = players.filter(p => p.verificationStatus !== 'approved' && p.verificationStatus !== 'rejected');
+  const updateTeamStatus = async (updatedPlayers: TeamPlayer[]) => {
+    if (!teamData) return;
     
-    if (selectedPlayers.size === selectablePlayers.length) {
-      setSelectedPlayers(new Set());
+    const approvedCount = updatedPlayers.filter(p => p.verificationStatus === 'approved').length;
+    const rejectedCount = updatedPlayers.filter(p => p.verificationStatus === 'rejected').length;
+    const totalPlayers = updatedPlayers.length;
+    
+    let newStatus = teamData.status;
+    if (rejectedCount > 0) {
+      newStatus = 'rejected';
+    } else if (approvedCount === totalPlayers) {
+      newStatus = 'verified';
+    } else if (approvedCount > 0) {
+      newStatus = 'partial_verification';
     } else {
-      setSelectedPlayers(new Set(selectablePlayers.map(p => p.playerId)));
+      newStatus = 'pending';
     }
+    
+    // Update team document
+    const teamRef = doc(db, "teams", teamIdStr);
+    await updateDoc(teamRef, {
+      status: newStatus,
+      verifiedAt: new Date().toISOString(),
+      verifiedBy: user?.uid,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Log team status change
+    if (teamData && user && userProfile && newStatus !== teamData.status) {
+      await auditLogService.logTeamStatusChange(
+        {
+          uid: user.uid,
+          name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+          role: userProfile.role
+        },
+        {
+          id: teamData.id,
+          name: teamData.name
+        },
+        teamData.status,
+        newStatus,
+        `Team status changed based on player verification results`
+      );
+    }
+    
+    setTeamData(prev => prev ? { ...prev, status: newStatus } : null);
   };
 
-  const handleBulkVerifySelected = async () => {
-    if (selectedPlayers.size === 0) {
-      alert('Please select players to verify');
+  const handleBulkApprove = async () => {
+    const pendingPlayers = players.filter(p => p.verificationStatus === 'pending');
+    
+    if (pendingPlayers.length === 0) {
+      alert('No pending players to approve.');
       return;
     }
     
-    const selectedPlayersToVerify = players.filter(p => 
-      selectedPlayers.has(p.playerId) && p.verificationStatus !== 'approved'
-    );
-    
-    if (selectedPlayersToVerify.length === 0) {
-      alert('All selected players are already verified!');
-      setSelectedPlayers(new Set());
+    if (!confirm(`Approve all ${pendingPlayers.length} pending players?`)) {
       return;
     }
     
     setSaving(true);
-    const errors: string[] = [];
-    const successes: string[] = [];
-
+    
     try {
-      // Update local state first
-      const updatedPlayers = players.map(player => 
-        selectedPlayers.has(player.playerId) && player.verificationStatus !== 'approved'
-          ? {
-              ...player,
-              verificationStatus: 'approved' as const,
-              verificationComments: ['Verified by volunteer (bulk selection)']
-            }
-          : player
-      );
-      
-      setPlayers(updatedPlayers);
-
-      // Save individual player verifications in parallel
-      const verificationPromises = selectedPlayersToVerify.map(async (player) => {
-        try {
-          await savePlayerVerification(player.playerId, 'approved', 'Verified by volunteer (bulk selection)', updatedPlayers);
-          successes.push(player.name);
-          return { success: true, playerName: player.name };
-        } catch (error) {
-          errors.push(`${player.name}: ${error}`);
-          console.error(`Failed to verify player ${player.name}:`, error);
-          return { success: false, playerName: player.name, error };
-        }
-      });
-
-      await Promise.allSettled(verificationPromises);
-      
-      // Update team status after all individual verifications
-      try {
-        await saveTeamVerificationStatus(updatedPlayers);
-      } catch (teamError) {
-        console.error('Failed to update team status:', teamError);
-        errors.push(`Team status update failed: ${teamError}`);
+      for (const player of pendingPlayers) {
+        await handlePlayerStatusChange(player.playerId, 'approved', 'Bulk approved by verification volunteer');
       }
 
-      setSelectedPlayers(new Set());
-
-      // Show results
-      if (errors.length > 0) {
-        alert(`Selected verification completed with errors:\n\nSuccessful (${successes.length}): ${successes.join(', ')}\n\nFailed (${errors.length}): ${errors.join(', ')}`);
-      } else {
-        alert(`Successfully verified ${successes.length} selected players!`);
+      // Log the bulk action
+      if (teamData && user && userProfile) {
+        await auditLogService.logBulkPlayerVerification(
+          {
+            uid: user.uid,
+            name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+            role: userProfile.role
+          },
+          {
+            id: teamData.id,
+            name: teamData.name
+          },
+          pendingPlayers.length,
+          'approved',
+          'Bulk approved by verification volunteer'
+        );
       }
 
+      alert(`Successfully approved ${pendingPlayers.length} players!`);
     } catch (error) {
-      console.error('Bulk selected verification failed:', error);
-      alert(`Bulk verification failed: ${error}`);
+      alert('Some approvals may have failed. Please check and try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleBulkRejectSelected = async () => {
-    if (selectedPlayers.size === 0) {
-      alert('Please select players to reject');
-      return;
-    }
-    
-    const selectedPlayersToReject = players.filter(p => 
-      selectedPlayers.has(p.playerId) && p.verificationStatus !== 'rejected'
-    );
-    
-    if (selectedPlayersToReject.length === 0) {
-      alert('All selected players are already processed!');
-      setSelectedPlayers(new Set());
-      return;
-    }
-    
-    const reason = prompt('Please provide reason for rejection:');
-    if (!reason) return;
-    
-    const updatedPlayers = players.map(player => 
-      selectedPlayers.has(player.playerId) && player.verificationStatus !== 'rejected'
-        ? {
-            ...player,
-            verificationStatus: 'rejected' as const,
-            verificationComments: [reason]
-          }
-        : player
-    );
-    
-    setPlayers(updatedPlayers);
-    
-    // Auto-save selected rejections
-    for (const player of selectedPlayersToReject) {
-      try {
-        await savePlayerVerification(player.playerId, 'rejected', reason);
-      } catch (error) {
-        console.error(`Failed to reject player ${player.name}:`, error);
-      }
-    }
-    
-    setSelectedPlayers(new Set());
-    alert(`Successfully rejected ${selectedPlayersToReject.length} selected players!`);
+  const handleViewImage = (url: string, title: string) => {
+    setSelectedImageUrl(url);
+    setSelectedImageTitle(title);
+    setShowImageModal(true);
   };
 
-  const handlePlayerClick = async (player: TeamPlayer) => {
-    setSelectedPlayer(player);
-    setShowPlayerModal(true);
-  };
-
-  const handleDocumentView = async (player: TeamPlayer, documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack') => {
-    try {
-      let url = player.documents[documentType].url;
-      
-      console.log(`Attempting to view ${documentType} for player ${player.name}:`);
-      console.log(`Player data:`, player);
-      console.log(`Document URL from player data:`, url);
-      console.log(`Document details:`, player.documents[documentType]);
-      
-      // If no URL in player data, try to get it from document service
-      if (!url && player.userId) {
-        console.log(`No URL found, trying documentUploadService for userId: ${player.userId}`);
-        try {
-          url = await documentUploadService.getDocumentURL(player.userId, documentType);
-          console.log(`Document service returned URL:`, url);
-        } catch (serviceError) {
-          console.error('Document service error:', serviceError);
-        }
-      }
-      
-      if (url) {
-        // Test if the URL is accessible before showing modal
-        try {
-          const response = await fetch(url, { method: 'HEAD' });
-          if (!response.ok) {
-            console.error(`Document URL returned ${response.status}: ${response.statusText}`);
-            throw new Error(`HTTP ${response.status}`);
-          }
-        } catch (fetchError) {
-          console.error('Document URL not accessible:', fetchError);
-          alert(`Document URL is not accessible. This might be due to:\n1. Firebase Storage security rules\n2. Authentication issues\n3. Document doesn't exist\n\nURL: ${url}`);
-          return;
-        }
-        
-        setSelectedDocumentType(documentType);
-        setSelectedDocumentUrl(url);
-        setShowDocumentModal(true);
-      } else {
-        console.error(`No document URL found for ${documentType}`);
-        alert(`Document not available for ${documentType}. Please check if the document has been uploaded.`);
-      }
-    } catch (error) {
-      console.error('Error loading document:', error);
-      alert('Failed to load document');
-    }
-  };
-
-  const getPlayerStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return 'text-green-700 bg-green-100';
-      case 'rejected':
-        return 'text-red-700 bg-red-100';
-      default:
-        return 'text-yellow-700 bg-yellow-100';
-    }
-  };
-
-  const getDocumentStatusIcon = (document: DocumentStatus) => {
-    if (document.verified) {
+  const getDocumentIcon = (doc: DocumentStatus) => {
+    if (doc.url && doc.verified) {
       return <CheckCircle className="w-4 h-4 text-green-600" />;
-    } else if (document.url) {
-      return <Clock className="w-4 h-4 text-yellow-600" />;
+    } else if (doc.url) {
+      return <Eye className="w-4 h-4 text-blue-600" />;
     } else {
       return <X className="w-4 h-4 text-red-600" />;
     }
   };
 
-  const calculateTeamStatus = () => {
-    const approvedCount = players.filter(p => p.verificationStatus === 'approved').length;
-    const rejectedCount = players.filter(p => p.verificationStatus === 'rejected').length;
-    const pendingCount = players.filter(p => p.verificationStatus === 'pending').length;
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-yellow-100 text-yellow-800';
+    }
+  };
 
-    // Check if all players have verified documents
-    const allDocumentsVerified = players.every(player => {
-      const docs = player.documents || {};
-      return docs.profilePhoto?.verified && 
-             docs.aadhaarFront?.verified && 
-             docs.aadhaarBack?.verified;
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'Unknown';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
     });
-
-    if (rejectedCount > 0) {
-      return 'rejected';
-    } else if (pendingCount === 0 && approvedCount === players.length && allDocumentsVerified) {
-      return 'verified';
-    } else if (approvedCount > 0 || allDocumentsVerified) {
-      return 'partial_verification';
-    } else {
-      return 'pending';
-    }
-  };
-
-  const savePlayerVerification = async (playerId: string, status: 'approved' | 'rejected', comments: string, currentPlayers?: TeamPlayer[]) => {
-    if (!teamData || !user) {
-      throw new Error('Missing team data or user');
-    }
-
-    const playersToUse = currentPlayers || players;
-    const player = playersToUse.find(p => p.playerId === playerId);
-    if (!player) {
-      throw new Error(`Player with ID ${playerId} not found`);
-    }
-
-    console.log(`Saving verification for player ${player.name}: ${status}`);
-
-    try {
-      // Update individual user document with verification status
-      if (player.userId) {
-        const userRef = doc(db, "users", player.userId);
-        await updateDoc(userRef, {
-          [`teams.${teamIdStr}.verificationStatus`]: status,
-          [`teams.${teamIdStr}.verificationComments`]: [comments],
-          [`teams.${teamIdStr}.verifiedAt`]: new Date().toISOString(),
-          [`teams.${teamIdStr}.verifiedBy`]: user.uid,
-        });
-        console.log(`Updated user document for ${player.name}`);
-      }
-
-      return { success: true, playerId, status };
-    } catch (error) {
-      console.error(`Error saving verification for player ${player.name}:`, error);
-      throw error;
-    }
-  };
-
-  const saveTeamVerificationStatus = async (updatedPlayers: TeamPlayer[]) => {
-    if (!teamData || !user) return;
-
-    try {
-      const allPlayersVerified = updatedPlayers.every(p => p.verificationStatus === 'approved');
-      const hasRejectedPlayers = updatedPlayers.some(p => p.verificationStatus === 'rejected');
-      
-      let newTeamStatus = teamData.status;
-      if (hasRejectedPlayers) {
-        newTeamStatus = 'rejected';
-      } else if (allPlayersVerified) {
-        newTeamStatus = 'verified';
-      } else {
-        newTeamStatus = 'partial_verification';
-      }
-
-      // Helper function to safely convert dates to ISO string
-      const safeToISOString = (date: any): string | null => {
-        if (!date) return null;
-        if (typeof date === 'string') {
-          const parsedDate = new Date(date);
-          return isNaN(parsedDate.getTime()) ? null : parsedDate.toISOString();
-        }
-        if (date instanceof Date) {
-          return isNaN(date.getTime()) ? null : date.toISOString();
-        }
-        if (date?.seconds) { // Firestore Timestamp
-          return new Date(date.seconds * 1000).toISOString();
-        }
-        return null;
-      };
-
-      // Update team document
-      const teamRef = doc(db, "teams", teamIdStr!);
-      const cleanedPlayers = updatedPlayers.map(player => ({
-        ...player,
-        addedAt: safeToISOString(player.addedAt) || new Date().toISOString(),
-        documents: {
-          profilePhoto: {
-            ...player.documents.profilePhoto,
-            uploadedAt: safeToISOString(player.documents.profilePhoto.uploadedAt)
-          },
-          aadhaarFront: {
-            ...player.documents.aadhaarFront,
-            uploadedAt: safeToISOString(player.documents.aadhaarFront.uploadedAt)
-          },
-          aadhaarBack: {
-            ...player.documents.aadhaarBack,
-            uploadedAt: safeToISOString(player.documents.aadhaarBack.uploadedAt)
-          }
-        }
-      }));
-      
-      await updateDoc(teamRef, {
-        players: cleanedPlayers,
-        status: newTeamStatus,
-        verifiedAt: new Date().toISOString(),
-        verifiedBy: user.uid,
-        updatedAt: new Date().toISOString(),
-      });
-
-      console.log(`Updated team document with status: ${newTeamStatus}`);
-    } catch (error) {
-      console.error('Error saving team verification status:', error);
-      throw error;
-    }
-  };
-
-  const handleSaveVerification = async () => {
-    if (!teamData) return;
-
-    setSaving(true);
-    setError("");
-
-    try {
-      const newStatus = calculateTeamStatus();
-      
-      // Clean players data before saving
-      const cleanedPlayers = players.map(player => ({
-        ...player,
-        addedAt: player.addedAt ? player.addedAt.toISOString() : new Date().toISOString(),
-        documents: {
-          profilePhoto: {
-            ...player.documents.profilePhoto,
-            uploadedAt: player.documents.profilePhoto.uploadedAt ? player.documents.profilePhoto.uploadedAt.toISOString() : null
-          },
-          aadhaarFront: {
-            ...player.documents.aadhaarFront,
-            uploadedAt: player.documents.aadhaarFront.uploadedAt ? player.documents.aadhaarFront.uploadedAt.toISOString() : null
-          },
-          aadhaarBack: {
-            ...player.documents.aadhaarBack,
-            uploadedAt: player.documents.aadhaarBack.uploadedAt ? player.documents.aadhaarBack.uploadedAt.toISOString() : null
-          }
-        }
-      }));
-      
-      // Update team document
-      const teamRef = doc(db, "teams", teamIdStr!);
-      await updateDoc(teamRef, {
-        players: cleanedPlayers,
-        status: newStatus,
-        verifiedAt: new Date().toISOString(),
-        verifiedBy: user?.uid,
-        updatedAt: new Date().toISOString(),
-      });
-
-      // Also update individual user documents with verification status
-      for (const player of players) {
-        if (player.userId && player.verificationStatus) {
-          try {
-            const userRef = doc(db, "users", player.userId);
-            await updateDoc(userRef, {
-              [`teams.${teamIdStr}.verificationStatus`]: player.verificationStatus,
-              [`teams.${teamIdStr}.verificationComments`]: player.verificationComments,
-              [`teams.${teamIdStr}.verifiedAt`]: new Date().toISOString(),
-              [`teams.${teamIdStr}.verifiedBy`]: user?.uid,
-            });
-          } catch (userUpdateError) {
-            console.error(`Error updating user ${player.userId}:`, userUpdateError);
-          }
-        }
-      }
-
-      alert('Verification saved successfully!');
-      
-      // Redirect back to dashboard
-      router.push(`/${lang}/verification/dashboard`);
-    } catch (err: any) {
-      console.error("Error saving verification:", err);
-      setError("Failed to save verification. Please try again.");
-    } finally {
-      setSaving(false);
-    }
   };
 
   if (authLoading || loading) {
@@ -810,286 +443,314 @@ export default function TeamVerificationPage() {
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
           <p className="text-gray-600 mb-4">{error || "Team not found"}</p>
-          <Button 
+          <button 
             onClick={() => router.push(`/${lang}/verification/dashboard`)}
+            className="bg-[#CE4520] text-white px-6 py-2 rounded-lg hover:bg-[#1565C0] transition-colors"
           >
             Back to Dashboard
-          </Button>
+          </button>
         </div>
       </div>
     );
   }
 
-  if (!user || !userProfile) {
-    return null;
-  }
-
-  const approvedCount = players.filter(p => p.verificationStatus === 'approved').length;
-  const rejectedCount = players.filter(p => p.verificationStatus === 'rejected').length;
-  const pendingCount = players.filter(p => p.verificationStatus === 'pending').length;
-  
-  // Document verification stats
-  const documentsVerifiedCount = players.filter(player => {
-    const docs = player.documents || {};
-    return docs.profilePhoto?.verified && 
-           docs.aadhaarFront?.verified && 
-           docs.aadhaarBack?.verified;
-  }).length;
+  const stats = {
+    approved: players.filter(p => p.verificationStatus === 'approved').length,
+    rejected: players.filter(p => p.verificationStatus === 'rejected').length,
+    pending: players.filter(p => p.verificationStatus === 'pending').length
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <button
             onClick={() => router.push(`/${lang}/verification/dashboard`)}
-            className="flex items-center text-[#F28C38] hover:text-[#E67A26] mb-6 transition-colors"
+            className="flex items-center text-[#F28C38] hover:text-[#E67A26] mb-4 transition-colors"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
           </button>
           
-          <div className="text-center mb-8">
-            <div className="mb-4">
+          <div className="text-center mb-6">
+            <div className="mb-3">
               <Image 
                 src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" 
                 alt="Isha Logo" 
-                width={80} 
-                height={80} 
+                width={60} 
+                height={60} 
                 className="mx-auto"
               />
             </div>
-            <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">
-              {teamData.teamName} - Verification
+            <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
+              {teamData.name}
             </h1>
-            <p className="text-gray-600">
-              {teamData.sportId} • {teamData.gender === 'F' ? 'Women' : 'Men'} • {teamData.panchayat}
+            <p className="text-sm sm:text-base text-gray-600 font-fira">
+              {teamData.sportName} • {teamData.genderCategory} • {teamData.panchayat}
             </p>
           </div>
         </div>
 
-        {/* Team Status and Actions */}
+        {/* Team Info Card */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="bg-green-50 p-3 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-green-600 mx-auto mb-1" />
-                <p className="font-semibold text-green-800">{approvedCount}</p>
-                <p className="text-xs text-green-600">Approved</p>
-              </div>
-              <div className="bg-red-50 p-3 rounded-lg">
-                <X className="w-6 h-6 text-red-600 mx-auto mb-1" />
-                <p className="font-semibold text-red-800">{rejectedCount}</p>
-                <p className="text-xs text-red-600">Rejected</p>
-              </div>
-              <div className="bg-yellow-50 p-3 rounded-lg">
-                <Clock className="w-6 h-6 text-yellow-600 mx-auto mb-1" />
-                <p className="font-semibold text-yellow-800">{pendingCount}</p>
-                <p className="text-xs text-yellow-600">Pending</p>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-3">Team Details</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center">
+                  <Users className="w-4 h-4 mr-2 text-gray-400" />
+                  <span>{teamData.currentPlayers}/{teamData.maxPlayers} Players</span>
+                </div>
+                <div className="flex items-center">
+                  <Phone className="w-4 h-4 mr-2 text-gray-400" />
+                  <span>{teamData.captainProfile.name} - {teamData.captainProfile.phone}</span>
+                </div>
+                <div className="flex items-center">
+                  <MapPin className="w-4 h-4 mr-2 text-gray-400" />
+                  <span>{teamData.panchayat}, {teamData.district}, {teamData.state}</span>
+                </div>
+                <div className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+                  <span>Submitted: {formatDate(teamData.submittedAt)}</span>
+                </div>
               </div>
             </div>
             
-            <div className="flex gap-3 flex-wrap">
-              {(() => {
-                const unverifiedCount = players.filter(p => p.verificationStatus !== 'approved').length;
-                return unverifiedCount > 0 && (
-                  <button
-                    onClick={handleBulkVerifyAll}
-                    className="bg-[#3A7F3F] hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center text-sm"
-                    disabled={saving}
-                  >
-                    <UserCheck className="w-4 h-4 mr-2" />
-                    Verify All ({unverifiedCount})
-                  </button>
-                );
-              })()}
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-3">Verification Stats</h3>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
+                  <div className="text-xs text-gray-600">Approved</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
+                  <div className="text-xs text-gray-600">Rejected</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
+                  <div className="text-xs text-gray-600">Pending</div>
+                </div>
+              </div>
               
-              {selectedPlayers.size > 0 && (
-                <>
-                  <button
-                    onClick={handleBulkVerifySelected}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center text-sm"
-                  >
-                    <Check className="w-4 h-4 mr-2" />
-                    Verify Selected ({selectedPlayers.size})
-                  </button>
-                  
-                  <button
-                    onClick={handleBulkRejectSelected}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center text-sm"
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Reject Selected ({selectedPlayers.size})
-                  </button>
-                </>
+              {stats.pending > 0 && (
+                <button
+                  onClick={handleBulkApprove}
+                  disabled={saving}
+                  className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center disabled:opacity-50"
+                >
+                  <UserCheck className="w-4 h-4 mr-2" />
+                  Approve All Pending ({stats.pending})
+                </button>
               )}
             </div>
           </div>
         </div>
 
-        {/* Players List */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-[#4A2F1D] flex items-center">
-              <Users className="w-5 h-5 mr-2" />
-              Team Players ({players.length})
-            </h2>
-          </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+        {/* Players Table - Desktop */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden hidden md:block">
+          <div className="overflow-x-auto">
+            <table className="w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">
-                    <input
-                      type="checkbox"
-                      checked={(() => {
-                        const selectablePlayers = players.filter(p => p.verificationStatus !== 'approved' && p.verificationStatus !== 'rejected');
-                        return selectablePlayers.length > 0 && selectedPlayers.size === selectablePlayers.length;
-                      })()}
-                      onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
-                      disabled={players.filter(p => p.verificationStatus !== 'approved' && p.verificationStatus !== 'rejected').length === 0}
-                    />
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Player</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Position</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Documents</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-900 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {players.map((player, index) => (
-                  <tr key={player.playerId} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      {player.verificationStatus === 'approved' || player.verificationStatus === 'rejected' ? (
-                        <div className="flex items-center justify-center">
-                          {player.verificationStatus === 'approved' ? (
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                          ) : (
-                            <X className="w-5 h-5 text-red-600" />
-                          )}
-                        </div>
-                      ) : (
-                        <input
-                          type="checkbox"
-                          checked={selectedPlayers.has(player.playerId)}
-                          onChange={() => handlePlayerSelect(player.playerId)}
-                          className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
-                        />
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="font-semibold text-gray-900">{player.name}</div>
-                        <div className="text-sm text-gray-600">Age: {player.age} • {player.gender === 'M' ? 'Male' : 'Female'}</div>
+                {players.map((player) => (
+                  <tr key={player.playerId} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-medium text-gray-900">{player.name}</div>
+                      <div className="text-sm text-gray-500">
+                        Age: {player.age} • {player.gender === 'M' ? 'Male' : 'Female'} • {player.position}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm">
-                        <div className="text-gray-900">+91 {player.phone}</div>
-                        <div className="text-gray-600">{player.profileData.village}</div>
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{player.phone}</div>
+                      <div className="text-sm text-gray-500">{player.profileData.village}</div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        player.position === 'main' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {player.position === 'main' ? 'Main' : 'Substitute'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex space-x-2">
-                        {getDocumentStatusIcon(player.documents.profilePhoto)}
-                        {getDocumentStatusIcon(player.documents.aadhaarFront)}
-                        {getDocumentStatusIcon(player.documents.aadhaarBack)}
+                        <button
+                          onClick={() => player.documents.profilePhoto.url && handleViewImage(player.documents.profilePhoto.url, 'Profile Photo')}
+                          disabled={!player.documents.profilePhoto.url}
+                          className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
+                          title="Profile Photo"
+                        >
+                          {getDocumentIcon(player.documents.profilePhoto)}
+                        </button>
+                        <button
+                          onClick={() => player.documents.aadhaarFront.url && handleViewImage(player.documents.aadhaarFront.url, 'Aadhaar Front')}
+                          disabled={!player.documents.aadhaarFront.url}
+                          className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
+                          title="Aadhaar Front"
+                        >
+                          {getDocumentIcon(player.documents.aadhaarFront)}
+                        </button>
+                        <button
+                          onClick={() => player.documents.aadhaarBack.url && handleViewImage(player.documents.aadhaarBack.url, 'Aadhaar Back')}
+                          disabled={!player.documents.aadhaarBack.url}
+                          className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
+                          title="Aadhaar Back"
+                        >
+                          {getDocumentIcon(player.documents.aadhaarBack)}
+                        </button>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPlayerStatusColor(player.verificationStatus)}`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(player.verificationStatus)}`}>
                         {player.verificationStatus}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => handlePlayerClick(player)}
-                        className="text-[#F28C38] hover:text-[#E67A26] font-medium text-sm transition-colors"
-                      >
-                        View Details
-                      </button>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex space-x-2">
+                        {player.verificationStatus !== 'approved' && (
+                          <button
+                            onClick={() => handlePlayerStatusChange(player.playerId, 'approved', 'Approved by verification volunteer')}
+                            disabled={saving}
+                            className="text-green-600 hover:text-green-800 font-medium text-sm disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                        )}
+                        {player.verificationStatus !== 'rejected' && (
+                          <button
+                            onClick={() => {
+                              const reason = prompt('Reason for rejection:');
+                              if (reason) {
+                                handlePlayerStatusChange(player.playerId, 'rejected', reason);
+                              }
+                            }}
+                            disabled={saving}
+                            className="text-red-600 hover:text-red-800 font-medium text-sm disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedPlayer(player);
+                            setShowPlayerModal(true);
+                          }}
+                          className="text-[#F28C38] hover:text-[#E67A26] font-medium text-sm"
+                        >
+                          Details
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-
-          {/* Mobile Card View */}
-          <div className="md:hidden divide-y divide-gray-200">
-            {players.map((player, index) => (
-              <div key={player.playerId} className="p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-start space-x-3">
-                    {player.verificationStatus === 'approved' || player.verificationStatus === 'rejected' ? (
-                      <div className="mt-1 flex items-center justify-center">
-                        {player.verificationStatus === 'approved' ? (
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <X className="w-5 h-5 text-red-600" />
-                        )}
-                      </div>
-                    ) : (
-                      <input
-                        type="checkbox"
-                        checked={selectedPlayers.has(player.playerId)}
-                        onChange={() => handlePlayerSelect(player.playerId)}
-                        className="mt-1 rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
-                      />
-                    )}
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{player.name}</h3>
-                      <p className="text-sm text-gray-600">+91 {player.phone}</p>
-                    </div>
-                  </div>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPlayerStatusColor(player.verificationStatus)}`}>
-                    {player.verificationStatus}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between items-center mb-3">
-                  <div className="text-sm text-gray-600">
-                    Age: {player.age} • {player.gender === 'M' ? 'Male' : 'Female'} • {player.position}
-                  </div>
-                  <div className="flex space-x-1">
-                    {getDocumentStatusIcon(player.documents.profilePhoto)}
-                    {getDocumentStatusIcon(player.documents.aadhaarFront)}
-                    {getDocumentStatusIcon(player.documents.aadhaarBack)}
-                  </div>
-                </div>
-                
-                <button
-                  onClick={() => handlePlayerClick(player)}
-                  className="w-full bg-[#F28C38] hover:bg-[#E67A26] text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                >
-                  View Details
-                </button>
-              </div>
-            ))}
-          </div>
         </div>
 
+        {/* Players Cards - Mobile */}
+        <div className="md:hidden space-y-4">
+          {players.map((player) => (
+            <div key={player.playerId} className="bg-white rounded-lg shadow-sm p-4">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <h3 className="font-semibold text-gray-900">{player.name}</h3>
+                  <p className="text-sm text-gray-600">{player.phone}</p>
+                  <p className="text-sm text-gray-500">Age: {player.age} • {player.gender === 'M' ? 'Male' : 'Female'}</p>
+                </div>
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(player.verificationStatus)}`}>
+                  {player.verificationStatus}
+                </span>
+              </div>
 
-        {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-600 text-sm">{error}</p>
+              <div className="flex justify-between items-center mb-3">
+                <div className="text-sm text-gray-600">{player.profileData.village}</div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => player.documents.profilePhoto.url && handleViewImage(player.documents.profilePhoto.url, 'Profile Photo')}
+                    disabled={!player.documents.profilePhoto.url}
+                    className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
+                    title="Profile Photo"
+                  >
+                    {getDocumentIcon(player.documents.profilePhoto)}
+                  </button>
+                  <button
+                    onClick={() => player.documents.aadhaarFront.url && handleViewImage(player.documents.aadhaarFront.url, 'Aadhaar Front')}
+                    disabled={!player.documents.aadhaarFront.url}
+                    className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
+                    title="Aadhaar Front"
+                  >
+                    {getDocumentIcon(player.documents.aadhaarFront)}
+                  </button>
+                  <button
+                    onClick={() => player.documents.aadhaarBack.url && handleViewImage(player.documents.aadhaarBack.url, 'Aadhaar Back')}
+                    disabled={!player.documents.aadhaarBack.url}
+                    className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
+                    title="Aadhaar Back"
+                  >
+                    {getDocumentIcon(player.documents.aadhaarBack)}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {player.verificationStatus !== 'approved' && (
+                  <button
+                    onClick={() => handlePlayerStatusChange(player.playerId, 'approved', 'Approved by verification volunteer')}
+                    disabled={saving}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
+                  >
+                    <Check className="w-4 h-4 mr-1" />
+                    Approve
+                  </button>
+                )}
+                {player.verificationStatus !== 'rejected' && (
+                  <button
+                    onClick={() => {
+                      const reason = prompt('Reason for rejection:');
+                      if (reason) {
+                        handlePlayerStatusChange(player.playerId, 'rejected', reason);
+                      }
+                    }}
+                    disabled={saving}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Reject
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setSelectedPlayer(player);
+                    setShowPlayerModal(true);
+                  }}
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg font-medium transition-colors flex items-center justify-center"
+                >
+                  <Eye className="w-4 h-4 mr-1" />
+                  Details
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {players.length === 0 && !loading && (
+          <div className="text-center py-12">
+            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 font-fira mb-2">
+              No players found
+            </h3>
+            <p className="text-gray-600 font-fira">
+              This team has no players registered yet.
+            </p>
           </div>
         )}
       </div>
-      
-      {/* Player Detail Modal */}
+
+      {/* Player Details Modal */}
       {selectedPlayer && showPlayerModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -1097,7 +758,7 @@ export default function TeamVerificationPage() {
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.name}</h2>
-                  <p className="text-gray-600">+91 {selectedPlayer.phone}</p>
+                  <p className="text-gray-600">{selectedPlayer.phone}</p>
                 </div>
                 <button
                   onClick={() => setShowPlayerModal(false)}
@@ -1109,81 +770,66 @@ export default function TeamVerificationPage() {
             </div>
             
             <div className="p-6 space-y-6">
-              {/* Documents - Show First */}
+              {/* Documents Section - First and Prominent */}
               <div>
-                <h3 className="font-semibold text-gray-900 mb-4 text-lg">Documents</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Identity Documents</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {(['profilePhoto', 'aadhaarFront', 'aadhaarBack'] as const).map((docType) => {
-                    const doc = selectedPlayer.documents[docType];
-                    return (
-                      <div key={docType} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-medium">
-                            {docType === 'profilePhoto' ? 'Profile Photo' : 
-                             docType === 'aadhaarFront' ? 'Aadhaar Front' : 'Aadhaar Back'}
-                          </span>
-                          {getDocumentStatusIcon(doc)}
-                        </div>
-                        
-                        {/* Show document image directly */}
-                        <div className="mb-3">
-                          {doc.url ? (
-                            <div className="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
-                              <Image
-                                src={doc.url}
-                                alt={`${docType} document`}
-                                fill
-                                className="object-cover cursor-pointer hover:opacity-75 transition-opacity"
-                                onClick={() => handleDocumentView(selectedPlayer, docType)}
-                                unoptimized={doc.url.includes('firebasestorage.googleapis.com')}
-                                onLoadingComplete={() => {
-                                  console.log(`Successfully loaded ${docType} image:`, doc.url);
-                                }}
-                                onError={(e) => {
-                                  console.error(`Failed to load ${docType} image:`, doc.url);
-                                  console.error('Image error event:', e);
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = 'none';
-                                  const parent = target.parentElement;
-                                  if (parent) {
-                                    parent.innerHTML = `
-                                      <div class="flex items-center justify-center h-full text-red-600 text-xs p-2">
-                                        <div class="text-center">
-                                          <div class="mb-2">⚠️</div>
-                                          <div>Failed to load image</div>
-                                          <div class="text-gray-500 mt-1 break-all">${doc.url}</div>
-                                        </div>
+                  {[
+                    { key: 'profilePhoto', title: 'Profile Photo', doc: selectedPlayer.documents.profilePhoto },
+                    { key: 'aadhaarFront', title: 'Aadhaar Front', doc: selectedPlayer.documents.aadhaarFront },
+                    { key: 'aadhaarBack', title: 'Aadhaar Back', doc: selectedPlayer.documents.aadhaarBack }
+                  ].map(({ key, title, doc }) => (
+                    <div key={key} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="font-medium text-sm">{title}</span>
+                        {getDocumentIcon(doc)}
+                      </div>
+                      
+                      {doc.url ? (
+                        <div className="space-y-3">
+                          <div className="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
+                            <Image
+                              src={doc.url}
+                              alt={title}
+                              fill
+                              className="object-cover cursor-pointer hover:opacity-75 transition-opacity"
+                              onClick={() => handleViewImage(doc.url!, title)}
+                              unoptimized={doc.url.includes('firebasestorage.googleapis.com')}
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  parent.innerHTML = `
+                                    <div class="flex items-center justify-center h-full text-red-600 text-xs">
+                                      <div class="text-center">
+                                        <div class="mb-2">⚠️</div>
+                                        <div>Failed to load</div>
                                       </div>
-                                    `;
-                                  }
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                                <Eye className="w-6 h-6 text-white opacity-0 hover:opacity-100 transition-opacity" />
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
-                              <div className="text-center text-gray-500">
-                                <AlertCircle className="w-8 h-8 mx-auto mb-2" />
-                                <p className="text-sm">Document not uploaded</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {doc.url && (
+                                    </div>
+                                  `;
+                                }
+                              }}
+                            />
+                          </div>
                           <button
-                            onClick={() => handleDocumentView(selectedPlayer, docType)}
+                            onClick={() => handleViewImage(doc.url!, title)}
                             className="w-full text-sm text-blue-600 hover:text-blue-800 flex items-center justify-center py-2 border border-blue-200 rounded hover:bg-blue-50 transition-colors"
                           >
                             <Eye className="w-4 h-4 mr-1" />
                             View Full Size
                           </button>
-                        )}
-                      </div>
-                    );
-                  })}
+                        </div>
+                      ) : (
+                        <div className="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                          <div className="text-center text-gray-500">
+                            <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+                            <p className="text-sm">Not uploaded</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -1196,11 +842,12 @@ export default function TeamVerificationPage() {
                     <div><span className="font-medium">Gender:</span> {selectedPlayer.gender === 'M' ? 'Male' : 'Female'}</div>
                     <div><span className="font-medium">DOB:</span> {selectedPlayer.dob}</div>
                     <div><span className="font-medium">Position:</span> {selectedPlayer.position}</div>
+                    <div><span className="font-medium">WhatsApp:</span> {selectedPlayer.profileData.whatsappNumber}</div>
                   </div>
                 </div>
                 
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-3">Location</h3>
+                  <h3 className="font-semibold text-gray-900 mb-3">Location Details</h3>
                   <div className="space-y-2 text-sm">
                     <div><span className="font-medium">Village:</span> {selectedPlayer.profileData.village}</div>
                     <div><span className="font-medium">Panchayat:</span> {selectedPlayer.profileData.panchayat}</div>
@@ -1211,53 +858,54 @@ export default function TeamVerificationPage() {
               </div>
 
               {/* Verification Actions */}
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={async () => {
-                    await handlePlayerStatusChange(selectedPlayer.playerId, 'approved', 'Verified by volunteer');
-                    setShowPlayerModal(false);
-                    alert('Player verified and saved successfully!');
-                  }}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:bg-gray-400"
-                  disabled={selectedPlayer.verificationStatus === 'approved'}
-                >
-                  <Check className="w-4 h-4 mr-2" />
-                  Verify Player
-                </button>
-                
-                <button
-                  onClick={async () => {
-                    const reason = prompt('Please provide reason for rejection:');
-                    if (reason) {
-                      await handlePlayerStatusChange(selectedPlayer.playerId, 'rejected', reason);
+              <div className="flex justify-center space-x-4 pt-4 border-t">
+                {selectedPlayer.verificationStatus !== 'approved' && (
+                  <button
+                    onClick={async () => {
+                      await handlePlayerStatusChange(selectedPlayer.playerId, 'approved', 'Approved by verification volunteer');
                       setShowPlayerModal(false);
-                      alert('Player rejection saved successfully!');
-                    }
-                  }}
-                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:bg-gray-400"
-                  disabled={selectedPlayer.verificationStatus === 'rejected'}
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Reject Player
-                </button>
+                      alert('Player approved successfully!');
+                    }}
+                    disabled={saving}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
+                  >
+                    <Check className="w-4 h-4 mr-2" />
+                    Approve Player
+                  </button>
+                )}
+                
+                {selectedPlayer.verificationStatus !== 'rejected' && (
+                  <button
+                    onClick={async () => {
+                      const reason = prompt('Please provide reason for rejection:');
+                      if (reason) {
+                        await handlePlayerStatusChange(selectedPlayer.playerId, 'rejected', reason);
+                        setShowPlayerModal(false);
+                        alert('Player rejected successfully!');
+                      }
+                    }}
+                    disabled={saving}
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Reject Player
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Document View Modal */}
-      {showDocumentModal && selectedDocumentUrl && selectedDocumentType && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {/* Full Size Image Modal */}
+      {showImageModal && selectedImageUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto">
-            <div className="p-6 border-b border-gray-200">
+            <div className="p-4 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">
-                  {selectedDocumentType === 'profilePhoto' ? 'Profile Photo' : 
-                   selectedDocumentType === 'aadhaarFront' ? 'Aadhaar Front' : 'Aadhaar Back'}
-                </h3>
+                <h3 className="text-lg font-semibold">{selectedImageTitle}</h3>
                 <button
-                  onClick={() => setShowDocumentModal(false)}
+                  onClick={() => setShowImageModal(false)}
                   className="text-gray-500 hover:text-gray-700"
                 >
                   <X className="w-6 h-6" />
@@ -1265,22 +913,17 @@ export default function TeamVerificationPage() {
               </div>
             </div>
             
-            <div className="p-6 text-center">
+            <div className="p-4 text-center">
               <div className="relative max-w-4xl mx-auto">
                 <Image
-                  src={selectedDocumentUrl}
-                  alt={`${selectedDocumentType} document`}
+                  src={selectedImageUrl}
+                  alt={selectedImageTitle}
                   width={800}
                   height={600}
                   className="max-w-full max-h-[70vh] mx-auto border rounded-lg shadow-lg object-contain"
                   priority
-                  unoptimized={selectedDocumentUrl.includes('firebasestorage.googleapis.com')}
-                  onLoadingComplete={() => {
-                    console.log('Full-size document loaded successfully:', selectedDocumentUrl);
-                  }}
+                  unoptimized={selectedImageUrl.includes('firebasestorage.googleapis.com')}
                   onError={(e) => {
-                    console.error('Failed to load full-size document image:', selectedDocumentUrl);
-                    console.error('Full image error event:', e);
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                     const parent = target.parentElement;
@@ -1290,10 +933,7 @@ export default function TeamVerificationPage() {
                           <div class="text-center p-4">
                             <div class="text-4xl mb-4">⚠️</div>
                             <p class="font-semibold mb-2">Failed to load document image</p>
-                            <p class="text-sm text-gray-500 break-all">${selectedDocumentUrl}</p>
-                            <button onclick="window.open('${selectedDocumentUrl}', '_blank')" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                              Try opening in new tab
-                            </button>
+                            <p class="text-sm text-gray-500 break-all">${selectedImageUrl}</p>
                           </div>
                         </div>
                       `;

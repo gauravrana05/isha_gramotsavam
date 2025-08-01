@@ -50,75 +50,34 @@ export default function AdminSidebar({ className = '' }: AdminSidebarProps) {
     },
     {
       name: 'Events',
+      href: `/${lang}/admin/events`,
       icon: Calendar,
-      children: [
-        { name: 'All Events', href: `/${lang}/admin/events`, icon: Calendar },
-        { name: 'Create Event', href: `/${lang}/admin/events/create`, icon: Calendar },
-        { name: 'Event Schedule', href: `/${lang}/admin/events/schedule`, icon: Calendar },
-      ]
     },
     {
       name: 'Sports',
+      href: `/${lang}/admin/sports`,
       icon: Trophy,
-      children: [
-        { name: 'All Sports', href: `/${lang}/admin/sports`, icon: Trophy },
-        { name: 'Create Sport', href: `/${lang}/admin/sports/create`, icon: Trophy },
-        { name: 'Sports Config', href: `/${lang}/admin/sports/config`, icon: Trophy },
-      ]
     },
     {
       name: 'Venues',
+      href: `/${lang}/admin/venues`,
       icon: MapPin,
-      children: [
-        { name: 'All Venues', href: `/${lang}/admin/venues`, icon: MapPin },
-        { name: 'Create Venue', href: `/${lang}/admin/venues/create`, icon: MapPin },
-        { name: 'Venue Schedule', href: `/${lang}/admin/venues/schedule`, icon: MapPin },
-      ]
     },
     {
       name: 'Teams',
+      href: `/${lang}/admin/teams`,
       icon: Users,
-      children: [
-        { name: 'All Teams', href: `/${lang}/admin/teams`, icon: Users },
-        { name: 'Team Verification', href: `/${lang}/admin/teams/verification`, icon: UserCheck },
-        { name: 'Team Stats', href: `/${lang}/admin/teams/stats`, icon: BarChart3 },
-      ]
     },
     {
       name: 'Users',
+      href: `/${lang}/admin/users`,
       icon: Shield,
-      children: [
-        { name: 'All Users', href: `/${lang}/admin/users`, icon: Shield },
-        { name: 'User Verification', href: `/${lang}/admin/users/verification`, icon: UserCheck },
-        { name: 'Role Management', href: `/${lang}/admin/users/roles`, icon: Settings },
-      ]
-    },
-    {
-      name: 'Volunteers',
-      icon: UserCheck,
-      children: [
-        { name: 'All Volunteers', href: `/${lang}/admin/volunteers`, icon: UserCheck },
-        { name: 'Assign Venues', href: `/${lang}/admin/volunteers/assign-venues`, icon: MapPin },
-        { name: 'Volunteer Reports', href: `/${lang}/admin/volunteers/reports`, icon: BarChart3 },
-      ]
-    },
-    {
-      name: 'Reports',
-      icon: BarChart3,
-      children: [
-        { name: 'Overview', href: `/${lang}/admin/reports`, icon: BarChart3 },
-        { name: 'Registrations', href: `/${lang}/admin/reports/registrations`, icon: Users },
-        { name: 'Participation', href: `/${lang}/admin/reports/participation`, icon: Trophy },
-        { name: 'Analytics', href: `/${lang}/admin/reports/analytics`, icon: BarChart3 },
-      ]
     },
     {
       name: 'System',
       icon: Settings,
       children: [
-        { name: 'System Config', href: `/${lang}/admin/system/config`, icon: Settings },
         { name: 'Audit Logs', href: `/${lang}/admin/system/audit-logs`, icon: BarChart3 },
-        { name: 'Backup', href: `/${lang}/admin/system/backup`, icon: Settings },
       ]
     }
   ];
@@ -218,7 +177,7 @@ export default function AdminSidebar({ className = '' }: AdminSidebarProps) {
       {/* Sidebar */}
       <div className={`
         fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
-        lg:translate-x-0 lg:static lg:inset-0 lg:z-0
+        lg:translate-x-0 lg:static lg:inset-0 lg:z-0 lg:flex-shrink-0
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
         ${className}
       `}>

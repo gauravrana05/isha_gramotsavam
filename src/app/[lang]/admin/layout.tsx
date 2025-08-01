@@ -55,7 +55,7 @@ export default function AdminLayout({
       <AdminSidebar />
       
       {/* Main Content */}
-      <div className="flex-1 lg:ml-0">
+      <div className="flex-1 lg:ml-0 min-w-0 overflow-hidden">
         {/* Mobile padding for menu button */}
         <div className="lg:hidden h-16"></div>
         

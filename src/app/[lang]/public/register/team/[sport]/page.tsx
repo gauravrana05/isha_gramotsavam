@@ -113,6 +113,7 @@ export default function TeamRegistrationPage() {
       const teamData = {
         name: formData.name,
         sportName: sportName.charAt(0).toUpperCase() + sportName.slice(1),
+        sportId: sport === 'volleyball' ? 'gDZ7zitmogfMCLH5YEzO' : '36o6rT3bTu4cQAm49hrd',
         description: formData.description,
         panchayat: formData.panchayat,
         district: formData.district,
