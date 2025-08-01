@@ -72,13 +72,31 @@ export const createTeamWithCompleteSchema = onCall(async (request: CallableReque
       }
     }
 
-    // Set sport-specific requirements
-    const sportConfig = {
-      'Volleyball': { maxPlayers: 6, maxSubstitutes: 6, genderCategory: userProfile.gender === 'F' ? 'women' : 'men' },
-      'Throwball': { maxPlayers: 7, maxSubstitutes: 2, genderCategory: 'women' }
-    };
+    // Load sport configuration from database
+    let sportConfig = null;
+    try {
+      const sportId = teamData.sportName.toLowerCase();
+      const sportDoc = await admin.firestore().collection("sports").doc(sportId).get();
+      if (sportDoc.exists) {
+        const sportData = sportDoc.data();
+        sportConfig = {
+          maxPlayers: sportData?.maxPlayers || 6,
+          maxSubstitutes: sportData?.maxSubstitutes || 6,
+          genderCategories: sportData?.genderCategories || ['mixed']
+        };
+      }
+    } catch (error) {
+      console.error("Error loading sport configuration:", error);
+    }
 
-    const config = sportConfig[teamData.sportName as keyof typeof sportConfig];
+    // Fallback to hardcoded values if sport not found in database
+    if (!sportConfig) {
+      const fallbackConfig = {
+        'Volleyball': { maxPlayers: 6, maxSubstitutes: 6, genderCategories: userProfile.gender === 'F' ? ['women'] : ['men'] },
+        'Throwball': { maxPlayers: 7, maxSubstitutes: 2, genderCategories: ['women'] }
+      };
+      sportConfig = fallbackConfig[teamData.sportName as keyof typeof fallbackConfig] || { maxPlayers: 6, maxSubstitutes: 6, genderCategories: ['mixed'] };
+    }
 
     // Create comprehensive team document
     const teamRef = await admin.firestore().collection("teams").add({
@@ -95,11 +113,11 @@ export const createTeamWithCompleteSchema = onCall(async (request: CallableReque
       eventId: "gramotsavam_2025", // Could be dynamic
       sportId: teamData.sportName.toLowerCase(),
       sportName: teamData.sportName,
-      genderCategory: config.genderCategory,
+      genderCategories: sportConfig.genderCategories,
       
       // Player Requirements
-      maxPlayers: config.maxPlayers,
-      maxSubstitutes: config.maxSubstitutes,
+      maxPlayers: sportConfig.maxPlayers,
+      maxSubstitutes: sportConfig.maxSubstitutes,
       currentPlayers: 1, // Captain counts as first player
       currentSubstitutes: 0,
       
@@ -393,7 +411,7 @@ export const submitTeamForVerificationEnhanced = onCall(async (request: Callable
         playerCount: team.currentPlayers,
         panchayat: team.panchayat,
         district: team.district,
-        genderCategory: team.genderCategory
+        genderCategories: team.genderCategories
       },
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       read: false

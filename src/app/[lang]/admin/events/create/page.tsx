@@ -75,8 +75,10 @@ export default function CreateEventPage() {
   });
 
   const [availableSports, setAvailableSports] = useState<any[]>([]);
+  const [availableVenues, setAvailableVenues] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingSports, setLoadingSports] = useState(true);
+  const [loadingVenues, setLoadingVenues] = useState(true);
   const [error, setError] = useState('');
 
   // Calculate if registration should be open based on dates
@@ -119,6 +121,7 @@ export default function CreateEventPage() {
     }
 
     loadSports();
+    loadVenues();
   }, [user, userProfile]);
 
   const loadSports = async () => {
@@ -135,6 +138,23 @@ export default function CreateEventPage() {
       console.error('Error loading sports:', err);
     } finally {
       setLoadingSports(false);
+    }
+  };
+
+  const loadVenues = async () => {
+    try {
+      setLoadingVenues(true);
+      const venuesCollection = collection(db, 'venues');
+      const venuesSnapshot = await getDocs(venuesCollection);
+      const venuesData = venuesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setAvailableVenues(venuesData.filter(venue => venue.isActive));
+    } catch (err: any) {
+      console.error('Error loading venues:', err);
+    } finally {
+      setLoadingVenues(false);
     }
   };
 
@@ -167,20 +187,34 @@ export default function CreateEventPage() {
     }
   };
 
-  const handleArrayChange = (field: 'rules' | 'eligibilityCriteria' | 'venues', index: number, value: string) => {
+  const handleVenueChange = (venueId: string, checked: boolean) => {
+    if (checked) {
+      setFormData(prev => ({
+        ...prev,
+        venues: [...prev.venues, venueId]
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        venues: prev.venues.filter(v => v !== venueId)
+      }));
+    }
+  };
+
+  const handleArrayChange = (field: 'rules' | 'eligibilityCriteria', index: number, value: string) => {
     const newArray = [...formData[field]];
     newArray[index] = value;
     setFormData(prev => ({ ...prev, [field]: newArray }));
   };
 
-  const addArrayItem = (field: 'rules' | 'eligibilityCriteria' | 'venues') => {
+  const addArrayItem = (field: 'rules' | 'eligibilityCriteria') => {
     setFormData(prev => ({
       ...prev,
       [field]: [...prev[field], '']
     }));
   };
 
-  const removeArrayItem = (field: 'rules' | 'eligibilityCriteria' | 'venues', index: number) => {
+  const removeArrayItem = (field: 'rules' | 'eligibilityCriteria', index: number) => {
     setFormData(prev => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index)
@@ -255,7 +289,6 @@ export default function CreateEventPage() {
         registrationEndDate: formData.registrationEndDate ? new Date(formData.registrationEndDate) : null,
         rules: formData.rules.filter(rule => rule.trim() !== ''),
         eligibilityCriteria: formData.eligibilityCriteria.filter(criteria => criteria.trim() !== ''),
-        venues: formData.venues.filter(venue => venue.trim() !== ''),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -581,35 +614,40 @@ export default function CreateEventPage() {
             </div>
           </div>
 
-          {/* Venues */}
+          {/* Venues Selection */}
           <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Venues</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Venues Selection</h3>
             
-            {formData.venues.map((venue, index) => (
-              <div key={index} className="flex mb-2">
-                <input
-                  type="text"
-                  value={venue}
-                  onChange={(e) => handleArrayChange('venues', index, e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                  placeholder="Enter venue name"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeArrayItem('venues', index)}
-                  className="ml-2 px-3 py-2 text-red-600 hover:text-red-800"
-                >
-                  Remove
-                </button>
+            {loadingVenues ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin text-[#3A7F3F]" />
+                <span className="ml-2">Loading venues...</span>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => addArrayItem('venues')}
-              className="text-[#3A7F3F] hover:text-green-700 text-sm"
-            >
-              + Add Venue
-            </button>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {availableVenues.map((venue) => (
+                  <label key={venue.id} className="flex items-start p-3 border rounded-lg hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={formData.venues.includes(venue.id)}
+                      onChange={(e) => handleVenueChange(venue.id, e.target.checked)}
+                      className="rounded border-gray-300 text-[#3A7F3F] focus:ring-[#3A7F3F] mt-1"
+                    />
+                    <div className="ml-3 flex-1">
+                      <span className="text-sm font-medium text-gray-900">{venue.name}</span>
+                      <div className="text-xs text-gray-500 mt-1">
+                        <div>{venue.shortName} • {venue.type}</div>
+                        <div>{venue.district}, {venue.state}</div>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+            
+            {!loadingVenues && availableVenues.length === 0 && (
+              <p className="text-gray-500 text-center py-4">No venues available. Create venues first.</p>
+            )}
           </div>
 
           {/* Rules */}

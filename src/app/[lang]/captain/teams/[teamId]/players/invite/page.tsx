@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase/config";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, orderBy } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase/config";
 import { documentUploadService } from "@/lib/services/documentUploadService";
@@ -85,7 +85,7 @@ interface TeamData {
   maxPlayers: number;
   maxSubstitutes: number;
   panchayat: string;
-  taluk:string;
+  taluk: string;
   district: string;
   state: string;
   captainId: string;
@@ -95,12 +95,19 @@ interface TeamData {
   };
   players: TeamPlayer[];
   status: string;
+  currentPlayers: number;
+  currentSubstitutes: number;
 }
 
-const SPORT_CONFIG = {
-  volleyball: { maxPlayers: 6, maxSubstitutes: 6 },
-  throwball: { maxPlayers: 7, maxSubstitutes: 2 }
-};
+interface SportData {
+  id: string;
+  displayName: string;
+  maxPlayers: number;
+  maxSubstitutes: number;
+  genderCategories: string[];
+  isActive: boolean;
+}
+
 
 export default function CaptainPlayerManagement() {
   const router = useRouter();
@@ -108,6 +115,7 @@ export default function CaptainPlayerManagement() {
   const { user, userProfile } = useAuth();
   
   const [teamData, setTeamData] = useState<TeamData | null>(null);
+  const [sportData, setSportData] = useState<SportData | null>(null);
   const [players, setPlayers] = useState<TeamPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -145,6 +153,9 @@ export default function CaptainPlayerManagement() {
     }
     
     try {
+      setLoading(true);
+      
+      // Load team data
       const teamRef = doc(db, "teams", teamIdStr);
       const teamSnap = await getDoc(teamRef);
 
@@ -156,146 +167,162 @@ export default function CaptainPlayerManagement() {
       const team = teamSnap.data();
       console.log("Team data:", team);
       
-      // Create mock team data structure
-      const mockTeamData: TeamData = {
-        teamId: teamIdStr || '',
-        name: team.teamName || team.name || 'Team Name',
-        sportName: team.sport || team.sportName || 'Volleyball',
-        sportId: (team.sport || team.sportName || 'volleyball').toLowerCase(),
-        maxPlayers: SPORT_CONFIG.volleyball.maxPlayers,
-        maxSubstitutes: SPORT_CONFIG.volleyball.maxSubstitutes,
-        panchayat: team.panchayat || 'Panchayat Name',
-        taluk: team.taluk || 'Taluk Name',
-        district: team.district || 'District Name',
-        state: team.state || 'State Name',
-        captainId: team.captainId || user?.uid || '',
-        captainProfile: {
-          name: userProfile?.name || 'Captain Name',
-          phone: userProfile?.phoneNumber || '+919876543210'
-        },
-        players: [],
-        status: team.status || 'draft'
-      };
+      // Verify team ownership
+      if (team.captainId !== user?.uid) {
+        setError("You are not authorized to manage this team");
+        return;
+      }
 
-      // Create captain player entry
-      const captainPlayer: TeamPlayer = {
-        playerId: `captain_${user?.uid}`,
-        userId: user?.uid || '',
-        teamId: teamIdStr,
-        name: `${userProfile?.firstName} ${userProfile?.lastName}`.trim() || 'Captain Name',
-        phone: userProfile?.phoneNumber || '+919876543210',
-        dob: userProfile?.dob || '1990-01-01',
-        age: userProfile?.dob ? calculateAge(userProfile.dob) : 25,
-        gender: userProfile?.gender || 'M',
-        position: 'main',
-        addedAt: new Date(),
-        addedBy: 'system',
-        profileComplete: true,
-        profileData: {
-          firstName: userProfile?.firstName || 'Captain',
-          lastName: userProfile?.lastName || 'Name',
-          whatsappNumber: userProfile?.whatsappNumber || userProfile?.phoneNumber || '',
-          village: userProfile?.village || team.panchayat?.replace(' Panchayat', '') || '',
-          panchayat: team.panchayat || 'Panchayat Name',
-          taluk: userProfile?.taluk || 'Taluk',
-          district: team.district || 'District Name',
-          state: team.state || 'State Name',
-          pincode: userProfile?.pincode || '000000'
-        },
-        documents: {
-          profilePhoto: {
-            storagePath: `profilePhotos/${user?.uid}/profile_photo`,
-            url: userProfile?.profilePhotoURL || null,
-            verified: false,
-            uploadedAt: userProfile?.profilePhotoURL ? new Date() : null,
-            uploadedBy: user?.uid || null
-          },
-          aadhaarFront: {
-            storagePath: `aadhaar/${user?.uid}/front_`,
-            url: userProfile?.aadhaarFrontURL || null,
-            verified: false,
-            uploadedAt: userProfile?.aadhaarFrontURL ? new Date() : null,
-            uploadedBy: user?.uid || null
-          },
-          aadhaarBack: {
-            storagePath: `aadhaar/${user?.uid}/back_`,
-            url: userProfile?.aadhaarBackURL || null,
-            verified: false,
-            uploadedAt: userProfile?.aadhaarBackURL ? new Date() : null,
-            uploadedBy: user?.uid || null
+      // Load sport data from database
+      let sport: SportData | null = null;
+      if (team.sportId) {
+        try {
+          const sportRef = doc(db, "sports", team.sportId);
+          const sportSnap = await getDoc(sportRef);
+          if (sportSnap.exists()) {
+            const sportData = sportSnap.data();
+            console.log("Sport data:", team.sportId, sportData);
+            sport = {
+              id: sportSnap.id,
+              displayName: sportData.displayName || sportData.name || team.sportName || 'Unknown Sport',
+              maxPlayers: sportData.maxPlayers || team.maxPlayers || 6,
+              maxSubstitutes: sportData.maxSubstitutes || team.maxSubstitutes || 6,
+              genderCategories: sportData.genderCategories || team.genderCategories || ['mixed'],
+              isActive: sportData.isActive !== false
+            };
           }
-        },
-        verificationStatus: 'pending'
-      };
-
-      setTeamData(mockTeamData);
-      
-      // Load existing players from team data
-      const existingPlayers: TeamPlayer[] = [captainPlayer]; // Start with captain
-      
-      // Add existing players from the team document
-      if (team.players && Array.isArray(team.players)) {
-        team.players.forEach((player: any) => {
-          // Skip if it's the captain (to avoid duplicates)
-          if (player.playerId === `captain_${user?.uid}` || player.userId === user?.uid) {
-            return;
-          }
-          
-          existingPlayers.push({
-            playerId: player.playerId || `player_${Date.now()}_${Math.random()}`,
-            userId: player.userId || '',
-            teamId: teamIdStr,
-            name: player.name || `${player.firstName || ''} ${player.lastName || ''}`.trim(),
-            phone: player.phone || '',
-            dob: player.dob || '',
-            age: player.age || (player.dob ? calculateAge(player.dob) : 18),
-            gender: player.gender || 'M',
-            position: player.position || 'main',
-            addedAt: player.addedAt ? (new Date(player.addedAt).getTime() ? new Date(player.addedAt) : new Date()) : new Date(),
-            addedBy: player.addedBy || 'captain',
-            profileComplete: player.profileComplete || false,
-            profileData: {
-              firstName: player.firstName || player.profileData?.firstName || '',
-              lastName: player.lastName || player.profileData?.lastName || '',
-              whatsappNumber: player.whatsappNumber || player.profileData?.whatsappNumber || '',
-              village: player.village || player.profileData?.village || '',
-              panchayat: player.panchayat || player.profileData?.panchayat || team.panchayat || '',
-              taluk: player.taluk || player.profileData?.taluk || '',
-              district: player.district || player.profileData?.district || team.district || '',
-              state: player.state || player.profileData?.state || team.state || '',
-              pincode: player.pincode || player.profileData?.pincode || ''
-            },
-            documents: {
-              profilePhoto: {
-                storagePath: player.documents?.profilePhoto?.storagePath || `profilePhotos/${player.userId}/profile_photo`,
-                url: player.documents?.profilePhoto?.url || null,
-                verified: player.documents?.profilePhoto?.verified || false,
-                uploadedAt: player.documents?.profilePhoto?.uploadedAt ? (new Date(player.documents.profilePhoto.uploadedAt).getTime() ? new Date(player.documents.profilePhoto.uploadedAt) : null) : null,
-                uploadedBy: player.documents?.profilePhoto?.uploadedBy || null
-              },
-              aadhaarFront: {
-                storagePath: player.documents?.aadhaarFront?.storagePath || `aadhaar/${player.userId}/front_`,
-                url: player.documents?.aadhaarFront?.url || null,
-                verified: player.documents?.aadhaarFront?.verified || false,
-                uploadedAt: player.documents?.aadhaarFront?.uploadedAt ? (new Date(player.documents.aadhaarFront.uploadedAt).getTime() ? new Date(player.documents.aadhaarFront.uploadedAt) : null) : null,
-                uploadedBy: player.documents?.aadhaarFront?.uploadedBy || null
-              },
-              aadhaarBack: {
-                storagePath: player.documents?.aadhaarBack?.storagePath || `aadhaar/${player.userId}/back_`,
-                url: player.documents?.aadhaarBack?.url || null,
-                verified: player.documents?.aadhaarBack?.verified || false,
-                uploadedAt: player.documents?.aadhaarBack?.uploadedAt ? (new Date(player.documents.aadhaarBack.uploadedAt).getTime() ? new Date(player.documents.aadhaarBack.uploadedAt) : null) : null,
-                uploadedBy: player.documents?.aadhaarBack?.uploadedBy || null
-              }
-            },
-            verificationStatus: player.verificationStatus || 'pending',
-            verificationComments: player.verificationComments || []
-          });
-        });
+        } catch (sportError) {
+          console.error("Error loading sport data:", sportError);
+        }
       }
       
-      console.log(`Loaded ${existingPlayers.length} players (including captain)`);
-      setPlayers(existingPlayers);
+      // Fallback if sport not found in database
+      if (!sport) {
+        sport = {
+          id: team.sportId || 'unknown',
+          displayName: team.sportName || 'Unknown Sport',
+          maxPlayers: team.maxPlayers || 6,
+          maxSubstitutes: team.maxSubstitutes || 6,
+          genderCategories: team.genderCategories || ['mixed'],
+          isActive: true
+        };
+      }
+
+      setSportData(sport);
+      
+      // Create team data structure using actual database values
+      const actualTeamData: TeamData = {
+        teamId: teamIdStr,
+        name: team.name || '',
+        sportName: sport.displayName,
+        sportId: team.sportId || '',
+        maxPlayers: sport.maxPlayers,
+        maxSubstitutes: sport.maxSubstitutes,
+        panchayat: team.panchayat || '',
+        taluk: team.taluk || '',
+        district: team.district || '',
+        state: team.state || '',
+        captainId: team.captainId || '',
+        captainProfile: {
+          name: team.captainProfile?.name || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim(),
+          phone: team.captainProfile?.phone || userProfile?.phoneNumber || ''
+        },
+        players: [],
+        status: team.status || 'draft',
+        currentPlayers: team.currentPlayers || 0,
+        currentSubstitutes: team.currentSubstitutes || 0
+      };
+
+      setTeamData(actualTeamData);
+
+      // Load players from subcollection (excluding deleted players)
+      const playersCollection = collection(db, "teams", teamIdStr, "players");
+      const playersQuery = query(playersCollection, orderBy("addedAt", "asc"));
+      const playersSnapshot = await getDocs(playersQuery);
+      
+      const loadedPlayers: TeamPlayer[] = [];
+      
+      for (const doc of playersSnapshot.docs) {
+        const playerData = doc.data();
+        
+        // Skip deleted players
+        if (playerData.isDeleted) {
+          continue;
+        }
+        
+        // Load latest document information from users collection if userId exists
+        let userDocuments = playerData.documents;
+        if (playerData.userId && !playerData.userId.startsWith('user_')) {
+          try {
+            const userDocRef = doc(db, "users", playerData.userId);
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              if (userData.documents) {
+                userDocuments = userData.documents;
+              }
+            }
+          } catch (error) {
+            console.warn(`Could not load user documents for player ${playerData.userId}:`, error);
+          }
+        }
+        
+        const player: TeamPlayer = {
+          playerId: doc.id,
+          userId: playerData.userId || '',
+          teamId: teamIdStr,
+          name: playerData.name || '',
+          phone: playerData.phone || '',
+          dob: playerData.dateOfBirth || playerData.dob || '',
+          age: playerData.age || 0,
+          gender: playerData.gender || 'M',
+          position: playerData.position || 'main',
+          addedAt: playerData.addedAt?.toDate() || new Date(),
+          addedBy: playerData.addedBy || '',
+          profileComplete: playerData.profileComplete || false,
+          profileData: {
+            firstName: playerData.profileData?.firstName || '',
+            lastName: playerData.profileData?.lastName || '',
+            whatsappNumber: playerData.profileData?.whatsappNumber || '',
+            village: playerData.profileData?.village || '',
+            panchayat: playerData.profileData?.panchayat || '',
+            taluk: playerData.profileData?.taluk || '',
+            district: playerData.profileData?.district || '',
+            state: playerData.profileData?.state || '',
+            pincode: playerData.profileData?.pincode || ''
+          },
+          documents: {
+            profilePhoto: {
+              storagePath: userDocuments?.profilePhoto?.storagePath || '',
+              url: userDocuments?.profilePhoto?.url || null,
+              verified: userDocuments?.profilePhoto?.verified || false,
+              uploadedAt: userDocuments?.profilePhoto?.uploadedAt?.toDate() || null,
+              uploadedBy: userDocuments?.profilePhoto?.uploadedBy || null
+            },
+            aadhaarFront: {
+              storagePath: userDocuments?.aadhaarFront?.storagePath || '',
+              url: userDocuments?.aadhaarFront?.url || null,
+              verified: userDocuments?.aadhaarFront?.verified || false,
+              uploadedAt: userDocuments?.aadhaarFront?.uploadedAt?.toDate() || null,
+              uploadedBy: userDocuments?.aadhaarFront?.uploadedBy || null
+            },
+            aadhaarBack: {
+              storagePath: userDocuments?.aadhaarBack?.storagePath || '',
+              url: userDocuments?.aadhaarBack?.url || null,
+              verified: userDocuments?.aadhaarBack?.verified || false,
+              uploadedAt: userDocuments?.aadhaarBack?.uploadedAt?.toDate() || null,
+              uploadedBy: userDocuments?.aadhaarBack?.uploadedBy || null
+            }
+          },
+          verificationStatus: playerData.verificationStatus || 'pending',
+          verificationComments: playerData.verificationComments || []
+        };
+        
+        loadedPlayers.push(player);
+      }
+      
+      console.log(`Loaded ${loadedPlayers.length} players from subcollection`);
+      setPlayers(loadedPlayers);
       
     } catch (err: any) {
       console.error("Error loading team:", err);
@@ -311,8 +338,8 @@ export default function CaptainPlayerManagement() {
     }
   }, [user, userProfile, teamIdStr, loadTeamData]);
 
-  const sportConfig = teamData ? SPORT_CONFIG[teamData.sportId as keyof typeof SPORT_CONFIG] || SPORT_CONFIG.volleyball : SPORT_CONFIG.volleyball;
-  const totalSlotsNeeded = sportConfig.maxPlayers;
+  const sportConfig = sportData || { maxPlayers: 6, maxSubstitutes: 6 };
+  const totalSlotsNeeded = sportConfig.maxPlayers + sportConfig.maxSubstitutes;
   const currentPlayers = players.length;
   const mainPlayers = players.filter(p => p.position === 'main').length;
   const substitutes = players.filter(p => p.position === 'substitute').length;
@@ -583,6 +610,19 @@ export default function CaptainPlayerManagement() {
     setShowDocumentModal(true);
   };
 
+  const resetPlayerForm = () => {
+    setPlayerFormData({
+      phone: '',
+      firstName: '',
+      lastName: '',
+      dob: '',
+      whatsappNumber: '',
+      village: '',
+      position: 'main'
+    });
+    setPlayerExists(false);
+  };
+
   const handleAddPlayer = async () => {
     if (!teamData) {
       console.error('handleAddPlayer: teamData is not available');
@@ -648,116 +688,52 @@ export default function CaptainPlayerManagement() {
           return;
         }
       }
-      // Create Firebase Authentication user first
-      console.log('handleAddPlayer: Calling createPlayerUser function');
-      const createPlayerUser = httpsCallable(functions, 'createPlayerUser');
-      let result;
+      
+      // Use the Firebase function to add player to team
+      // This function will first create the user if they don't exist, then add them to the team
+      console.log('handleAddPlayer: Calling addPlayerToTeam function');
+      const addPlayerToTeam = httpsCallable(functions, 'addPlayerToTeam');
+      
       try {
-        result = await createPlayerUser({
-          phoneNumber: playerFormData.phone,
-          firstName: playerFormData.firstName,
-          lastName: playerFormData.lastName,
-          dob: playerFormData.dob,
-          gender: teamData.sportId === 'volleyball' ? 'M' : 'F',
-          whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
-          village: playerFormData.village,
-          panchayat: teamData.panchayat,
-          taluk: teamData.taluk,
-          district: teamData.district,
-          state: teamData.state,
-          teamId: teamData.teamId
-        });
-      } catch (functionError) {
-        console.error('handleAddPlayer: Firebase function call failed:', functionError);
-        throw new Error(`Firebase function failed: ${functionError instanceof Error ? functionError.message : 'Unknown function error'}`);
-      }
-      
-      const resultData = result.data as { success: boolean; userId: string; existed: boolean; message: string };
-      console.log('handleAddPlayer: Function result:', resultData);
-      if (!resultData.success) {
-        throw new Error(resultData.message || 'Failed to create player user');
-      }
-
-      const realUserId = resultData.userId;
-      const playerId = `player_${Date.now()}`;
-      
-      const newPlayer: TeamPlayer = {
-        playerId: playerId,
-        userId: realUserId, // Use the actual Firebase user ID
-        teamId: teamData.teamId,
-        name: `${playerFormData.firstName} ${playerFormData.lastName}`,
-        phone: playerFormData.phone,
-        dob: playerFormData.dob,
-        age: calculateAge(playerFormData.dob),
-        gender: teamData.sportId === 'volleyball' ? 'M' : 'F',
-        position: playerPosition,
-        addedAt: new Date(),
-        addedBy: user!.uid,
-        profileComplete: true,
-        profileData: {
-          firstName: playerFormData.firstName,
-          lastName: playerFormData.lastName,
-          whatsappNumber: playerFormData.whatsappNumber,
-          village: playerFormData.village,
-          panchayat: teamData.panchayat,
-          taluk: 'Taluk',
-          district: teamData.district,
-          state: teamData.state,
-          pincode: '000000'
-        },
-        documents: {
-          profilePhoto: {
-            storagePath: `profilePhotos/${realUserId}/profile_photo`,
-            url: null,
-            verified: false,
-            uploadedAt: null,
-            uploadedBy: null
-          },
-          aadhaarFront: {
-            storagePath: `aadhaar/${realUserId}/front_${Date.now()}`,
-            url: null,
-            verified: false,
-            uploadedAt: null,
-            uploadedBy: null
-          },
-          aadhaarBack: {
-            storagePath: `aadhaar/${realUserId}/back_${Date.now()}`,
-            url: null,
-            verified: false,
-            uploadedAt: null,
-            uploadedBy: null
+        const result = await addPlayerToTeam({
+          teamId: teamData.teamId,
+          playerData: {
+            name: `${playerFormData.firstName} ${playerFormData.lastName}`,
+            firstName: playerFormData.firstName,
+            lastName: playerFormData.lastName,
+            phone: playerFormData.phone,
+            dateOfBirth: playerFormData.dob,
+            gender: sportData?.genderCategories[0] === 'women' ? 'F' : 'M',
+            whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
+            village: playerFormData.village,
+            panchayat: teamData.panchayat,
+            taluk: teamData.taluk,
+            district: teamData.district,
+            state: teamData.state,
+            position: playerPosition
           }
-        },
-        verificationStatus: 'pending'
-      };
-
-      // Update local state
-      const updatedPlayers = [...players, newPlayer];
-      setPlayers(updatedPlayers);
-      
-      // Save to team's players array in Firestore
-      console.log('handleAddPlayer: Saving player to Firestore');
-      const teamRef = doc(db, "teams", teamData.teamId);
-      const playersToSave = updatedPlayers
-        .filter(p => !p.playerId.startsWith('captain_')) // Don't save captain in players array
-        .map(cleanFirestoreData); // Clean undefined values
-      
-      try {
-        await updateDoc(teamRef, {
-          players: playersToSave,
-          updatedAt: new Date().toISOString()
         });
-        console.log('handleAddPlayer: Successfully saved to Firestore');
-      } catch (firestoreError) {
-        console.error('handleAddPlayer: Firestore update failed:', firestoreError);
-        throw new Error(`Failed to save player to team: ${firestoreError instanceof Error ? firestoreError.message : 'Unknown Firestore error'}`);
+        
+        const resultData = result.data as { success: boolean; playerId: string; message: string };
+        console.log('handleAddPlayer: Function result:', resultData);
+        
+        if (!resultData.success) {
+          throw new Error(resultData.message || 'Failed to add player to team');
+        }
+        
+        console.log(`Player added successfully with ID: ${resultData.playerId}`);
+        
+        // Reload team data to get updated player list
+        await loadTeamData();
+        
+        setShowAddPlayerModal(false);
+        resetPlayerForm();
+      } catch (error) {
+        console.error('Error adding player:', error);
+        alert(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setIsSubmitting(false);
       }
-      
-      console.log('Player added and saved to Firestore with real Firebase user ID:', realUserId);
-      console.log('Player creation result:', { existed: resultData.existed, message: resultData.message });
-      setShowAddPlayerModal(false);
-      resetPlayerForm();
-      
     } catch (error) {
       console.error('Error adding player:', error);
       alert(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -766,49 +742,37 @@ export default function CaptainPlayerManagement() {
     }
   };
 
-  const resetPlayerForm = () => {
-    setPlayerFormData({
-      phone: '',
-      firstName: '',
-      lastName: '',
-      dob: '',
-      whatsappNumber: '',
-      village: '',
-      position: 'main'
-    });
-    setPlayerExists(false);
-  };
-
   const removePlayer = async (playerId: string) => {
     if (!teamData) return;
     
-    // Prevent removing captain
-    if (playerId.startsWith('captain_')) {
-      alert('Captain cannot be removed from the team.');
+    if (!confirm('Are you sure you want to remove this player from the team?')) {
       return;
     }
     
     try {
-      // Update local state
-      const updatedPlayers = players.filter(p => p.playerId !== playerId);
-      setPlayers(updatedPlayers);
-      
-      // Save to Firestore
-      const teamRef = doc(db, "teams", teamData.teamId);
-      const playersToSave = updatedPlayers
-        .filter(p => !p.playerId.startsWith('captain_')) // Don't save captain in players array
-        .map(cleanFirestoreData); // Clean undefined values
-      
-      await updateDoc(teamRef, {
-        players: playersToSave,
-        updatedAt: new Date().toISOString()
+      // Delete player from subcollection
+      const playerRef = doc(db, "teams", teamData.teamId, "players", playerId);
+      await updateDoc(playerRef, { 
+        // Mark as deleted instead of actually deleting
+        isDeleted: true,
+        deletedAt: new Date(),
+        deletedBy: user?.uid
       });
       
-      console.log('Player removed and updated in Firestore');
+      // Update team player count
+      const teamRef = doc(db, "teams", teamData.teamId);
+      await updateDoc(teamRef, {
+        currentPlayers: Math.max(0, teamData.currentPlayers - 1),
+        updatedAt: new Date()
+      });
+      
+      // Reload team data to reflect changes
+      await loadTeamData();
+      
+      console.log('Player removed successfully');
     } catch (error) {
       console.error('Error removing player:', error);
-      // Revert local state on error
-      loadTeamData(); // Reload to get correct state
+      alert('Failed to remove player. Please try again.');
     }
   };
 
@@ -851,7 +815,18 @@ export default function CaptainPlayerManagement() {
   );
 
   const handleSubmitTeam = async () => {
-    // Check if all requirements are met
+    if (!teamData || !sportData) {
+      alert('Team data is not loaded. Please refresh and try again.');
+      return;
+    }
+
+    // Check if minimum players are added
+    if (currentPlayers < sportData.maxPlayers) {
+      alert(`Please add at least ${sportData.maxPlayers} main players before submission`);
+      return;
+    }
+
+    // Check if all players have complete documents
     const allPlayersHaveDocuments = players.every(player => 
       player.documents.profilePhoto.url && 
       player.documents.aadhaarFront.url && 
@@ -859,31 +834,23 @@ export default function CaptainPlayerManagement() {
     );
 
     if (!allPlayersHaveDocuments) {
-      alert('All players must have complete documents before submission');
+      alert('All players must have complete documents (Profile Photo, Aadhaar Front & Back) before submission');
       return;
     }
 
-    if (currentPlayers !== totalSlotsNeeded) {
-      alert(`Please add all ${totalSlotsNeeded} players before submission`);
-      return;
-    }
-
-    // Submit team for verification
+    // Use the Firebase function to submit team for verification
     try {
-      const teamRef = doc(db, "teams", teamIdStr);
+      const submitTeam = httpsCallable(functions, 'submitTeamForVerificationEnhanced');
+      const result = await submitTeam({ teamId: teamData.teamId });
       
-      // Clean the players data before saving to Firestore
-      const playersToSubmit = players
-        .filter(p => !p.playerId.startsWith('captain_')) // Don't save captain in players array
-        .map(cleanFirestoreData); // Clean undefined values and fix dates
+      const resultData = result.data as { success: boolean; message: string };
       
-      await updateDoc(teamRef, {
-        players: playersToSubmit,
-        status: "submitted",
-        updatedAt: new Date().toISOString(),
-      });
-      
-      router.push(`/${lang}/captain/dashboard`);
+      if (resultData.success) {
+        alert('Team submitted for verification successfully!');
+        router.push(`/${lang}/captain/dashboard`);
+      } else {
+        throw new Error(resultData.message || 'Failed to submit team');
+      }
     } catch (error) {
       console.error('Error submitting team:', error);
       alert(`Failed to submit team: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1212,14 +1179,16 @@ export default function CaptainPlayerManagement() {
         </div>
 
         {/* Submit Section */}
-        {currentPlayers === totalSlotsNeeded && (
+        {sportData && currentPlayers >= sportData.maxPlayers && (
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex flex-col sm:flex-row items-center justify-between">
               
               <div>
                 <h3 className="text-lg font-bold text-[#4A2F1D] mb-2">Ready to Submit?</h3>
                 <p className="text-gray-600">
-                  All {totalSlotsNeeded} players added. Submit your team for verification.
+                  {currentPlayers >= sportData.maxPlayers 
+                    ? `You have ${currentPlayers} players. Submit your team for verification.`
+                    : `Add at least ${sportData.maxPlayers} players to submit.`}
                 </p>
               </div>
               <button

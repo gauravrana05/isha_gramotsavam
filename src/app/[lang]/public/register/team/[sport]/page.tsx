@@ -9,11 +9,8 @@ import Image from "next/image";
 import { Users, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 
 interface TeamFormData {
-  teamName: string;
-  captainName: string;
-  captainPhone: string;
-  captainWhatsapp: string;
-  teamDescription: string;
+  name: string;
+  description: string;
   panchayat: string;
   district: string;
   state: string;
@@ -21,11 +18,8 @@ interface TeamFormData {
 
 export default function TeamRegistrationPage() {
   const [formData, setFormData] = useState<TeamFormData>({
-    teamName: "",
-    captainName: "",
-    captainPhone: "",
-    captainWhatsapp: "",
-    teamDescription: "",
+    name: "",
+    description: "",
     panchayat: "",
     district: "",
     state: "",
@@ -33,7 +27,6 @@ export default function TeamRegistrationPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [isWhatsAppSame, setIsWhatsAppSame] = useState(true);
 
   const router = useRouter();
   const { lang, sport } = useParams();
@@ -78,19 +71,10 @@ export default function TeamRegistrationPage() {
     if (userProfile) {
       setFormData(prev => ({
         ...prev,
-        captainName: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-        captainPhone: userProfile.phoneNumber || "",
-        captainWhatsapp: userProfile.whatsappNumber || userProfile.phoneNumber || "",
         panchayat: userProfile.panchayat || "",
         district: userProfile.district || "",
         state: userProfile.state || "",
       }));
-
-      if (userProfile.whatsappNumber === userProfile.phoneNumber) {
-        setIsWhatsAppSame(true);
-      } else {
-        setIsWhatsAppSame(false);
-      }
     }
   }, [user, userProfile, authLoading, router, lang, sportName]);
 
@@ -99,21 +83,10 @@ export default function TeamRegistrationPage() {
     setError("");
   };
 
-  const handleWhatsAppSameChange = (checked: boolean) => {
-    setIsWhatsAppSame(checked);
-    if (checked) {
-      setFormData(prev => ({ ...prev, captainWhatsapp: prev.captainPhone }));
-    } else {
-      setFormData(prev => ({ ...prev, captainWhatsapp: "" }));
-    }
-  };
 
   const validateForm = () => {
-    if (!formData.teamName.trim()) return "Please enter team name";
-    if (formData.teamName.length < 3) return "Team name must be at least 3 characters";
-    if (!formData.captainName.trim()) return "Please enter captain name";
-    if (!formData.captainPhone.trim()) return "Please enter captain phone number";
-    if (!formData.captainWhatsapp.trim()) return "Please enter WhatsApp number";
+    if (!formData.name.trim()) return "Please enter team name";
+    if (formData.name.length < 3) return "Team name must be at least 3 characters";
     if (!formData.panchayat.trim()) return "Please enter panchayat";
     if (!formData.district.trim()) return "Please enter district";
     if (!formData.state.trim()) return "Please enter state";
@@ -138,9 +111,9 @@ export default function TeamRegistrationPage() {
       const createTeam = httpsCallable(functions, 'createTeamWithCompleteSchema');
       
       const teamData = {
-        name: formData.teamName,
+        name: formData.name,
         sportName: sportName.charAt(0).toUpperCase() + sportName.slice(1),
-        description: formData.teamDescription,
+        description: formData.description,
         panchayat: formData.panchayat,
         district: formData.district,
         state: formData.state,
@@ -246,8 +219,8 @@ export default function TeamRegistrationPage() {
                 type="text"
                 className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38] font-fira text-sm sm:text-base"
                 placeholder="Enter your team name"
-                value={formData.teamName}
-                onChange={(e) => handleInputChange('teamName', e.target.value)}
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
                 maxLength={50}
               />
             </div>
@@ -259,87 +232,19 @@ export default function TeamRegistrationPage() {
               <textarea
                 className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38] font-fira text-sm sm:text-base"
                 placeholder="Brief description about your team"
-                value={formData.teamDescription}
-                onChange={(e) => handleInputChange('teamDescription', e.target.value)}
+                value={formData.description}
+                onChange={(e) => handleInputChange('description', e.target.value)}
                 rows={3}
                 maxLength={200}
               />
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
-          <div className="flex items-center mb-4 sm:mb-6">
-            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-[#F28C38] mr-2 sm:mr-3" />
-            <h3 className="text-lg sm:text-xl font-semibold font-fira text-[#4A2F1D]">Captain Details</h3>
-          </div>
-          <hr className="mb-4 sm:mb-6" />
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
-                Captain Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg bg-gray-50 font-fira text-sm sm:text-base"
-                value={formData.captainName}
-                readOnly
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
-                Phone Number <span className="text-red-500">*</span>
-              </label>
-              <div className="flex">
-                <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-2 sm:px-3">
-                  <span className="text-xs sm:text-sm font-fira">+91</span>
-                </div>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-r-lg bg-gray-50 font-fira text-sm sm:text-base"
-                  value={formData.captainPhone}
-                  readOnly
-                />
-              </div>
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
-                WhatsApp Number <span className="text-red-500">*</span>
-              </label>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="isWhatsAppSame"
-                    className="mr-2"
-                    checked={isWhatsAppSame}
-                    onChange={(e) => handleWhatsAppSameChange(e.target.checked)}
-                  />
-                  <label htmlFor="isWhatsAppSame" className="text-xs sm:text-sm font-fira">
-                    Same as phone number
-                  </label>
-                </div>
-                <div className="flex">
-                  <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-2 sm:px-3">
-                    <span className="text-xs sm:text-sm font-fira">+91</span>
-                  </div>
-                  <input
-                    type="tel"
-                    className={`w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-r-lg font-fira text-sm sm:text-base ${
-                      isWhatsAppSame ? 'bg-gray-50' : ''
-                    }`}
-                    placeholder="Enter WhatsApp number"
-                    value={formData.captainWhatsapp}
-                    onChange={(e) => handleInputChange('captainWhatsapp', e.target.value.replace(/\D/g, ''))}
-                    maxLength={10}
-                    readOnly={isWhatsAppSame}
-                  />
-                </div>
-              </div>
-            </div>
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-700 text-xs sm:text-sm font-fira">
+              <strong>Captain Details:</strong> You ({userProfile?.firstName} {userProfile?.lastName}) will automatically be set as the team captain. 
+              After team creation, you can add other players to your team.
+            </p>
           </div>
         </div>
 
