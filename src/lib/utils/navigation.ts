@@ -11,6 +11,7 @@ export const ALL_ROLES = ["admin", "captain", "player", "general_volunteer", "te
 
 
 export const getDashboardRoute = (role: string | null | undefined, lang: string): string => {
+  console.log("THe role of the user is", role);
   const userRole = role || "public";
   switch (userRole) {
     case "admin":
@@ -44,7 +45,7 @@ export const handleRedirect = async (user: any, lang: string, router: AppRouterI
       const role = userData.role;
       const isProfileComplete = userData.isProfileComplete;
       
-      const specialRole = role === 'admin' || (role && role.includes('volunteer'));
+      const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
 
       if (isProfileComplete || specialRole) {
         const dashboardRoute = getDashboardRoute(role, lang as string);
@@ -87,7 +88,7 @@ export const useRedirect = (allowedRoles?: string[]) => {
       const role = userData.role;
       const isProfileComplete = userData.isProfileComplete;
 
-      const specialRole = role === 'admin' || (role && role.includes('volunteer'));
+      const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
 
       if (!isProfileComplete && !specialRole) {
         router.push(`/${lang}/complete-profile`);

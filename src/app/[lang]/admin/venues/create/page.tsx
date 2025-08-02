@@ -5,9 +5,10 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
 import { collection, addDoc, serverTimestamp, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { pincodeService } from '@/lib/services/pincodeService';
 import Container from '@/components/ui/Container';
 import Button from '@/components/ui/Button';
-import { ArrowLeft, Save, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Plus, Trash2, MapPin } from 'lucide-react';
 
 interface VenueFormData {
   name: string;
@@ -86,9 +87,14 @@ export default function CreateVenuePage() {
   const [availableSports, setAvailableSports] = useState<any[]>([]);
   const [availableEvents, setAvailableEvents] = useState<any[]>([]);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
+  const [districts, setDistricts] = useState<string[]>([]);
+  const [taluks, setTaluks] = useState<string[]>([]);
+  const [panchayats, setPanchayats] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingSports, setLoadingSports] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressCaptured, setAddressCaptured] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -110,7 +116,9 @@ export default function CreateVenuePage() {
         id: doc.id,
         ...doc.data()
       }));
-      setAvailableSports(sportsData.filter(sport => sport.isActive));
+      const activeSports = sportsData.filter(sport => sport.isActive);
+      console.log('Loaded sports:', activeSports);
+      setAvailableSports(activeSports);
     } catch (err: any) {
       console.error('Error loading sports:', err);
     } finally {
@@ -138,6 +146,58 @@ export default function CreateVenuePage() {
   const handleInputChange = (field: keyof VenueFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setError('');
+
+    if (field === 'pincode') {
+      setAddressCaptured(false);
+      setDistricts([]);
+      setTaluks([]);
+      setPanchayats([]);
+      setFormData(prev => ({
+        ...prev,
+        state: '',
+        district: '',
+        taluk: '',
+        panchayat: ''
+      }));
+      if (value.length === 6) {
+        fetchState(value);
+      }
+    } else if (field === 'state') {
+      setDistricts([]);
+      setTaluks([]);
+      setPanchayats([]);
+      setFormData(prev => ({
+        ...prev,
+        district: '',
+        taluk: '',
+        panchayat: ''
+      }));
+      if (value) {
+        fetchDistricts(value);
+      }
+    } else if (field === 'district') {
+      setTaluks([]);
+      setPanchayats([]);
+      setFormData(prev => ({
+        ...prev,
+        taluk: '',
+        panchayat: ''
+      }));
+      if (value && formData.state) {
+        fetchTaluks(formData.state, value);
+      }
+    } else if (field === 'taluk') {
+      setPanchayats([]);
+      setFormData(prev => ({
+        ...prev,
+        panchayat: ''
+      }));
+      if (value && formData.state && formData.district) {
+        fetchPanchayats(formData.state, formData.district, value);
+      }
+    } else if (field === 'panchayat') {
+      setAddressCaptured(!!value);
+    }
   };
 
   const handleNestedInputChange = (parent: keyof VenueFormData, field: string, value: any) => {
@@ -229,6 +289,67 @@ export default function CreateVenuePage() {
     }
   };
 
+  const fetchState = async (pincode: string) => {
+    if (pincode.length !== 6) return;
+
+    setAddressLoading(true);
+    setError('');
+
+    try {
+      const addressData = await pincodeService.getAddressByPincode(pincode);
+      setFormData(prev => ({
+        ...prev,
+        state: addressData.state,
+        district: '',
+        taluk: '',
+        panchayat: ''
+      }));
+      if (addressData.state) {
+        await fetchDistricts(addressData.state);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Invalid pincode. Please check and try again.');
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const fetchDistricts = async (state: string) => {
+    setAddressLoading(true);
+    try {
+      const districtList = await pincodeService.getDistrictsByState(state);
+      setDistricts(districtList);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch districts. Please try again.');
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const fetchTaluks = async (state: string, district: string) => {
+    setAddressLoading(true);
+    try {
+      const { taluks } = await pincodeService.getTaluksByDistrict(state, district);
+      setTaluks(taluks);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch taluks. Please try again.');
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const fetchPanchayats = async (state: string, district: string, taluk: string) => {
+    setAddressLoading(true);
+    try {
+      const panchayatList = await pincodeService.getPanchayatsByTaluk(state, district, taluk);
+      setPanchayats(panchayatList);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch panchayats. Please try again.');
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -247,13 +368,13 @@ export default function CreateVenuePage() {
       return;
     }
 
-    if (!formData.district.trim()) {
-      setError('District is required');
+    if (!formData.pincode || formData.pincode.length !== 6) {
+      setError('Please enter a valid 6-digit pincode');
       return;
     }
 
-    if (!formData.state.trim()) {
-      setError('State is required');
+    if (!addressCaptured) {
+      setError('Please complete the address selection by choosing a panchayat');
       return;
     }
 
@@ -436,40 +557,82 @@ export default function CreateVenuePage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  District *
+                  Pincode *
                 </label>
-                <input
-                  type="text"
-                  value={formData.district}
-                  onChange={(e) => handleInputChange('district', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={formData.pincode}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '');
+                      handleInputChange('pincode', value);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F] pr-10"
+                    placeholder="Enter 6-digit pincode"
+                    required
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    {addressLoading && <Loader2 className="w-4 h-4 animate-spin text-[#3A7F3F]" />}
+                  </div>
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  State *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
                 <input
                   type="text"
                   value={formData.state}
-                  onChange={(e) => handleInputChange('state', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                  placeholder="Select pincode first"
+                  disabled={!formData.pincode}
+                  readOnly
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Pincode
-                </label>
-                <input
-                  type="text"
-                  value={formData.pincode}
-                  onChange={(e) => handleInputChange('pincode', e.target.value)}
+                <label className="block text-sm font-medium text-gray-700 mb-2">District</label>
+                <select
+                  value={formData.district}
+                  onChange={(e) => handleInputChange('district', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                />
+                  disabled={!formData.state || !districts.length}
+                >
+                  <option value="" disabled>Select District</option>
+                  {districts.map(district => (
+                    <option key={district} value={district}>{district}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Taluk</label>
+                <select
+                  value={formData.taluk}
+                  onChange={(e) => handleInputChange('taluk', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                  disabled={!formData.district || !taluks.length}
+                >
+                  <option value="" disabled>Select Taluk</option>
+                  {taluks.map(taluk => (
+                    <option key={taluk} value={taluk}>{taluk}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Panchayat</label>
+                <select
+                  value={formData.panchayat}
+                  onChange={(e) => handleInputChange('panchayat', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                  disabled={!formData.taluk || !panchayats.length}
+                >
+                  <option value="" disabled>Select Panchayat</option>
+                  {panchayats.map(panchayat => (
+                    <option key={panchayat} value={panchayat}>{panchayat}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -498,6 +661,15 @@ export default function CreateVenuePage() {
                 />
               </div>
             </div>
+
+            {addressCaptured && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <MapPin className="w-4 h-4 text-green-600" />
+                  <p className="text-green-600 text-sm">Address captured successfully</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Supported Sports */}
@@ -537,14 +709,17 @@ export default function CreateVenuePage() {
                       onChange={(e) => {
                         const selectedSport = availableSports.find(s => s.id === e.target.value);
                         handleSupportedSportChange(index, 'sportId', e.target.value);
-                        handleSupportedSportChange(index, 'sportName', selectedSport?.displayName || '');
+                        handleSupportedSportChange(index, 'sportName', selectedSport?.displayName || selectedSport?.name || selectedSport?.id || '');
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                      disabled={loadingSports || availableSports.length === 0}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F] disabled:bg-gray-100"
                     >
-                      <option value="">Select a sport</option>
+                      <option value="">
+                        {loadingSports ? 'Loading sports...' : availableSports.length === 0 ? 'No sports available' : 'Select a sport'}
+                      </option>
                       {availableSports.map((availableSport) => (
                         <option key={availableSport.id} value={availableSport.id}>
-                          {availableSport.displayName}
+                          {availableSport.displayName || availableSport.name || availableSport.id}
                         </option>
                       ))}
                     </select>

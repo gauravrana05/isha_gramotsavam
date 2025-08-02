@@ -1,105 +1,76 @@
-// src/lib/types/sports.ts
-
-export interface TeamConfig {
-  minPlayers: number;         // Minimum required players
-  maxPlayers: number;         // Maximum main players
-  maxSubstitutes: number;     // Maximum substitute players
-  totalTeamSize: number;      // minPlayers + maxSubstitutes
-}
-
-export interface Eligibility {
-  genderRestriction: 'male' | 'female' | 'any';
-  minAge: number;
-  maxAge: number;
-  requireSamePanchayat: boolean;
-  customRules: string[];      // Additional rules as text
-}
-
-export interface PrizePool {
-  first: number;
-  second: number;
-  third: number;
-  currency: string;
-}
-
-export interface EventInfo {
-  registrationStart: string;  // ISO date
-  registrationEnd: string;    // ISO date
-  eventStart: string;         // ISO date
-  eventEnd: string;           // ISO date
-  venue: string;
-  prizePool: PrizePool;
-}
-
-export interface SportAssets {
-  primaryImage: string;       // Main sport image URL
-  thumbnailImage: string;     // Small preview image
-  galleryImages: string[];    // Additional images
-  rulesDocument?: string;     // PDF/document URL
-  videoUrl?: string;          // Promotional video
-}
+import { Timestamp } from 'firebase/firestore';
 
 export interface Sport {
-  // Identifiers
-  sportId: string;           // 'volleyball', 'throwball', etc.
-  name: string;             // 'Volleyball'
-  displayName: string;      // 'Volleyball Championship'
-  
-  // Basic Info
+  // Basic Information
+  sportId: string;
+  name: string; // e.g., "Volleyball"
+  displayName: string;
   description: string;
-  category: 'men' | 'women' | 'mixed';
-  status: 'active' | 'inactive' | 'upcoming';
   
-  // Team Configuration
-  teamConfig: TeamConfig;
+  // Sport Configuration
+  category: 'individual' | 'team';
+  genderCategories: ('men' | 'women')[];
   
-  // Eligibility Rules
-  eligibility: Eligibility;
+  // Team Requirements
+  minPlayers: number;
+  maxPlayers: number;
+  minSubstitutes: number;
+  maxSubstitutes: number;
   
-  // Event Information
-  eventInfo: EventInfo;
+  // Age Restrictions (Gramotsavam specific)
+  minAge: number; // Minimum 13/14 years
+  maxAge?: number;
+  maxPlayersUnder21: number; // Max 3 players under 21
+  allowPET: boolean; // Physical Education Trainer allowed
   
-  // Display Assets
-  assets: SportAssets;
+  // Geographic Restrictions
+  restrictedToStates: string[]; // e.g., Kabaddi only in Tamil Nadu
   
-  // Administrative
-  createdBy: string;          // Admin user ID
-  createdAt: string;          // ISO date
-  updatedAt: string;          // ISO date
-  version: number;            // For tracking changes
+  // Scoring System
+  scoringSystem: {
+    pointsToWin: number;
+    setsToWin?: number;
+    timeLimit?: number; // in minutes
+    customRules: string[];
+  };
+  
+  // Media & Assets
+  iconURL: string;
+  bannerImageURL?: string;
+  rulesPDF?: string;
+  
+  // Availability
+  isActive: boolean;
+  availableInEvents: string[]; // Array of event IDs
+  
+  // Audit Fields
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
-export interface SportSeason {
-  seasonId: string;           // '2025', '2026'
-  year: number;
-  status: 'upcoming' | 'active' | 'completed' | 'cancelled';
-  
-  // Override sport config for this season
-  teamConfigOverride?: Partial<TeamConfig>;
-  eligibilityOverride?: Partial<Eligibility>;
-  eventInfoOverride?: Partial<EventInfo>;
-  
-  // Season-specific data
-  registeredTeams: number;
-  maxTeams?: number;
-  
-  createdAt: string;
-  updatedAt: string;
+export interface ScoringSystem {
+  pointsToWin: number;
+  setsToWin?: number;
+  timeLimit?: number; // in minutes
+  customRules: string[];
 }
 
-// For backward compatibility with existing code
+// Utility types for sport operations
+export interface CreateSportData extends Omit<Sport, 'sportId' | 'createdAt' | 'updatedAt'> {
+  // Required fields for creating a new sport
+}
+
+export interface UpdateSportData extends Partial<Omit<Sport, 'sportId' | 'createdAt'>> {
+  // All fields except sportId and createdAt are optional for updates
+}
+
+// Sport types for type safety
+export type SportCategory = 'individual' | 'team';
+export type GenderCategory = 'men' | 'women';
+
+// Legacy interfaces for backward compatibility
 export interface LegacySportConfig {
   maxPlayers: number;
   maxSubstitutes: number;
   genderCategory: string;
-}
-
-// Utility type for creating new sports
-export interface CreateSportData extends Omit<Sport, 'createdAt' | 'updatedAt' | 'version' | 'createdBy'> {
-  // All fields except auto-generated ones
-}
-
-// Utility type for updating sports
-export interface UpdateSportData extends Partial<Omit<Sport, 'sportId' | 'createdAt' | 'createdBy' | 'version'>> {
-  // All fields except immutable ones, all optional
 }

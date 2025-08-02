@@ -6,7 +6,7 @@ import { serializeFirestoreDocs } from '@/lib/utils/firestore';
 
 async function getVolunteers() {
   const volunteersSnapshot = await adminDb.collection('users')
-    .where('role', 'in', ['verification_volunteer', 'checkin_volunteer', 'media_volunteer'])
+    .where('role', 'in', ['verification_volunteer', 'general_volunteer', 'technical_volunteer'])
     .where('isActive', '==', true)
     .get();
   return serializeFirestoreDocs(volunteersSnapshot.docs);

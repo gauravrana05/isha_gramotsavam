@@ -28,7 +28,7 @@ interface PageProps {
 async function getVolunteers() {
   try {
     const volunteersSnapshot = await adminDb.collection('users')
-      .where('role', 'in', ['verification_volunteer', 'checkin_volunteer', 'media_volunteer'])
+      .where('role', 'in', ['verification_volunteer', 'general_volunteer', 'technical_volunteer'])
       .where('isActive', '==', true)
       .get();
     return serializeFirestoreDocs(volunteersSnapshot.docs);
@@ -72,8 +72,8 @@ export default async function VolunteersManagement({ params }: PageProps) {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'media_volunteer': return 'bg-purple-100 text-purple-800';
-      case 'checkin_volunteer': return 'bg-blue-100 text-blue-800';
+      case 'technical_volunteer': return 'bg-purple-100 text-purple-800';
+      case 'general_volunteer': return 'bg-blue-100 text-blue-800';
       case 'verification_volunteer': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -81,8 +81,8 @@ export default async function VolunteersManagement({ params }: PageProps) {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'media_volunteer': return <Users className="w-3 h-3 mr-1" />;
-      case 'checkin_volunteer': return <UserCheck className="w-3 h-3 mr-1" />;
+      case 'technical_volunteer': return <Users className="w-3 h-3 mr-1" />;
+      case 'general_volunteer': return <UserCheck className="w-3 h-3 mr-1" />;
       case 'verification_volunteer': return <Shield className="w-3 h-3 mr-1" />;
       default: return <Users className="w-3 h-3 mr-1" />;
     }
@@ -104,10 +104,10 @@ export default async function VolunteersManagement({ params }: PageProps) {
               Assign Venues
             </Button>
           </Link>
-          <Link href={`/${lang}/admin/users/volunteers/invite`}>
+          <Link href={`/${lang}/admin/users/volunteers/add`}>
             <Button className="bg-[#3A7F3F] hover:bg-green-700 flex items-center">
               <Plus className="w-4 h-4 mr-2" />
-              Invite Volunteer
+              Add Volunteer
             </Button>
           </Link>
         </div>
@@ -176,12 +176,12 @@ export default async function VolunteersManagement({ params }: PageProps) {
           <UserCheck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No volunteers found</h3>
           <p className="text-gray-600 mb-6">
-            Invite your first volunteer to get started
+            Add your first volunteer to get started
           </p>
-          <Link href={`/${lang}/admin/users/volunteers/invite`}>
+          <Link href={`/${lang}/admin/users/volunteers/add`}>
             <Button className="bg-[#3A7F3F] hover:bg-green-700">
               <Plus className="w-4 h-4 mr-2" />
-              Invite First Volunteer
+              Add First Volunteer
             </Button>
           </Link>
         </Card>

@@ -1,3 +1,7 @@
-export default function PlaceholderPage() {
-  return null;
+export default function VolunteerTeamLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <>{children}</>;
 }

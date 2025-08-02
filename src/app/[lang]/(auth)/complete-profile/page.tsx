@@ -8,6 +8,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { documentUploadService } from "@/lib/services/documentUploadService";
 import { pincodeService } from "@/lib/services/pincodeService";
 import { useTranslation } from "@/lib/utils/i18n";
+import { getDashboardRoute } from "@/lib/utils/navigation";
 import Image from "next/image";
 import { Camera, Upload, Check, Loader2, MapPin } from "lucide-react";
 
@@ -94,26 +95,8 @@ export default function CompleteProfilePage() {
 
     if (userProfile?.isProfileComplete) {
       const role = userProfile.role || "public";
-      switch (role) {
-        case "admin":
-          router.push(`/${lang}/admin/dashboard`);
-          break;
-        case "captain":
-          router.push(`/${lang}/captain/dashboard`);
-          break;
-        case "player":
-          router.push(`/${lang}/player/dashboard`);
-          break;
-        case "volunteer_general":
-        case "volunteer_technical":
-          router.push(`/${lang}/volunteer/dashboard`);
-          break;
-        case "guest":
-          router.push(`/${lang}/guest/dashboard`);
-          break;
-        default:
-          router.push(`/${lang}/public`);
-      }
+      const dashboardRoute = getDashboardRoute(role, lang as string);
+      router.push(dashboardRoute);
     }
 
     if (userProfile) {
@@ -308,14 +291,7 @@ export default function CompleteProfilePage() {
       setError("Please select your gender");
       return;
     }
-    if (!formData.pincode || formData.pincode.length !== 6) {
-      setError("Please enter your 6-digit pincode");
-      return;
-    }
-    if (!addressCaptured) {
-      setError("Please complete the address selection by choosing a panchayat");
-      return;
-    }
+    // Validate Aadhaar uploads if provided (must be both sides)
     if ((formData.aadhaarFront && !formData.aadhaarBack) || (!formData.aadhaarFront && formData.aadhaarBack)) {
       setError("Please upload both front and back sides of Aadhaar card");
       return;
@@ -325,20 +301,23 @@ export default function CompleteProfilePage() {
     setError("");
 
     try {
-      // Check if profile is complete (all required fields + documents)
-      const hasAllRequiredFields = formData.firstName.trim() && 
+      // Check if profile is complete (all fields + documents for captain promotion)
+      const hasRequiredFields = formData.firstName.trim() && 
         formData.lastName.trim() && 
         formData.whatsappNumber.trim() && 
         formData.dob && 
-        formData.gender && 
-        formData.pincode && 
+        formData.gender;
+      
+      const hasCompleteAddress = formData.pincode && 
+        formData.pincode.length === 6 && 
         addressCaptured;
       
-      const hasAllDocuments = formData.profilePhoto && 
+      const hasCompleteDocuments = formData.profilePhoto && 
         formData.aadhaarFront && 
         formData.aadhaarBack;
       
-      const isComplete = hasAllRequiredFields && hasAllDocuments;
+      // isProfileComplete indicates user is ready for captain promotion
+      const isComplete = hasRequiredFields && hasCompleteAddress && hasCompleteDocuments;
 
       const profileData: any = {
         firstName: formData.firstName,
@@ -422,26 +401,8 @@ export default function CompleteProfilePage() {
       await updateDoc(userRef, cleanFirestoreData(profileData));
 
       const role = userProfile?.role || "public";
-      switch (role) {
-        case "admin":
-          router.push(`/${lang}/admin/dashboard`);
-          break;
-        case "captain":
-          router.push(`/${lang}/captain/dashboard`);
-          break;
-        case "player":
-          router.push(`/${lang}/player/dashboard`);
-          break;
-        case "volunteer_general":
-        case "volunteer_technical":
-          router.push(`/${lang}/volunteer/dashboard`);
-          break;
-        case "guest":
-          router.push(`/${lang}/guest/dashboard`);
-          break;
-        default:
-          router.push(`/${lang}/public`);
-      }
+      const dashboardRoute = getDashboardRoute(role, lang as string);
+      router.push(dashboardRoute);
     } catch (err: any) {
       console.error("Error completing profile:", err);
       setError(
@@ -942,7 +903,7 @@ export default function CompleteProfilePage() {
             </div>
           </div>
           <p className="text-sm text-gray-500 mt-4 font-fira">
-            Note: If you upload one side of Aadhaar, both sides are required. This is optional but recommended for verification.
+            Note: Aadhaar documents are optional but recommended for verification. If you upload one side, both sides are required.
           </p>
         </div>
 
