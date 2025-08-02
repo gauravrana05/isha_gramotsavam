@@ -11,6 +11,7 @@ import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { useTranslation } from "@/lib/utils/i18n";
 import { useServiceWorker } from "@/lib/utils/registerServiceWorker";
 import Image from "next/image";
+import { handleRedirect } from "@/lib/utils/navigation";
 
 declare global {
   interface Window {
@@ -30,42 +31,16 @@ export default function LoginPage() {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
   const { lang } = useParams();
-  const { user, userProfile } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { t } = useTranslation();
   useServiceWorker();
 
 
   useEffect(() => {
-    if (user && userProfile) {
-      if (!userProfile.isProfileComplete) {
-        router.push(`/${lang}/complete-profile`);
-      } else {
-        const role = userProfile.role || "public";
-        switch (role) {
-          case "admin":
-            router.push(`/${lang}/admin/dashboard`);
-            break;
-          case "captain":
-            router.push(`/${lang}/captain/dashboard`);
-            break;
-          case "player":
-            router.push(`/${lang}/player/dashboard`);
-            break;
-          case "volunteer_general":
-            router.push(`/${lang}/volunteer/dashboard`);
-            break;
-          case "volunteer_technical":
-            router.push(`/${lang}/volunteer/dashboard`);
-            break;
-          case "guest":
-            router.push(`/${lang}/guest/dashboard`);
-            break;
-          default:
-            router.push(`/${lang}/public`);
-        }
-      }
+    if (!authLoading && user) {
+      handleRedirect(user, lang as string, router);
     }
-  }, [user, userProfile, router, lang]);
+  }, [user, authLoading, router, lang]);
 
   // Timer for resend OTP
   useEffect(() => {
@@ -207,11 +182,8 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const result = await confirmationResult.confirm(otpValue);
+      await confirmationResult.confirm(otpValue);
       console.log("Phone number verified successfully");
-      
-      // The useEffect will handle routing once the user and userProfile are loaded
-      // If there's a delay in profile creation, the AuthContext will handle it
       
     } catch (err: any) {
       console.error("Error verifying OTP:", err);
@@ -236,13 +208,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Clear existing recaptcha first
       if (window.recaptchaVerifier) {
         window.recaptchaVerifier.clear();
         window.recaptchaVerifier = undefined;
       }
 
-      // Set up fresh recaptcha
       setUpRecaptcha();
       const formattedPhone = formatPhoneNumber(phoneNumber);
       const appVerifier = window.recaptchaVerifier!;
@@ -272,6 +242,14 @@ export default function LoginPage() {
       window.recaptchaVerifier = undefined;
     }
   };
+
+  if (authLoading || user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingSpinner size="large" />
+      </div>
+    );
+  }
 
   if (step === "phone") {
     return (
@@ -378,7 +356,6 @@ export default function LoginPage() {
       </div>
 
       <div className="space-y-6">
-        {/* OTP Input Container */}
         <div className="mb-4">
           <div className="flex justify-center items-center space-x-2 mb-4">
             {otp.map((digit, index) => (
@@ -403,7 +380,6 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Resend OTP */}
           <div className="text-center">
             {canResend ? (
               <button
@@ -420,14 +396,12 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-600 text-sm font-fira">{error}</p>
           </div>
         )}
 
-        {/* Verify Button */}
         <button
           onClick={handleVerifyCode}
           disabled={isVerifyDisabled}
@@ -448,7 +422,6 @@ export default function LoginPage() {
         </button>
       </div>
 
-      {/* Terms and Privacy */}
       <div className="mt-6 text-center">
         <p className="text-sm font-fira text-gray-600">
           By clicking on verify, you accept our{" "}
