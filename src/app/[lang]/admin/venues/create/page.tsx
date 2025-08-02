@@ -10,6 +10,22 @@ import Container from '@/components/ui/Container';
 import Button from '@/components/ui/Button';
 import { ArrowLeft, Save, Loader2, Plus, Trash2, MapPin } from 'lucide-react';
 
+interface Event {
+  id: string;
+  name: string;
+  description?: string;
+  startDate?: { toDate: () => Date };
+  endDate?: { toDate: () => Date };
+  isActive: boolean;
+}
+
+interface Sport {
+  id: string;
+  name?: string;
+  displayName?: string;
+  isActive: boolean;
+}
+
 interface VenueFormData {
   name: string;
   shortName: string;
@@ -18,6 +34,8 @@ interface VenueFormData {
   pincode: string;
   district: string;
   state: string;
+  taluk: string;
+  panchayat: string;
   coordinates: {
     latitude: number;
     longitude: number;
@@ -60,6 +78,8 @@ export default function CreateVenuePage() {
     pincode: '',
     district: '',
     state: '',
+    taluk: '',
+    panchayat: '',
     coordinates: {
       latitude: 0,
       longitude: 0
@@ -84,8 +104,8 @@ export default function CreateVenuePage() {
     utilizationRate: 0
   });
 
-  const [availableSports, setAvailableSports] = useState<any[]>([]);
-  const [availableEvents, setAvailableEvents] = useState<any[]>([]);
+  const [availableSports, setAvailableSports] = useState<Sport[]>([]);
+  const [availableEvents, setAvailableEvents] = useState<Event[]>([]);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
   const [taluks, setTaluks] = useState<string[]>([]);
@@ -105,7 +125,7 @@ export default function CreateVenuePage() {
 
     loadSports();
     loadEvents();
-  }, [user, userProfile]);
+  }, [user, userProfile, lang, router]);
 
   const loadSports = async () => {
     try {
@@ -114,13 +134,16 @@ export default function CreateVenuePage() {
       const sportsSnapshot = await getDocs(sportsCollection);
       const sportsData = sportsSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
-      }));
+        ...doc.data(),
+      } as Sport));
       const activeSports = sportsData.filter(sport => sport.isActive);
-      console.log('Loaded sports:', activeSports);
       setAvailableSports(activeSports);
+      if (activeSports.length === 0) {
+        console.warn('No active sports found.');
+      }
     } catch (err: any) {
       console.error('Error loading sports:', err);
+      setError('Failed to load sports. Please try again.');
     } finally {
       setLoadingSports(false);
     }
@@ -131,10 +154,14 @@ export default function CreateVenuePage() {
       setLoadingEvents(true);
       const eventsCollection = collection(db, 'events');
       const eventsSnapshot = await getDocs(eventsCollection);
-      const eventsData = eventsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const eventsData = eventsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          isActive: data.isActive || false,
+        } as Event;
+      });
       setAvailableEvents(eventsData.filter(event => event.isActive));
     } catch (err: any) {
       console.error('Error loading events:', err);
@@ -352,17 +379,17 @@ export default function CreateVenuePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name.trim()) {
       setError('Venue name is required');
       return;
     }
-    
+
     if (!formData.shortName.trim()) {
       setError('Short name is required');
       return;
     }
-    
+
     if (!formData.address.trim()) {
       setError('Address is required');
       return;
@@ -401,13 +428,12 @@ export default function CreateVenuePage() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
-      
+
       const venueDoc = await addDoc(collection(db, 'venues'), venueData);
-      
-      // Update selected events to include this venue
+
       if (selectedEvents.length > 0) {
         await Promise.all(
-          selectedEvents.map(eventId => 
+          selectedEvents.map(eventId =>
             updateDoc(doc(db, 'events', eventId), {
               venues: arrayUnion(venueDoc.id),
               updatedAt: serverTimestamp()
@@ -415,7 +441,7 @@ export default function CreateVenuePage() {
           )
         );
       }
-      
+
       router.push(`/${lang}/admin/venues`);
     } catch (err: any) {
       console.error('Error creating venue:', err);
@@ -432,7 +458,6 @@ export default function CreateVenuePage() {
   return (
     <Container>
       <div className="max-w-4xl mx-auto py-8">
-        {/* Header */}
         <div className="flex items-center mb-6">
           <Button
             onClick={() => router.back()}
@@ -448,19 +473,15 @@ export default function CreateVenuePage() {
           </div>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <p className="text-red-600">{error}</p>
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -475,7 +496,6 @@ export default function CreateVenuePage() {
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Short Name *
@@ -489,7 +509,6 @@ export default function CreateVenuePage() {
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Type *
@@ -505,7 +524,6 @@ export default function CreateVenuePage() {
                   <option value="final">Final</option>
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Current Status
@@ -521,7 +539,6 @@ export default function CreateVenuePage() {
                   <option value="unavailable">Unavailable</option>
                 </select>
               </div>
-
               <div className="md:col-span-2">
                 <label className="flex items-center">
                   <input
@@ -536,10 +553,8 @@ export default function CreateVenuePage() {
             </div>
           </div>
 
-          {/* Location Information */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Location Information</h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -554,7 +569,6 @@ export default function CreateVenuePage() {
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Pincode *
@@ -577,7 +591,6 @@ export default function CreateVenuePage() {
                   </div>
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
                 <input
@@ -589,7 +602,6 @@ export default function CreateVenuePage() {
                   readOnly
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">District</label>
                 <select
@@ -604,7 +616,6 @@ export default function CreateVenuePage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Taluk</label>
                 <select
@@ -619,7 +630,6 @@ export default function CreateVenuePage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Panchayat</label>
                 <select
@@ -634,7 +644,6 @@ export default function CreateVenuePage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Latitude
@@ -647,7 +656,6 @@ export default function CreateVenuePage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Longitude
@@ -661,7 +669,6 @@ export default function CreateVenuePage() {
                 />
               </div>
             </div>
-
             {addressCaptured && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center space-x-2">
@@ -672,7 +679,6 @@ export default function CreateVenuePage() {
             )}
           </div>
 
-          {/* Supported Sports */}
           <div className="bg-white rounded-lg border p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900">Supported Sports</h3>
@@ -686,7 +692,6 @@ export default function CreateVenuePage() {
                 Add Sport
               </Button>
             </div>
-            
             {formData.supportedSports.map((sport, index) => (
               <div key={index} className="mb-4 p-4 border rounded-lg">
                 <div className="flex items-center justify-between mb-3">
@@ -700,7 +705,6 @@ export default function CreateVenuePage() {
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Sport</label>
@@ -709,7 +713,7 @@ export default function CreateVenuePage() {
                       onChange={(e) => {
                         const selectedSport = availableSports.find(s => s.id === e.target.value);
                         handleSupportedSportChange(index, 'sportId', e.target.value);
-                        handleSupportedSportChange(index, 'sportName', selectedSport?.displayName || selectedSport?.name || selectedSport?.id || '');
+                        handleSupportedSportChange(index, 'sportName', selectedSport?.displayName || selectedSport?.name || '');
                       }}
                       disabled={loadingSports || availableSports.length === 0}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F] disabled:bg-gray-100"
@@ -749,10 +753,8 @@ export default function CreateVenuePage() {
             ))}
           </div>
 
-          {/* Primary Contact */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Primary Contact</h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
@@ -796,10 +798,8 @@ export default function CreateVenuePage() {
             </div>
           </div>
 
-          {/* Officials */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Officials</h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Coordinator ID</label>
@@ -820,7 +820,6 @@ export default function CreateVenuePage() {
                 />
               </div>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Referees</label>
               {formData.officials.referees.map((referee, index) => (
@@ -851,10 +850,8 @@ export default function CreateVenuePage() {
             </div>
           </div>
 
-          {/* Assigned Volunteers */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Assigned Volunteers</h3>
-            
             {formData.assignedVolunteers.map((volunteer, index) => (
               <div key={index} className="flex mb-2">
                 <input
@@ -882,10 +879,8 @@ export default function CreateVenuePage() {
             </button>
           </div>
 
-          {/* Assign to Events */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Assign to Events</h3>
-            
             {loadingEvents ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin text-[#3A7F3F]" />
@@ -912,13 +907,11 @@ export default function CreateVenuePage() {
                 ))}
               </div>
             )}
-            
             {!loadingEvents && availableEvents.length === 0 && (
               <p className="text-gray-500 text-center py-4">No events available to assign.</p>
             )}
           </div>
 
-          {/* Submit Button */}
           <div className="flex justify-end space-x-4">
             <Button
               type="button"

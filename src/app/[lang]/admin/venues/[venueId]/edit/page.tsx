@@ -49,6 +49,22 @@ interface VenueFormData {
   utilizationRate: number;
 }
 
+interface Sport {
+  id: string;
+  name?: string;
+  displayName?: string;
+  isActive: boolean;
+}
+
+interface Event {
+  id: string;
+  name: string;
+  description?: string;
+  startDate?: { toDate: () => Date };
+  endDate?: { toDate: () => Date };
+  isActive: boolean;
+}
+
 export default function EditVenuePage() {
   const router = useRouter();
   const { lang, venueId } = useParams();
@@ -88,8 +104,8 @@ export default function EditVenuePage() {
     utilizationRate: 0
   });
 
-  const [availableSports, setAvailableSports] = useState<any[]>([]);
-  const [availableEvents, setAvailableEvents] = useState<any[]>([]);
+  const [availableSports, setAvailableSports] = useState<Sport[]>([]);
+  const [availableEvents, setAvailableEvents] = useState<Event[]>([]);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [originalEvents, setOriginalEvents] = useState<string[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
@@ -112,7 +128,7 @@ export default function EditVenuePage() {
     loadVenue();
     loadSports();
     loadEvents();
-  }, [user, userProfile, venueId]);
+  }, [user, userProfile, venueId, lang, router]);
 
   const loadVenue = async () => {
     try {
@@ -153,7 +169,8 @@ export default function EditVenuePage() {
           utilizationRate: venueData.utilizationRate || 0
         });
 
-        // Set up address capture for existing venue data
+        console.log('Loaded venue supportedSports:', venueData.supportedSports); // Debug: Verify loaded sports
+
         if (venueData.state) {
           await fetchDistricts(venueData.state);
           if (venueData.district) {
@@ -167,7 +184,6 @@ export default function EditVenuePage() {
           }
         }
 
-        // Load which events currently use this venue
         loadEventsForVenue(venueId as string);
       } else {
         setError('Venue not found');
@@ -207,13 +223,17 @@ export default function EditVenuePage() {
       const sportsSnapshot = await getDocs(sportsCollection);
       const sportsData = sportsSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
-      }));
-      const activeSports = sportsData.filter(sport => sport.isActive);
-      console.log('Loaded sports (edit):', activeSports);
+        ...doc.data(),
+      } as Sport));
+      const activeSports = sportsData.filter(sport => sport.isActive !== false);
+      console.log('Loaded sports:', activeSports); // Debug: Verify sports data
       setAvailableSports(activeSports);
+      if (activeSports.length === 0) {
+        console.warn('No active sports found.');
+      }
     } catch (err: any) {
       console.error('Error loading sports:', err);
+      setError('Failed to load sports. Please try again.');
     } finally {
       setLoadingSports(false);
     }
@@ -226,8 +246,9 @@ export default function EditVenuePage() {
       const eventsSnapshot = await getDocs(eventsCollection);
       const eventsData = eventsSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
-      }));
+        ...doc.data(),
+        isActive: doc.data().isActive || false
+      } as Event));
       setAvailableEvents(eventsData.filter(event => event.isActive));
     } catch (err: any) {
       console.error('Error loading events:', err);
@@ -301,13 +322,6 @@ export default function EditVenuePage() {
         [field]: value
       }
     }));
-  };
-
-  const handleSupportedSportChange = (index: number, field: string, value: any) => {
-    const newSports = [...formData.supportedSports];
-    console.log(newSports);
-    newSports[index] = { ...newSports[index], [field]: value };
-    setFormData(prev => ({ ...prev, supportedSports: newSports }));
   };
 
   const addSupportedSport = () => {
@@ -495,14 +509,14 @@ export default function EditVenuePage() {
         updatedAt: serverTimestamp()
       };
       
+      console.log('Submitting venueData:', venueData); // Debug: Verify submitted data
+
       const venueDoc = doc(db, 'venues', venueId as string);
       await updateDoc(venueDoc, venueData);
       
-      // Update event assignments
       const eventsToAdd = selectedEvents.filter(eventId => !originalEvents.includes(eventId));
       const eventsToRemove = originalEvents.filter(eventId => !selectedEvents.includes(eventId));
       
-      // Add venue to new events
       await Promise.all(
         eventsToAdd.map(eventId => 
           updateDoc(doc(db, 'events', eventId), {
@@ -512,7 +526,6 @@ export default function EditVenuePage() {
         )
       );
       
-      // Remove venue from events that were deselected
       await Promise.all(
         eventsToRemove.map(eventId => 
           updateDoc(doc(db, 'events', eventId), {
@@ -565,7 +578,6 @@ export default function EditVenuePage() {
   return (
     <Container>
       <div className="max-w-4xl mx-auto py-8">
-        {/* Header */}
         <div className="flex items-center mb-6">
           <Button
             onClick={() => router.back()}
@@ -581,19 +593,15 @@ export default function EditVenuePage() {
           </div>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <p className="text-red-600">{error}</p>
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -607,7 +615,6 @@ export default function EditVenuePage() {
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Short Name *
@@ -620,7 +627,6 @@ export default function EditVenuePage() {
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Type *
@@ -636,7 +642,6 @@ export default function EditVenuePage() {
                   <option value="final">Final</option>
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Current Status
@@ -652,7 +657,6 @@ export default function EditVenuePage() {
                   <option value="unavailable">Unavailable</option>
                 </select>
               </div>
-
               <div className="md:col-span-2">
                 <label className="flex items-center">
                   <input
@@ -667,10 +671,8 @@ export default function EditVenuePage() {
             </div>
           </div>
 
-          {/* Location Information */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Location Information</h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -684,7 +686,6 @@ export default function EditVenuePage() {
                   required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Pincode *
@@ -707,7 +708,6 @@ export default function EditVenuePage() {
                   </div>
                 </div>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
                 <input
@@ -719,7 +719,6 @@ export default function EditVenuePage() {
                   readOnly
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">District</label>
                 <select
@@ -734,7 +733,6 @@ export default function EditVenuePage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Taluk</label>
                 <select
@@ -749,7 +747,6 @@ export default function EditVenuePage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Panchayat</label>
                 <select
@@ -764,7 +761,6 @@ export default function EditVenuePage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Latitude
@@ -777,7 +773,6 @@ export default function EditVenuePage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Longitude
@@ -791,7 +786,6 @@ export default function EditVenuePage() {
                 />
               </div>
             </div>
-
             {addressCaptured && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center space-x-2">
@@ -802,7 +796,6 @@ export default function EditVenuePage() {
             )}
           </div>
 
-          {/* Supported Sports */}
           <div className="bg-white rounded-lg border p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900">Supported Sports</h3>
@@ -816,7 +809,6 @@ export default function EditVenuePage() {
                 Add Sport
               </Button>
             </div>
-            
             {formData.supportedSports.map((sport, index) => (
               <div key={index} className="mb-4 p-4 border rounded-lg">
                 <div className="flex items-center justify-between mb-3">
@@ -830,7 +822,6 @@ export default function EditVenuePage() {
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Sport</label>
@@ -838,8 +829,17 @@ export default function EditVenuePage() {
                       value={sport.sportId}
                       onChange={(e) => {
                         const selectedSport = availableSports.find(s => s.id === e.target.value);
-                        handleSupportedSportChange(index, 'sportId', e.target.value);
-                        handleSupportedSportChange(index, 'sportName', selectedSport?.displayName || selectedSport?.sportName || selectedSport?.id || '');
+                        console.log('Selected sport:', selectedSport); // Debug: Verify selected sport
+                        const newSports = [...formData.supportedSports];
+                        newSports[index] = {
+                          ...newSports[index],
+                          sportId: e.target.value,
+                          sportName: selectedSport?.displayName || selectedSport?.name || e.target.value || '',
+                        };
+                        setFormData(prev => {
+                          console.log('Updated supportedSports:', newSports); // Debug: Verify state update
+                          return { ...prev, supportedSports: newSports };
+                        });
                       }}
                       disabled={loadingSports || availableSports.length === 0}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F] disabled:bg-gray-100"
@@ -849,7 +849,7 @@ export default function EditVenuePage() {
                       </option>
                       {availableSports.map((availableSport) => (
                         <option key={availableSport.id} value={availableSport.id}>
-                          {availableSport.displayName || availableSport.sportName || availableSport.id}
+                          {availableSport.displayName || availableSport.name || availableSport.id}
                         </option>
                       ))}
                     </select>
@@ -860,7 +860,14 @@ export default function EditVenuePage() {
                       type="number"
                       min="1"
                       value={sport.courtCount}
-                      onChange={(e) => handleSupportedSportChange(index, 'courtCount', parseInt(e.target.value) || 1)}
+                      onChange={(e) => {
+                        const newSports = [...formData.supportedSports];
+                        newSports[index] = {
+                          ...newSports[index],
+                          courtCount: parseInt(e.target.value) || 1
+                        };
+                        setFormData(prev => ({ ...prev, supportedSports: newSports }));
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
                     />
                   </div>
@@ -868,7 +875,14 @@ export default function EditVenuePage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Court Specifications</label>
                     <textarea
                       value={sport.courtSpecifications}
-                      onChange={(e) => handleSupportedSportChange(index, 'courtSpecifications', e.target.value)}
+                      onChange={(e) => {
+                        const newSports = [...formData.supportedSports];
+                        newSports[index] = {
+                          ...newSports[index],
+                          courtSpecifications: e.target.value
+                        };
+                        setFormData(prev => ({ ...prev, supportedSports: newSports }));
+                      }}
                       rows={2}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
                       placeholder="Specifications and requirements for this sport"
@@ -879,10 +893,8 @@ export default function EditVenuePage() {
             ))}
           </div>
 
-          {/* Primary Contact */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Primary Contact</h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
@@ -926,10 +938,8 @@ export default function EditVenuePage() {
             </div>
           </div>
 
-          {/* Officials */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Officials</h3>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Coordinator ID</label>
@@ -950,7 +960,6 @@ export default function EditVenuePage() {
                 />
               </div>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Referees</label>
               {formData.officials.referees.map((referee, index) => (
@@ -981,10 +990,8 @@ export default function EditVenuePage() {
             </div>
           </div>
 
-          {/* Assigned Volunteers */}
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Assigned Volunteers</h3>
-            
             {formData.assignedVolunteers.map((volunteer, index) => (
               <div key={index} className="flex mb-2">
                 <input
@@ -998,85 +1005,81 @@ export default function EditVenuePage() {
                   type="button"
                   onClick={() => removeArrayItem('assignedVolunteers', index)}
                   className="ml-2 px-3 py-2 text-red-600 hover:text-red-800"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => addArrayItem('assignedVolunteers')}
-              className="text-[#3A7F3F] hover:text-green-700 text-sm"
-            >
-              + Add Volunteer
-            </button>
-          </div>
-
-          {/* Assign to Events */}
-          <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Assign to Events</h3>
-            
-            {loadingEvents ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin text-[#3A7F3F]" />
-                <span className="ml-2">Loading events...</span>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {availableEvents.map((event) => (
-                  <label key={event.id} className="flex items-start p-3 border rounded-lg hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={selectedEvents.includes(event.id)}
-                      onChange={(e) => handleEventChange(event.id, e.target.checked)}
-                      className="rounded border-gray-300 text-[#3A7F3F] focus:ring-[#3A7F3F] mt-1"
-                    />
-                    <div className="ml-3 flex-1">
-                      <span className="text-sm font-medium text-gray-900">{event.name}</span>
-                      <div className="text-xs text-gray-500 mt-1">
-                        <div>{event.description}</div>
-                        <div>{event.startDate?.toDate ? event.startDate.toDate().toLocaleDateString() : 'TBD'} - {event.endDate?.toDate ? event.endDate.toDate().toLocaleDateString() : 'TBD'}</div>
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
-            
-            {!loadingEvents && availableEvents.length === 0 && (
-              <p className="text-gray-500 text-center py-4">No events available to assign.</p>
-            )}
-          </div>
-
-          {/* Submit Button */}
-          <div className="flex justify-end space-x-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={saving}
-              className="bg-[#3A7F3F] hover:bg-green-700"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => addArrayItem('assignedVolunteers')}
+                className="text-[#3A7F3F] hover:text-green-700 text-sm"
+              >
+                + Add Volunteer
+              </button>
+            </div>
+  
+            <div className="bg-white rounded-lg border p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Assign to Events</h3>
+              {loadingEvents ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#3A7F3F]" />
+                  <span className="ml-2">Loading events...</span>
+                </div>
               ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Changes
-                </>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {availableEvents.map((event) => (
+                    <label key={event.id} className="flex items-start p-3 border rounded-lg hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={selectedEvents.includes(event.id)}
+                        onChange={(e) => handleEventChange(event.id, e.target.checked)}
+                        className="rounded border-gray-300 text-[#3A7F3F] focus:ring-[#3A7F3F] mt-1"
+                      />
+                      <div className="ml-3 flex-1">
+                        <span className="text-sm font-medium text-gray-900">{event.name}</span>
+                        <div className="text-xs text-gray-500 mt-1">
+                          <div>{event.description}</div>
+                          <div>{event.startDate?.toDate ? event.startDate.toDate().toLocaleDateString() : 'TBD'} - {event.endDate?.toDate ? event.endDate.toDate().toLocaleDateString() : 'TBD'}</div>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
               )}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </Container>
-  );
-}
+              {!loadingEvents && availableEvents.length === 0 && (
+                <p className="text-gray-500 text-center py-4">No events available to assign.</p>
+              )}
+            </div>
+  
+            <div className="flex justify-end space-x-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving}
+                className="bg-[#3A7F3F] hover:bg-green-700"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Container>
+    );
+  }
