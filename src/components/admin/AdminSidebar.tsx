@@ -36,7 +36,7 @@ interface NavItem {
 
 export default function AdminSidebar({ className = '' }: AdminSidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<string[]>(['overview']);
+  const [expandedItems, setExpandedItems] = useState<string[]>(['Venues', 'Users']);
   
   const pathname = usePathname();
   const { lang } = useParams();
@@ -60,8 +60,12 @@ export default function AdminSidebar({ className = '' }: AdminSidebarProps) {
     },
     {
       name: 'Venues',
-      href: `/${lang}/admin/venues`,
       icon: MapPin,
+      children: [
+        { name: 'All Venues', href: `/${lang}/admin/venues`, icon: MapPin },
+        { name: 'Location Mapping', href: `/${lang}/admin/venues/location-mapping`, icon: MapPin },
+        { name: 'Cluster-Division Mapping', href: `/${lang}/admin/venues/cluster-division-mapping`, icon: MapPin },
+      ]
     },
     {
       name: 'Teams',
@@ -70,14 +74,24 @@ export default function AdminSidebar({ className = '' }: AdminSidebarProps) {
     },
     {
       name: 'Users',
-      href: `/${lang}/admin/users`,
       icon: Shield,
+      children: [
+        { name: 'All Users', href: `/${lang}/admin/users`, icon: Shield },
+        { name: 'Volunteers', href: `/${lang}/admin/users/volunteers`, icon: UserCheck },
+        { name: 'Assign Venues', href: `/${lang}/admin/users/volunteers/assign-venues`, icon: UserCheck },
+      ]
+    },
+    {
+      name: 'Analytics',
+      href: `/${lang}/admin/analytics`,
+      icon: BarChart3,
     },
     {
       name: 'System',
       icon: Settings,
       children: [
         { name: 'Audit Logs', href: `/${lang}/admin/system/audit-logs`, icon: BarChart3 },
+        { name: 'Configuration', href: `/${lang}/admin/system/config`, icon: Settings },
       ]
     }
   ];

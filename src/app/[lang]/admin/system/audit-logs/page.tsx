@@ -335,7 +335,7 @@ export default function AuditLogsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Player Actions</p>
-                <p className="text-2xl font-bold text-blue-600">{logs.filter(l => l.actionType === 'player_verification').length}</p>
+                <p className="text-2xl font-bold text-blue-600">{logs.filter(l => l.resource === 'player').length}</p>
               </div>
               <User className="w-8 h-8 text-blue-400" />
             </div>
@@ -344,18 +344,18 @@ export default function AuditLogsPage() {
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Bulk Actions</p>
-                <p className="text-2xl font-bold text-purple-600">{logs.filter(l => l.actionType === 'bulk_action').length}</p>
+                <p className="text-gray-600 text-sm">Document Actions</p>
+                <p className="text-2xl font-bold text-orange-600">{logs.filter(l => l.resource === 'document').length}</p>
               </div>
-              <CheckCircle className="w-8 h-8 text-purple-400" />
+              <CheckCircle className="w-8 h-8 text-orange-400" />
             </div>
           </div>
           
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Unique Users</p>
-                <p className="text-2xl font-bold text-green-600">{new Set(logs.map(l => l.performedBy.uid)).size}</p>
+                <p className="text-gray-600 text-sm">Unique Volunteers</p>
+                <p className="text-2xl font-bold text-green-600">{new Set(logs.map(l => l.userId)).size}</p>
               </div>
               <Users className="w-8 h-8 text-green-400" />
             </div>
@@ -386,25 +386,39 @@ export default function AuditLogsPage() {
                   className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
                 >
                   <option value="all">All Actions</option>
-                  <option value="player_verification">Player Verification</option>
-                  <option value="team_verification">Team Verification</option>
-                  <option value="bulk_action">Bulk Actions</option>
-                  <option value="document_review">Document Review</option>
-                  <option value="status_change">Status Change</option>
+                  <option value="team_player_verification">Player Verification</option>
+                  <option value="onground_player_verification">On-ground Verification</option>
+                  <option value="volunteer_document_upload">Document Upload</option>
+                  <option value="volunteer_media_upload">Media Upload</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               </div>
 
               <div className="relative">
                 <select
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
+                  value={resourceFilter}
+                  onChange={(e) => setResourceFilter(e.target.value)}
                   className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
                 >
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 Days</option>
-                  <option value="month">Last 30 Days</option>
+                  <option value="all">All Resources</option>
+                  <option value="player">Player</option>
+                  <option value="team">Team</option>
+                  <option value="document">Document</option>
+                  <option value="media">Media</option>
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
+                >
+                  <option value="all">All Roles</option>
+                  <option value="verification_volunteer">Verification Volunteer</option>
+                  <option value="volunteer_technical">Technical Volunteer</option>
+                  <option value="volunteer_general">General Volunteer</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               </div>
@@ -428,7 +442,7 @@ export default function AuditLogsPage() {
               No audit logs found
             </h3>
             <p className="text-gray-600 font-fira">
-              {searchTerm || actionFilter !== 'all' || dateFilter !== 'all'
+              {searchTerm || actionFilter !== 'all' || resourceFilter !== 'all' || roleFilter !== 'all'
                 ? 'Try adjusting your search or filters' 
                 : 'Audit logs will appear here as verification activities occur'}
             </p>
@@ -443,11 +457,11 @@ export default function AuditLogsPage() {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Performed By</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resource</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Volunteer</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status Change</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Change</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -472,41 +486,49 @@ export default function AuditLogsPage() {
                         <div className="text-sm font-medium text-gray-900">{log.action}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getActionColor(log.actionType)}`}>
-                          {getActionIcon(log.actionType)}
-                          <span className="ml-1 capitalize">{log.actionType.replace('_', ' ')}</span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getResourceColor(log.resource)}`}>
+                          {getResourceIcon(log.resource)}
+                          <span className="ml-1 capitalize">{log.resource}</span>
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{log.performedBy.name}</div>
-                        <div className="text-xs text-gray-500 capitalize">{log.performedBy.role.replace('_', ' ')}</div>
+                        <div className="text-sm text-gray-900">{log.userDisplayName || log.userId}</div>
+                        <div className="text-xs text-gray-500">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getRoleColor(log.userRole)}`}>
+                            {log.userRole.replace('_', ' ')}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
-                          {log.targetTeam && (
-                            <div>Team: {log.targetTeam.name}</div>
+                          {log.targetUserDisplayName && (
+                            <div>User: {log.targetUserDisplayName}</div>
                           )}
-                          {log.targetPlayer && (
-                            <div>Player: {log.targetPlayer.name}</div>
+                          {log.targetTeamDisplayName && (
+                            <div>Team: {log.targetTeamDisplayName}</div>
                           )}
-                          {log.details.bulkCount && (
-                            <div>Bulk: {log.details.bulkCount} players</div>
+                          {log.venueDisplayName && (
+                            <div className="text-xs text-gray-500">Venue: {log.venueDisplayName}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900 max-w-xs">
+                          {log.changeDescription}
+                          {log.oldValue && log.newValue && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              {log.oldValue} → {log.newValue}
+                            </div>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {log.details.previousStatus && log.details.newStatus && (
-                          <div className="text-sm">
-                            <span className="text-gray-500">{log.details.previousStatus}</span>
-                            <span className="mx-1">→</span>
-                            <span className="font-medium text-gray-900">{log.details.newStatus}</span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-500 max-w-xs truncate">
-                          {log.details.reason || log.details.comments || '-'}
-                        </div>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          log.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {log.success ? <CheckCircle className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
+                          {log.success ? 'Success' : 'Failed'}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -538,28 +560,42 @@ export default function AuditLogsPage() {
                         })}
                       </p>
                     </div>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getActionColor(log.actionType)}`}>
-                      {getActionIcon(log.actionType)}
-                      <span className="ml-1 capitalize">{log.actionType.replace('_', ' ')}</span>
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getResourceColor(log.resource)}`}>
+                        {getResourceIcon(log.resource)}
+                        <span className="ml-1 capitalize">{log.resource}</span>
+                      </span>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        log.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {log.success ? <CheckCircle className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
+                        {log.success ? 'Success' : 'Failed'}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="space-y-2 text-sm text-gray-600 mb-4">
-                    <div><strong>Performed by:</strong> {log.performedBy.name} ({log.performedBy.role.replace('_', ' ')})</div>
-                    {log.targetTeam && (
-                      <div><strong>Team:</strong> {log.targetTeam.name}</div>
+                    <div><strong>Volunteer:</strong> {log.userDisplayName || log.userId}</div>
+                    <div><strong>Role:</strong> 
+                      <span className={`ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getRoleColor(log.userRole)}`}>
+                        {log.userRole.replace('_', ' ')}
+                      </span>
+                    </div>
+                    {log.targetUserDisplayName && (
+                      <div><strong>Target User:</strong> {log.targetUserDisplayName}</div>
                     )}
-                    {log.targetPlayer && (
-                      <div><strong>Player:</strong> {log.targetPlayer.name}</div>
+                    {log.targetTeamDisplayName && (
+                      <div><strong>Target Team:</strong> {log.targetTeamDisplayName}</div>
                     )}
-                    {log.details.previousStatus && log.details.newStatus && (
-                      <div><strong>Status:</strong> {log.details.previousStatus} → {log.details.newStatus}</div>
+                    {log.venueDisplayName && (
+                      <div><strong>Venue:</strong> {log.venueDisplayName}</div>
                     )}
-                    {(log.details.reason || log.details.comments) && (
-                      <div><strong>Details:</strong> {log.details.reason || log.details.comments}</div>
+                    <div><strong>Change:</strong> {log.changeDescription}</div>
+                    {log.oldValue && log.newValue && (
+                      <div><strong>Status:</strong> {log.oldValue} → {log.newValue}</div>
                     )}
-                    {log.details.bulkCount && (
-                      <div><strong>Bulk Count:</strong> {log.details.bulkCount} players</div>
+                    {log.uploadReason && (
+                      <div><strong>Reason:</strong> {log.uploadReason}</div>
                     )}
                   </div>
                 </div>
