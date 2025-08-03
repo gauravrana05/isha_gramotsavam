@@ -27,10 +27,16 @@ async function getVenueFixtures(venueId: string) {
   try {
     const fixturesSnapshot = await adminDb.collection('fixtures')
       .where('venueId', '==', venueId)
-      .orderBy('createdAt', 'desc')
       .get();
     
-    return serializeFirestoreDocs(fixturesSnapshot.docs);
+    // Sort in memory instead of using orderBy to avoid index requirement
+    const docs = fixturesSnapshot.docs.sort((a, b) => {
+      const aTime = a.data().createdAt?.toDate?.() || new Date(0);
+      const bTime = b.data().createdAt?.toDate?.() || new Date(0);
+      return bTime.getTime() - aTime.getTime();
+    });
+    
+    return serializeFirestoreDocs(docs);
   } catch (error) {
     console.error('Error fetching fixtures:', error);
     return [];

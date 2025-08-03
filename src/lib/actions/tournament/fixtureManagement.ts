@@ -2,7 +2,8 @@
 
 import { adminDb } from '@/lib/firebase/admin';
 import { revalidatePath } from 'next/cache';
-import { Fixture, FixtureMatch } from '@/lib/types/fixtures';
+import { Fixture, FixtureMatch, Match } from '@/lib/types/fixtures';
+import { FieldValue } from 'firebase-admin/firestore';
 
 interface TeamNumberAssignment {
   teamId: string;
@@ -28,7 +29,7 @@ export async function assignTeamNumbers(
       const teamRef = adminDb.collection('teams').doc(assignment.teamId);
       batch.update(teamRef, {
         tournamentNumber: assignment.number,
-        numberAssignedAt: new Date(),
+        numberAssignedAt: FieldValue.serverTimestamp(),
         numberAssignedVenue: venueId
       });
     }
@@ -57,26 +58,32 @@ export async function createKnockoutDraw(
   genderCategory: 'men' | 'women'
 ) {
   try {
-    // Get checked-in teams for this venue
-    const teamsSnapshot = await adminDb.collection('teams')
-      .where('checkedInVenue', '==', venueId)
-      .where('checkedIn', '==', true)
-      .where('eventId', '==', eventId)
-      .where('sportId', '==', sportId)
-      .where('genderCategory', '==', genderCategory)
-      .get();
+    console.log(`Creating knockout draw for venue: ${venueId}, sport: ${sportId}, gender: ${genderCategory}`);
     
-    if (teamsSnapshot.empty) {
-      return { 
-        success: false, 
-        error: 'No checked-in teams found for this venue and sport' 
+    // First try to get teams via teamVenueAssignment (more reliable)
+    const venueTeamsResult = await getVenueCheckedInTeams(venueId, eventId);
+    
+    if (!venueTeamsResult.success) {
+      return {
+        success: false,
+        error: 'Failed to get venue teams: ' + venueTeamsResult.error
       };
     }
     
-    const teams = teamsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const sportKey = `${sportId}_${genderCategory}`;
+    const sportTeams = venueTeamsResult.teamsBySport[sportKey] || [];
+    
+    console.log(`Found ${sportTeams.length} checked-in teams for ${sportKey}`);
+    
+    if (sportTeams.length === 0) {
+      return { 
+        success: false, 
+        error: `No checked-in teams found for ${sportId} ${genderCategory} at this venue` 
+      };
+    }
+    
+    // Use the teams from venue assignment result
+    const teams = sportTeams;
     
     // Sort teams by tournament number
     teams.sort((a, b) => (a.tournamentNumber || 0) - (b.tournamentNumber || 0));
@@ -118,8 +125,8 @@ export async function createKnockoutDraw(
       },
       status: 'in_progress',
       finalStandings: [],
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
     };
     
     const fixtureRef = await adminDb.collection('fixtures').add(fixtureData);
@@ -127,7 +134,43 @@ export async function createKnockoutDraw(
     // Update the document with its own ID
     await fixtureRef.update({ fixtureId: fixtureRef.id });
     
+    // Create standalone match documents for volunteer result updates
+    const matchCreationResult = await createMatchesFromBracket(
+      fixtureRef.id,
+      fixtureData,
+      bracket.matches,
+      teams
+    );
+    
+    if (matchCreationResult.success && matchCreationResult.matches && matchCreationResult.matches.length > 0) {
+      // Create a mapping from bracket match IDs to real match IDs
+      const bracketToRealMatchMapping = new Map();
+      bracket.matches.forEach((bracketMatch, index) => {
+        if (matchCreationResult.matches[index]) {
+          bracketToRealMatchMapping.set(bracketMatch.matchId, matchCreationResult.matches[index].matchId);
+        }
+      });
+    
+      // Update bracket matches with real IDs and correct nextMatchId references
+      const updatedBracketMatches = bracket.matches.map((bracketMatch) => {
+        const realMatchId = bracketToRealMatchMapping.get(bracketMatch.matchId);
+        const realNextMatchId = bracketMatch.nextMatchId ? bracketToRealMatchMapping.get(bracketMatch.nextMatchId) : null;
+        
+        return {
+          ...bracketMatch,
+          matchId: realMatchId || bracketMatch.matchId,
+          nextMatchId: realNextMatchId || bracketMatch.nextMatchId
+        };
+      });
+    
+      await fixtureRef.update({
+          'bracket.matches': updatedBracketMatches
+      });
+      console.log(`Fixture ${fixtureRef.id} bracket has been updated with real match IDs and correct nextMatchId references.`);
+    }
+    
     revalidatePath(`/volunteer/venues/${venueId}/fixtures`);
+    revalidatePath(`/volunteer/venues/${venueId}/matches`);
     
     return { 
       success: true, 
@@ -135,7 +178,8 @@ export async function createKnockoutDraw(
       fixtureId: fixtureRef.id,
       totalMatches: bracket.matches.length,
       totalTeams: teams.length,
-      bracketSize: bracket.bracketSize
+      bracketSize: bracket.bracketSize,
+      matchesCreated: matchCreationResult.success ? matchCreationResult.matchesCreated : 0
     };
   } catch (error) {
     console.error('Error creating knockout draw:', error);
@@ -146,109 +190,151 @@ export async function createKnockoutDraw(
   }
 }
 
+
+
 function generateKnockoutBracket(teams: any[]): BracketGenerationResult {
   const teamCount = teams.length;
-  
   if (teamCount < 2) {
-    throw new Error('At least 2 teams required for tournament');
+      throw new Error('At least 2 teams are required for a tournament.');
   }
-  
-  // Find next power of 2 (e.g., 27 teams → 32 bracket)
+
+  if (teamCount === 2) {
+      return {
+          matches: [{
+              matchId: 'match_1',
+              team1Id: teams[0].id,
+              team2Id: teams[1].id,
+              winnerId: null,
+              roundName: 'Final',
+              status: 'scheduled',
+              nextMatchId: null,
+              nextSlot: null,
+          }],
+          totalRounds: 1,
+          bracketSize: 2,
+          byeTeams: []
+      };
+  }
+
   const bracketSize = Math.pow(2, Math.ceil(Math.log2(teamCount)));
   const byeCount = bracketSize - teamCount;
-  
-  const matches: FixtureMatch[] = [];
+  const preliminaryTeamsCount = teamCount - byeCount;
+  const preliminaryMatchCount = preliminaryTeamsCount / 2;
+
+  const byeTeams = teams.slice(0, byeCount);
+  const playingTeams = teams.slice(byeCount);
+
   let matchCounter = 1;
-  
-  // Teams that get byes (advance directly to next round)
-  const byeTeams = teams.slice(0, byeCount).map(t => t.id);
-  const firstRoundTeams = teams.slice(byeCount);
-  
-  // Create first round matches
-  const firstRoundMatches = [];
-  for (let i = 0; i < firstRoundTeams.length; i += 2) {
-    const match: FixtureMatch = {
-      matchId: `match_${matchCounter++}`,
-      team1Id: firstRoundTeams[i]?.id,
-      team2Id: firstRoundTeams[i + 1]?.id,
-      winnerId: undefined,
-      roundName: bracketSize === 2 ? 'Final' : `Round of ${bracketSize}`,
-      status: 'scheduled'
-    };
-    matches.push(match);
-    firstRoundMatches.push(match);
+  const allRounds: FixtureMatch[][] = [];
+
+  // --- Step 1: Create Preliminary Round (if necessary) ---
+  if (preliminaryMatchCount > 0) {
+      const roundName = getRoundName(bracketSize);
+      const preliminaryMatches: FixtureMatch[] = [];
+      for (let i = 0; i < preliminaryMatchCount; i++) {
+          preliminaryMatches.push({
+              matchId: `match_${matchCounter++}`,
+              team1Id: playingTeams[i * 2].id,
+              team2Id: playingTeams[i * 2 + 1].id,
+              winnerId: null,
+              roundName: roundName,
+              status: 'scheduled',
+              nextMatchId: null,
+              nextSlot: null,
+          });
+      }
+      allRounds.push(preliminaryMatches);
   }
-  
-  // Create subsequent rounds
-  let currentRoundSize = bracketSize / 2;
-  let previousRoundMatches = firstRoundMatches;
-  
-  while (currentRoundSize >= 1) {
-    const roundName = getRoundName(currentRoundSize);
-    const roundMatches = [];
-    
-    // For the first round after byes, we need to pair bye teams with first round winners
-    if (currentRoundSize === bracketSize / 2 && byeCount > 0) {
-      // Mix bye teams with winners from first round
-      const slotsToFill = currentRoundSize;
+
+  // --- Step 2: Create all subsequent rounds with empty matches ---
+  let teamsForThisRound = bracketSize / 2;
+  while (teamsForThisRound >= 2) {
+      const roundName = getRoundName(teamsForThisRound);
+      const matchesInThisRoundCount = teamsForThisRound / 2;
+      const currentRoundMatches: FixtureMatch[] = [];
+      for (let i = 0; i < matchesInThisRoundCount; i++) {
+          currentRoundMatches.push({
+              matchId: `match_${matchCounter++}`,
+              team1Id: null,
+              team2Id: null,
+              winnerId: null,
+              roundName: roundName,
+              status: 'scheduled',
+              nextMatchId: null,
+              nextSlot: null,
+          });
+      }
+      allRounds.push(currentRoundMatches);
+      teamsForThisRound /= 2;
+  }
+
+  // --- Step 3: Populate the second round with bye teams ---
+  const secondRound = allRounds[preliminaryMatchCount > 0 ? 1 : 0];
+  const round2Participants = [...byeTeams, ...Array(preliminaryMatchCount).fill(null)];
+
+  for (let i = 0; i < secondRound.length; i++) {
+      const team1 = round2Participants[i];
+      const team2 = round2Participants[round2Participants.length - 1 - i];
+      secondRound[i].team1Id = team1?.id || null;
+      secondRound[i].team2Id = team2?.id || null;
+  }
+
+  // --- Step 4: Link all matches to their next match ---
+  for (let roundIndex = 0; roundIndex < allRounds.length - 1; roundIndex++) {
+      const currentRound = allRounds[roundIndex];
+      const nextRound = allRounds[roundIndex + 1];
       
-      for (let i = 0; i < slotsToFill; i++) {
-        const match: FixtureMatch = {
-          matchId: `match_${matchCounter++}`,
-          team1Id: undefined,
-          team2Id: undefined,
-          winnerId: undefined,
-          roundName,
-          status: 'scheduled'
-        };
-        matches.push(match);
-        roundMatches.push(match);
+      if (currentRound.length === nextRound.length * 2) { // Standard progression (e.g., 8 QF -> 4 SF)
+          for (let matchIndex = 0; matchIndex < currentRound.length; matchIndex++) {
+              const nextMatch = nextRound[Math.floor(matchIndex / 2)];
+              currentRound[matchIndex].nextMatchId = nextMatch.matchId;
+              currentRound[matchIndex].nextSlot = (matchIndex % 2 === 0) ? 'team1Id' : 'team2Id';
+          }
+      } else { // Handle preliminary round to second round progression
+           const emptySlotsInNextRound: { matchId: string, slot: 'team1Id' | 'team2Id' }[] = [];
+           nextRound.forEach(match => {
+              if (match.team1Id === null) emptySlotsInNextRound.push({ matchId: match.matchId, slot: 'team1Id' });
+              if (match.team2Id === null) emptySlotsInNextRound.push({ matchId: match.matchId, slot: 'team2Id' });
+           });
+
+           for(let matchIndex = 0; matchIndex < currentRound.length; matchIndex++) {
+              const targetSlotInfo = emptySlotsInNextRound[matchIndex];
+              if(targetSlotInfo) {
+                  currentRound[matchIndex].nextMatchId = targetSlotInfo.matchId;
+                  currentRound[matchIndex].nextSlot = targetSlotInfo.slot;
+              }
+           }
       }
-    } else {
-      // Regular rounds
-      for (let i = 0; i < currentRoundSize; i++) {
-        const match: FixtureMatch = {
-          matchId: `match_${matchCounter++}`,
-          team1Id: undefined,
-          team2Id: undefined,
-          winnerId: undefined,
-          roundName,
-          status: 'scheduled'
-        };
-        matches.push(match);
-        roundMatches.push(match);
-      }
-    }
-    
-    previousRoundMatches = roundMatches;
-    currentRoundSize /= 2;
   }
-  
+
+  const allMatches = allRounds.flat();
+
   return {
-    matches,
-    totalRounds: Math.ceil(Math.log2(bracketSize)),
-    bracketSize,
-    byeTeams
+      matches: allMatches,
+      totalRounds: allRounds.length,
+      bracketSize,
+      byeTeams: byeTeams.map(t => t.id)
   };
 }
 
 function getRoundName(roundSize: number): string {
   switch (roundSize) {
-    case 1: return 'Final';
-    case 2: return 'Semi Final';
-    case 4: return 'Quarter Final';
-    case 8: return 'Round of 16';
-    case 16: return 'Round of 32';
-    case 32: return 'Round of 64';
-    default: return `Round of ${roundSize * 2}`;
+    case 2: return 'Final';
+    case 4: return 'Semi Final';
+    case 8: return 'Quarter Final';
+    case 16: return 'Round of 16';
+    case 32: return 'Round of 32';
+    case 64: return 'Round of 64';
+    default: return `Round of ${roundSize}`;
   }
 }
 
 export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
   try {
     console.log(`Getting checked-in teams for venue: ${venueId}, event: ${eventId}`);
+    const startTime = Date.now();
     
-    // First, let's also check teams assigned to this venue via teamVenueAssignment
+    // Get team venue assignments
     const venueAssignmentsSnapshot = await adminDb.collection('teamVenueAssignment')
       .where('venueId', '==', venueId)
       .where('eventId', '==', eventId)
@@ -256,28 +342,60 @@ export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
     
     console.log(`Found ${venueAssignmentsSnapshot.docs.length} team assignments for venue`);
     
-    const checkedInTeams = [];
-    
-    // Check each assigned team's status
-    for (const assignmentDoc of venueAssignmentsSnapshot.docs) {
-      const assignment = assignmentDoc.data();
-      const teamDoc = await adminDb.collection('teams').doc(assignment.teamId).get();
-      
-      if (teamDoc.exists) {
-        const teamData = teamDoc.data();
-        console.log(`Team ${assignment.teamId}: checkedIn=${teamData?.checkedIn}, matchDayStatus=${teamData?.matchDayStatus}, checkedInVenue=${teamData?.checkedInVenue}`);
-        
-        // Check if team is checked in (either via checkedIn field or matchDayStatus)
-        if (teamData?.checkedIn === true || teamData?.matchDayStatus === 'checked_in') {
-          checkedInTeams.push({
-            id: teamDoc.id,
-            ...teamData
-          });
-        }
-      }
+    if (venueAssignmentsSnapshot.empty) {
+      return { 
+        success: true, 
+        teams: [],
+        teamsBySport: {},
+        totalTeams: 0
+      };
     }
     
-    console.log(`Found ${checkedInTeams.length} checked-in teams for venue`);
+    // Extract team IDs for batch query
+    const teamIds = venueAssignmentsSnapshot.docs.map(doc => doc.data().teamId);
+    
+    // Batch query all teams at once instead of individual queries
+    console.log(`Batch querying ${teamIds.length} teams...`);
+    const teamRefs = teamIds.map(id => adminDb.collection('teams').doc(id));
+    const teamDocs = await adminDb.getAll(...teamRefs);
+    
+    // Create team lookup for fast access
+    const teamLookup = new Map();
+    teamDocs.forEach(doc => {
+      if (doc.exists) {
+        teamLookup.set(doc.id, doc.data());
+      }
+    });
+    
+    // Process teams in parallel using Promise.all
+    console.log(`Processing ${teamIds.length} teams in parallel...`);
+    const teamProcessingPromises = venueAssignmentsSnapshot.docs.map(async (assignmentDoc) => {
+      const assignment = assignmentDoc.data();
+      const teamData = teamLookup.get(assignment.teamId);
+      
+      if (!teamData) {
+        return null; // Team not found
+      }
+      
+      // Check if team is checked in (either via checkedIn field or matchDayStatus)
+      const isCheckedIn = teamData.checkedIn === true || teamData.matchDayStatus === 'checked_in';
+      
+      if (!isCheckedIn) {
+        return null; // Team not checked in
+      }
+      
+      // Serialize timestamp fields efficiently
+      return serializeTeamData(assignment.teamId, teamData);
+    });
+    
+    // Wait for all team processing to complete
+    const processedTeams = await Promise.all(teamProcessingPromises);
+    
+    // Filter out null values (teams that weren't checked in or didn't exist)
+    const checkedInTeams = processedTeams.filter(team => team !== null);
+    
+    const endTime = Date.now();
+    console.log(`Found ${checkedInTeams.length} checked-in teams for venue (took ${endTime - startTime}ms)`);
     
     // Group by sport and gender
     const teamsBySport = checkedInTeams.reduce((acc, team) => {
@@ -303,6 +421,141 @@ export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
       teams: [],
       teamsBySport: {},
       totalTeams: 0
+    };
+  }
+}
+
+// Helper function to serialize team data efficiently
+function serializeTeamData(teamId: string, teamData: any) {
+  return {
+    id: teamId,
+    ...teamData,
+    // Only serialize timestamps that exist to avoid unnecessary work
+    createdAt: teamData?.createdAt?.toDate?.()?.toISOString() || null,
+    updatedAt: teamData?.updatedAt?.toDate?.()?.toISOString() || null,
+    submittedAt: teamData?.submittedAt?.toDate?.()?.toISOString() || null,
+    verifiedAt: teamData?.verifiedAt?.toDate?.()?.toISOString() || null,
+    checkedInAt: teamData?.checkedInAt?.toDate?.()?.toISOString() || null,
+    teamImageUploadedAt: teamData?.teamImageUploadedAt?.toDate?.()?.toISOString() || null,
+    numberAssignedAt: teamData?.numberAssignedAt?.toDate?.()?.toISOString() || null
+  };
+}
+
+async function createMatchesFromBracket(
+  fixtureId: string,
+  fixture: Omit<Fixture, 'fixtureId'>,
+  bracketMatches: FixtureMatch[],
+  teams: any[]
+) {
+  try {
+    console.log(`Creating ${bracketMatches.length} matches from bracket...`);
+    const startTime = Date.now();
+    
+    const batch = adminDb.batch();
+    const matches: Match[] = [];
+    let matchNumber = 1;
+    
+    // Create a team lookup for quick access - no additional queries needed since teams are already loaded
+    const teamLookup = teams.reduce((acc, team) => {
+      acc[team.id] = team;
+      return acc;
+    }, {} as Record<string, any>);
+    
+    // Process all bracket matches in parallel (for preparation, then batch write)
+    const matchCreationPromises = bracketMatches.map(async (bracketMatch) => {
+      // Determine teams for first round matches (those with actual team IDs)
+      let team1 = null;
+      let team2 = null;
+      let status: Match['status'] = 'scheduled';
+      
+      if (bracketMatch.team1Id && teamLookup[bracketMatch.team1Id]) {
+        const team = teamLookup[bracketMatch.team1Id];
+        team1 = {
+          teamId: team.id,
+          teamName: team.name,
+          tournamentNumber: team.tournamentNumber
+        };
+      }
+      
+      if (bracketMatch.team2Id && teamLookup[bracketMatch.team2Id]) {
+        const team = teamLookup[bracketMatch.team2Id];
+        team2 = {
+          teamId: team.id,
+          teamName: team.name,
+          tournamentNumber: team.tournamentNumber
+        };
+      }
+      
+      // If both teams are assigned, match is ready
+      if (team1 && team2) {
+        status = 'ready';
+      }
+      
+      return {
+        bracketMatch,
+        team1,
+        team2,
+        status
+      };
+    });
+    
+    // Wait for all match preparations to complete
+    const preparedMatches = await Promise.all(matchCreationPromises);
+    
+    // Create batch writes for all matches
+    for (const { bracketMatch, team1, team2, status } of preparedMatches) {
+      const match: Omit<Match, 'matchId'> = {
+        fixtureId,
+        fixtureName: fixture.name,
+        eventId: fixture.eventId,
+        sportId: fixture.sportId,
+        sportName: fixture.sportName,
+        genderCategory: fixture.genderCategory,
+        venueId: fixture.venueId,
+        venueName: fixture.venueName,
+        roundName: bracketMatch.roundName,
+        nextMatchId: bracketMatch.nextMatchId ,
+        nextSlot: bracketMatch.nextSlot,
+        matchNumber,
+        team1,
+        team2,
+        status,
+        createdAt: FieldValue.serverTimestamp() as any,
+        updatedAt: FieldValue.serverTimestamp() as any
+      };
+      
+      const matchRef = adminDb.collection('matches').doc();
+      batch.set(matchRef, {
+        ...match,
+        matchId: matchRef.id
+      });
+      
+      matches.push({
+        ...match,
+        matchId: matchRef.id
+      } as Match);
+      
+      matchNumber++;
+    }
+    
+    // Single batch commit for all matches
+    await batch.commit();
+    
+    const endTime = Date.now();
+    console.log(`Created ${matches.length} matches (took ${endTime - startTime}ms)`);
+    
+    return {
+      success: true,
+      matchesCreated: matches.length,
+      matches
+    };
+    
+  } catch (error) {
+    console.error('Error creating matches from bracket:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      matchesCreated: 0
     };
   }
 }

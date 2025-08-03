@@ -1,0 +1,452 @@
+import { adminDb } from '@/lib/firebase/admin';
+import { serializeFirestoreDocs } from '@/lib/utils/firestore';
+import Link from 'next/link';
+import { 
+  ArrowLeft,
+  Trophy,
+  Users,
+  Clock,
+  Play,
+  CheckCircle,
+  AlertCircle,
+  Target,
+  Calendar,
+  Hash,
+  Crown
+} from 'lucide-react';
+
+interface PageProps {
+  params: {
+    venueId: string;
+    fixtureId: string;
+    lang: string;
+  };
+}
+
+async function getFixtureDetails(fixtureId: string) {
+  try {
+    const fixtureDoc = await adminDb.collection('fixtures').doc(fixtureId).get();
+    
+    if (!fixtureDoc.exists) {
+      return { success: false, error: 'Fixture not found' };
+    }
+    
+    const fixtureData = fixtureDoc.data();
+    
+    // Serialize timestamps
+    const serializedFixture = {
+      id: fixtureDoc.id,
+      ...fixtureData,
+      createdAt: fixtureData?.createdAt?.toDate?.()?.toISOString() || null,
+      updatedAt: fixtureData?.updatedAt?.toDate?.()?.toISOString() || null
+    };
+    
+    return { success: true, fixture: serializedFixture };
+  } catch (error) {
+    console.error('Error fetching fixture:', error);
+    return { success: false, error: 'Failed to fetch fixture' };
+  }
+}
+
+async function getTeamDetails(teamIds: string[]) {
+  try {
+    console.log(`Batch querying ${teamIds.length} teams for fixture view...`);
+    const startTime = Date.now();
+    
+    const teams: Record<string, any> = {};
+    
+    if (teamIds.length > 0) {
+      // Batch query all teams at once instead of individual queries
+      const teamRefs = teamIds.map(id => adminDb.collection('teams').doc(id));
+      const teamDocs = await adminDb.getAll(...teamRefs);
+      
+      // Process teams efficiently
+      teamDocs.forEach(doc => {
+        if (doc.exists) {
+          const teamData = doc.data();
+          teams[doc.id] = {
+            id: doc.id,
+            name: teamData?.name || 'Unknown Team',
+            tournamentNumber: teamData?.tournamentNumber || null,
+            sportName: teamData?.sportName,
+            genderCategory: teamData?.genderCategory,
+            currentPlayers: teamData?.currentPlayers,
+            maxPlayers: teamData?.maxPlayers,
+            matchDayStatus: teamData?.matchDayStatus,
+            // Only include essential data for performance
+            captainProfile: teamData?.captainProfile
+          };
+        }
+      });
+    }
+    
+    const endTime = Date.now();
+    console.log(`Loaded ${Object.keys(teams).length} teams for fixture view (took ${endTime - startTime}ms)`);
+    
+    return teams;
+  } catch (error) {
+    console.error('Error fetching team details:', error);
+    return {};
+  }
+}
+
+async function getFixtureMatches(fixtureId: string) {
+  try {
+    const matchesSnapshot = await adminDb.collection('matches')
+      .where('fixtureId', '==', fixtureId)
+      .get();
+    
+    return serializeFirestoreDocs(matchesSnapshot.docs);
+  } catch (error) {
+    console.error('Error fetching matches:', error);
+    return [];
+  }
+}
+
+export default async function FixtureDetailPage({ params }: PageProps) {
+  const { venueId, fixtureId } = params;
+  
+  console.log(`Loading fixture detail page for: ${fixtureId}`);
+  const pageStartTime = Date.now();
+  
+  // Load fixture details and standalone matches in parallel
+  const [fixtureResult, standaloneMatches] = await Promise.all([
+    getFixtureDetails(fixtureId),
+    getFixtureMatches(fixtureId)
+  ]);
+  
+  if (!fixtureResult.success) {
+    return (
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Fixture Not Found</h3>
+          <p className="text-gray-600">{fixtureResult.error}</p>
+          <Link href={`/en/volunteer/venues/${venueId}/fixtures`}>
+            <button className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors">
+              Back to Fixtures
+            </button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  
+  const { fixture } = fixtureResult;
+  
+  // Get all team IDs from bracket matches and assigned teams
+  const allTeamIds = [
+    ...fixture.assignedTeams,
+    ...fixture.bracket.matches.flatMap((match: any) => [match.team1Id, match.team2Id, match.winnerId])
+  ].filter(Boolean);
+  
+  // Load team details with unique IDs only
+  const teams = await getTeamDetails([...new Set(allTeamIds)]);
+  
+  const pageEndTime = Date.now();
+  console.log(`Fixture detail page loaded completely (took ${pageEndTime - pageStartTime}ms)`);
+  
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'in_progress': return 'bg-blue-100 text-blue-800';
+      case 'teams_assigned': return 'bg-yellow-100 text-yellow-800';
+      case 'draft': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return <CheckCircle className="w-4 h-4" />;
+      case 'in_progress': return <Play className="w-4 h-4" />;
+      case 'teams_assigned': return <Users className="w-4 h-4" />;
+      case 'draft': return <AlertCircle className="w-4 h-4" />;
+      default: return <AlertCircle className="w-4 h-4" />;
+    }
+  };
+
+  const getMatchStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'scheduled': return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  // Group matches by round for bracket visualization
+  const matchesByRound = fixture.bracket.matches.reduce((acc: any, match: any) => {
+    const round = match.roundName;
+    if (!acc[round]) {
+      acc[round] = [];
+    }
+    acc[round].push(match);
+    return acc;
+  }, {});
+
+  // Sort rounds in tournament order
+  const roundOrder = ['Round of 64', 'Round of 32', 'Round of 16', 'Quarter Final', 'Semi Final', 'Final'];
+  const sortedRounds = Object.keys(matchesByRound).sort((a, b) => {
+    const aIndex = roundOrder.indexOf(a);
+    const bIndex = roundOrder.indexOf(b);
+    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+    if (aIndex === -1) return 1;
+    if (bIndex === -1) return -1;
+    return bIndex - aIndex; // Reverse order to show first round first
+  });
+
+  return (
+    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-center mb-4">
+          <Link 
+            href={`/en/volunteer/venues/${venueId}/fixtures`} 
+            className="text-[#F28C38] hover:text-[#E67A26] flex items-center mr-4"
+          >
+            <ArrowLeft className="w-5 h-5 mr-1" />
+            Back to Fixtures
+          </Link>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900">{fixture.name}</h1>
+        <p className="text-gray-600 text-sm">Tournament Bracket & Match Progress</p>
+      </div>
+
+      {/* Tournament Info */}
+      <div className="bg-white rounded-lg border shadow-sm p-6 mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center mb-4 lg:mb-0">
+            <Trophy className="w-6 h-6 text-[#F28C38] mr-3" />
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">{fixture.name}</h2>
+              <p className="text-gray-600 text-sm">
+                {fixture.assignedTeams?.length || 0} teams • {fixture.level} level • {fixture.venueName}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(fixture.status)}`}>
+              {getStatusIcon(fixture.status)}
+              <span className="ml-1 capitalize">{fixture.status.replace('_', ' ')}</span>
+            </span>
+            <Link href={`/en/volunteer/venues/${venueId}/matches?fixture=${fixtureId}`}>
+              <button className="flex items-center px-4 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors">
+                <Play className="w-4 h-4 mr-2" />
+                View Matches
+              </button>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-lg p-4 shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Total Teams</p>
+              <p className="text-2xl font-bold text-gray-900">{fixture.assignedTeams?.length || 0}</p>
+            </div>
+            <Users className="w-8 h-8 text-gray-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Total Matches</p>
+              <p className="text-2xl font-bold text-blue-600">{fixture.bracket.matches.length}</p>
+            </div>
+            <Calendar className="w-8 h-8 text-blue-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Completed</p>
+              <p className="text-2xl font-bold text-green-600">
+                {fixture.bracket.matches.filter((m: any) => m.status === 'completed').length}
+              </p>
+            </div>
+            <CheckCircle className="w-8 h-8 text-green-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Rounds</p>
+              <p className="text-2xl font-bold text-purple-600">{sortedRounds.length}</p>
+            </div>
+            <Target className="w-8 h-8 text-purple-400" />
+          </div>
+        </div>
+      </div>
+
+      {/* Tournament Bracket */}
+      <div className="bg-white rounded-lg border shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-6">Tournament Bracket</h3>
+        
+        {/* Tournament Progression */}
+        <div className="space-y-8">
+          {sortedRounds.map((roundName, roundIndex) => (
+            <div key={roundName} className="relative">
+              {/* Round Header */}
+              <div className="flex items-center mb-4">
+                <div className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mr-3 ${
+                    roundName === 'Final' ? 'bg-yellow-100 text-yellow-800' :
+                    roundName === 'Semi Final' ? 'bg-purple-100 text-purple-800' :
+                    'bg-blue-100 text-blue-800'
+                  }`}>
+                    {roundIndex + 1}
+                  </div>
+                  <h4 className="text-lg font-semibold text-gray-900">{roundName}</h4>
+                  <span className="ml-3 text-sm text-gray-500">
+                    {matchesByRound[roundName].length} match{matchesByRound[roundName].length !== 1 ? 'es' : ''}
+                  </span>
+                </div>
+                {roundName === 'Final' && (
+                  <Crown className="w-6 h-6 text-yellow-500 ml-auto" />
+                )}
+              </div>
+
+              {/* Matches in this round */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {matchesByRound[roundName].map((match: any, matchIndex: number) => (
+                  <div key={match.matchId} className={`border-2 rounded-lg p-4 transition-all ${getMatchStatusColor(match.status)}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center">
+                        <Hash className="w-4 h-4 text-gray-500 mr-1" />
+                        <span className="text-sm font-medium text-gray-700">
+                          Match {matchIndex + 1}
+                        </span>
+                      </div>
+                      <div className="flex items-center text-xs">
+                        {match.status === 'completed' && <CheckCircle className="w-3 h-3 text-green-600 mr-1" />}
+                        {match.status === 'in_progress' && <Play className="w-3 h-3 text-blue-600 mr-1" />}
+                        {match.status === 'scheduled' && <Clock className="w-3 h-3 text-gray-500 mr-1" />}
+                        <span className="capitalize">{match.status}</span>
+                      </div>
+                    </div>
+
+                    {/* Team 1 */}
+                    <div className={`p-2 rounded border mb-2 ${
+                      match.winnerId === match.team1Id ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                          {match.team1Id && teams[match.team1Id] ? (
+                            <div>
+                              <span className="font-medium text-sm">{teams[match.team1Id].name}</span>
+                              {teams[match.team1Id].tournamentNumber && (
+                                <span className="ml-1 text-xs text-gray-500">#{teams[match.team1Id].tournamentNumber}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic text-sm">TBD</span>
+                          )}
+                        </div>
+                        {match.winnerId === match.team1Id && (
+                          <Trophy className="w-4 h-4 text-green-600" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* VS */}
+                    <div className="text-center text-xs text-gray-400 mb-2">VS</div>
+
+                    {/* Team 2 */}
+                    <div className={`p-2 rounded border ${
+                      match.winnerId === match.team2Id ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                          {match.team2Id && teams[match.team2Id] ? (
+                            <div>
+                              <span className="font-medium text-sm">{teams[match.team2Id].name}</span>
+                              {teams[match.team2Id].tournamentNumber && (
+                                <span className="ml-1 text-xs text-gray-500">#{teams[match.team2Id].tournamentNumber}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic text-sm">TBD</span>
+                          )}
+                        </div>
+                        {match.winnerId === match.team2Id && (
+                          <Trophy className="w-4 h-4 text-green-600" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Winner advances indicator */}
+                    {match.winnerId && roundName !== 'Final' && (
+                      <div className="mt-2 text-center">
+                        <div className="inline-flex items-center text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          <ArrowLeft className="w-3 h-3 mr-1 rotate-90" />
+                          <span>Advances to {getNextRoundName(roundName)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Final winner */}
+                    {match.winnerId && roundName === 'Final' && (
+                      <div className="mt-2 text-center">
+                        <div className="inline-flex items-center text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+                          <Crown className="w-3 h-3 mr-1" />
+                          <span>Tournament Champion!</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Connection lines to next round (visual indicator) */}
+              {roundIndex < sortedRounds.length - 1 && (
+                <div className="flex justify-center mt-6 mb-2">
+                  <div className="flex items-center text-gray-400">
+                    <div className="w-8 h-px bg-gray-300"></div>
+                    <ArrowLeft className="w-4 h-4 mx-2 rotate-90" />
+                    <div className="w-8 h-px bg-gray-300"></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Tournament Winner */}
+        {fixture.status === 'completed' && fixture.bracket.winners && fixture.bracket.winners.length > 0 && (
+          <div className="mt-8 p-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-lg">
+            <div className="text-center">
+              <Crown className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Tournament Complete!</h3>
+              <div className="space-y-2">
+                {fixture.bracket.winners.map((winnerId: string, index: number) => (
+                  <div key={winnerId} className="flex items-center justify-center">
+                    <Trophy className="w-5 h-5 text-yellow-500 mr-2" />
+                    <span className="font-semibold text-lg">
+                      {index === 0 ? '🥇 Champion: ' : '🥈 Runner-up: '}
+                      {teams[winnerId]?.name || 'Unknown Team'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function getNextRoundName(currentRound: string): string {
+  const rounds = ['Round of 64', 'Round of 32', 'Round of 16', 'Quarter Final', 'Semi Final', 'Final'];
+  const currentIndex = rounds.indexOf(currentRound);
+  return currentIndex < rounds.length - 1 ? rounds[currentIndex + 1] : 'Next Level';
+}

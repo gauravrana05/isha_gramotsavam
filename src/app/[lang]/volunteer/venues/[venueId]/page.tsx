@@ -54,7 +54,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
       }
       
       // Fetch checked-in teams for sports overview
-      const checkedInResult = await getVenueCheckedInTeams(venueId, 'gramotsavam_2025');
+      const checkedInResult = await getVenueCheckedInTeams(venueId, 'isha_gramotsavam_2025');
       setCheckedInTeamsResult(checkedInResult);
       
       // Set a mock venue for now - in production you'd create an API route
@@ -103,6 +103,9 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
   const totalTeams = teams.length;
   const checkedInCount = teams.filter(team => team.matchDayStatus === 'checked_in').length;
   const verifiedCount = teams.filter(team => team.matchDayStatus === 'verified').length;
+  
+  // Also get counts from checked-in teams for sports overview
+  const checkedInSportsCount = checkedInTeamsResult.success ? checkedInTeamsResult.totalTeams : 0;
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -132,7 +135,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Checked In</p>
-              <p className="text-2xl font-bold text-green-600">{checkedInCount}</p>
+              <p className="text-2xl font-bold text-green-600">{checkedInSportsCount}</p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-400" />
           </div>
@@ -206,6 +209,22 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
                 <div>
                   <div className="font-semibold text-purple-700">Media</div>
                   <div className="text-sm text-purple-600">Photos & Videos</div>
+                </div>
+              </div>
+            </button>
+          </Link>
+        </div>
+        
+        {/* Test Data Management (Development Only) */}
+        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <h4 className="font-medium text-yellow-800 mb-2">Development Tools</h4>
+          <Link href={`/en/volunteer/venues/${venueId}/test-data`}>
+            <button className="w-full p-3 text-left bg-yellow-100 border border-yellow-300 rounded-lg hover:bg-yellow-200 transition-all">
+              <div className="flex items-center">
+                <AlertCircle className="w-6 h-6 text-yellow-600 mr-3" />
+                <div>
+                  <div className="font-medium text-yellow-700">Test Data Management</div>
+                  <div className="text-sm text-yellow-600">Create/delete test teams for testing</div>
                 </div>
               </div>
             </button>
@@ -286,17 +305,17 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
                 <div>
                   <span className="font-medium">{team.name}</span>
                   <span className="ml-2 text-sm text-gray-600">
-                    {team.verifiedPlayersCount}/{team.playerCount} verified
+                    {team.currentPlayers}/{team.maxPlayers} players
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className={`w-3 h-3 rounded-full ${
-                    team.checkedIn ? 'bg-green-500' : 
-                    team.allPlayersVerified ? 'bg-yellow-500' : 'bg-red-500'
+                    team.matchDayStatus === 'checked_in' ? 'bg-green-500' : 
+                    team.matchDayStatus === 'verified' ? 'bg-yellow-500' : 'bg-red-500'
                   }`} />
                   <span className="text-sm">
-                    {team.checkedIn ? 'Checked In' : 
-                     team.allPlayersVerified ? 'Ready' : 'Pending'}
+                    {team.matchDayStatus === 'checked_in' ? 'Checked In' : 
+                     team.matchDayStatus === 'verified' ? 'Ready' : 'Pending'}
                   </span>
                 </div>
               </div>

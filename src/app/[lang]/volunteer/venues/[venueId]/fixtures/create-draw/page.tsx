@@ -313,60 +313,149 @@ export default function CreateDrawPage({ params }: PageProps) {
         </div>
       )}
 
-        {/* Step 2: Create Draw */}
-        {step === 2 && (
-          <>
-            <div className="mb-4">
-              <h3 className="font-medium mb-2">Ready to Create Tournament</h3>
-              <Card className="p-4">
-                <div className="space-y-2 text-sm">
-                  <div>🏆 Tournament: {sportId.replace('_', ' ')} {genderCategory}</div>
-                  <div>👥 Teams: {teams.length}</div>
-                  <div>🎯 Format: Single Elimination</div>
-                  <div>🏅 Winners: Top 2 teams advance to next level</div>
+      {/* Step 2: Create Draw */}
+      {step === 2 && (
+        <div className="space-y-6">
+          {/* Tournament Summary */}
+          <div className="bg-white rounded-lg border shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tournament Summary</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <Trophy className="w-5 h-5 text-[#F28C38] mr-3" />
+                  <div>
+                    <span className="text-sm text-gray-500">Tournament</span>
+                    <div className="font-medium capitalize">{sportId.replace('_', ' ')} - {genderCategory}</div>
+                  </div>
                 </div>
-              </Card>
+                <div className="flex items-center">
+                  <Users className="w-5 h-5 text-blue-600 mr-3" />
+                  <div>
+                    <span className="text-sm text-gray-500">Teams</span>
+                    <div className="font-medium">{teams.length} teams registered</div>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <Target className="w-5 h-5 text-purple-600 mr-3" />
+                  <div>
+                    <span className="text-sm text-gray-500">Format</span>
+                    <div className="font-medium">Single Elimination</div>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <Medal className="w-5 h-5 text-yellow-600 mr-3" />
+                  <div>
+                    <span className="text-sm text-gray-500">Winners</span>
+                    <div className="font-medium">Top 2 teams advance</div>
+                  </div>
+                </div>
+              </div>
             </div>
+          </div>
 
-            <div className="mb-6">
-              <h4 className="font-medium mb-2">Team Order (by number)</h4>
-              <div className="space-y-2">
-                {teams
-                  .sort((a, b) => (a.tournamentNumber || 0) - (b.tournamentNumber || 0))
-                  .map(team => (
-                    <div key={team.id} className="flex items-center space-x-3 p-2 bg-white rounded">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium">
-                        {team.tournamentNumber}
-                      </div>
-                      <div>{team.name}</div>
+          {/* Team Seeding Order */}
+          <div className="bg-white rounded-lg border shadow-sm p-6">
+            <h4 className="text-lg font-semibold text-gray-900 mb-4">Team Seeding Order</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {teams
+                .sort((a, b) => (a.tournamentNumber || 0) - (b.tournamentNumber || 0))
+                .map((team, index) => (
+                  <div key={team.id} className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                    <div className="w-10 h-10 bg-[#F28C38] text-white rounded-full flex items-center justify-center text-sm font-bold mr-4">
+                      {team.tournamentNumber}
                     </div>
-                  ))}
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{team.name}</div>
+                      <div className="text-sm text-gray-500">
+                        Seed #{team.tournamentNumber} • {index < 2 ? 'Top seed' : index < teams.length - 2 ? 'Middle seed' : 'Lower seed'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="bg-white rounded-lg border shadow-sm p-6">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setStep(1)}
+                className="flex items-center justify-center px-6 py-3 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Numbers
+              </button>
+              <button
+                onClick={handleCreateDraw}
+                disabled={creating}
+                className="flex-1 flex items-center justify-center px-6 py-3 text-white bg-[#F28C38] hover:bg-[#E67A26] rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {creating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating Tournament...
+                  </>
+                ) : (
+                  <>
+                    <Trophy className="w-4 h-4 mr-2" />
+                    Create Tournament Draw
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Success */}
+      {step === 3 && (
+        <div className="bg-white rounded-lg border shadow-sm p-8">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trophy className="w-8 h-8 text-green-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Tournament Created Successfully!</h3>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              The knockout tournament has been successfully created with {teams.length} teams. 
+              Matches will be automatically generated based on the bracket structure.
+            </p>
+            
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 max-w-sm mx-auto">
+              <div className="flex items-center justify-center space-x-4 text-sm">
+                <div className="text-center">
+                  <div className="font-bold text-[#F28C38]">{teams.length}</div>
+                  <div className="text-gray-500">Teams</div>
+                </div>
+                <div className="w-px h-8 bg-gray-300"></div>
+                <div className="text-center">
+                  <div className="font-bold text-green-600">Ready</div>
+                  <div className="text-gray-500">Status</div>
+                </div>
+                <div className="w-px h-8 bg-gray-300"></div>
+                <div className="text-center">
+                  <div className="font-bold text-blue-600">Auto</div>
+                  <div className="text-gray-500">Matches</div>
+                </div>
               </div>
             </div>
 
-            <Button 
-              onClick={handleCreateDraw}
-              disabled={creating}
-              className="w-full"
-            >
-              {creating ? 'Creating Tournament...' : 'Create Tournament Draw'}
-            </Button>
-          </>
-        )}
-
-        {/* Step 3: Success */}
-        {step === 3 && (
-          <div className="text-center py-8">
-            <div className="text-6xl mb-4">🏆</div>
-            <h3 className="text-xl font-semibold mb-2">Tournament Created!</h3>
-            <p className="text-gray-600 mb-4">
-              The knockout tournament has been successfully created with {teams.length} teams.
-            </p>
-            <div className="text-sm text-gray-500">
+            <div className="flex items-center justify-center text-sm text-gray-500 mb-4">
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
               Redirecting to fixtures page...
             </div>
+
+            <button
+              onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/fixtures`)}
+              className="inline-flex items-center px-6 py-2 text-sm text-[#F28C38] hover:text-[#E67A26] font-medium"
+            >
+              Go to Fixtures Now
+              <ArrowLeft className="w-4 h-4 ml-1 rotate-180" />
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
   );
 }

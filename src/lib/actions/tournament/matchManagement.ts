@@ -2,7 +2,10 @@
 
 import { adminDb } from '@/lib/firebase/admin';
 import { revalidatePath } from 'next/cache';
-import { FixtureMatch } from '@/lib/types/fixtures';
+import { FixtureMatch, Match } from '@/lib/types/fixtures';
+import { FieldValue } from 'firebase-admin/firestore';
+
+// --- INTERFACES ---
 
 interface MatchResult {
   winnerId: string;
@@ -19,12 +22,27 @@ interface MatchResult {
   notes?: string;
 }
 
+interface NewMatchResult {
+  winnerId: string;
+  winnerName: string;
+  score?: {
+    team1Score?: number;
+    team2Score?: number;
+    details?: string;
+  };
+  resultEnteredBy: string;
+}
+
+// --- OLD SYSTEM (for reference, contains flawed logic) ---
+
 export async function updateMatchResult(
   fixtureId: string,
   matchId: string,
   result: MatchResult,
   venueId: string
 ) {
+  // NOTE: This function contains the original, flawed logic for advancing winners.
+  // It is recommended to use the new `updateStandaloneMatchResult` function which uses a corrected advancement algorithm.
   try {
     const fixtureRef = adminDb.collection('fixtures').doc(fixtureId);
     const fixtureDoc = await fixtureRef.get();
@@ -34,7 +52,6 @@ export async function updateMatchResult(
       return { success: false, error: 'Fixture not found' };
     }
     
-    // Update match result
     const updatedMatches = fixtureData.bracket.matches.map((match: FixtureMatch) => {
       if (match.matchId === matchId) {
         return {
@@ -51,7 +68,6 @@ export async function updateMatchResult(
       return match;
     });
     
-    // Find and update next round match
     const nextRoundMatch = findNextRoundMatch(updatedMatches, matchId, result.winnerId);
     let finalMatches = updatedMatches;
     
@@ -68,7 +84,6 @@ export async function updateMatchResult(
         updatedAt: new Date()
       });
     } else {
-      // Tournament might be finished - check for completion
       const completionResult = await checkTournamentCompletion(
         fixtureId, 
         finalMatches, 
@@ -86,7 +101,6 @@ export async function updateMatchResult(
           updatedAt: new Date()
         });
         
-        // Trigger level advancement if applicable
         await checkAndTriggerLevelAdvancement(fixtureId, fixtureData, completionResult.winners);
       } else {
         await fixtureRef.update({
@@ -121,14 +135,12 @@ function findNextRoundMatch(
   const currentMatch = matches.find(m => m.matchId === currentMatchId);
   if (!currentMatch) return null;
   
-  // Find the next round by looking for matches that don't have both teams set
   const nextRoundMatches = matches.filter(match => 
     match.status === 'scheduled' && 
     (!match.team1Id || !match.team2Id) &&
     match.matchId !== currentMatchId
   );
   
-  // Simple logic: assign winner to the first available slot in next round
   for (const nextMatch of nextRoundMatches) {
     if (!nextMatch.team1Id) {
       return {
@@ -152,24 +164,20 @@ async function checkTournamentCompletion(
   fixtureData: any,
   venueId: string
 ) {
-  // Check if final match is completed
   const finalMatch = matches.find(match => match.roundName === 'Final');
   
   if (!finalMatch || finalMatch.status !== 'completed') {
     return { isComplete: false, winners: [], standings: [] };
   }
   
-  // Tournament is complete
   const champion = finalMatch.winnerId;
   const runnerUp = finalMatch.team1Id === champion ? finalMatch.team2Id : finalMatch.team1Id;
   
-  // For cluster/division tournaments, we need top 2 teams
   const winners = [champion];
   if (runnerUp && (fixtureData.level === 'cluster' || fixtureData.level === 'division')) {
     winners.push(runnerUp);
   }
   
-  // Generate final standings
   const standings = await generateFinalStandings(matches, fixtureData.assignedTeams);
   
   return {
@@ -181,8 +189,6 @@ async function checkTournamentCompletion(
 
 async function generateFinalStandings(matches: FixtureMatch[], teamIds: string[]) {
   const standings = [];
-  
-  // Get team details
   const teamData = {};
   for (const teamId of teamIds) {
     const teamDoc = await adminDb.collection('teams').doc(teamId).get();
@@ -191,7 +197,6 @@ async function generateFinalStandings(matches: FixtureMatch[], teamIds: string[]
     }
   }
   
-  // Find final match for positions 1 and 2
   const finalMatch = matches.find(match => match.roundName === 'Final' && match.status === 'completed');
   if (finalMatch) {
     standings.push({
@@ -210,7 +215,6 @@ async function generateFinalStandings(matches: FixtureMatch[], teamIds: string[]
     }
   }
   
-  // Add remaining teams (simplified - could be enhanced with more detailed ranking logic)
   const topTwoTeams = standings.map(s => s.teamId);
   const remainingTeams = teamIds.filter(id => !topTwoTeams.includes(id));
   
@@ -232,7 +236,6 @@ async function checkAndTriggerLevelAdvancement(
 ) {
   try {
     if (fixtureData.level === 'cluster' && winners.length >= 2) {
-      // Find division venue mapping
       const mappingSnapshot = await adminDb.collection('clusterDivisionMapping')
         .where('clusterVenueId', '==', fixtureData.venueId)
         .where('isActive', '==', true)
@@ -240,11 +243,9 @@ async function checkAndTriggerLevelAdvancement(
       
       if (!mappingSnapshot.empty) {
         const mapping = mappingSnapshot.docs[0].data();
-        
-        // Update team assignments for division level
         const batch = adminDb.batch();
         
-        for (const teamId of winners.slice(0, 2)) { // Top 2 teams only
+        for (const teamId of winners.slice(0, 2)) {
           const teamAssignmentRef = adminDb.collection('teamVenueAssignment').doc(teamId);
           batch.update(teamAssignmentRef, {
             currentLevel: 'division',
@@ -255,7 +256,6 @@ async function checkAndTriggerLevelAdvancement(
             updatedAt: new Date()
           });
 
-          // Update team document with division venue info
           const teamRef = adminDb.collection('teams').doc(teamId);
           batch.update(teamRef, {
             currentTournamentLevel: 'division',
@@ -263,15 +263,12 @@ async function checkAndTriggerLevelAdvancement(
             divisionVenueName: mapping.divisionVenueName,
             clusterQualified: true,
             clusterQualifiedAt: new Date(),
-            // Reset for division level
             checkedIn: false,
             tournamentNumber: null
           });
         }
         
         await batch.commit();
-        
-        // Create advancement notification
         await createAdvancementNotification(
           winners.slice(0, 2), 
           'division', 
@@ -279,11 +276,9 @@ async function checkAndTriggerLevelAdvancement(
           fixtureData.sportName,
           fixtureData.genderCategory
         );
-        
         console.log(`Teams ${winners.slice(0, 2).join(', ')} advanced to division level at ${mapping.divisionVenueName}`);
       }
     } else if (fixtureData.level === 'division' && winners.length >= 2) {
-      // Advance to finals (Isha Yoga Center)
       const batch = adminDb.batch();
       
       for (const teamId of winners.slice(0, 2)) {
@@ -297,7 +292,6 @@ async function checkAndTriggerLevelAdvancement(
           updatedAt: new Date()
         });
 
-        // Update team document for finals
         const teamRef = adminDb.collection('teams').doc(teamId);
         batch.update(teamRef, {
           currentTournamentLevel: 'final',
@@ -305,15 +299,12 @@ async function checkAndTriggerLevelAdvancement(
           finalVenueName: 'Isha Yoga Center',
           divisionQualified: true,
           divisionQualifiedAt: new Date(),
-          // Reset for final level
           checkedIn: false,
           tournamentNumber: null
         });
       }
       
       await batch.commit();
-      
-      // Create advancement notification for finals
       await createAdvancementNotification(
         winners.slice(0, 2), 
         'final', 
@@ -321,7 +312,6 @@ async function checkAndTriggerLevelAdvancement(
         fixtureData.sportName,
         fixtureData.genderCategory
       );
-      
       console.log(`Teams ${winners.slice(0, 2).join(', ')} advanced to finals at Isha Yoga Center`);
     }
   } catch (error) {
@@ -340,7 +330,6 @@ async function createAdvancementNotification(
     const batch = adminDb.batch();
     
     for (const teamId of teamIds) {
-      // Get team captain info
       const teamDoc = await adminDb.collection('teams').doc(teamId).get();
       const teamData = teamDoc.data();
       
@@ -373,6 +362,353 @@ async function createAdvancementNotification(
   }
 }
 
+// --- NEW, CORRECTED SYSTEM ---
+
+export async function updateStandaloneMatchResult(
+  matchId: string,
+  result: NewMatchResult,
+  volunteerId: string
+) {
+  try {
+    const userDoc = await adminDb.collection('users').doc(volunteerId).get();
+    if (!userDoc.exists) {
+      return { success: false, error: 'Volunteer not found' };
+    }
+    
+    const userData = userDoc.data();
+    if (!userData || !['technical_volunteer', 'admin'].includes(userData.role)) {
+      return { success: false, error: 'Not authorized to update match results' };
+    }
+    
+    const matchRef = adminDb.collection('matches').doc(matchId);
+    const matchDoc = await matchRef.get();
+    if (!matchDoc.exists) {
+      return { success: false, error: 'Match not found' };
+    }
+    
+    const matchData = matchDoc.data();
+    
+    if (matchData?.status !== 'ready' && matchData?.status !== 'in_progress') {
+      return { 
+        success: false, 
+        error: 'Match is not ready to be played or already completed' 
+      };
+    }
+    
+    const validWinners = [matchData?.team1?.teamId, matchData?.team2?.teamId].filter(Boolean);
+    if (!validWinners.includes(result.winnerId)) {
+      return { 
+        success: false, 
+        error: 'Winner must be one of the participating teams' 
+      };
+    }
+    
+    await matchRef.update({
+      result: {
+        winnerId: result.winnerId,
+        winnerName: result.winnerName,
+        score: result.score || null,
+        resultEnteredBy: volunteerId,
+        resultEnteredAt: FieldValue.serverTimestamp()
+      },
+      status: 'completed',
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    
+    if (matchData?.fixtureId) {
+      await updateFixtureAndAdvanceWinner(matchData.fixtureId, matchData, result.winnerId, result.winnerName);
+    }
+    
+    if (matchData?.fixtureId) {
+      await checkAndCompleteTournament(matchData.fixtureId, matchData, result.winnerId, result.winnerName);
+    }
+    
+    revalidatePath(`/volunteer/venues/${matchData?.venueId}/matches`);
+    revalidatePath(`/volunteer/venues/${matchData?.venueId}/fixtures`);
+    
+    console.log(`Match ${matchId} result updated: ${result.winnerName} wins`);
+    
+    return {
+      success: true,
+      message: 'Match result updated successfully'
+    };
+    
+  } catch (error) {
+    console.error('Error updating match result:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+
+async function updateFixtureAndAdvanceWinner(
+    fixtureId: string,
+    completedMatchData: any,
+    winnerId: string,
+    winnerName: string
+) {
+    try {
+        const fixtureRef = adminDb.collection('fixtures').doc(fixtureId);
+        const fixtureDoc = await fixtureRef.get();
+        if (!fixtureDoc.exists) {
+            console.error(`[Advancement] Fixture ${fixtureId} not found.`);
+            return;
+        }
+
+        const fixtureData = fixtureDoc.data();
+        let allBracketMatches: any[] = fixtureData?.bracket?.matches || [];
+
+        // Find the completed match in the bracket to get its pre-defined advancement path
+        const completedBracketMatch = allBracketMatches.find(m => m.matchId === completedMatchData.matchId);
+
+        if (!completedBracketMatch) {
+            console.error(`Could not find match ${completedMatchData.matchId} in the fixture's bracket.`);
+            return;
+        }
+
+        // Part 1: Mark the match as completed in the bracket
+        allBracketMatches = allBracketMatches.map(m => 
+            m.matchId === completedMatchData.matchId 
+                ? { ...m, winnerId: winnerId, status: 'completed' } 
+                : m
+        );
+
+        // Part 2: Advance the winner if a next match is defined
+        const { nextMatchId, nextSlot } = completedBracketMatch;
+
+        if (nextMatchId && nextSlot) {
+            // Update the team slot in the next match within the bracket
+            allBracketMatches = allBracketMatches.map(m => {
+                if (m.matchId === nextMatchId) {
+                    console.log(`[Advancement] Advancing winner to ${nextSlot} in fixture bracket match ${nextMatchId}`);
+                    return { ...m, [nextSlot]: winnerId };
+                }
+                return m;
+            });
+
+            // Update the corresponding standalone match document
+            const targetMatchRef = adminDb.collection('matches').doc(nextMatchId);
+            const winnerTeamDetails = {
+                teamId: winnerId,
+                teamName: winnerName,
+                tournamentNumber: (await adminDb.collection('teams').doc(winnerId).get()).data()?.tournamentNumber
+            };
+
+            const updatePayload: any = {};
+            const teamSlotKey = nextSlot === 'team1Id' ? 'team1' : 'team2';
+            updatePayload[teamSlotKey] = winnerTeamDetails;
+            
+            // Check if the target match is now ready to be played
+            const targetMatchData = allBracketMatches.find(m => m.matchId === nextMatchId);
+            if (targetMatchData && targetMatchData.team1Id && targetMatchData.team2Id) {
+                updatePayload.status = 'ready';
+                console.log(`[Advancement] Standalone match ${nextMatchId} is now ready.`);
+            }
+            
+            await targetMatchRef.update({ ...updatePayload, updatedAt: FieldValue.serverTimestamp() });
+        }
+
+        // Part 3: Commit all changes to the fixture document
+        await fixtureRef.update({
+            'bracket.matches': allBracketMatches,
+            updatedAt: FieldValue.serverTimestamp()
+        });
+
+        console.log(`[Advancement] Fixture ${fixtureId} updated successfully.`);
+
+    } catch (error) {
+        console.error('Error during fixture update and winner advancement:', error);
+    }
+}
+
+async function checkAndCompleteTournament(
+  fixtureId: string, 
+  matchData: any, 
+  winnerId: string, 
+  winnerName: string
+) {
+  try {
+    const fixtureDoc = await adminDb.collection('fixtures').doc(fixtureId).get();
+    if (!fixtureDoc.exists) return;
+    
+    const fixtureData = fixtureDoc.data();
+    
+    if (matchData.roundName !== 'Final') {
+      return;
+    }
+    
+    console.log(`Final match completed for fixture ${fixtureId}. Winner: ${winnerName}`);
+    
+    const allMatches = await adminDb.collection('matches')
+      .where('fixtureId', '==', fixtureId)
+      .where('status', '==', 'completed')
+      .get();
+    
+    const finalStandings = await calculateFinalStandings(
+      fixtureData,
+      allMatches.docs.map(doc => doc.data()),
+      winnerId
+    );
+    
+    const winners = [winnerId];
+    
+    if ((fixtureData.level === 'cluster' || fixtureData.level === 'division') && finalStandings.length >= 2) {
+      winners.push(finalStandings[1].teamId);
+    }
+    
+    await adminDb.collection('fixtures').doc(fixtureId).update({
+      status: 'completed',
+      'bracket.winners': winners,
+      finalStandings: finalStandings,
+      championTeamId: winnerId,
+      championTeamName: winnerName,
+      completedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    
+    await triggerLevelAdvancement(fixtureData, winners);
+    
+    revalidatePath(`/volunteer/venues/${fixtureData.venueId}/fixtures`);
+    revalidatePath(`/volunteer/venues/${fixtureData.venueId}/fixtures/${fixtureId}`);
+    
+    console.log(`Tournament ${fixtureId} completed. Champion: ${winnerName}, Winners advancing: ${winners.length}`);
+    
+  } catch (error) {
+    console.error('Error completing tournament:', error);
+  }
+}
+
+async function calculateFinalStandings(
+  fixtureData: any,
+  completedMatches: any[],
+  championId: string
+) {
+  const standings = [];
+  
+  const teamData = {};
+  for (const teamId of fixtureData.assignedTeams) {
+    const teamDoc = await adminDb.collection('teams').doc(teamId).get();
+    if (teamDoc.exists) {
+      teamData[teamId] = teamDoc.data();
+    }
+  }
+  
+  const finalMatch = completedMatches.find(match => match.roundName === 'Final');
+  let runnerUpId = null;
+  
+  if (finalMatch) {
+    runnerUpId = finalMatch.team1?.teamId === championId ? 
+      finalMatch.team2?.teamId : finalMatch.team1?.teamId;
+  }
+  
+  standings.push({
+    position: 1,
+    teamId: championId,
+    teamName: teamData[championId]?.name || 'Unknown Team',
+    qualifiesForNext: true
+  });
+  
+  if (runnerUpId) {
+    standings.push({
+      position: 2,
+      teamId: runnerUpId,
+      teamName: teamData[runnerUpId]?.name || 'Unknown Team',
+      qualifiesForNext: fixtureData.level === 'cluster' || fixtureData.level === 'division'
+    });
+  }
+  
+  const topTwoTeams = [championId, runnerUpId].filter(Boolean);
+  const remainingTeams = fixtureData.assignedTeams.filter(teamId => !topTwoTeams.includes(teamId));
+  
+  remainingTeams.forEach((teamId, index) => {
+    standings.push({
+      position: index + 3,
+      teamId,
+      teamName: teamData[teamId]?.name || 'Unknown Team',
+      qualifiesForNext: false
+    });
+  });
+  
+  return standings;
+}
+
+async function triggerLevelAdvancement(fixtureData: any, winners: string[]) {
+  try {
+    if (fixtureData.level === 'cluster' && winners.length >= 2) {
+      const mappingSnapshot = await adminDb.collection('clusterDivisionMapping')
+        .where('clusterVenueId', '==', fixtureData.venueId)
+        .where('isActive', '==', true)
+        .get();
+      
+      if (!mappingSnapshot.empty) {
+        const mapping = mappingSnapshot.docs[0].data();
+        const batch = adminDb.batch();
+        
+        for (const teamId of winners.slice(0, 2)) {
+          const teamAssignmentRef = adminDb.collection('teamVenueAssignment').doc(teamId);
+          batch.update(teamAssignmentRef, {
+            currentLevel: 'division',
+            divisionVenueId: mapping.divisionVenueId,
+            divisionVenueName: mapping.divisionVenueName,
+            clusterQualified: true,
+            qualifiedAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp()
+          });
+
+          const teamRef = adminDb.collection('teams').doc(teamId);
+          batch.update(teamRef, {
+            currentTournamentLevel: 'division',
+            divisionVenueId: mapping.divisionVenueId,
+            divisionVenueName: mapping.divisionVenueName,
+            clusterQualified: true,
+            clusterQualifiedAt: FieldValue.serverTimestamp(),
+            checkedIn: false,
+            tournamentNumber: null,
+            matchDayStatus: 'pending'
+          });
+        }
+        
+        await batch.commit();
+        console.log(`Teams ${winners.slice(0, 2).join(', ')} advanced to division level at ${mapping.divisionVenueName}`);
+      }
+    } else if (fixtureData.level === 'division' && winners.length >= 2) {
+      const batch = adminDb.batch();
+      
+      for (const teamId of winners.slice(0, 2)) {
+        const teamAssignmentRef = adminDb.collection('teamVenueAssignment').doc(teamId);
+        batch.update(teamAssignmentRef, {
+          currentLevel: 'final',
+          finalVenueId: 'isha_yoga_center',
+          finalVenueName: 'Isha Yoga Center',
+          divisionQualified: true,
+          qualifiedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+
+        const teamRef = adminDb.collection('teams').doc(teamId);
+        batch.update(teamRef, {
+          currentTournamentLevel: 'final',
+          finalVenueId: 'isha_yoga_center',
+          finalVenueName: 'Isha Yoga Center',
+          divisionQualified: true,
+          divisionQualifiedAt: FieldValue.serverTimestamp(),
+          checkedIn: false,
+          tournamentNumber: null,
+          matchDayStatus: 'pending'
+        });
+      }
+      
+      await batch.commit();
+      console.log(`Teams ${winners.slice(0, 2).join(', ')} advanced to finals at Isha Yoga Center`);
+    }
+  } catch (error) {
+    console.error('Error in level advancement:', error);
+  }
+}
+
+// --- OTHER UTILITY FUNCTIONS ---
+
 export async function getFixtureDetails(fixtureId: string) {
   try {
     const fixtureDoc = await adminDb.collection('fixtures').doc(fixtureId).get();
@@ -387,7 +723,6 @@ export async function getFixtureDetails(fixtureId: string) {
     
     const fixtureData = fixtureDoc.data();
     
-    // Get team details for matches
     const teamIds = [...new Set([
       ...fixtureData.assignedTeams,
       ...fixtureData.bracket.matches.flatMap((match: FixtureMatch) => 
@@ -396,24 +731,32 @@ export async function getFixtureDetails(fixtureId: string) {
     ])];
     
     const teams = {};
-    for (const teamId of teamIds) {
-      if (teamId) {
-        const teamDoc = await adminDb.collection('teams').doc(teamId).get();
-        if (teamDoc.exists) {
-          teams[teamId] = {
-            id: teamId,
-            ...teamDoc.data()
+    if (teamIds.length > 0) {
+      const teamRefs = teamIds.map(id => adminDb.collection('teams').doc(id));
+      const teamDocs = await adminDb.getAll(...teamRefs);
+      
+      teamDocs.forEach(doc => {
+        if (doc.exists) {
+          const teamData = doc.data();
+          teams[doc.id] = {
+            id: doc.id,
+            ...teamData
           };
         }
-      }
+      });
     }
     
+    const serializedFixture = {
+      id: fixtureId,
+      ...fixtureData,
+      createdAt: fixtureData?.createdAt?.toDate?.()?.toISOString() || null,
+      updatedAt: fixtureData?.updatedAt?.toDate?.()?.toISOString() || null,
+      completedAt: fixtureData?.completedAt?.toDate?.()?.toISOString() || null
+    };
+
     return {
       success: true,
-      fixture: {
-        id: fixtureId,
-        ...fixtureData
-      },
+      fixture: serializedFixture,
       teams
     };
   } catch (error) {
@@ -434,7 +777,6 @@ export async function getAvailableMatches(fixtureId: string) {
       return { success: false, error: result.error, matches: [] };
     }
     
-    // Get matches that are ready to be played (have both teams assigned)
     const availableMatches = result.fixture.bracket.matches.filter((match: FixtureMatch) => 
       match.team1Id && 
       match.team2Id && 
@@ -455,3 +797,88 @@ export async function getAvailableMatches(fixtureId: string) {
     };
   }
 }
+
+export async function getMatchDetails(matchId: string) {
+  try {
+    const matchDoc = await adminDb.collection('matches').doc(matchId).get();
+    
+    if (!matchDoc.exists) {
+      return {
+        success: false,
+        error: 'Match not found'
+      };
+    }
+    
+    const matchData = matchDoc.data();
+    
+    const serializedMatch = {
+      matchId: matchDoc.id,
+      ...matchData,
+      createdAt: matchData?.createdAt?.toDate?.()?.toISOString() || null,
+      updatedAt: matchData?.updatedAt?.toDate?.()?.toISOString() || null,
+      result: matchData?.result ? {
+        ...matchData.result,
+        resultEnteredAt: matchData.result.resultEnteredAt?.toDate?.()?.toISOString() || null
+      } : undefined
+    };
+    
+    return {
+      success: true,
+      match: serializedMatch
+    };
+  } catch (error) {
+    console.error('Error getting match details:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+
+export async function startMatch(matchId: string, volunteerId: string) {
+  try {
+    const userDoc = await adminDb.collection('users').doc(volunteerId).get();
+    if (!userDoc.exists) {
+      return { success: false, error: 'Volunteer not found' };
+    }
+    
+    const userData = userDoc.data();
+    if (!userData || !['technical_volunteer', 'admin'].includes(userData.role)) {
+      return { success: false, error: 'Not authorized to start matches' };
+    }
+    
+    const matchDoc = await adminDb.collection('matches').doc(matchId).get();
+    if (!matchDoc.exists) {
+      return { success: false, error: 'Match not found' };
+    }
+    
+    const matchData = matchDoc.data();
+    
+    if (matchData?.status !== 'ready') {
+      return { 
+        success: false, 
+        error: 'Match is not ready to start' 
+      };
+    }
+    
+    await adminDb.collection('matches').doc(matchId).update({
+      status: 'in_progress',
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    
+    revalidatePath(`/volunteer/venues/${matchData?.venueId}/matches`);
+    
+    return {
+      success: true,
+      message: 'Match started successfully'
+    };
+    
+  } catch (error) {
+    console.error('Error starting match:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+

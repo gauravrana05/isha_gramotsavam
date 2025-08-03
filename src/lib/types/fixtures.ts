@@ -46,11 +46,73 @@ export interface Fixture {
 
 export interface FixtureMatch {
   matchId: string;
-  team1Id?: string;
-  team2Id?: string;
-  winnerId?: string;
+  team1Id: string | null;
+  team2Id: string | null;
+  winnerId: string | null;
   roundName: string; // "Quarter Final", "Semi Final", "Final"
   status: 'scheduled' | 'in_progress' | 'completed';
+  dependsOnMatch?: string | null; // Match ID that this match depends on for team advancement
+  nextMatchId?: string | null; // Match ID that this match depends on for team advancement
+  nextSlot?: string | null; // Slot number that this match depends on for team advancement
+}
+
+// Standalone Match document for volunteers to update results
+export interface Match {
+  matchId: string;
+  
+  // Tournament Context
+  fixtureId: string;
+  fixtureName: string;
+  eventId: string;
+  sportId: string;
+  sportName: string;
+  genderCategory: 'men' | 'women';
+  venueId: string;
+  venueName: string;
+  nextMatchId?: string | null; // Match ID that this match depends on for team advancement
+  nextSlot?: string | null; // Slot number that this match depends on for team advancement
+  
+  // Match Details
+  roundName: string; // "Quarter Final", "Semi Final", "Final"
+  matchNumber: number; // Sequential number within the fixture
+  
+  // Teams
+  team1: {
+    teamId: string;
+    teamName: string;
+    tournamentNumber?: number;
+  } | null;
+  team2: {
+    teamId: string;
+    teamName: string;
+    tournamentNumber?: number;
+  } | null;
+  
+  // Result
+  result?: {
+    winnerId: string;
+    winnerName: string;
+    score?: {
+      team1Score?: number;
+      team2Score?: number;
+      details?: string; // Additional score details
+    };
+    resultEnteredBy: string;
+    resultEnteredAt: Timestamp;
+  };
+  
+  // Dependencies (for knockout structure)
+  dependsOn?: {
+    match1Id?: string; // Winner of this match becomes team1
+    match2Id?: string; // Winner of this match becomes team2
+  };
+  
+  // Status
+  status: 'scheduled' | 'ready' | 'in_progress' | 'completed' | 'cancelled';
+  
+  // Audit Fields
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 // Venue Location Mapping for Automatic Team Assignment

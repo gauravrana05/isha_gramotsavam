@@ -28,6 +28,7 @@ interface MatchDayTeamData {
   matchDayStatus?: 'pending' | 'verified' | 'checked_in';
   clusterVenue?: string;
   teamImageUrl?: string;
+  verifiedPlayersCount?: number;
 }
 
 interface MatchDayPlayerData {
@@ -54,6 +55,9 @@ interface MatchDayPlayerData {
 
 export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: string) {
   try {
+    console.log(`Getting match day teams for venue: ${venueId}`);
+    const startTime = Date.now();
+
     // Check if user has technical volunteer permissions
     const userDoc = await adminDb.collection("users").doc(volunteerId).get();
     if (!userDoc.exists) {
@@ -72,43 +76,77 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
       .where('eventId', '==', 'isha_gramotsavam_2025')
       .get();
 
-    const teams: MatchDayTeamData[] = [];
-
-    for (const assignmentDoc of teamVenueQuery.docs) {
-      const assignment = assignmentDoc.data();
-      const teamDoc = await adminDb.collection('teams').doc(assignment.teamId).get();
-
-      if (teamDoc.exists) {
-        const teamData = teamDoc.data();
-
-        // Get players count and match day verification status
-        const playersSnapshot = await adminDb
-          .collection('teams').doc(assignment.teamId)
-          .collection('players')
-          .get();
-
-        // Filter out deleted players manually and count verified players
-        const activePlayers = playersSnapshot.docs.filter(doc => doc.data().isDeleted !== true);
-        const verifiedPlayersCount = activePlayers.filter(doc => 
-          doc.data().matchDayVerificationStatus === 'verified'
-        ).length;
-
-        teams.push({
-          id: assignment.teamId,
-          name: teamData.name,
-          sportName: teamData.sportName,
-          captainProfile: teamData.captainProfile,
-          panchayat: teamData.panchayat,
-          district: teamData.district,
-          currentPlayers: activePlayers.length,
-          maxPlayers: teamData.maxPlayers,
-          status: teamData.status,
-          matchDayStatus: teamData.matchDayStatus || 'pending',
-          clusterVenue: teamData.clusterVenue,
-          teamImageUrl: teamData.teamImageUrl
-        });
-      }
+    if (teamVenueQuery.empty) {
+      return { success: true, teams: [] };
     }
+
+    console.log(`Found ${teamVenueQuery.docs.length} team assignments`);
+
+    // Extract team IDs for batch query
+    const teamIds = teamVenueQuery.docs.map(doc => doc.data().teamId);
+    
+    // Batch query all teams and their players in parallel
+    console.log(`Batch querying ${teamIds.length} teams and their players...`);
+    
+    const [teamDocs, ...playerSnapshots] = await Promise.all([
+      // Batch query all teams
+      adminDb.getAll(...teamIds.map(id => adminDb.collection('teams').doc(id))),
+      // Parallel query all team players
+      ...teamIds.map(teamId => 
+        adminDb.collection('teams').doc(teamId).collection('players').get()
+      )
+    ]);
+
+    // Create team lookup for fast access
+    const teamLookup = new Map();
+    teamDocs.forEach(doc => {
+      if (doc.exists) {
+        teamLookup.set(doc.id, doc.data());
+      }
+    });
+
+    // Process teams in parallel
+    console.log(`Processing ${teamIds.length} teams in parallel...`);
+    const teamProcessingPromises = teamVenueQuery.docs.map(async (assignmentDoc, index) => {
+      const assignment = assignmentDoc.data();
+      const teamData = teamLookup.get(assignment.teamId);
+      const playersSnapshot = playerSnapshots[index];
+
+      if (!teamData) {
+        return null; // Team not found
+      }
+
+      // Filter out deleted players and count verified players efficiently
+      const activePlayers = playersSnapshot.docs.filter(doc => doc.data().isDeleted !== true);
+      const verifiedPlayersCount = activePlayers.filter(doc => 
+        doc.data().matchDayVerificationStatus === 'verified'
+      ).length;
+
+      return {
+        id: assignment.teamId,
+        name: teamData.name,
+        sportName: teamData.sportName,
+        captainProfile: teamData.captainProfile,
+        panchayat: teamData.panchayat,
+        district: teamData.district,
+        currentPlayers: activePlayers.length,
+        maxPlayers: teamData.maxPlayers,
+        status: teamData.status,
+        matchDayStatus: teamData.matchDayStatus || 'pending',
+        clusterVenue: teamData.clusterVenue,
+        teamImageUrl: teamData.teamImageUrl,
+        verifiedPlayersCount // Add verified players count for UI
+      };
+    });
+
+    // Wait for all team processing to complete
+    const processedTeams = await Promise.all(teamProcessingPromises);
+    
+    // Filter out null values
+    const teams = processedTeams.filter(team => team !== null) as MatchDayTeamData[];
+
+    const endTime = Date.now();
+    console.log(`Loaded ${teams.length} match day teams (took ${endTime - startTime}ms)`);
 
     return {
       success: true,
