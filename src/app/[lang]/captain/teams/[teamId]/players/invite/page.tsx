@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { 
-  ArrowLeft, 
-  UserPlus, 
-  Users, 
-  Check, 
-  X, 
-  Edit, 
-  Trash2, 
-  Search, 
+import {
+  ArrowLeft,
+  UserPlus,
+  Users,
+  Check,
+  X,
+  Edit,
+  Trash2,
+  Search,
   Upload,
   Eye,
   AlertCircle,
@@ -21,8 +21,8 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase/config";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, orderBy } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase/config";
+import { addPlayerToTeam } from "@/lib/actions/captain/addPlayerToTeam";
+import { submitTeamForVerification } from "@/lib/actions/captain/submitTeam";
 import { documentUploadService } from "@/lib/services/documentUploadService";
 import Image from "next/image";
 
@@ -82,6 +82,7 @@ interface TeamData {
   name: string;
   sportName: string;
   sportId: string;
+  minPlayers: number;
   maxPlayers: number;
   maxSubstitutes: number;
   panchayat: string;
@@ -102,6 +103,7 @@ interface TeamData {
 interface SportData {
   id: string;
   displayName: string;
+  minPlayers: number;
   maxPlayers: number;
   maxSubstitutes: number;
   genderCategories: string[];
@@ -185,8 +187,9 @@ export default function CaptainPlayerManagement() {
             sport = {
               id: sportSnap.id,
               displayName: sportData.displayName || sportData.name || team.sportName || 'Unknown Sport',
-              maxPlayers: sportData.maxPlayers || team.maxPlayers || 6,
-              maxSubstitutes: sportData.maxSubstitutes || team.maxSubstitutes || 6,
+              minPlayers: sportData.teamConfig?.minPlayers || sportData.maxPlayers || team.maxPlayers || 6,
+              maxPlayers: sportData.teamConfig?.maxPlayers || sportData.maxPlayers || team.maxPlayers || 6,
+              maxSubstitutes: sportData.teamConfig?.maxSubstitutes || sportData.maxSubstitutes || team.maxSubstitutes || 6,
               genderCategories: sportData.genderCategories || ['mixed'],
               isActive: sportData.isActive !== false
             };
@@ -198,11 +201,17 @@ export default function CaptainPlayerManagement() {
       
       // Fallback if sport not found in database
       if (!sport) {
+        // Use sport-specific defaults
+        const defaults = team.sportName === 'Throwball' ? 
+          { minPlayers: 7, maxPlayers: 7, maxSubstitutes: 2 } :
+          { minPlayers: 6, maxPlayers: 6, maxSubstitutes: 6 };
+          
         sport = {
           id: team.sportId || 'unknown',
           displayName: team.sportName || 'Unknown Sport',
-          maxPlayers: team.maxPlayers || 6,
-          maxSubstitutes: team.maxSubstitutes || 6,
+          minPlayers: team.maxPlayers || defaults.minPlayers,
+          maxPlayers: team.maxPlayers || defaults.maxPlayers,
+          maxSubstitutes: team.maxSubstitutes || defaults.maxSubstitutes,
           genderCategories: team.genderCategory ? [team.genderCategory] : ['mixed'],
           isActive: true
         };
@@ -216,6 +225,7 @@ export default function CaptainPlayerManagement() {
         name: team.name || '',
         sportName: sport.displayName,
         sportId: team.sportId || '',
+        minPlayers: sport.minPlayers,
         maxPlayers: sport.maxPlayers,
         maxSubstitutes: sport.maxSubstitutes,
         panchayat: team.panchayat || '',
@@ -252,6 +262,8 @@ export default function CaptainPlayerManagement() {
         
         // Load latest document information from users collection if userId exists
         let userDocuments = playerData.documents;
+        let actualProfileComplete = playerData.profileComplete || false;
+        
         if (playerData.userId && !playerData.userId.startsWith('user_')) {
           try {
             const userDocRef = doc(db, "users", playerData.userId);
@@ -260,6 +272,13 @@ export default function CaptainPlayerManagement() {
               const userData = userDoc.data();
               if (userData.documents) {
                 userDocuments = userData.documents;
+                
+                // Recalculate profile completion based on current documents
+                actualProfileComplete = !!(
+                  userDocuments.profilePhoto?.url &&
+                  userDocuments.aadhaarFront?.url &&
+                  userDocuments.aadhaarBack?.url
+                );
               }
             }
           } catch (error) {
@@ -279,7 +298,7 @@ export default function CaptainPlayerManagement() {
           position: playerData.position || 'main',
           addedAt: playerData.addedAt?.toDate() || new Date(),
           addedBy: playerData.addedBy || '',
-          profileComplete: playerData.profileComplete || false,
+          profileComplete: actualProfileComplete,
           profileData: {
             firstName: playerData.profileData?.firstName || '',
             lastName: playerData.profileData?.lastName || '',
@@ -360,9 +379,9 @@ export default function CaptainPlayerManagement() {
         
         // Try multiple queries since phone numbers might be stored in different formats
         const queries = [
-          query(usersRef, where("phoneNumber", "==", phone)),           // As string
-          query(usersRef, where("phoneNumber", "==", `+91${phone}`)),   // With country code
-          query(usersRef, where("phoneNumber", "==", parseInt(phone))), // As number
+          query(usersRef, where("phoneNumber", "==", phone)),
+          query(usersRef, where("phoneNumber", "==", `+91${phone}`)),
+          query(usersRef, where("phoneNumber", "==", parseInt(phone))),
         ];
 
         let existingUser = null;
@@ -533,30 +552,27 @@ export default function CaptainPlayerManagement() {
           throw new Error(`Invalid document type: ${documentType}`);
       }
       
-      // Update player document in Firestore
       const playerDocRef = doc(db, "users", player.userId);
-      
-      // Check if this is an old player with custom user ID - skip Firestore update for now
-      if (player.userId.startsWith('user_')) {
-        console.warn(`Skipping Firestore update for old player with custom ID: ${player.userId}`);
-        console.warn('Please recreate this player to get a real Firebase user ID');
-        alert('This player was created with an old system. Please remove and re-add this player to enable document uploads.');
-        return;
-      }
-      
-      // Check if all documents will be uploaded by captain after this upload
-      const playerDocuments = {
-        profilePhoto: player.documents.profilePhoto.url && player.documents.profilePhoto.uploadedBy === user!.uid,
-        aadhaarFront: player.documents.aadhaarFront.url && player.documents.aadhaarFront.uploadedBy === user!.uid,
-        aadhaarBack: player.documents.aadhaarBack.url && player.documents.aadhaarBack.uploadedBy === user!.uid
+
+      // **** START: UPDATED PROFILE COMPLETION LOGIC ****
+      // Create a representation of the player's documents AFTER this upload to check for completion.
+      const updatedPlayerDocuments = {
+        ...player.documents,
+        [documentType]: {
+          ...player.documents[documentType],
+          url: downloadURL,
+          uploadedBy: user!.uid,
+        },
       };
-      
-      // Update the current document type
-      playerDocuments[documentType as keyof typeof playerDocuments] = true;
-      
-      // Check if all documents are uploaded by captain
-      const allDocumentsUploadedByCaptain = playerDocuments.profilePhoto && playerDocuments.aadhaarFront && playerDocuments.aadhaarBack;
-      
+
+      // Check if all three documents now have a URL, regardless of who uploaded them.
+      const isNowProfileComplete = !!(
+        updatedPlayerDocuments.profilePhoto.url &&
+        updatedPlayerDocuments.aadhaarFront.url &&
+        updatedPlayerDocuments.aadhaarBack.url
+      );
+      // **** END: UPDATED PROFILE COMPLETION LOGIC ****
+
       const updateData: any = {
         [`documents.${documentType}.storagePath`]: documentUploadService.getStoragePath(player.userId, documentType),
         [`documents.${documentType}.url`]: downloadURL,
@@ -564,7 +580,7 @@ export default function CaptainPlayerManagement() {
         [`documents.${documentType}.uploadedAt`]: new Date(),
         [`documents.${documentType}.uploadedBy`]: user!.uid,
         [`documents.${documentType}.uploadedByCaptain`]: true,
-        isProfileComplete: allDocumentsUploadedByCaptain,
+        isProfileComplete: isNowProfileComplete, // Use the new completion status
         currentTeamId: teamIdStr
       };
       
@@ -576,7 +592,7 @@ export default function CaptainPlayerManagement() {
           p.userId === player.userId 
             ? {
                 ...p,
-                profileComplete: allDocumentsUploadedByCaptain,
+                profileComplete: isNowProfileComplete, // Also update local state
                 documents: {
                   ...p.documents,
                   [documentType]: {
@@ -706,10 +722,8 @@ export default function CaptainPlayerManagement() {
         }
       }
       
-      // Use the Firebase function to add player to team
-      // This function will first create the user if they don't exist, then add them to the team
-      console.log('handleAddPlayer: Calling addPlayerToTeam function');
-      const addPlayerToTeam = httpsCallable(functions, 'addPlayerToTeam');
+      // Use the server action to add player to team
+      console.log('handleAddPlayer: Calling addPlayerToTeam server action');
       
       try {
         const result = await addPlayerToTeam({
@@ -728,17 +742,17 @@ export default function CaptainPlayerManagement() {
             district: teamData.district,
             state: teamData.state,
             position: playerPosition
-          }
+          },
+          captainId: user!.uid
         });
         
-        const resultData = result.data as { success: boolean; playerId: string; message: string };
-        console.log('handleAddPlayer: Function result:', resultData);
+        console.log('handleAddPlayer: Server action result:', result);
         
-        if (!resultData.success) {
-          throw new Error(resultData.message || 'Failed to add player to team');
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to add player to team');
         }
         
-        console.log(`Player added successfully with ID: ${resultData.playerId}`);
+        console.log(`Player added successfully with ID: ${result.playerId}`);
         
         // Reload team data to get updated player list
         await loadTeamData();
@@ -794,39 +808,24 @@ export default function CaptainPlayerManagement() {
   };
 
   const getPlayerStatusColor = (player: TeamPlayer) => {
-    const hasAllDocsByCaptain = 
-      player.documents.profilePhoto.url && player.documents.profilePhoto.uploadedBy === user?.uid &&
-      player.documents.aadhaarFront.url && player.documents.aadhaarFront.uploadedBy === user?.uid &&
-      player.documents.aadhaarBack.url && player.documents.aadhaarBack.uploadedBy === user?.uid;
-    
     if (player.verificationStatus === 'verified') return 'text-[#3A7F3F] bg-green-50';
     if (player.verificationStatus === 'rejected') return 'text-red-600 bg-red-50';
-    if (hasAllDocsByCaptain) return 'text-[#C79016] bg-yellow-50';
+    if (player.profileComplete) return 'text-[#C79016] bg-yellow-50';
     return 'text-gray-600 bg-gray-50';
   };
 
   const getPlayerStatusIcon = (player: TeamPlayer) => {
-    const hasAllDocsByCaptain = 
-      player.documents.profilePhoto.url && player.documents.profilePhoto.uploadedBy === user?.uid &&
-      player.documents.aadhaarFront.url && player.documents.aadhaarFront.uploadedBy === user?.uid &&
-      player.documents.aadhaarBack.url && player.documents.aadhaarBack.uploadedBy === user?.uid;
-    
     if (player.verificationStatus === 'verified') return <CheckCircle className="w-4 h-4" />;
     if (player.verificationStatus === 'rejected') return <X className="w-4 h-4" />;
-    if (hasAllDocsByCaptain) return <Clock className="w-4 h-4" />;
+    if (player.profileComplete) return <Clock className="w-4 h-4" />;
     return <AlertCircle className="w-4 h-4" />;
   };
 
   const getPlayerStatusText = (player: TeamPlayer) => {
-    const hasAllDocsByCaptain = 
-      player.documents.profilePhoto.url && player.documents.profilePhoto.uploadedBy === user?.uid &&
-      player.documents.aadhaarFront.url && player.documents.aadhaarFront.uploadedBy === user?.uid &&
-      player.documents.aadhaarBack.url && player.documents.aadhaarBack.uploadedBy === user?.uid;
-    
     if (player.verificationStatus === 'verified') return 'Verified';
     if (player.verificationStatus === 'rejected') return 'Rejected';
-    if (hasAllDocsByCaptain) return 'Pending Review';
-    return 'Captain Upload Required';
+    if (player.profileComplete) return 'Pending Review';
+    return 'Docs Incomplete';
   };
 
   const filteredPlayers = players.filter(player =>
@@ -845,37 +844,26 @@ export default function CaptainPlayerManagement() {
       return;
     }
 
-    // Comprehensive team validation
     const validationErrors = [];
 
-    // Check minimum players based on sport requirements from database
-    if (currentPlayers < sportData.maxPlayers) {
-      validationErrors.push(`Need at least ${sportData.maxPlayers} main players (currently have ${currentPlayers})`);
+    if (mainPlayers < sportData.minPlayers) {
+      validationErrors.push(`Need at least ${sportData.minPlayers} main players (currently have ${mainPlayers})`);
     }
 
-    // Check if team has players
     if (players.length === 0) {
       validationErrors.push('Team must have at least one player');
     }
 
-    // Check if all players have valid user IDs (not custom IDs)
     const playersWithInvalidIds = players.filter(p => !p.userId || p.userId.startsWith('user_'));
     if (playersWithInvalidIds.length > 0) {
       validationErrors.push(`${playersWithInvalidIds.length} player(s) have invalid user IDs. Please remove and re-add them.`);
     }
 
-    // Check if all players have complete documents uploaded by captain
-    const playersWithIncompleteDocuments = players.filter(player => 
-      !(player.documents.profilePhoto.url && player.documents.profilePhoto.uploadedBy === user?.uid &&
-        player.documents.aadhaarFront.url && player.documents.aadhaarFront.uploadedBy === user?.uid &&
-        player.documents.aadhaarBack.url && player.documents.aadhaarBack.uploadedBy === user?.uid)
-    );
-
+    const playersWithIncompleteDocuments = players.filter(player => !player.profileComplete);
     if (playersWithIncompleteDocuments.length > 0) {
-      validationErrors.push(`${playersWithIncompleteDocuments.length} player(s) missing documents uploaded by captain`);
+        validationErrors.push(`${playersWithIncompleteDocuments.length} player(s) have incomplete documents. Please ensure all documents are uploaded.`);
     }
 
-    // Check gender requirements based on sport configuration
     if (sportData.genderCategories && sportData.genderCategories.length > 0) {
       const requiredGender = sportData.genderCategories[0];
       if (requiredGender === 'women') {
@@ -891,19 +879,16 @@ export default function CaptainPlayerManagement() {
       }
     }
 
-    // Show validation errors if any
     if (validationErrors.length > 0) {
       alert(`Cannot submit team:\n\n${validationErrors.map((error, index) => `${index + 1}. ${error}`).join('\n')}`);
       return;
     }
 
-    // Confirm submission
     const confirmMessage = `Submit team "${teamData.name}" for ${sportData.displayName}?\n\nPlayers: ${currentPlayers}\nDocuments: Complete\nSport: ${sportData.displayName}\n\nThis action cannot be undone.`;
     if (!confirm(confirmMessage)) {
       return;
     }
 
-    // Use the Firebase function to submit team for verification
     try {
       console.log('Submitting team for verification...', {
         teamId: teamData.teamId,
@@ -912,25 +897,22 @@ export default function CaptainPlayerManagement() {
         playerCount: currentPlayers
       });
 
-      const submitTeam = httpsCallable(functions, 'submitTeamForVerificationEnhanced');
-      const result = await submitTeam({ 
+      const result = await submitTeamForVerification({ 
         teamId: teamData.teamId,
-        sportId: sportData.id,
+        captainId: user.uid,
         validation: {
-          playerCount: currentPlayers,
-          requiredPlayers: sportData.maxPlayers,
+          playerCount: mainPlayers,
+          requiredPlayers: sportData.minPlayers,
           documentsComplete: playersWithIncompleteDocuments.length === 0,
           sportGenderCategory: sportData.genderCategories?.[0] || 'mixed'
         }
       });
       
-      const resultData = result.data as { success: boolean; message: string };
-      
-      if (resultData.success) {
+      if (result.success) {
         alert(`Team "${teamData.name}" submitted for verification successfully!\n\nYou will be notified once the review is complete.`);
         router.push(`/${lang}/captain/dashboard`);
       } else {
-        throw new Error(resultData.message || 'Failed to submit team');
+        throw new Error(result.error || 'Failed to submit team');
       }
     } catch (error) {
       console.error('Error submitting team:', error);
@@ -1059,13 +1041,9 @@ export default function CaptainPlayerManagement() {
           <div className="bg-white rounded-lg p-6 shadow-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Documents Complete</p>
+                <p className="text-gray-600 text-sm">Profiles Complete</p>
                 <p className="text-2xl font-bold text-[#4A2F1D]">
-                  {players.filter(p => 
-                    p.documents.profilePhoto.url && p.documents.profilePhoto.uploadedBy === user?.uid &&
-                    p.documents.aadhaarFront.url && p.documents.aadhaarFront.uploadedBy === user?.uid &&
-                    p.documents.aadhaarBack.url && p.documents.aadhaarBack.uploadedBy === user?.uid
-                  ).length}
+                  {players.filter(p => p.profileComplete).length}
                 </p>
               </div>
               <CheckCircle className="w-8 h-8 text-[#3A7F3F]" />
@@ -1172,9 +1150,9 @@ export default function CaptainPlayerManagement() {
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="flex space-x-1">
-                            <div className={`w-2 h-2 rounded-full ${player.documents.profilePhoto.url && player.documents.profilePhoto.uploadedBy === user?.uid ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Profile"></div>
-                            <div className={`w-2 h-2 rounded-full ${player.documents.aadhaarFront.url && player.documents.aadhaarFront.uploadedBy === user?.uid ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
-                            <div className={`w-2 h-2 rounded-full ${player.documents.aadhaarBack.url && player.documents.aadhaarBack.uploadedBy === user?.uid ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.documents.profilePhoto.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Profile"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.documents.aadhaarFront.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.documents.aadhaarBack.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
                           </div>
                           <div className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold rounded-full ${getPlayerStatusColor(player)}`}>
                             {getPlayerStatusIcon(player)}
@@ -1228,20 +1206,20 @@ export default function CaptainPlayerManagement() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex space-x-1">
-                              {player.documents.profilePhoto.url && player.documents.profilePhoto.uploadedBy === user?.uid ? (
-                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]" title="Profile Photo Uploaded by Captain" />
+                              {player.documents.profilePhoto.url ? (
+                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]" title="Profile Photo Present" />
                               ) : (
-                                <div className="w-4 h-4 rounded-full bg-gray-300" title="Profile Photo Missing or Not Uploaded by Captain"></div>
+                                <div className="w-4 h-4 rounded-full bg-gray-300" title="Profile Photo Missing"></div>
                               )}
-                              {player.documents.aadhaarFront.url && player.documents.aadhaarFront.uploadedBy === user?.uid ? (
-                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]" title="Aadhaar Front Uploaded by Captain" />
+                              {player.documents.aadhaarFront.url ? (
+                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]" title="Aadhaar Front Present" />
                               ) : (
-                                <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Front Missing or Not Uploaded by Captain"></div>
+                                <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Front Missing"></div>
                               )}
-                              {player.documents.aadhaarBack.url && player.documents.aadhaarBack.uploadedBy === user?.uid ? (
-                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]" title="Aadhaar Back Uploaded by Captain" />
+                              {player.documents.aadhaarBack.url ? (
+                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]" title="Aadhaar Back Present" />
                               ) : (
-                                <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Back Missing or Not Uploaded by Captain"></div>
+                                <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Back Missing"></div>
                               )}
                             </div>
                           </td>
@@ -1282,16 +1260,16 @@ export default function CaptainPlayerManagement() {
         </div>
 
         {/* Submit Section */}
-        {!isReadOnly && sportData && currentPlayers >= sportData.maxPlayers && (
+        {!isReadOnly && sportData && mainPlayers >= sportData.minPlayers && (
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex flex-col sm:flex-row items-center justify-between">
               
               <div>
                 <h3 className="text-lg font-bold text-[#4A2F1D] mb-2">Ready to Submit?</h3>
                 <p className="text-gray-600">
-                  {currentPlayers >= sportData.maxPlayers 
-                    ? `You have ${currentPlayers} players. Submit your team for verification.`
-                    : `Add at least ${sportData.maxPlayers} players to submit.`}
+                  {mainPlayers >= sportData.minPlayers 
+                    ? `You have ${mainPlayers} main players. Submit your team for verification.`
+                    : `Add at least ${sportData.minPlayers} main players to submit.`}
                 </p>
               </div>
               <button
@@ -1507,221 +1485,128 @@ export default function CaptainPlayerManagement() {
                   </div>
                 </div>
 
-                {/* Document Management */}
+                {/* **** START: UPDATED DOCUMENT MANAGEMENT UI **** */}
                 <div>
                   <h3 className="text-lg font-bold text-[#4A2F1D] mb-4">Identity Documents</h3>
                   <div className="space-y-4">
+                    
+                    {/* Profile Photo */}
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Profile Photo</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.documents.profilePhoto.url && selectedPlayer.documents.profilePhoto.uploadedBy === user?.uid ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.documents.profilePhoto.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.documents.profilePhoto.url && selectedPlayer.documents.profilePhoto.uploadedBy === user?.uid ? (
+                      {selectedPlayer.documents.profilePhoto.url ? (
                         <div className="space-y-2">
-                          <p className="text-sm text-green-600">✓ Document uploaded by captain</p>
-                          <img 
-                            src={selectedPlayer.documents.profilePhoto.url} 
-                            alt="Profile Photo" 
-                            className="w-24 h-24 object-cover rounded-lg border"
-                          />
-                        </div>
-                      ) : selectedPlayer.documents.profilePhoto.url ? (
-                        <div className="space-y-2">
-                          <p className="text-sm text-blue-600">ℹ Document uploaded by player (captain needs to re-upload)</p>
-                          <img 
-                            src={selectedPlayer.documents.profilePhoto.url} 
-                            alt="Profile Photo" 
-                            className="w-24 h-24 object-cover rounded-lg border opacity-50"
-                          />
+                          <img src={selectedPlayer.documents.profilePhoto.url} alt="Profile Photo" className="w-24 h-24 object-cover rounded-lg border"/>
+                          <p className="text-sm text-gray-600">
+                            {selectedPlayer.documents.profilePhoto.uploadedBy === user?.uid ? '✓ You uploaded this document.' : '✓ Player has already uploaded this.'}
+                          </p>
+                          {!isReadOnly && (
+                            <div>
+                              <label htmlFor={`profile-photo-${selectedPlayer.playerId}`} className="text-sm flex items-center space-x-1 text-[#F28C38] hover:text-[#E67A26] cursor-pointer">
+                                {isUploading[`${selectedPlayer.userId}_profilePhoto`] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Edit className="w-4 h-4" />}
+                                <span>{isUploading[`${selectedPlayer.userId}_profilePhoto`] ? `Uploading... ${Math.round(uploadProgress[`${selectedPlayer.userId}_profilePhoto`] || 0)}%` : 'Change Photo'}</span>
+                              </label>
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          <div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              id={`profile-photo-${selectedPlayer.playerId}`}
-                              disabled={isReadOnly}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file && selectedPlayer && !isReadOnly) {
-                                  handleDocumentUpload(selectedPlayer, 'profilePhoto', file);
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`profile-photo-${selectedPlayer.playerId}`}
-                              className={`text-sm flex items-center space-x-1 ${
-                                isReadOnly 
-                                  ? 'text-gray-400 cursor-not-allowed'
-                                  : isUploading[`${selectedPlayer.userId}_profilePhoto`] 
-                                    ? 'text-gray-400 cursor-not-allowed' 
-                                    : 'text-[#F28C38] hover:text-[#E67A26] cursor-pointer'
-                              }`}
-                            >
-                              {isUploading[`${selectedPlayer.userId}_profilePhoto`] ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Upload className="w-4 h-4" />
-                              )}
-                              <span>
-                                {isReadOnly
-                                  ? 'Read-only (Team Submitted)'
-                                  : isUploading[`${selectedPlayer.userId}_profilePhoto`] 
-                                    ? `Uploading... ${Math.round(uploadProgress[`${selectedPlayer.userId}_profilePhoto`] || 0)}%`
-                                    : `Upload Photo ${selectedPlayer.playerId.startsWith('captain_') ? '(Captain)' : '(As Captain)'}`
-                                }
-                              </span>
-                            </label>
-                          </div>
+                        <div>
+                          <label htmlFor={`profile-photo-${selectedPlayer.playerId}`} className={`text-sm flex items-center space-x-1 ${isReadOnly || isUploading[`${selectedPlayer.userId}_profilePhoto`] ? 'text-gray-400 cursor-not-allowed' : 'text-[#F28C38] hover:text-[#E67A26] cursor-pointer'}`}>
+                            {isUploading[`${selectedPlayer.userId}_profilePhoto`] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            <span>{isUploading[`${selectedPlayer.userId}_profilePhoto`] ? `Uploading...` : 'Upload Photo'}</span>
+                          </label>
                         </div>
                       )}
+                      <input type="file" accept="image/*" className="hidden" id={`profile-photo-${selectedPlayer.playerId}`} disabled={isReadOnly || isUploading[`${selectedPlayer.userId}_profilePhoto`]}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file && selectedPlayer && !isReadOnly) {
+                            handleDocumentUpload(selectedPlayer, 'profilePhoto', file);
+                          }
+                        }}/>
                     </div>
 
+                    {/* Aadhaar Front */}
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Aadhaar Front</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.documents.aadhaarFront.url && selectedPlayer.documents.aadhaarFront.uploadedBy === user?.uid ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.documents.aadhaarFront.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.documents.aadhaarFront.url && selectedPlayer.documents.aadhaarFront.uploadedBy === user?.uid ? (
+                      {selectedPlayer.documents.aadhaarFront.url ? (
                         <div className="space-y-2">
-                          <p className="text-sm text-green-600">✓ Document uploaded by captain</p>
-                          <img 
-                            src={selectedPlayer.documents.aadhaarFront.url} 
-                            alt="Aadhaar Front" 
-                            className="w-32 h-20 object-cover rounded-lg border"
-                          />
-                        </div>
-                      ) : selectedPlayer.documents.aadhaarFront.url ? (
-                        <div className="space-y-2">
-                          <p className="text-sm text-blue-600">ℹ Document uploaded by player (captain needs to re-upload)</p>
-                          <img 
-                            src={selectedPlayer.documents.aadhaarFront.url} 
-                            alt="Aadhaar Front" 
-                            className="w-32 h-20 object-cover rounded-lg border opacity-50"
-                          />
+                          <img src={selectedPlayer.documents.aadhaarFront.url} alt="Aadhaar Front" className="w-32 h-20 object-cover rounded-lg border"/>
+                          <p className="text-sm text-gray-600">
+                            {selectedPlayer.documents.aadhaarFront.uploadedBy === user?.uid ? '✓ You uploaded this document.' : '✓ Player has already uploaded this.'}
+                          </p>
+                          {!isReadOnly && (
+                            <div>
+                              <label htmlFor={`aadhaar-front-${selectedPlayer.playerId}`} className="text-sm flex items-center space-x-1 text-[#F28C38] hover:text-[#E67A26] cursor-pointer">
+                                {isUploading[`${selectedPlayer.userId}_aadhaarFront`] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Edit className="w-4 h-4" />}
+                                <span>{isUploading[`${selectedPlayer.userId}_aadhaarFront`] ? `Uploading... ${Math.round(uploadProgress[`${selectedPlayer.userId}_aadhaarFront`] || 0)}%` : 'Change Aadhaar Front'}</span>
+                              </label>
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          <div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              id={`aadhaar-front-${selectedPlayer.playerId}`}
-                              disabled={isReadOnly}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file && selectedPlayer && !isReadOnly) {
-                                  handleDocumentUpload(selectedPlayer, 'aadhaarFront', file);
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`aadhaar-front-${selectedPlayer.playerId}`}
-                              className={`text-sm flex items-center space-x-1 ${
-                                isReadOnly 
-                                  ? 'text-gray-400 cursor-not-allowed'
-                                  : isUploading[`${selectedPlayer.userId}_aadhaarFront`] 
-                                    ? 'text-gray-400 cursor-not-allowed' 
-                                    : 'text-[#F28C38] hover:text-[#E67A26] cursor-pointer'
-                              }`}
-                            >
-                              {isUploading[`${selectedPlayer.userId}_aadhaarFront`] ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Upload className="w-4 h-4" />
-                              )}
-                              <span>
-                                {isReadOnly
-                                  ? 'Read-only (Team Submitted)'
-                                  : isUploading[`${selectedPlayer.userId}_aadhaarFront`] 
-                                    ? `Uploading... ${Math.round(uploadProgress[`${selectedPlayer.userId}_aadhaarFront`] || 0)}%`
-                                    : `Upload Aadhaar Front ${selectedPlayer.playerId.startsWith('captain_') ? '(Captain)' : '(As Captain)'}`
-                                }
-                              </span>
-                            </label>
-                          </div>
+                        <div>
+                          <label htmlFor={`aadhaar-front-${selectedPlayer.playerId}`} className={`text-sm flex items-center space-x-1 ${isReadOnly || isUploading[`${selectedPlayer.userId}_aadhaarFront`] ? 'text-gray-400 cursor-not-allowed' : 'text-[#F28C38] hover:text-[#E67A26] cursor-pointer'}`}>
+                            {isUploading[`${selectedPlayer.userId}_aadhaarFront`] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            <span>{isUploading[`${selectedPlayer.userId}_aadhaarFront`] ? `Uploading...` : 'Upload Aadhaar Front'}</span>
+                          </label>
                         </div>
                       )}
+                      <input type="file" accept="image/*" className="hidden" id={`aadhaar-front-${selectedPlayer.playerId}`} disabled={isReadOnly || isUploading[`${selectedPlayer.userId}_aadhaarFront`]}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file && selectedPlayer && !isReadOnly) {
+                            handleDocumentUpload(selectedPlayer, 'aadhaarFront', file);
+                          }
+                        }}/>
                     </div>
 
+                    {/* Aadhaar Back */}
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Aadhaar Back</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.documents.aadhaarBack.url && selectedPlayer.documents.aadhaarBack.uploadedBy === user?.uid ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.documents.aadhaarBack.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.documents.aadhaarBack.url && selectedPlayer.documents.aadhaarBack.uploadedBy === user?.uid ? (
+                      {selectedPlayer.documents.aadhaarBack.url ? (
                         <div className="space-y-2">
-                          <p className="text-sm text-green-600">✓ Document uploaded by captain</p>
-                          <img 
-                            src={selectedPlayer.documents.aadhaarBack.url} 
-                            alt="Aadhaar Back" 
-                            className="w-32 h-20 object-cover rounded-lg border"
-                          />
-                        </div>
-                      ) : selectedPlayer.documents.aadhaarBack.url ? (
-                        <div className="space-y-2">
-                          <p className="text-sm text-blue-600">ℹ Document uploaded by player (captain needs to re-upload)</p>
-                          <img 
-                            src={selectedPlayer.documents.aadhaarBack.url} 
-                            alt="Aadhaar Back" 
-                            className="w-32 h-20 object-cover rounded-lg border opacity-50"
-                          />
+                          <img src={selectedPlayer.documents.aadhaarBack.url} alt="Aadhaar Back" className="w-32 h-20 object-cover rounded-lg border"/>
+                          <p className="text-sm text-gray-600">
+                            {selectedPlayer.documents.aadhaarBack.uploadedBy === user?.uid ? '✓ You uploaded this document.' : '✓ Player has already uploaded this.'}
+                          </p>
+                          {!isReadOnly && (
+                            <div>
+                              <label htmlFor={`aadhaar-back-${selectedPlayer.playerId}`} className="text-sm flex items-center space-x-1 text-[#F28C38] hover:text-[#E67A26] cursor-pointer">
+                                {isUploading[`${selectedPlayer.userId}_aadhaarBack`] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Edit className="w-4 h-4" />}
+                                <span>{isUploading[`${selectedPlayer.userId}_aadhaarBack`] ? `Uploading... ${Math.round(uploadProgress[`${selectedPlayer.userId}_aadhaarBack`] || 0)}%` : 'Change Aadhaar Back'}</span>
+                              </label>
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          <div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              id={`aadhaar-back-${selectedPlayer.playerId}`}
-                              disabled={isReadOnly}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file && selectedPlayer && !isReadOnly) {
-                                  handleDocumentUpload(selectedPlayer, 'aadhaarBack', file);
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`aadhaar-back-${selectedPlayer.playerId}`}
-                              className={`text-sm flex items-center space-x-1 ${
-                                isReadOnly 
-                                  ? 'text-gray-400 cursor-not-allowed'
-                                  : isUploading[`${selectedPlayer.userId}_aadhaarBack`] 
-                                    ? 'text-gray-400 cursor-not-allowed' 
-                                    : 'text-[#F28C38] hover:text-[#E67A26] cursor-pointer'
-                              }`}
-                            >
-                              {isUploading[`${selectedPlayer.userId}_aadhaarBack`] ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Upload className="w-4 h-4" />
-                              )}
-                              <span>
-                                {isReadOnly
-                                  ? 'Read-only (Team Submitted)'
-                                  : isUploading[`${selectedPlayer.userId}_aadhaarBack`] 
-                                    ? `Uploading... ${Math.round(uploadProgress[`${selectedPlayer.userId}_aadhaarBack`] || 0)}%`
-                                    : `Upload Aadhaar Back ${selectedPlayer.playerId.startsWith('captain_') ? '(Captain)' : '(As Captain)'}`
-                                }
-                              </span>
-                            </label>
-                          </div>
+                        <div>
+                          <label htmlFor={`aadhaar-back-${selectedPlayer.playerId}`} className={`text-sm flex items-center space-x-1 ${isReadOnly || isUploading[`${selectedPlayer.userId}_aadhaarBack`] ? 'text-gray-400 cursor-not-allowed' : 'text-[#F28C38] hover:text-[#E67A26] cursor-pointer'}`}>
+                            {isUploading[`${selectedPlayer.userId}_aadhaarBack`] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            <span>{isUploading[`${selectedPlayer.userId}_aadhaarBack`] ? `Uploading...` : 'Upload Aadhaar Back'}</span>
+                          </label>
                         </div>
                       )}
+                      <input type="file" accept="image/*" className="hidden" id={`aadhaar-back-${selectedPlayer.playerId}`} disabled={isReadOnly || isUploading[`${selectedPlayer.userId}_aadhaarBack`]}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file && selectedPlayer && !isReadOnly) {
+                            handleDocumentUpload(selectedPlayer, 'aadhaarBack', file);
+                          }
+                        }}/>
                     </div>
-                  </div>
-                  
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-600">
-                      <strong>Note:</strong> As captain, you can upload documents for any team member {selectedPlayer.playerId.startsWith('captain_') ? '(yourself)' : `(${selectedPlayer.name})`} now or add players without documents and upload later.
-                    </p>
+
                   </div>
                 </div>
+                {/* **** END: UPDATED DOCUMENT MANAGEMENT UI **** */}
               </div>
 
               {/* Action Buttons */}
@@ -1733,7 +1618,7 @@ export default function CaptainPlayerManagement() {
                   Close
                 </button>
                 {/* Remove Player button - disabled for captain */}
-                {!selectedPlayer.playerId.startsWith('captain_') ? (
+                {!selectedPlayer.playerId.startsWith('captain_') && !isReadOnly ? (
                   <button
                     onClick={() => {
                       removePlayer(selectedPlayer.playerId);
@@ -1748,7 +1633,7 @@ export default function CaptainPlayerManagement() {
                     className="px-6 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed transition-colors"
                     disabled
                   >
-                    Cannot Remove Captain
+                    { isReadOnly ? 'Cannot Remove (Team Submitted)' : 'Cannot Remove Player' }
                   </button>
                 )}
               </div>

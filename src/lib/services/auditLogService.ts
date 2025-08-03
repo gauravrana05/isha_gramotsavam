@@ -1,186 +1,104 @@
 import { db } from "@/lib/firebase/config";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-export interface AuditLogData {
-  // Action Details
-  action: string; // 'team_player_verification', 'onground_player_verification', 'volunteer_document_upload', 'volunteer_media_upload'
-  resource: string; // 'team', 'player', 'document', 'media'
-  resourceId: string;
-  
-  // User Context (Volunteer performing action)
-  userId: string; // Volunteer's user ID
-  userRole: string; // 'verification_volunteer' | 'volunteer_technical' | 'volunteer_general'
-  ipAddress: string;
-  userAgent: string;
-  
-  // Volunteer-specific Context
-  venueId?: string; // Venue where volunteer is assigned
-  verificationType?: 'document_verification' | 'onground_verification' | 'eligibility_check';
-  
-  // Target Information (Who/What is being acted upon)
-  targetUserId?: string; // Player being verified or whose document is being uploaded
-  targetTeamId?: string; // Team being verified
-  
-  // Document Upload Context (when volunteer uploads for user)
-  documentType?: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack';
-  uploadReason?: string; // Why volunteer is uploading
-  
-  // Media Upload Context  
-  mediaType?: 'photo' | 'video';
-  mediaCategory?: 'team_photo' | 'match_action' | 'celebration' | 'venue_documentation';
-  
-  // Changes Made
-  changeDescription: string; // Brief description of what changed
-  oldValue?: string; // Previous key value
-  newValue?: string; // New key value
-  
-  // Context
-  eventId?: string;
-  teamId?: string;
-  matchId?: string;
-  playerId?: string;
-  mediaId?: string;
-  
-  // Result
-  success: boolean;
-  errorMessage?: string;
+// Define the object shapes for clarity
+interface Actor {
+  uid: string;
+  name: string;
+  role: string;
 }
 
-class AuditLogService {
-  private getClientInfo() {
-    return {
-      ipAddress: 'unknown', // Would need server-side implementation for real IP
-      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'unknown'
-    };
-  }
+interface TeamInfo {
+  id: string;
+  name: string;
+}
 
-  async logPlayerVerification(
-    userId: string,
-    userRole: string,
-    targetTeamId: string,
-    targetPlayerId: string,
-    previousStatus: string,
+interface PlayerInfo {
+  id: string;
+  name: string;
+}
+
+export const auditLogService = {
+  /**
+   * Logs the verification status change for a single player.
+   */
+  logPlayerVerification: async (
+    actor: Actor,
+    team: TeamInfo,
+    player: PlayerInfo,
+    oldStatus: string,
     newStatus: string,
-    venueId?: string,
-    reason?: string
-  ) {
-    const logData: AuditLogData = {
-      action: 'team_player_verification',
-      resource: 'player',
-      resourceId: targetPlayerId,
-      userId,
-      userRole,
-      venueId,
-      verificationType: 'document_verification',
-      targetUserId: targetPlayerId,
-      targetTeamId,
-      changeDescription: `Player verification status changed from ${previousStatus} to ${newStatus}`,
-      oldValue: previousStatus,
-      newValue: newStatus,
-      success: true,
-      ...this.getClientInfo()
-    };
-
-    await this.createLog(logData);
-  }
-
-  async logDocumentUpload(
-    userId: string,
-    userRole: string,
-    targetUserId: string,
-    documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack',
-    uploadReason: string,
-    venueId?: string
-  ) {
-    const logData: AuditLogData = {
-      action: 'volunteer_document_upload',
-      resource: 'document',
-      resourceId: `${targetUserId}_${documentType}`,
-      userId,
-      userRole,
-      venueId,
-      targetUserId,
-      documentType,
-      uploadReason,
-      changeDescription: `Volunteer uploaded ${documentType} for user: ${uploadReason}`,
-      success: true,
-      ...this.getClientInfo()
-    };
-
-    await this.createLog(logData);
-  }
-
-  async logMediaUpload(
-    userId: string,
-    userRole: string,
-    mediaType: 'photo' | 'video',
-    mediaCategory: 'team_photo' | 'match_action' | 'celebration' | 'venue_documentation',
-    mediaId: string,
-    venueId?: string,
-    teamId?: string,
-    matchId?: string
-  ) {
-    const logData: AuditLogData = {
-      action: 'volunteer_media_upload',
-      resource: 'media',
-      resourceId: mediaId,
-      userId,
-      userRole,
-      venueId,
-      mediaType,
-      mediaCategory,
-      teamId,
-      matchId,
-      mediaId,
-      changeDescription: `Volunteer uploaded ${mediaType} for ${mediaCategory}`,
-      success: true,
-      ...this.getClientInfo()
-    };
-
-    await this.createLog(logData);
-  }
-
-  async logOngroundVerification(
-    userId: string,
-    userRole: string,
-    targetUserId: string,
-    verificationType: 'eligibility_check' | 'onground_verification',
-    result: string,
-    venueId?: string,
-    teamId?: string,
-    matchId?: string
-  ) {
-    const logData: AuditLogData = {
-      action: 'onground_player_verification',
-      resource: 'player', 
-      resourceId: targetUserId,
-      userId,
-      userRole,
-      venueId,
-      verificationType,
-      targetUserId,
-      teamId,
-      matchId,
-      changeDescription: `On-ground ${verificationType} completed with result: ${result}`,
-      newValue: result,
-      success: true,
-      ...this.getClientInfo()
-    };
-
-    await this.createLog(logData);
-  }
-
-  private async createLog(logData: AuditLogData) {
+    reason: string | null
+  ) => {
     try {
-      await addDoc(collection(db, 'auditLog'), {
-        ...logData,
-        timestamp: serverTimestamp()
+      await addDoc(collection(db, "auditLog"), {
+        action: "PLAYER_VERIFICATION",
+        actor,
+        team,
+        player,
+        oldValue: oldStatus,
+        newValue: newStatus,
+        details: {
+          reason: reason,
+        },
+        timestamp: serverTimestamp(),
       });
     } catch (error) {
-      console.error('Error creating audit log:', error);
-      // Don't throw error to prevent breaking the main functionality
+      console.error("Error creating player verification audit log:", error);
     }
-  }
-}
+  },
 
-export const auditLogService = new AuditLogService();
+  /**
+   * Logs a bulk verification action for multiple players.
+   */
+  logBulkPlayerVerification: async (
+    actor: Actor,
+    team: TeamInfo,
+    playerCount: number,
+    status: 'approved' | 'rejected',
+    reason: string
+  ) => {
+    try {
+      await addDoc(collection(db, "auditLog"), {
+        action: "BULK_PLAYER_VERIFICATION",
+        actor,
+        team,
+        newValue: status,
+        details: {
+          playerCount: playerCount,
+          reason: reason,
+        },
+        timestamp: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error creating bulk verification audit log:", error);
+    }
+  },
+
+  /**
+   * Logs a change in the overall team status.
+   */
+  logTeamStatusChange: async (
+    actor: Actor,
+    team: TeamInfo,
+    oldStatus: string,
+    newStatus: string,
+    reason: string
+  ) => {
+    try {
+      await addDoc(collection(db, "auditLog"), {
+        action: "TEAM_STATUS_CHANGE",
+        actor,
+        team,
+        oldValue: oldStatus,
+        newValue: newStatus,
+        details: {
+          reason: reason,
+        },
+        timestamp: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error creating team status change audit log:", error);
+    }
+  },
+};

@@ -111,7 +111,7 @@ export interface VolunteerVenueAssignment {
   // Volunteer Information
   volunteerId: string;
   volunteerName: string;
-  volunteerType: 'verification' | 'checkin' | 'media';
+  volunteerType: 'technical_volunteer' | 'general_volunteer';
   
   // Venue Assignment
   venueId: string;

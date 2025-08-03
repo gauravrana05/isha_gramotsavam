@@ -9,12 +9,44 @@ async function getVenues() {
   const venuesSnapshot = await adminDb.collection('venues').where('isActive', '==', true).get();
   return venuesSnapshot.docs.map(doc => {
     const data = doc.data();
-    // Only return the fields needed for the form
     return {
       id: doc.id,
       name: data.name,
+      address: {
+        state: data.address?.state || data.state || '',
+        district: data.address?.district || data.district || '',
+        taluk: data.address?.taluk || data.taluk || '',
+        panchayat: data.address?.panchayat || data.panchayat || '',
+      },
+      type: data.type || 'cluster'
     };
   });
+}
+
+function analyzeVenueDistribution(venues: any[]) {
+  // Group venues by district and count cluster venues only
+  const districtCounts = venues
+    .filter(venue => venue.type === 'cluster')
+    .reduce((acc, venue) => {
+      const district = venue.address.district;
+      const state = venue.address.state;
+      if (district) {
+        if (!acc[district]) {
+          acc[district] = { count: 0, state };
+        }
+        acc[district].count++;
+      }
+      return acc;
+    }, {} as Record<string, { count: number; state: string }>);
+
+  // Return districts with multiple cluster venues
+  return Object.entries(districtCounts)
+    .filter(([_, data]) => data.count > 1)
+    .map(([district, data]) => ({
+      district,
+      count: data.count,
+      state: data.state
+    }));
 }
 
 async function getVenueLocationMappings() {
@@ -26,16 +58,26 @@ async function getVenueLocationMappings() {
 export default async function VenueLocationMappingPage() {
   const venues = await getVenues();
   const mappings = await getVenueLocationMappings();
+  const districtsWithMultipleVenues = analyzeVenueDistribution(venues);
 
   return (
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">Venue Location Mapping</h1>
         <p className="text-gray-600">Map venues to locations for automatic team assignment</p>
+        
+        <div className="mt-4 text-sm text-gray-600">
+          <div><strong>Total Venues:</strong> {venues.length}</div>
+          <div><strong>Districts with single venues:</strong> {venues.filter(v => v.type === 'cluster').length - districtsWithMultipleVenues.reduce((sum, d) => sum + d.count, 0)} (auto-assigned)</div>
+          <div><strong>Districts requiring mapping:</strong> {districtsWithMultipleVenues.length}</div>
+        </div>
       </div>
 
       {/* Create New Mapping Form */}
-      <VenueLocationMappingForm venues={venues} />
+      <VenueLocationMappingForm 
+        venues={venues} 
+        districtsWithMultipleVenues={districtsWithMultipleVenues}
+      />
 
       {/* Existing Mappings */}
       <div className="space-y-4">

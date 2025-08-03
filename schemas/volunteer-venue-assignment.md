@@ -15,14 +15,12 @@ interface VolunteerVenueAssignment {
   // Volunteer Information
   volunteerId: string;
   volunteerName: string;
-  volunteerType: 'verification' | 'checkin' | 'media';
+  volunteerType: 'general' | 'technical';
   
   // Venue Assignment
   venueId: string;
   venueName: string;
   
-  // Contact
-  contactPhone: string;
   
   // Status
   status: 'assigned' | 'confirmed' | 'active';
@@ -44,12 +42,11 @@ interface VolunteerVenueAssignment {
   
   volunteerId: 'volunteer_001',
   volunteerName: 'Ravi Kumar',
-  volunteerType: 'verification',
+  volunteerType: 'general',
   
   venueId: 'coimbatore_sports_complex',
   venueName: 'Coimbatore Sports Complex',
   
-  contactPhone: '+91-9876543210',
   
   status: 'confirmed',
   
@@ -61,9 +58,8 @@ interface VolunteerVenueAssignment {
 ```
 
 ### Volunteer Types
-- **verification**: Handles document verification and team eligibility
-- **checkin**: Manages team check-in process at venues
-- **media**: Handles media coverage and social media updates
+- **general**: Handles general event management, coordination, and support tasks
+- **technical**: Manages technical equipment, scoring systems, and IT support
 
 ### Usage
 - Admin assigns volunteers to venues through UI

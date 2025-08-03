@@ -1,9 +1,10 @@
 import { initializeApp, getApps, cert, ServiceAccount } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
 // This will hold our admin database instance
 let adminDb: FirebaseFirestore.Firestore;
-
+let adminAuth: ReturnType<typeof getAuth>;
 function initializeFirebaseAdmin() {
   try {
     // Check if Firebase Admin is already initialized
@@ -45,16 +46,17 @@ function initializeFirebaseAdmin() {
     
   } catch (error) {
     console.error('Firebase Admin initialization failed:', error);
-    throw new Error(`Firebase Admin setup failed: ${error.message}`);
+    throw new Error(`Firebase Admin setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-// Initialize the admin database
+// Initialize the admin database and auth
 try {
   adminDb = initializeFirebaseAdmin();
+  adminAuth = getAuth();
 } catch (error) {
   console.error('Critical error initializing Firebase Admin:', error);
   throw error;
 }
 
-export { adminDb };
+export { adminDb, adminAuth };

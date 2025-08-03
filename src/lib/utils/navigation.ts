@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase/config";
 import { doc, getDoc } from "firebase/firestore";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
-export const ALL_ROLES = ["admin", "captain", "player", "general_volunteer", "techincal_volunteer", "verification_volunteer", "guest"];
+export const ALL_ROLES = ["admin", "captain", "player", "general_volunteer", "technical_volunteer", "verification_volunteer", "guest"];
 
 
 export const getDashboardRoute = (role: string | null | undefined, lang: string): string => {
@@ -21,7 +21,7 @@ export const getDashboardRoute = (role: string | null | undefined, lang: string)
     case "player":
       return `/${lang}/player/dashboard`;
     case "general_volunteer":
-    case "techincal_volunteer":
+    case "technical_volunteer":
       return `/${lang}/volunteer/dashboard`;
     case "verification_volunteer":
       return `/${lang}/verification/dashboard`;

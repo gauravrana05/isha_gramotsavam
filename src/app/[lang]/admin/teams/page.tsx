@@ -42,6 +42,7 @@ interface TeamData {
   status: string;
   createdAt: any;
   eventId: string;
+  clusterVenue?: string;
 }
 
 export default function AdminTeamsPage() {
@@ -98,7 +99,8 @@ export default function AdminTeamsPage() {
           maxPlayers: data.maxPlayers || 12,
           status: data.status || 'draft',
           createdAt: data.createdAt,
-          eventId: data.eventId || 'gramotsavam_2025'
+          eventId: data.eventId || 'gramotsavam_2025',
+          clusterVenue: data.clusterVenue || undefined
         };
       });
       
@@ -341,6 +343,7 @@ export default function AdminTeamsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sport</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Captain</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Venue</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Players</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
@@ -364,6 +367,9 @@ export default function AdminTeamsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{team.panchayat}</div>
                         <div className="text-xs text-gray-500">{team.district}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {team.clusterVenue || <span className="text-gray-400 italic">Not assigned</span>}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {team.currentPlayers}/{team.maxPlayers}
@@ -412,6 +418,7 @@ export default function AdminTeamsPage() {
                     <div><strong>Captain:</strong> {team.captainProfile.name}</div>
                     <div><strong>Phone:</strong> {team.captainProfile.phone}</div>
                     <div><strong>Location:</strong> {team.panchayat}, {team.district}</div>
+                    <div><strong>Venue:</strong> {team.clusterVenue || <span className="text-gray-400 italic">Not assigned</span>}</div>
                     <div><strong>Players:</strong> {team.currentPlayers}/{team.maxPlayers}</div>
                     <div><strong>Created:</strong> {team.createdAt ? team.createdAt.toDate?.() ? team.createdAt.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date(team.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unknown'}</div>
                   </div>

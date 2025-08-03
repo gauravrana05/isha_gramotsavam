@@ -3,6 +3,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { revalidatePath } from 'next/cache';
 import { VolunteerVenueAssignment } from '@/lib/types/fixtures';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export async function assignVolunteerToVenue(formData: FormData) {
   try {
@@ -10,19 +11,18 @@ export async function assignVolunteerToVenue(formData: FormData) {
       eventId: formData.get('eventId') as string,
       volunteerId: formData.get('volunteerId') as string,
       volunteerName: formData.get('volunteerName') as string,
-      volunteerType: formData.get('volunteerType') as 'verification' | 'checkin' | 'media',
+      volunteerType: formData.get('volunteerType') as 'general_volunteer' | 'technical_volunteer',
       venueId: formData.get('venueId') as string,
       venueName: formData.get('venueName') as string,
-      contactPhone: formData.get('contactPhone') as string,
       status: 'assigned',
       assignedBy: formData.get('assignedBy') as string,
-      assignedAt: new Date()
+      assignedAt: FieldValue.serverTimestamp()
     };
 
     const assignmentWithTimestamps = {
       ...assignmentData,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
     };
 
     const docRef = await adminDb.collection('volunteerVenueAssignment').add(assignmentWithTimestamps);
@@ -72,11 +72,11 @@ export async function updateVolunteerAssignmentStatus(
   try {
     const updateData: any = {
       status,
-      updatedAt: new Date()
+      updatedAt: FieldValue.serverTimestamp()
     };
 
     if (status === 'confirmed') {
-      updateData.confirmedAt = new Date();
+      updateData.confirmedAt = FieldValue.serverTimestamp();
     }
 
     await adminDb.collection('volunteerVenueAssignment').doc(assignmentId).update(updateData);

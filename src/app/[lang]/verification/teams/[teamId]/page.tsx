@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase/config";
 import { doc, getDoc, collection, getDocs, updateDoc } from "firebase/firestore";
 import { auditLogService } from "@/lib/services/auditLogService";
+import { assignTeamToVenue } from "@/lib/actions/admin/teamVenueAssignment";
 import Image from "next/image";
 import { ArrowLeft, Users, Phone, Calendar, MapPin, Loader2, AlertCircle, CheckCircle, X, Eye, Check, UserCheck } from "lucide-react";
 
@@ -225,82 +226,92 @@ export default function TeamVerificationPage() {
   };
 
   const handlePlayerStatusChange = async (playerId: string, status: 'approved' | 'rejected', comments?: string) => {
-    try {
-      setSaving(true);
-      
-      // Update local state
-      const updatedPlayers = players.map(player => 
-        player.playerId === playerId 
-          ? {
-              ...player,
-              verificationStatus: status,
-              verificationComments: comments ? [comments] : []
-            }
-          : player
-      );
-      
-      setPlayers(updatedPlayers);
-      
-      // Update in database
-      const player = players.find(p => p.playerId === playerId);
-      if (player && player.userId) {
-        // Update user document
-        const userRef = doc(db, "users", player.userId);
-        await updateDoc(userRef, {
-          [`teams.${teamIdStr}.verificationStatus`]: status,
-          [`teams.${teamIdStr}.verificationComments`]: comments ? [comments] : [],
-          [`teams.${teamIdStr}.verifiedAt`]: new Date().toISOString(),
-          [`teams.${teamIdStr}.verifiedBy`]: user?.uid,
-        });
-        
-        // Update player in team subcollection
-        const playerRef = doc(db, "teams", teamIdStr, "players", playerId);
-        await updateDoc(playerRef, {
-          verificationStatus: status,
-          verificationComments: comments ? [comments] : [],
-          verifiedAt: new Date().toISOString(),
-          verifiedBy: user?.uid,
-        });
-
-        // Log the verification action
-        if (teamData && user && userProfile) {
-          await auditLogService.logPlayerVerification(
-            {
-              uid: user.uid,
-              name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-              role: userProfile.role
-            },
-            {
-              id: teamData.id,
-              name: teamData.name
-            },
-            {
-              id: player.playerId,
-              name: player.name
-            },
-            player.verificationStatus,
-            status,
-            status === 'rejected' ? comments : undefined,
-            comments
-          );
-        }
-      }
-      
-      // Update team status
-      await updateTeamStatus(updatedPlayers);
-      
-    } catch (error) {
-      console.error('Error updating player status:', error);
-      alert('Failed to save verification. Please try again.');
-      loadTeamData(); // Reload data on error
-    } finally {
-      setSaving(false);
+    if (!teamIdStr) {
+      console.error("Team ID is missing, cannot update player status.");
+      return;
     }
-  };
+    try {
+    setSaving(true);
+
+    
+    // Find the player *before* updating the state to get the old status
+    const player = players.find(p => p.playerId === playerId);
+    if (!player) {
+      throw new Error("Player not found in local state.");
+    }
+
+    // Update local state first for a responsive UI
+    const updatedPlayers = players.map(p => 
+      p.playerId === playerId 
+        ? { 
+            ...p, 
+            verificationStatus: status, 
+            verificationComments: comments ? [comments] : [] 
+          } 
+        : p
+    );
+    setPlayers(updatedPlayers);
+
+    // Update in database
+    if (player.userId) {
+      const userRef = doc(db, "users", player.userId);
+      await updateDoc(userRef, {
+        [`teams.${teamIdStr}.verificationStatus`]: status,
+        [`teams.${teamIdStr}.verificationComments`]: comments ? [comments] : [],
+        [`teams.${teamIdStr}.verifiedAt`]: new Date().toISOString(),
+        [`teams.${teamIdStr}.verifiedBy`]: user?.uid,
+      });
+
+      const playerRef = doc(db, "teams", teamIdStr, "players", playerId);
+      await updateDoc(playerRef, {
+        verificationStatus: status,
+        verificationComments: comments ? [comments] : [],
+        verifiedAt: new Date().toISOString(),
+        verifiedBy: user?.uid,
+      });
+
+      // Log the verification action - CORRECTED CALL
+      if (teamData && user && userProfile) {
+        await auditLogService.logPlayerVerification(
+          { // actor
+            uid: user.uid,
+            name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+            role: userProfile.role
+          },
+          { // team
+            id: teamData.id,
+            name: teamData.name
+          },
+          { // player
+            id: player.playerId,
+            name: player.name
+          },
+          player.verificationStatus, // oldStatus
+          status, // newStatus
+          comments || null // reason
+        );
+      }
+    }
+    
+    // Update team status based on the new list of players
+    await updateTeamStatus(updatedPlayers);
+    
+  } catch (error) {
+    console.error('Error updating player status:', error);
+    alert('Failed to save verification. Please try again.');
+    loadTeamData(); // Reload data on error
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   const updateTeamStatus = async (updatedPlayers: TeamPlayer[]) => {
     if (!teamData) return;
-    
+    if (!teamIdStr) {
+      console.error("Team ID is missing, cannot update player status.");
+      return;
+    } 
     const approvedCount = updatedPlayers.filter(p => p.verificationStatus === 'approved').length;
     const rejectedCount = updatedPlayers.filter(p => p.verificationStatus === 'rejected').length;
     const totalPlayers = updatedPlayers.length;
@@ -324,6 +335,23 @@ export default function TeamVerificationPage() {
       verifiedBy: user?.uid,
       updatedAt: new Date().toISOString(),
     });
+
+    // Trigger venue assignment when team becomes verified
+    if (newStatus === 'verified' && teamData.status !== 'verified') {
+      try {
+        const result = await assignTeamToVenue({
+          id: teamData.id,
+          name: teamData.name,
+          state: teamData.state,
+          district: teamData.district,
+          panchayat: teamData.panchayat
+        });
+        console.log('Venue assignment result:', result.message);
+      } catch (error) {
+        console.error('Error assigning team to venue:', error);
+        // Don't fail the verification process if venue assignment fails
+      }
+    }
 
     // Log team status change
     if (teamData && user && userProfile && newStatus !== teamData.status) {
@@ -368,19 +396,19 @@ export default function TeamVerificationPage() {
       // Log the bulk action
       if (teamData && user && userProfile) {
         await auditLogService.logBulkPlayerVerification(
-          {
+          { // actor
             uid: user.uid,
             name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
             role: userProfile.role
           },
-          {
+          { // team
             id: teamData.id,
             name: teamData.name
           },
-          pendingPlayers.length,
-          'approved',
-          'Bulk approved by verification volunteer'
-        );
+          pendingPlayers.length, // playerCount
+          'approved', // status
+          'Bulk approved by verification volunteer' // reason
+        ); 
       }
 
       alert(`Successfully approved ${pendingPlayers.length} players!`);
@@ -609,28 +637,28 @@ export default function TeamVerificationPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex space-x-2">
-                        {player.verificationStatus !== 'approved' && (
-                          <button
-                            onClick={() => handlePlayerStatusChange(player.playerId, 'approved', 'Approved by verification volunteer')}
-                            disabled={saving}
-                            className="text-green-600 hover:text-green-800 font-medium text-sm disabled:opacity-50"
-                          >
-                            Approve
-                          </button>
-                        )}
-                        {player.verificationStatus !== 'rejected' && (
-                          <button
-                            onClick={() => {
-                              const reason = prompt('Reason for rejection:');
-                              if (reason) {
-                                handlePlayerStatusChange(player.playerId, 'rejected', reason);
-                              }
-                            }}
-                            disabled={saving}
-                            className="text-red-600 hover:text-red-800 font-medium text-sm disabled:opacity-50"
-                          >
-                            Reject
-                          </button>
+                        {player.verificationStatus === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handlePlayerStatusChange(player.playerId, 'approved', 'Approved by verification volunteer')}
+                              disabled={saving}
+                              className="text-green-600 hover:text-green-800 font-medium text-sm disabled:opacity-50"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => {
+                                const reason = prompt('Reason for rejection:');
+                                if (reason) {
+                                  handlePlayerStatusChange(player.playerId, 'rejected', reason);
+                                }
+                              }}
+                              disabled={saving}
+                              className="text-red-600 hover:text-red-800 font-medium text-sm disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </>
                         )}
                         <button
                           onClick={() => {
@@ -696,31 +724,31 @@ export default function TeamVerificationPage() {
               </div>
 
               <div className="flex gap-2">
-                {player.verificationStatus !== 'approved' && (
-                  <button
-                    onClick={() => handlePlayerStatusChange(player.playerId, 'approved', 'Approved by verification volunteer')}
-                    disabled={saving}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
-                  >
-                    <Check className="w-4 h-4 mr-1" />
-                    Approve
-                  </button>
-                )}
-                {player.verificationStatus !== 'rejected' && (
-                  <button
-                    onClick={() => {
-                      const reason = prompt('Reason for rejection:');
-                      if (reason) {
-                        handlePlayerStatusChange(player.playerId, 'rejected', reason);
-                      }
-                    }}
-                    disabled={saving}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
-                  >
-                    <X className="w-4 h-4 mr-1" />
-                    Reject
-                  </button>
-                )}
+                {player.verificationStatus === 'pending' ? (
+                  <>
+                    <button
+                      onClick={() => handlePlayerStatusChange(player.playerId, 'approved', 'Approved by verification volunteer')}
+                      disabled={saving}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => {
+                        const reason = prompt('Reason for rejection:');
+                        if (reason) {
+                          handlePlayerStatusChange(player.playerId, 'rejected', reason);
+                        }
+                      }}
+                      disabled={saving}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Reject
+                    </button>
+                  </>
+                ) : null}
                 <button
                   onClick={() => {
                     setSelectedPlayer(player);
@@ -859,37 +887,37 @@ export default function TeamVerificationPage() {
 
               {/* Verification Actions */}
               <div className="flex justify-center space-x-4 pt-4 border-t">
-                {selectedPlayer.verificationStatus !== 'approved' && (
-                  <button
-                    onClick={async () => {
-                      await handlePlayerStatusChange(selectedPlayer.playerId, 'approved', 'Approved by verification volunteer');
-                      setShowPlayerModal(false);
-                      alert('Player approved successfully!');
-                    }}
-                    disabled={saving}
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
-                  >
-                    <Check className="w-4 h-4 mr-2" />
-                    Approve Player
-                  </button>
-                )}
-                
-                {selectedPlayer.verificationStatus !== 'rejected' && (
-                  <button
-                    onClick={async () => {
-                      const reason = prompt('Please provide reason for rejection:');
-                      if (reason) {
-                        await handlePlayerStatusChange(selectedPlayer.playerId, 'rejected', reason);
+                {selectedPlayer.verificationStatus === 'pending' && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        await handlePlayerStatusChange(selectedPlayer.playerId, 'approved', 'Approved by verification volunteer');
                         setShowPlayerModal(false);
-                        alert('Player rejected successfully!');
-                      }
-                    }}
-                    disabled={saving}
-                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Reject Player
-                  </button>
+                        alert('Player approved successfully!');
+                      }}
+                      disabled={saving}
+                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      Approve Player
+                    </button>
+                    
+                    <button
+                      onClick={async () => {
+                        const reason = prompt('Please provide reason for rejection:');
+                        if (reason) {
+                          await handlePlayerStatusChange(selectedPlayer.playerId, 'rejected', reason);
+                          setShowPlayerModal(false);
+                          alert('Player rejected successfully!');
+                        }
+                      }}
+                      disabled={saving}
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Reject Player
+                    </button>
+                  </>
                 )}
               </div>
             </div>

@@ -246,19 +246,41 @@ function getRoundName(roundSize: number): string {
 
 export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
   try {
-    const teamsSnapshot = await adminDb.collection('teams')
-      .where('checkedInVenue', '==', venueId)
-      .where('checkedIn', '==', true)
+    console.log(`Getting checked-in teams for venue: ${venueId}, event: ${eventId}`);
+    
+    // First, let's also check teams assigned to this venue via teamVenueAssignment
+    const venueAssignmentsSnapshot = await adminDb.collection('teamVenueAssignment')
+      .where('venueId', '==', venueId)
       .where('eventId', '==', eventId)
       .get();
     
-    const teams = teamsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    console.log(`Found ${venueAssignmentsSnapshot.docs.length} team assignments for venue`);
+    
+    const checkedInTeams = [];
+    
+    // Check each assigned team's status
+    for (const assignmentDoc of venueAssignmentsSnapshot.docs) {
+      const assignment = assignmentDoc.data();
+      const teamDoc = await adminDb.collection('teams').doc(assignment.teamId).get();
+      
+      if (teamDoc.exists) {
+        const teamData = teamDoc.data();
+        console.log(`Team ${assignment.teamId}: checkedIn=${teamData?.checkedIn}, matchDayStatus=${teamData?.matchDayStatus}, checkedInVenue=${teamData?.checkedInVenue}`);
+        
+        // Check if team is checked in (either via checkedIn field or matchDayStatus)
+        if (teamData?.checkedIn === true || teamData?.matchDayStatus === 'checked_in') {
+          checkedInTeams.push({
+            id: teamDoc.id,
+            ...teamData
+          });
+        }
+      }
+    }
+    
+    console.log(`Found ${checkedInTeams.length} checked-in teams for venue`);
     
     // Group by sport and gender
-    const teamsBySport = teams.reduce((acc, team) => {
+    const teamsBySport = checkedInTeams.reduce((acc, team) => {
       const key = `${team.sportId}_${team.genderCategory}`;
       if (!acc[key]) {
         acc[key] = [];
@@ -269,9 +291,9 @@ export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
     
     return { 
       success: true, 
-      teams,
+      teams: checkedInTeams,
       teamsBySport,
-      totalTeams: teams.length
+      totalTeams: checkedInTeams.length
     };
   } catch (error) {
     console.error('Error getting venue checked-in teams:', error);

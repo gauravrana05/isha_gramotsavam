@@ -1,158 +1,246 @@
+'use client';
+
+import { useState, useEffect, use } from 'react';
 import { adminDb } from '@/lib/firebase/admin';
-import { getVenueTeams } from '@/lib/actions/volunteer/teamCheckin';
+import { getVenueTeamsForMatchDay } from '@/lib/actions/volunteer/matchDayVerification';
 import { getVenueCheckedInTeams } from '@/lib/actions/tournament/fixtureManagement';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import { Loader2, Users, CheckCircle, UserCheck, Trophy, Calendar, Camera, AlertCircle } from 'lucide-react';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     venueId: string;
     lang: string;
-  };
+  }>;
 }
 
-async function getVenueDetails(venueId: string) {
-  try {
-    const venueDoc = await adminDb.collection('venues').doc(venueId).get();
-    if (!venueDoc.exists) {
-      return null;
-    }
-    return { id: venueDoc.id, ...venueDoc.data() };
-  } catch (error) {
-    console.error('Error fetching venue:', error);
-    return null;
-  }
-}
+export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) {
+  const { venueId } = use(params);
+  const { user, loading: authLoading } = useAuth();
+  
+  const [venue, setVenue] = useState<any>(null);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [fixtures, setFixtures] = useState<any[]>([]);
+  const [checkedInTeamsResult, setCheckedInTeamsResult] = useState<any>({ success: false });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-async function getVenueFixtures(venueId: string) {
-  try {
-    const fixturesSnapshot = await adminDb.collection('fixtures')
-      .where('venueId', '==', venueId)
-      .orderBy('createdAt', 'desc')
-      .get();
+  useEffect(() => {
+    if (authLoading) return;
     
-    return fixturesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  } catch (error) {
-    console.error('Error fetching fixtures:', error);
-    return [];
-  }
-}
+    if (!user) {
+      setError('Please log in to access this page');
+      setLoading(false);
+      return;
+    }
 
-export default async function TechnicalVolunteerVenueDashboard({ params }: PageProps) {
-  const { venueId } = params;
-  const eventId = 'isha_gramotsavam_2025'; // This should come from context/params
+    loadVenueData();
+  }, [user, authLoading, venueId]);
 
-  const venue = await getVenueDetails(venueId);
-  const teamsResult = await getVenueTeams(venueId, eventId);
-  const checkedInTeamsResult = await getVenueCheckedInTeams(venueId, eventId);
-  const fixtures = await getVenueFixtures(venueId);
+  const loadVenueData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch teams for match day verification
+      const teamsResult = await getVenueTeamsForMatchDay(venueId, user!.uid);
+      
+      if (teamsResult.success) {
+        setTeams(teamsResult.teams);
+      } else {
+        setError(teamsResult.error || 'Failed to load teams');
+      }
+      
+      // Fetch checked-in teams for sports overview
+      const checkedInResult = await getVenueCheckedInTeams(venueId, 'gramotsavam_2025');
+      setCheckedInTeamsResult(checkedInResult);
+      
+      // Set a mock venue for now - in production you'd create an API route
+      setVenue({
+        id: venueId,
+        name: `Venue ${venueId}`,
+        location: 'Match Day Verification Center'
+      });
+      
+    } catch (err) {
+      console.error('Error loading venue data:', err);
+      setError('Failed to load venue data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (!venue) {
+  if (authLoading || loading) {
     return (
-      <div className="p-6">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600">Venue Not Found</h1>
-          <p className="mt-2 text-gray-600">The requested venue could not be found.</p>
+          <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
+          <p className="text-gray-600">Loading venue data...</p>
         </div>
       </div>
     );
   }
 
-  const teams = teamsResult.success ? teamsResult.teams : [];
-  const checkedInTeams = checkedInTeamsResult.success ? checkedInTeamsResult.teams : [];
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600">Error</h1>
+          <p className="mt-2 text-gray-600">{error}</p>
+          <button 
+            onClick={loadVenueData}
+            className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const totalTeams = teams.length;
-  const checkedInCount = teams.filter(team => team.checkedIn).length;
+  const checkedInCount = teams.filter(team => team.matchDayStatus === 'checked_in').length;
+  const verifiedCount = teams.filter(team => team.matchDayStatus === 'verified').length;
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Venue Header */}
+    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">{venue.name}</h1>
-            <p className="text-gray-600">{venue.location}</p>
+        <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
+          {venue?.name || 'Match Day Venue'}
+        </h1>
+        <p className="text-sm sm:text-base text-gray-600 font-fira">
+          {venue?.location || 'Technical Volunteer Station'} - Match Day Operations
+        </p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Total Teams</p>
+              <p className="text-2xl font-bold text-[#4A2F1D]">{totalTeams}</p>
+            </div>
+            <Users className="w-8 h-8 text-gray-400" />
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-blue-600">{checkedInCount}/{totalTeams}</div>
-            <div className="text-sm text-gray-500">Teams Checked In</div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Checked In</p>
+              <p className="text-2xl font-bold text-green-600">{checkedInCount}</p>
+            </div>
+            <CheckCircle className="w-8 h-8 text-green-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Verified</p>
+              <p className="text-2xl font-bold text-blue-600">{verifiedCount}</p>
+            </div>
+            <UserCheck className="w-8 h-8 text-blue-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Fixtures</p>
+              <p className="text-2xl font-bold text-purple-600">{fixtures.length}</p>
+            </div>
+            <Trophy className="w-8 h-8 text-purple-400" />
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Link href={`/volunteer/venues/${venueId}/teams`}>
-          <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{checkedInCount}</div>
-              <div className="text-sm font-medium">Checked In Teams</div>
-              <div className="text-xs text-gray-500 mt-1">Manage Check-ins</div>
-            </div>
-          </Card>
-        </Link>
-
-        <Link href={`/volunteer/venues/${venueId}/fixtures`}>
-          <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{fixtures.length}</div>
-              <div className="text-sm font-medium">Active Fixtures</div>
-              <div className="text-xs text-gray-500 mt-1">Tournament Brackets</div>
-            </div>
-          </Card>
-        </Link>
-
-        <Link href={`/volunteer/venues/${venueId}/matches`}>
-          <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">
-                {fixtures.reduce((total, fixture) => total + (fixture.bracket?.matches?.length || 0), 0)}
+      <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <h3 className="text-lg font-semibold text-[#4A2F1D] mb-4">Quick Actions</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Link href={`/en/volunteer/venues/${venueId}/teams`}>
+            <button className="w-full p-4 text-left bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg hover:from-green-100 hover:to-green-200 transition-all">
+              <div className="flex items-center">
+                <Users className="w-8 h-8 text-green-600 mr-3" />
+                <div>
+                  <div className="font-semibold text-green-700">Match Day Verification</div>
+                  <div className="text-sm text-green-600">Verify Teams</div>
+                </div>
               </div>
-              <div className="text-sm font-medium">Total Matches</div>
-              <div className="text-xs text-gray-500 mt-1">Match Management</div>
-            </div>
-          </Card>
-        </Link>
+            </button>
+          </Link>
 
-        <Link href={`/volunteer/venues/${venueId}/media`}>
-          <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">📸</div>
-              <div className="text-sm font-medium">Media</div>
-              <div className="text-xs text-gray-500 mt-1">Photos & Videos</div>
-            </div>
-          </Card>
-        </Link>
+          <Link href={`/en/volunteer/venues/${venueId}/fixtures`}>
+            <button className="w-full p-4 text-left bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg hover:from-blue-100 hover:to-blue-200 transition-all">
+              <div className="flex items-center">
+                <Trophy className="w-8 h-8 text-blue-600 mr-3" />
+                <div>
+                  <div className="font-semibold text-blue-700">Active Fixtures</div>
+                  <div className="text-sm text-blue-600">Tournament Brackets</div>
+                </div>
+              </div>
+            </button>
+          </Link>
+
+          <Link href={`/en/volunteer/venues/${venueId}/matches`}>
+            <button className="w-full p-4 text-left bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 rounded-lg hover:from-orange-100 hover:to-orange-200 transition-all">
+              <div className="flex items-center">
+                <Calendar className="w-8 h-8 text-orange-600 mr-3" />
+                <div>
+                  <div className="font-semibold text-orange-700">Total Matches</div>
+                  <div className="text-sm text-orange-600">Match Management</div>
+                </div>
+              </div>
+            </button>
+          </Link>
+
+          <Link href={`/en/volunteer/venues/${venueId}/media`}>
+            <button className="w-full p-4 text-left bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all">
+              <div className="flex items-center">
+                <Camera className="w-8 h-8 text-purple-600 mr-3" />
+                <div>
+                  <div className="font-semibold text-purple-700">Media</div>
+                  <div className="text-sm text-purple-600">Photos & Videos</div>
+                </div>
+              </div>
+            </button>
+          </Link>
+        </div>
       </div>
 
       {/* Sports Overview */}
       {checkedInTeamsResult.success && (
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Sports Overview</h2>
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <h3 className="text-lg font-semibold text-[#4A2F1D] mb-4">Sports Overview</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Object.entries(checkedInTeamsResult.teamsBySport).map(([sportKey, sportTeams]) => {
               const [sportId, genderCategory] = sportKey.split('_');
               return (
-                <div key={sportKey} className="p-4 border rounded-lg">
-                  <h3 className="font-medium capitalize">
+                <div key={sportKey} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                  <h4 className="font-medium capitalize text-gray-900">
                     {sportId.replace('_', ' ')} - {genderCategory}
-                  </h3>
+                  </h4>
                   <div className="mt-2 text-sm text-gray-600">
                     {sportTeams.length} teams checked in
                   </div>
                   
                   {sportTeams.length >= 2 && (
                     <Link href={`/volunteer/venues/${venueId}/fixtures/create-draw?sport=${sportId}&gender=${genderCategory}`}>
-                      <Button size="sm" className="mt-2">
+                      <button className="mt-3 bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors text-sm">
                         Create Tournament
-                      </Button>
+                      </button>
                     </Link>
                   )}
                 </div>
               );
             })}
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Active Fixtures */}
@@ -170,13 +258,13 @@ export default async function TechnicalVolunteerVenueDashboard({ params }: PageP
                 </div>
                 <div className="flex space-x-2">
                   <Link href={`/volunteer/venues/${venueId}/fixtures/${fixture.id}`}>
-                    <Button size="sm" variant="outline">
+                    <Button size="small" variant="outline">
                       Manage
                     </Button>
                   </Link>
                   {fixture.status === 'in_progress' && (
                     <Link href={`/volunteer/venues/${venueId}/matches?fixture=${fixture.id}`}>
-                      <Button size="sm">
+                      <Button size="small">
                         Live Matches
                       </Button>
                     </Link>
