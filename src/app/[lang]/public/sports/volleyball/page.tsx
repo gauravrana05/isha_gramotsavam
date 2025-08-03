@@ -9,7 +9,7 @@ import CelebrityTestimonials from '@/components/public/CelebrityTestimonials'
 import TransformationStories from '@/components/public/TransformationStories'
 import FAQSection from '@/components/public/FAQSection'
 import DecorativeElement from '@/components/ui/DecorativeElement'
-
+import PrizeDisplay from '@/components/public/PrizeDisplay'
 interface VolleyballPageProps {
     params: {
         lang: string
@@ -123,42 +123,7 @@ export default function VolleyballPage({ params }: VolleyballPageProps) {
                         </h2>
                         <SectionDivider type="decorative" />
                     </div>
-
-                    {/* Prize Display */}
-                    <div className="max-w-3xl mx-auto">
-                        {/* Tabs */}
-                        <div className="flex justify-center mb-12">
-                            <div className="bg-gray-100 rounded-lg p-1 flex flex-wrap gap-1">
-                                {['Finals', 'Division', 'Cluster'].map((tab) => (
-                                    <button
-                                        key={tab}
-                                        className={`px-4 sm:px-6 py-2 rounded-md font-semibold text-sm sm:text-base transition-colors font-fira ${tab === 'Finals'
-                                            ? 'bg-[#F28C38] text-white'
-                                            : 'text-[#4A2F1D] hover:text-[#F28C38]'
-                                            }`}
-                                    >
-                                        {tab}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Prize Content - Finals */}
-                        <div className="text-center">
-                            <div className="relative max-w-2xl mx-auto">
-                                <Image
-                                    src="/images/sports/finals_prizes.png"
-                                    alt="Finals Prize Structure"
-                                    width={700}
-                                    height={400}
-                                    className="w-full h-auto"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Decorative Dancing Ladies */}
-
-                    </div>
+                    < PrizeDisplay />
 
                     {/* Rules Section */}
                     <div className="mt-16 max-w-3xl mx-auto">
@@ -169,7 +134,7 @@ export default function VolleyballPage({ params }: VolleyballPageProps) {
                             <p className="text-lg text-[#4A2F1D] mb-8 font-fira">
                                 Make sure you read through all the rules carefully.
                             </p>
-                            <Link href={`/${lang}/public/sports/Volleyball/rules`}>
+                            <Link href={`/${lang}/public/sports/volleyball/rules`}>
                                 <Button variant="secondary" size="large" className="inline-flex items-center">
                                     <svg viewBox="0 0 27 27" className="w-6 h-6 mr-3" fill="currentColor">
                                         <g clipPath="url(#clip0_2085_23016)">
