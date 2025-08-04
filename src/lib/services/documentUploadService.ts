@@ -13,6 +13,10 @@ export const STORAGE_PATHS: DocumentUploadPaths = {
   aadhaarBack: (userId: string) => `aadhaar/${userId}/back_${Date.now()}`
 };
 
+export const getTeamPhotoStoragePath = (teamId: string): string => {
+  return `teamPhotos/${teamId}/team_photo_${Date.now()}`;
+};
+
 export interface UploadProgress {
   progress: number;
   bytesTransferred: number;
@@ -46,6 +50,22 @@ export class DocumentUploadService {
   ): Promise<string> {
     const storagePath = STORAGE_PATHS.aadhaarBack(userId);
     return this.uploadFile(storagePath, file, onProgress);
+  }
+
+  async uploadTeamPhoto(
+    teamId: string, 
+    file: File, 
+    onProgress?: (progress: UploadProgress) => void
+  ): Promise<string> {
+    const storagePath = getTeamPhotoStoragePath(teamId);
+    return this.uploadFile(storagePath, file, onProgress);
+  }
+
+  getStoragePath(
+    userId: string, 
+    documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack'
+  ): string {
+    return STORAGE_PATHS[documentType](userId);
   }
   
   private async uploadFile(
@@ -185,10 +205,6 @@ export class DocumentUploadService {
     return true;
   }
 
-  // Get storage paths for external use
-  getStoragePath(userId: string, documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack'): string {
-    return STORAGE_PATHS[documentType](userId);
-  }
 }
 
 // Export singleton instance

@@ -25,7 +25,7 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
         <Button
           onClick={resetErrorBoundary}
           className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-medium ripple"
-          variant="large"
+          size="lg"
           aria-label={t("try_again")}
         >
           {t("try_again")}

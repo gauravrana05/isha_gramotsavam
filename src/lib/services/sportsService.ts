@@ -17,7 +17,6 @@ import {
 import { db } from '@/lib/firebase/config';
 import { 
   Sport, 
-  SportSeason, 
   CreateSportData, 
   UpdateSportData, 
   LegacySportConfig 
@@ -33,7 +32,7 @@ class SportsService {
     try {
       const sportsQuery = query(
         collection(db, this.COLLECTION_NAME),
-        where('status', '==', 'active'),
+        where('isActive', '==', true),
         orderBy('name', 'asc')
       );
       
@@ -98,9 +97,8 @@ class SportsService {
       const docData = {
         ...sportData,
         createdBy,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: 1
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       };
 
       const docRef = await addDoc(collection(db, this.COLLECTION_NAME), docData);
@@ -124,12 +122,9 @@ class SportsService {
         throw new Error('Sport not found');
       }
 
-      const currentVersion = currentDoc.data().version || 1;
-
       await updateDoc(sportRef, {
         ...updateData,
-        updatedAt: new Date().toISOString(),
-        version: currentVersion + 1
+        updatedAt: serverTimestamp()
       });
     } catch (error) {
       console.error(`Error updating sport ${sportId}:`, error);
@@ -138,13 +133,12 @@ class SportsService {
   }
 
   /**
-   * Delete a sport (soft delete by setting status to inactive)
+   * Delete a sport (soft delete by setting isActive to false)
    */
   async deleteSport(sportId: string): Promise<void> {
     try {
       await this.updateSport(sportId, { 
-        status: 'inactive',
-        updatedAt: new Date().toISOString()
+        isActive: false
       });
     } catch (error) {
       console.error(`Error deleting sport ${sportId}:`, error);
@@ -163,10 +157,9 @@ class SportsService {
       }
 
       return {
-        maxPlayers: sport.teamConfig.maxPlayers,
-        maxSubstitutes: sport.teamConfig.maxSubstitutes,
-        genderCategory: sport.category === 'women' ? 'women' : 
-                       sport.category === 'men' ? 'men' : 'mixed'
+        maxPlayers: sport.maxPlayers,
+        maxSubstitutes: sport.maxSubstitutes,
+        genderCategory: sport.genderCategories?.[0] || 'mixed'
       };
     } catch (error) {
       console.error(`Error getting legacy config for ${sportId}:`, error);
@@ -182,10 +175,9 @@ class SportsService {
       const allSports = await this.getAllActiveSports();
       
       return allSports.filter(sport => {
-        if (sport.eligibility.genderRestriction === 'any') return true;
-        if (sport.eligibility.genderRestriction === 'male' && gender === 'M') return true;
-        if (sport.eligibility.genderRestriction === 'female' && gender === 'F') return true;
-        return false;
+        // Check if sport allows the user's gender
+        return sport.genderCategories.includes(gender === 'M' ? 'men' : 'women');
+
       });
     } catch (error) {
       console.error(`Error fetching sports for gender ${gender}:`, error);
@@ -196,7 +188,7 @@ class SportsService {
   /**
    * Check if a user is eligible for a sport
    */
-  async checkEligibility(sportId: string, userAge: number, userGender: 'M' | 'F'): Promise<{
+  async checkEligibility(sportId: string, userAge: number, userGender: string): Promise<{
     eligible: boolean;
     reasons: string[];
   }> {
@@ -209,19 +201,17 @@ class SportsService {
       const reasons: string[] = [];
 
       // Check gender eligibility
-      if (sport.eligibility.genderRestriction === 'male' && userGender !== 'M') {
-        reasons.push('This sport is only available for men');
-      }
-      if (sport.eligibility.genderRestriction === 'female' && userGender !== 'F') {
-        reasons.push('This sport is only available for women');
+      const userGenderCategory = userGender === 'M' ? 'men' : 'women';
+      if (!sport.genderCategories.includes(userGenderCategory)) {
+        reasons.push(`This sport is only available for: ${sport.genderCategories.join(', ')}`);
       }
 
       // Check age eligibility
-      if (userAge < sport.eligibility.minAge) {
-        reasons.push(`Minimum age requirement: ${sport.eligibility.minAge} years`);
+      if (userAge < sport.minAge) {
+        reasons.push(`Minimum age requirement: ${sport.minAge} years`);
       }
-      if (userAge > sport.eligibility.maxAge) {
-        reasons.push(`Maximum age limit: ${sport.eligibility.maxAge} years`);
+      if (sport.maxAge && userAge > sport.maxAge) {
+        reasons.push(`Maximum age limit: ${sport.maxAge} years`);
       }
 
       return {
@@ -231,6 +221,31 @@ class SportsService {
     } catch (error) {
       console.error(`Error checking eligibility for ${sportId}:`, error);
       return { eligible: false, reasons: ['Error checking eligibility'] };
+    }
+  }
+
+  /**
+   * Get sport configuration for team creation
+   */
+  async getSportConfig(sportId: string): Promise<{
+    maxPlayers: number;
+    maxSubstitutes: number;
+    genderCategories: string[];
+  } | null> {
+    try {
+      const sport = await this.getSportById(sportId);
+      if (!sport) {
+        return null;
+      }
+
+      return {
+        maxPlayers: sport.maxPlayers,
+        maxSubstitutes: sport.maxSubstitutes,
+        genderCategories: sport.genderCategories
+      };
+    } catch (error) {
+      console.error(`Error getting sport config for ${sportId}:`, error);
+      return null;
     }
   }
 
@@ -246,10 +261,8 @@ class SportsService {
         const sportRef = doc(collection(db, this.COLLECTION_NAME));
         batch.set(sportRef, {
           ...sport,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          version: 1,
-          createdBy: 'system'
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
         });
       }
 
@@ -262,114 +275,97 @@ class SportsService {
   }
 
   /**
-   * Get default sports data based on current hardcoded configuration
+   * Get default sports data based on the new schema
    */
-  private getDefaultSportsData(): Omit<Sport, 'createdAt' | 'updatedAt' | 'version' | 'createdBy'>[] {
+  private getDefaultSportsData(): Omit<Sport, 'sportId' | 'createdAt' | 'updatedAt'>[] {
     return [
       {
-        sportId: 'volleyball',
         name: 'Volleyball',
-        displayName: "Men's Volleyball Championship",
-        description: 'Traditional volleyball tournament following international rules for men\'s teams',
-        category: 'men',
-        status: 'active',
+        displayName: 'Volleyball',
+        description: 'Traditional volleyball tournament following international rules',
+        category: 'team',
+        genderCategories: ['men', 'women'],
         
-        teamConfig: {
-          minPlayers: 6,
-          maxPlayers: 6,
-          maxSubstitutes: 6,
-          totalTeamSize: 12
-        },
+        // Team Requirements
+        minPlayers: 6,
+        maxPlayers: 6,
+        minSubstitutes: 1,
+        maxSubstitutes: 6,
         
-        eligibility: {
-          genderRestriction: 'male',
-          minAge: 18,
-          maxAge: 45,
-          requireSamePanchayat: true,
+        // Age Restrictions
+        minAge: 16,
+        maxAge: 100,
+        maxPlayersUnder21: 3,
+        allowPET: true,
+        
+        // Geographic Restrictions
+        restrictedToStates: [],
+        
+        // Scoring System
+        scoringSystem: {
+          pointsToWin: 25,
+          setsToWin: 3,
+          timeLimit: 90,
           customRules: [
-            'All players must be from the same panchayat',
-            'Valid Aadhaar card required for all players',
-            'Team captain must be a registered player'
+            'Must win by 2 points',
+            'Maximum 2 timeouts per team per set',
+            'Maximum 6 substitutions per set'
           ]
         },
         
-        eventInfo: {
-          registrationStart: '2025-01-01T00:00:00Z',
-          registrationEnd: '2025-02-15T23:59:59Z',
-          eventStart: '2025-03-01T09:00:00Z',
-          eventEnd: '2025-03-07T18:00:00Z',
-          venue: 'Isha Yoga Center Sports Complex',
-          prizePool: {
-            first: 300000,
-            second: 200000, 
-            third: 100000,
-            currency: 'INR'
-          }
-        },
+        // Media & Assets
+        iconURL: '',
+        bannerImageURL: '',
+        rulesPDF: '',
         
-        assets: {
-          primaryImage: '/images/sports/volleyball_1.jpg',
-          thumbnailImage: '/images/sports/volleyball_1.jpg',
-          galleryImages: [
-            '/images/sports/volleyball_1.jpg',
-            '/images/sports/volleyball_2.jpg'
-          ],
-          rulesDocument: '/documents/volleyball_rules_2025.pdf'
-        }
+        // Availability
+        isActive: true,
+        availableInEvents: ['gramotsavam_2025']
       },
       
       {
-        sportId: 'throwball',
         name: 'Throwball',
-        displayName: "Women's Throwball Championship", 
-        description: 'Traditional throwball tournament following standard rules for women\'s teams',
-        category: 'women',
-        status: 'active',
+        displayName: 'Throwball',
+        description: 'Traditional 7-a-side throwball for women - authentic rural sport',
+        category: 'team',
+        genderCategories: ['women'],
         
-        teamConfig: {
-          minPlayers: 7,
-          maxPlayers: 7,
-          maxSubstitutes: 2,
-          totalTeamSize: 9
-        },
+        // Team Requirements
+        minPlayers: 7,
+        maxPlayers: 7,
+        minSubstitutes: 1,
+        maxSubstitutes: 6,
         
-        eligibility: {
-          genderRestriction: 'female',
-          minAge: 18,
-          maxAge: 40,
-          requireSamePanchayat: true,
+        // Age Restrictions
+        minAge: 16,
+        maxAge: 100,
+        maxPlayersUnder21: 3,
+        allowPET: true,
+        
+        // Geographic Restrictions
+        restrictedToStates: [],
+        
+        // Scoring System
+        scoringSystem: {
+          pointsToWin: 15,
+          setsToWin: 2,
+          timeLimit: 60,
           customRules: [
-            'All players must be women',
-            'All players must be from the same panchayat',
-            'Valid Aadhaar card required for all players',
-            'Team captain must be a registered player'
+            'Must win by 2 points',
+            'Maximum 1 timeout per team per set',
+            'Maximum 3 substitutions per set',
+            'No serving from the net line'
           ]
         },
         
-        eventInfo: {
-          registrationStart: '2025-01-01T00:00:00Z',
-          registrationEnd: '2025-02-15T23:59:59Z',
-          eventStart: '2025-03-01T09:00:00Z',
-          eventEnd: '2025-03-07T18:00:00Z',
-          venue: 'Isha Yoga Center Sports Complex',
-          prizePool: {
-            first: 300000,
-            second: 200000,
-            third: 100000,
-            currency: 'INR'
-          }
-        },
+        // Media & Assets
+        iconURL: '',
+        bannerImageURL: '',
+        rulesPDF: '',
         
-        assets: {
-          primaryImage: '/images/sports/throwball_1.jpg',
-          thumbnailImage: '/images/sports/throwball_1.jpg',
-          galleryImages: [
-            '/images/sports/throwball_1.jpg',
-            '/images/sports/mobile_throwball_3.png',
-            '/images/sports/web_throwball_3.png'
-          ],
-          rulesDocument: '/documents/throwball_rules_2025.pdf'
-        }
+        // Availability
+        isActive: true,
+        availableInEvents: ['gramotsavam_2025']
       }
     ];
   }

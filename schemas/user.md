@@ -29,7 +29,7 @@ interface User {
   pincode: string;
   
   // Account Information
-  role: 'admin' | 'captain' | 'player' | 'volunteer_general' | 'volunteer_technical | volunteer_verification';
+  role: 'admin' | 'captain' | 'player' | 'general_volunteer' | 'technical_volunteer | verification_volunteer';
   currentTeamId?: string; // For players/captains currently in a team
   
   // Status Fields
@@ -43,18 +43,21 @@ interface User {
       verified: boolean;
       uploadedAt: Timestamp | null;
       uploadedBy: string | null;
+      url: string| null;
     };
     aadhaarFront: {
       storagePath: string;
       verified: boolean;
       uploadedAt: Timestamp | null;
       uploadedBy: string | null;
+      url: string | null;
     };
     aadhaarBack: {
       storagePath: string;
       verified: boolean;
       uploadedAt: Timestamp | null;
       uploadedBy: string | null;
+      url: string | null;
     };
   };
   

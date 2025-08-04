@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import { useTranslation } from "@/lib/utils/i18n";
 import Image from "next/image";
 import { Users, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { createTeamAndPromoteCaptain } from "@/lib/actions/captain/createTeamOptimized";
 
 interface TeamFormData {
   name: string;
@@ -106,10 +106,6 @@ export default function TeamRegistrationPage() {
     setError("");
 
     try {
-      const functions = getFunctions();
-      console.log("I am initializing the function now");
-      const createTeam = httpsCallable(functions, 'createTeamWithCompleteSchema');
-      
       const teamData = {
         name: formData.name,
         sportName: sportName.charAt(0).toUpperCase() + sportName.slice(1),
@@ -118,30 +114,20 @@ export default function TeamRegistrationPage() {
         panchayat: formData.panchayat,
         district: formData.district,
         state: formData.state,
+        genderCategory: userProfile.gender,
       };
       
-      console.log("I am calling the function now");
-      const result: any = await createTeam({ teamData });
-      console.log("ran successfully");
-      if (result.data.success) {
-        console.log("Team created successfully, promoting user to captain...");
-        
-        // Manually trigger captain promotion
-        try {
-          const promoteFunction = httpsCallable(functions, 'promoteToTeamCaptain');
-          await promoteFunction({
-            teamId: result.data.teamId,
-            eventId: "gramotsavam_2025"
-          });
-          console.log("User promoted to captain successfully");
-        } catch (promotionError) {
-          console.error("Error promoting to captain:", promotionError);
-          // Don't fail the whole process if promotion fails - it might have been handled by the trigger
-        }
-        
-        router.push(`/${lang}/captain/teams/${result.data.teamId}/players/invite`);
+      console.log("Creating team with optimized server action...");
+      const result = await createTeamAndPromoteCaptain({ 
+        teamData, 
+        captainId: user.uid 
+      });
+      
+      if (result.success) {
+        console.log("Team created and user promoted successfully");
+        router.push(`/${lang}/captain/teams/${result.teamId}/players/invite`);
       } else {
-        throw new Error(result.data.message || "Failed to create team.");
+        throw new Error(result.error || "Failed to create team.");
       }
 
     } catch (err: any) {

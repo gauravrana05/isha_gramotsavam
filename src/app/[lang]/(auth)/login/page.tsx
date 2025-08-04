@@ -6,8 +6,7 @@ import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "fi
 import { auth } from "@/lib/firebase/config";
 import { useAuth } from "@/context/AuthContext";
 import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import { ButtonLoader, PageLoader } from "@/components/ui/loaders";
 import { useTranslation } from "@/lib/utils/i18n";
 import { useServiceWorker } from "@/lib/utils/registerServiceWorker";
 import Image from "next/image";
@@ -245,9 +244,11 @@ export default function LoginPage() {
 
   if (authLoading || user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingSpinner size="large" />
-      </div>
+      <PageLoader 
+        title="Loading..."
+        variant="brand"
+        size="lg"
+      />
     );
   }
 
@@ -279,21 +280,18 @@ export default function LoginPage() {
               <p className="text-red-600 text-sm font-roboto">{error}</p>
             </div>
           )}
-          <Button
+          <ButtonLoader
             onClick={handleSendCode}
-            disabled={loading || phoneNumber.length < 10}
-            className="w-full bg-[#CE4520] disabled:hover:bg-[#CE4520] hover:bg-[#1565C0] text-white py-3 text-lg font-firo"
-            size="large"
+            disabled={phoneNumber.length < 10}
+            loading={loading}
+            className="w-full bg-[#CE4520] disabled:hover:bg-[#CE4520] hover:bg-[#1565C0] py-3 text-lg font-firo"
+            size="lg"
+            variant="primary"
+            fullWidth
             aria-label={t("send_otp")}
           >
-            {loading ? (
-              <div className="flex items-center justify-center space-x-2">
-                <LoadingSpinner size="small" />
-              </div>
-            ) : <div className="flex items-center justify-center space-x-2">
-              Continue
-            </div>}
-          </Button>
+            Continue
+          </ButtonLoader>
           <div className="hr-sect">or</div>
           <div className="text-center">
             <button
@@ -402,24 +400,18 @@ export default function LoginPage() {
           </div>
         )}
 
-        <button
+        <ButtonLoader
           onClick={handleVerifyCode}
-          disabled={isVerifyDisabled}
-          tabIndex={7}
-          className={`w-full py-3 text-lg font-fira rounded-lg transition-colors ${isVerifyDisabled
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-[#CE4520] hover:bg-[#1565C0] text-white'
-            }`}
+          disabled={otp.some(digit => !digit)}
+          loading={loading}
+          loadingText="Verifying..."
+          className="w-full bg-[#CE4520] hover:bg-[#1565C0] py-3 text-lg font-fira"
+          size="lg"
+          variant="primary"
+          fullWidth
         >
-          {loading ? (
-            <div className="flex items-center justify-center space-x-2">
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span>Verifying...</span>
-            </div>
-          ) : (
-            'Verify'
-          )}
-        </button>
+          Verify
+        </ButtonLoader>
       </div>
 
       <div className="mt-6 text-center">

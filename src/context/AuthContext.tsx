@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User, signOut } from "firebase/auth";
 import { doc, onSnapshot, DocumentData } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/config";
-import { UserProfile } from "@/lib/types/auth";
+import { UserProfile } from "@/lib/types/user";
 
 interface AuthContextType {
   user: User | null;
@@ -90,7 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     pincode: "",
                     instagramHandle: "",
                     preferredLanguage: "",
-                    role: "player",
+                    role: "public",
                     currentTeamId: null,
                     isProfileComplete: false,
                     isVerified: false,

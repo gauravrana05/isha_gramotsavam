@@ -23,8 +23,8 @@ import { db } from "@/lib/firebase/config";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, orderBy } from "firebase/firestore";
 import { addPlayerToTeam } from "@/lib/actions/captain/addPlayerToTeam";
 import { submitTeamForVerification } from "@/lib/actions/captain/submitTeam";
-import { documentUploadService } from "@/lib/services/documentUploadService";
 import Image from "next/image";
+import { PlayerDocumentUpload } from "@/components/players";
 
 interface TeamPlayer {
   playerId: string;
@@ -498,7 +498,34 @@ export default function CaptainPlayerManagement() {
     return obj;
   };
 
-  // Document upload handlers
+  // Handle document upload success - refresh player data
+  const handleDocumentUploadSuccess = (playerId: string, documentType: string, url: string) => {
+    setPlayers(prev => prev.map(p => 
+      p.playerId === playerId 
+        ? {
+            ...p,
+            documents: {
+              ...p.documents,
+              [documentType]: {
+                ...p.documents[documentType],
+                url: url
+              }
+            }
+          }
+        : p
+    ));
+  };
+
+  // Handle profile completion status change
+  const handleProfileComplete = (playerId: string, isComplete: boolean) => {
+    setPlayers(prev => prev.map(p => 
+      p.playerId === playerId 
+        ? { ...p, profileComplete: isComplete }
+        : p
+    ));
+  };
+
+  // Placeholder for old function - will remove the body next
   const handleDocumentUpload = async (
     player: TeamPlayer, 
     documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack', 

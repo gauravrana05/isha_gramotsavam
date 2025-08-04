@@ -9,9 +9,9 @@ export default function AuthLayout({
   return (
     <div className="min-h-screen bg-isha from-orange-50 to-green-50 flex flex-col">
       {/* Header */}
-      <header className="safe-area-inset-top pe-4 flex justify-end items-center">
+      {/* <header className="safe-area-inset-top pe-4 flex justify-end items-center">
         <LanguageSelector />
-      </header>
+      </header> */}
 
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center p-2">

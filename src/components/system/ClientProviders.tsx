@@ -12,6 +12,8 @@ const ThemeProvider = dynamic(() => import("@/context/ThemeContext").then(mod =>
 const OfflineProvider = dynamic(() => import("@/context/OfflineContext").then(mod => ({ default: mod.OfflineProvider })), { ssr: false });
 const AuthProvider = dynamic(() => import("@/context/AuthContext").then(mod => ({ default: mod.AuthProvider })), { ssr: false });
 const NotificationProvider = dynamic(() => import("@/context/NotificationContext").then(mod => ({ default: mod.NotificationProvider })), { ssr: false });
+const LoadingProvider = dynamic(() => import("@/context/LoadingContext").then(mod => ({ default: mod.LoadingProvider })), { ssr: false });
+const DocumentProvider = dynamic(() => import("@/context/DocumentContext").then(mod => ({ default: mod.DocumentProvider })), { ssr: false });
 const OfflineIndicator = dynamic(() => import("@/components/common/OfflineIndicator"), { ssr: false });
 
 const ClientProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -19,16 +21,20 @@ const ClientProviders: React.FC<{ children: React.ReactNode }> = ({ children }) 
     <ErrorBoundary>
       <LanguageProvider>
         <ClientOnly>
-          <ThemeProvider>
-            <OfflineProvider>
-              <AuthProvider>
-                <NotificationProvider>
-                  <OfflineIndicator />
-                  {children}
-                </NotificationProvider>
-              </AuthProvider>
-            </OfflineProvider>
-          </ThemeProvider>
+          <LoadingProvider>
+            <ThemeProvider>
+              <OfflineProvider>
+                <AuthProvider>
+                  <DocumentProvider>
+                    <NotificationProvider>
+                      <OfflineIndicator />
+                      {children}
+                    </NotificationProvider>
+                  </DocumentProvider>
+                </AuthProvider>
+              </OfflineProvider>
+            </ThemeProvider>
+          </LoadingProvider>
         </ClientOnly>
       </LanguageProvider>
     </ErrorBoundary>

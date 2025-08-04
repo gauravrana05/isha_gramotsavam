@@ -66,7 +66,7 @@ async function getFixtureInfo(fixtureId: string) {
 }
 
 export default async function MatchesPage({ params, searchParams }: PageProps) {
-  const { venueId } = params;
+  const { venueId } = await params;
   const { fixture: fixtureId } = searchParams;
 
   const matches = await getVenueMatches(venueId, fixtureId);

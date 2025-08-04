@@ -20,6 +20,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/en',
+        permanent: true, // set to true if this should be a permanent redirect (SEO)
+      },
+    ];
+  },
 };
 
 export default nextConfig;

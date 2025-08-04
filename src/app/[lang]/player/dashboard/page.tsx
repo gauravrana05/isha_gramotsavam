@@ -7,9 +7,9 @@ import { db } from "@/lib/firebase/config";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { useTranslation } from "@/lib/utils/i18n";
 import Image from "next/image";
+import { PageLoader } from "@/components/ui/loaders";
 import { 
   Users, 
-  Loader2, 
   AlertCircle, 
   CheckCircle, 
   Clock, 
@@ -155,7 +155,7 @@ export default function PlayerDashboard() {
   };
 
   const handleUploadDocuments = () => {
-    router.push(`/${lang}/profile/documents`);
+    router.push(`/${lang}/profile`);
   };
 
   const getStatusIcon = (status: string) => {
@@ -203,9 +203,11 @@ export default function PlayerDashboard() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
-      </div>
+      <PageLoader 
+        title="Loading Player Dashboard..."
+        variant="brand"
+        size="lg"
+      />
     );
   }
 

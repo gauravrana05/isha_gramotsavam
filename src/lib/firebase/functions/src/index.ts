@@ -25,18 +25,11 @@ export {
 
 // Export Team Management Functions
 export {
-  createTeamWithCompleteSchema,
   addPlayerToTeam,
   submitTeamForVerificationEnhanced
 } from "./teams";
 
 // Export Storage Functions
-export {
-  processAadhaarImageUpload,
-  processProfilePhotoUpload,
-  generateMediaThumbnail
-} from "./storage";
-
 // Export Verification Functions
 export {
   verifyTeam,

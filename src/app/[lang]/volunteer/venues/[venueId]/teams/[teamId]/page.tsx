@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getTeamForMatchDayVerification, verifyPlayerMatchDay, uploadTeamImage } from '@/lib/actions/volunteer/matchDayVerification';
+import { getTeamForMatchDayVerification, verifyPlayerMatchDay } from '@/lib/actions/volunteer/matchDayVerification';
+// import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { 
@@ -686,35 +687,13 @@ export default function TeamMatchDayVerificationPage() {
             <div className="space-y-4">
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                 <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 mb-4">Select a team photo to upload</p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      const file = e.target.files[0];
-                      // Simple URL for demo - in production use proper file upload
-                      const imageUrl = URL.createObjectURL(file);
-                      uploadTeamImage(teamId, imageUrl, user!.uid).then((result) => {
-                        if (result.success) {
-                          setShowImageUpload(false);
-                          loadTeamData(); // Refresh data
-                          alert('Team photo uploaded successfully!');
-                        } else {
-                          alert(`Error: ${result.error}`);
-                        }
-                      });
-                    }
-                  }}
-                  className="hidden"
-                  id="team-photo-upload"
-                />
-                <label 
-                  htmlFor="team-photo-upload"
-                  className="bg-[#F28C38] text-white px-4 py-2 rounded-lg cursor-pointer hover:bg-[#E67A26] transition-colors inline-block"
+                <p className="text-gray-600 mb-4">Team photo upload functionality will be implemented soon</p>
+                <button
+                  className="bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed"
+                  disabled
                 >
-                  Choose Photo
-                </label>
+                  Choose Photo (Coming Soon)
+                </button>
               </div>
               
               <div className="flex space-x-3">
@@ -727,8 +706,8 @@ export default function TeamMatchDayVerificationPage() {
                 </Button>
               </div>
             </div>
+            </div>
           </div>
-        </div>
       )}
     </div>
   );

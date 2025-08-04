@@ -5,10 +5,13 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
-import { documentUploadService } from "@/lib/services/documentUploadService";
 import { pincodeService } from "@/lib/services/pincodeService";
+import { checkAndUpdateProfileCompletion } from "@/lib/actions/profile/checkProfileCompletion";
 import { useTranslation } from "@/lib/utils/i18n";
 import Image from "next/image";
+import { LoadingSpinner, PageLoader, SectionLoader } from "@/components/ui/loaders";
+import { DocumentUpload } from "@/components/documents";
+import { useDocumentManager } from "@/hooks/documents";
 import {
   MapPin,
   CheckCircle,
@@ -19,7 +22,6 @@ import {
   Trash2,
   Upload,
   Check,
-  Loader2,
   ArrowLeft,
   LogOut,
   Camera,
@@ -54,9 +56,6 @@ interface FormData {
   taluk: string;
   panchayat: string;
   preferredLanguage: string;
-  profilePhoto?: File;
-  aadhaarFront?: File;
-  aadhaarBack?: File;
 }
 
 export default function ProfilePage() {
@@ -107,15 +106,9 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [formLoading, setFormLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [addressLoading, setAddressLoading] = useState(false);
   const [addressCaptured, setAddressCaptured] = useState(false);
   const [isWhatsAppSame, setIsWhatsAppSame] = useState(true);
-  const [uploadProgress, setUploadProgress] = useState({
-    profile: 0,
-    aadhaarFront: 0,
-    aadhaarBack: 0,
-  });
   const [districts, setDistricts] = useState<string[]>([]);
   const [taluks, setTaluks] = useState<string[]>([]);
   const [panchayats, setPanchayats] = useState<string[]>([]);
@@ -131,6 +124,7 @@ export default function ProfilePage() {
   ];
 
   const phoneNumber = user?.phoneNumber?.replace(/^\+91/, '') || '';
+  const whatsappNumber = userProfile?.whatsappNumber?.replace(/^\+91/, '') || '';
 
   useEffect(() => {
     if (loading || !userProfile) return;
@@ -138,7 +132,7 @@ export default function ProfilePage() {
     setFormData({
       firstName: userProfile.firstName || "",
       lastName: userProfile.lastName || "",
-      whatsappNumber: userProfile.whatsappNumber || phoneNumber,
+      whatsappNumber: whatsappNumber || phoneNumber,
       dob: userProfile.dob || "",
       instagramHandle: userProfile.instagramHandle || "",
       gender: userProfile.gender || "",
@@ -317,55 +311,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleProfilePhotoUpload = async (file: File) => {
-    if (!user) return;
-
-    setUploading(true);
-    try {
-      const downloadURL = await documentUploadService.uploadProfilePhoto(
-        user.uid,
-        file,
-        (progress) => setUploadProgress(prev => ({ ...prev, profile: progress.progress }))
-      );
-
-      // Update with structured document format
-      const userRef = doc(db, "users", user.uid);
-      
-      // Check if profile is now complete after photo upload
-      const hasAllRequiredFields = userProfile?.firstName && 
-        userProfile?.lastName && 
-        userProfile?.whatsappNumber && 
-        userProfile?.dob && 
-        userProfile?.gender && 
-        userProfile?.pincode && 
-        userProfile?.panchayat;
-      
-      const hasAllDocuments = true && // Profile photo will be uploaded
-        userProfile?.documents?.aadhaarFront?.url && 
-        userProfile?.documents?.aadhaarBack?.url;
-      
-      const isComplete = hasAllRequiredFields && hasAllDocuments;
-
-      const updateData = {
-        [`documents.profilePhoto.storagePath`]: documentUploadService.getStoragePath(user.uid, 'profilePhoto'),
-        [`documents.profilePhoto.url`]: downloadURL,
-        [`documents.profilePhoto.verified`]: false,
-        [`documents.profilePhoto.uploadedAt`]: new Date(),
-        [`documents.profilePhoto.uploadedBy`]: user.uid,
-        isProfileComplete: isComplete,
-        updatedAt: new Date().toISOString()
-      };
-      
-      await updateDoc(userRef, cleanFirestoreData(updateData));
-
-      setSuccess("Profile photo updated successfully!");
-    } catch (error) {
-      console.error("Error uploading profile photo:", error);
-      setError("Failed to upload profile photo. Please try again.");
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const handleSave = async (section: keyof EditState) => {
     if (!user) return;
@@ -396,13 +341,6 @@ export default function ProfilePage() {
     if (section === 'addressDetails' && formData.pincode.length === 6 && !addressCaptured) {
       setError("Please complete the address selection by choosing a panchayat");
       return;
-    }
-
-    if (section === 'identityVerification') {
-      if ((formData.aadhaarFront && !formData.aadhaarBack) || (!formData.aadhaarFront && formData.aadhaarBack)) {
-        setError("Please upload both front and back sides of Aadhaar card");
-        return;
-      }
     }
 
     setFormLoading(true);
@@ -438,55 +376,19 @@ export default function ProfilePage() {
             instagramHandle: formData.instagramHandle,
           };
           break;
-        case 'identityVerification':
-          if (formData.aadhaarFront) {
-            const aadhaarFrontURL = await documentUploadService.uploadAadhaarFront(
-              user.uid,
-              formData.aadhaarFront,
-              (progress) => setUploadProgress(prev => ({ ...prev, aadhaarFront: progress.progress }))
-            );
-            updateData[`documents.aadhaarFront.storagePath`] = documentUploadService.getStoragePath(user.uid, 'aadhaarFront');
-            updateData[`documents.aadhaarFront.url`] = aadhaarFrontURL;
-            updateData[`documents.aadhaarFront.verified`] = false;
-            updateData[`documents.aadhaarFront.uploadedAt`] = new Date();
-            updateData[`documents.aadhaarFront.uploadedBy`] = user.uid;
-          }
-          if (formData.aadhaarBack) {
-            const aadhaarBackURL = await documentUploadService.uploadAadhaarBack(
-              user.uid,
-              formData.aadhaarBack,
-              (progress) => setUploadProgress(prev => ({ ...prev, aadhaarBack: progress.progress }))
-            );
-            updateData[`documents.aadhaarBack.storagePath`] = documentUploadService.getStoragePath(user.uid, 'aadhaarBack');
-            updateData[`documents.aadhaarBack.url`] = aadhaarBackURL;
-            updateData[`documents.aadhaarBack.verified`] = false;
-            updateData[`documents.aadhaarBack.uploadedAt`] = new Date();
-            updateData[`documents.aadhaarBack.uploadedBy`] = user.uid;
-          }
-          break;
       }
-
-      // Check if profile is now complete after this update
-      const currentProfile = { ...userProfile, ...updateData };
-      const hasAllRequiredFields = currentProfile.firstName && 
-        currentProfile.lastName && 
-        currentProfile.whatsappNumber && 
-        currentProfile.dob && 
-        currentProfile.gender && 
-        currentProfile.pincode && 
-        currentProfile.panchayat;
-      
-      const hasAllDocuments = currentProfile.documents?.profilePhoto?.url && 
-        currentProfile.documents?.aadhaarFront?.url && 
-        currentProfile.documents?.aadhaarBack?.url;
-      
-      const isComplete = hasAllRequiredFields && hasAllDocuments;
 
       await updateDoc(userRef, cleanFirestoreData({
         ...updateData,
-        isProfileComplete: isComplete,
         updatedAt: new Date().toISOString(),
       }));
+
+      // Check and update profile completion status using the server action
+      const completionResult = await checkAndUpdateProfileCompletion(user.uid);
+      
+      if (!completionResult.success) {
+        console.error("Profile completion check failed:", completionResult.error);
+      }
 
       toggleEdit(section);
       setSuccess("Profile updated successfully!");
@@ -517,9 +419,11 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#CE4520]" />
-      </div>
+      <PageLoader
+        title="Loading Profile..."
+        variant="brand"
+        size="lg"
+      />
     );
   }
 
@@ -593,74 +497,16 @@ export default function ProfilePage() {
         )}
 
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="text-center">
-            <div className="flex flex-col items-center">
-              <div className="relative mb-4">
-                {formData.profilePhoto ? (
-                  <img
-                    src={URL.createObjectURL(formData.profilePhoto)}
-                    alt="Profile Preview"
-                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
-                  />
-                ) : userProfile?.documents?.profilePhoto?.url ? (
-                  <img
-                    src={userProfile.documents.profilePhoto.url}
-                    alt="Profile"
-                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
-                  />
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
-                    <User className="w-12 h-12 text-gray-400" />
-                  </div>
-                )}
-              </div>
-
-              <label className="bg-[#CE4520] text-white px-6 py-2 rounded-lg cursor-pointer hover:bg-[#1565C0] transition-colors font-fira">
-                {uploading ? (
-                  <div className="flex items-center space-x-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Uploading...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-2">
-                    <Camera className="w-4 h-4" />
-                    <span>Change Profile Pic</span>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploading}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      if (file.size > 5 * 1024 * 1024) {
-                        setError("File size must be less than 5MB");
-                        return;
-                      }
-                      if (!file.type.startsWith('image/')) {
-                        setError("Please select a valid image file");
-                        return;
-                      }
-                      handleProfilePhotoUpload(file);
-                    }
-                  }}
-                />
-              </label>
-
-              {uploadProgress.profile > 0 && uploadProgress.profile < 100 && (
-                <div className="w-full mt-2">
-                  <div className="bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-[#CE4520] h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress.profile}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{uploadProgress.profile}% uploaded</p>
-                </div>
-              )}
-            </div>
+          <div className="text-center flex justify-center">
+            <DocumentUpload
+              type="profilePhoto"
+              label="Profile Photo"
+              currentUrl={userProfile?.documents?.profilePhoto?.url}
+              variant="profile"
+              className="flex flex-col justify-center items-center"
+              onSuccess={() => setError("")}
+              onError={(error) => setError(error)}
+            />
           </div>
         </div>
 
@@ -874,7 +720,7 @@ export default function ProfilePage() {
                 >
                   {formLoading ? (
                     <div className="flex items-center space-x-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <LoadingSpinner size="xs" color="primary" />
                       <span>Saving...</span>
                     </div>
                   ) : (
@@ -955,7 +801,7 @@ export default function ProfilePage() {
                       }}
                     />
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      {addressLoading && <Loader2 className="w-4 h-4 animate-spin text-[#CE4520]" />}
+                      {addressLoading && <LoadingSpinner size="xs" color="primary" />}
                     </div>
                   </div>
                 </div>
@@ -1050,7 +896,7 @@ export default function ProfilePage() {
                 >
                   {formLoading ? (
                     <div className="flex items-center space-x-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <LoadingSpinner size="xs" color="primary" />
                       <span>Saving...</span>
                     </div>
                   ) : (
@@ -1065,191 +911,33 @@ export default function ProfilePage() {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-semibold font-fira">Identity Verification</h3>
-            <button
-              onClick={() => toggleEdit('identityVerification')}
-              className="text-[#CE4520] hover:text-[#1565C0] font-fira text-sm transition-colors"
-            >
-              {editState.identityVerification ? 'Close' : hasAadhaar ? 'Edit' : 'Add'}
-            </button>
           </div>
           <hr className="mb-6" />
 
-          {!editState.identityVerification ? (
-            hasAadhaar ? (
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <p className="text-gray-600 font-fira font-medium mb-2">Aadhaar Card (Front):</p>
-                  <div className="mt-2">
-                    <img
-                      src={userProfile.documents?.aadhaarFront?.url}
-                      alt="Aadhaar Front"
-                      className="w-full max-w-sm h-auto rounded-lg object-cover border shadow-sm"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-gray-600 font-fira font-medium mb-2">Aadhaar Card (Back):</p>
-                  <div className="mt-2">
-                    <img
-                      src={userProfile.documents?.aadhaarBack?.url}
-                      alt="Aadhaar Back"
-                      className="w-full max-w-sm h-auto rounded-lg object-cover border shadow-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 font-fira mb-4">No identity verification documents added yet</p>
-                <button
-                  onClick={() => toggleEdit('identityVerification')}
-                  className="flex items-center space-x-2 bg-[#CE4520] text-white px-4 py-2 rounded-lg hover:bg-[#1565C0] font-fira transition-colors mx-auto"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Aadhaar</span>
-                </button>
-              </div>
-            )
-          ) : (
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
-                    Aadhaar Card (Front)
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                    {formData.aadhaarFront ? (
-                      <div className="space-y-2">
-                        <img
-                          src={URL.createObjectURL(formData.aadhaarFront)}
-                          alt="Aadhaar Front"
-                          className="w-full h-32 object-cover rounded"
-                        />
-                        <p className="text-sm text-green-600 font-fira">✓ Uploaded</p>
-                        {uploadProgress.aadhaarFront > 0 && uploadProgress.aadhaarFront < 100 && (
-                          <div className="w-full">
-                            <div className="bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-[#CE4520] h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${uploadProgress.aadhaarFront}%` }}
-                              />
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">{uploadProgress.aadhaarFront}% uploaded</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : userProfile?.documents?.aadhaarFront?.url ? (
-                      <div className="space-y-2">
-                        <img
-                          src={userProfile.documents.aadhaarFront.url}
-                          alt="Current Aadhaar Front"
-                          className="w-full h-32 object-cover rounded"
-                        />
-                        <p className="text-sm text-green-600 font-fira">✓ Already uploaded</p>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer">
-                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600 font-fira">Click to upload front side</p>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setFormData(prev => ({ ...prev, aadhaarFront: file }));
-                            }
-                          }}
-                        />
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
-                    Aadhaar Card (Back)
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                    {formData.aadhaarBack ? (
-                      <div className="space-y-2">
-                        <img
-                          src={URL.createObjectURL(formData.aadhaarBack)}
-                          alt="Aadhaar Back"
-                          className="w-full h-32 object-cover rounded"
-                        />
-                        <p className="text-sm text-green-600 font-fira">✓ Uploaded</p>
-                        {uploadProgress.aadhaarBack > 0 && uploadProgress.aadhaarBack < 100 && (
-                          <div className="w-full">
-                            <div className="bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-[#CE4520] h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${uploadProgress.aadhaarBack}%` }}
-                              />
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">{uploadProgress.aadhaarBack}% uploaded</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : userProfile?.documents?.aadhaarBack?.url ? (
-                      <div className="space-y-2">
-                        <img
-                          src={userProfile.documents.aadhaarBack.url}
-                          alt="Current Aadhaar Back"
-                          className="w-full h-32 object-cover rounded"
-                        />
-                        <p className="text-sm text-green-600 font-fira">✓ Already uploaded</p>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer">
-                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600 font-fira">Click to upload back side</p>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setFormData(prev => ({ ...prev, aadhaarBack: file }));
-                            }
-                          }}
-                        />
-                      </label>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <p className="text-sm text-gray-500 font-fira">
-                Note: If you upload one side of Aadhaar, both sides are required. This is optional but recommended for verification.
-              </p>
-
-              <div className="flex space-x-4">
-                <button
-                  onClick={() => toggleEdit('identityVerification')}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-fira transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleSave('identityVerification')}
-                  disabled={formLoading}
-                  className="px-4 py-2 bg-[#CE4520] text-white rounded-lg hover:bg-[#1565C0] font-fira transition-colors disabled:opacity-50"
-                >
-                  {formLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Saving...</span>
-                    </div>
-                  ) : (
-                    'Save'
-                  )}
-                </button>
-              </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+              <DocumentUpload
+                type="aadhaarFront"
+                label="Aadhar Card Front"
+                currentUrl={userProfile?.documents?.aadhaarFront?.url}
+                variant="card"
+                className="flex flex-col justify-center items-center"
+                onSuccess={() => setError("")}
+                onError={(error) => setError(error)}
+              />
             </div>
-          )}
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+              <DocumentUpload
+                type="aadhaarBack"
+                label="Aadhar Card Back"
+                currentUrl={userProfile?.documents?.aadhaarBack?.url}
+                variant="card"
+                className="flex flex-col justify-center items-center"
+                onSuccess={() => setError("")}
+                onError={(error) => setError(error)}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -1298,7 +986,7 @@ export default function ProfilePage() {
                 >
                   {formLoading ? (
                     <div className="flex items-center space-x-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <LoadingSpinner size="xs" color="primary" />
                       <span>Saving...</span>
                     </div>
                   ) : (

@@ -8,7 +8,7 @@ interface PincodeResponse {
   serviceable: boolean;
 }
 
-interface AddressData {
+export interface AddressData {
   taluk: string;
   district: string;
   state: string;

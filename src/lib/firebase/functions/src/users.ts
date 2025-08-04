@@ -47,18 +47,21 @@ export const createUserProfile = beforeUserCreated(async (event) => {
         profilePhoto: {
           storagePath: "",
           verified: false,
+          url: null,
           uploadedAt: null,
           uploadedBy: null
         },
         aadhaarFront: {
           storagePath: "",
           verified: false,
+          url: null, 
           uploadedAt: null,
           uploadedBy: null
         },
         aadhaarBack: {
           storagePath: "",
           verified: false,
+          url: null,
           uploadedAt: null,
           uploadedBy: null
         }
