@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { getTeamForMatchDayVerification, verifyPlayerMatchDay } from '@/lib/actions/volunteer/matchDayVerification';
-// import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
+import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
+import DocumentPreview from '@/components/documents/DocumentPreview';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { 
@@ -22,7 +23,6 @@ import {
   Eye,
   Edit3
 } from 'lucide-react';
-import Image from 'next/image';
 
 
 interface TeamData {
@@ -258,12 +258,12 @@ export default function TeamMatchDayVerificationPage() {
           
           <div className="ml-6 flex flex-col items-end">
             {team.teamImageUrl ? (
-              <Image 
-                src={team.teamImageUrl} 
-                alt="Team photo" 
-                width={120} 
-                height={120} 
-                className="rounded-lg object-cover border"
+              <DocumentPreview
+                type="teamPhoto"
+                url={team.teamImageUrl}
+                label="Team Photo"
+                showActions={false}
+                size="lg"
               />
             ) : (
               <div className="w-[120px] h-[120px] bg-gray-100 rounded-lg border flex items-center justify-center">
@@ -378,12 +378,14 @@ export default function TeamMatchDayVerificationPage() {
                         <td className="px-6 py-4">
                           <div className="flex items-center">
                             {player.documents.profilePhoto?.url && (
-                              <Image
-                                src={player.documents.profilePhoto.url}
-                                alt="Profile"
-                                width={40}
-                                height={40}
-                                className="rounded-full object-cover mr-3"
+                              <DocumentPreview
+                                type="profilePhoto"
+                                url={player.documents.profilePhoto.url}
+                                label="Profile Photo"
+                                verified={player.documents.profilePhoto.verified}
+                                showActions={false}
+                                size="sm"
+                                className="mr-3"
                               />
                             )}
                             <div>
@@ -450,12 +452,14 @@ export default function TeamMatchDayVerificationPage() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center flex-1">
                       {player.documents.profilePhoto?.url && (
-                        <Image
-                          src={player.documents.profilePhoto.url}
-                          alt="Profile"
-                          width={48}
-                          height={48}
-                          className="rounded-full object-cover mr-3"
+                        <DocumentPreview
+                          type="profilePhoto"
+                          url={player.documents.profilePhoto.url}
+                          label="Profile Photo"
+                          verified={player.documents.profilePhoto.verified}
+                          showActions={false}
+                          size="sm"
+                          className="mr-3"
                         />
                       )}
                       <div className="flex-1">
@@ -589,40 +593,34 @@ export default function TeamMatchDayVerificationPage() {
                 <h4 className="font-medium text-gray-900 mb-3">Documents</h4>
                 <div className="grid grid-cols-3 gap-4">
                   {selectedPlayer.documents.profilePhoto?.url && (
-                    <div className="text-center">
-                      <Image
-                        src={selectedPlayer.documents.profilePhoto.url}
-                        alt="Profile Photo"
-                        width={120}
-                        height={120}
-                        className="rounded-lg object-cover w-full h-32 mx-auto"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Profile Photo</p>
-                    </div>
+                    <DocumentPreview
+                      type="profilePhoto"
+                      url={selectedPlayer.documents.profilePhoto.url}
+                      label="Profile Photo"
+                      verified={selectedPlayer.documents.profilePhoto.verified}
+                      showActions={true}
+                      size="md"
+                    />
                   )}
                   {selectedPlayer.documents.aadhaarFront?.url && (
-                    <div className="text-center">
-                      <Image
-                        src={selectedPlayer.documents.aadhaarFront.url}
-                        alt="Aadhaar Front"
-                        width={120}
-                        height={120}
-                        className="rounded-lg object-cover w-full h-32 mx-auto"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Aadhaar Front</p>
-                    </div>
+                    <DocumentPreview
+                      type="aadhaarFront"
+                      url={selectedPlayer.documents.aadhaarFront.url}
+                      label="Aadhaar Front"
+                      verified={selectedPlayer.documents.aadhaarFront.verified}
+                      showActions={true}
+                      size="md"
+                    />
                   )}
                   {selectedPlayer.documents.aadhaarBack?.url && (
-                    <div className="text-center">
-                      <Image
-                        src={selectedPlayer.documents.aadhaarBack.url}
-                        alt="Aadhaar Back"
-                        width={120}
-                        height={120}
-                        className="rounded-lg object-cover w-full h-32 mx-auto"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Aadhaar Back</p>
-                    </div>
+                    <DocumentPreview
+                      type="aadhaarBack"
+                      url={selectedPlayer.documents.aadhaarBack.url}
+                      label="Aadhaar Back"
+                      verified={selectedPlayer.documents.aadhaarBack.verified}
+                      showActions={true}
+                      size="md"
+                    />
                   )}
                 </div>
               </div>
@@ -685,16 +683,18 @@ export default function TeamMatchDayVerificationPage() {
             </div>
             
             <div className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 mb-4">Team photo upload functionality will be implemented soon</p>
-                <button
-                  className="bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed"
-                  disabled
-                >
-                  Choose Photo (Coming Soon)
-                </button>
-              </div>
+              <TeamPhotoUpload
+                teamId={teamId}
+                currentUrl={team?.teamImageUrl}
+                onSuccess={(url) => {
+                  setTeam(prev => prev ? { ...prev, teamImageUrl: url } : null);
+                  setShowImageUpload(false);
+                }}
+                onError={(error) => {
+                  alert(`Upload failed: ${error}`);
+                }}
+                variant="card"
+              />
               
               <div className="flex space-x-3">
                 <Button

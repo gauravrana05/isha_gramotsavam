@@ -153,7 +153,7 @@ export default function EventDetailPage() {
           <div className="flex items-center">
             <Button
               onClick={() => router.back()}
-              variant="outline"
+              variant="secondary"
               className="mr-4"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -167,7 +167,9 @@ export default function EventDetailPage() {
           
           <Button
             onClick={() => router.push(`/${lang}/admin/events/${eventId}/edit`)}
-            className="bg-[#3A7F3F] hover:bg-green-700"
+            variant='primary'
+            size='lg'
+
           >
             <Edit className="w-4 h-4 mr-2" />
             Edit Event

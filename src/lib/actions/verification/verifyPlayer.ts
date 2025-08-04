@@ -2,14 +2,18 @@
 
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { z } from 'zod';
 
-interface VerifyPlayerRequest {
-  teamId: string;
-  playerId: string;
-  status: 'verified' | 'rejected';
-  comments?: string;
-  volunteerId: string; // The volunteer performing the verification
-}
+// Input validation schema
+const VerifyPlayerSchema = z.object({
+  teamId: z.string().min(1, 'Team ID is required'),
+  playerId: z.string().min(1, 'Player ID is required'),
+  status: z.enum(['verified', 'rejected'], { required_error: 'Status must be verified or rejected' }),
+  comments: z.string().max(500, 'Comments too long').optional(),
+  volunteerId: z.string().min(1, 'Volunteer ID is required')
+});
+
+interface VerifyPlayerRequest extends z.infer<typeof VerifyPlayerSchema> {}
 
 async function updateTeamVerificationRecord(teamId: string): Promise<void> {
   const playersSnapshot = await adminDb
@@ -53,11 +57,9 @@ async function updateTeamVerificationRecord(teamId: string): Promise<void> {
 
 export async function verifyPlayer(request: VerifyPlayerRequest) {
   try {
-    const { teamId, playerId, status, comments, volunteerId } = request;
-
-    if (!teamId || !playerId || !status || !['verified', 'rejected'].includes(status)) {
-      return { success: false, error: "Invalid player verification data" };
-    }
+    // Validate input
+    const validatedRequest = VerifyPlayerSchema.parse(request);
+    const { teamId, playerId, status, comments, volunteerId } = validatedRequest;
 
     // Check if user has verification permissions
     const userDoc = await adminDb.collection("users").doc(volunteerId).get();
@@ -104,6 +106,14 @@ export async function verifyPlayer(request: VerifyPlayerRequest) {
 
   } catch (error) {
     console.error("Error verifying player:", error);
+    
+    if (error instanceof z.ZodError) {
+      return { 
+        success: false, 
+        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+      };
+    }
+    
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to verify player"

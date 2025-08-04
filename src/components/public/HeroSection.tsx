@@ -73,7 +73,7 @@ export default function HeroSection({ lang }: HeroSectionProps) {
 
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <Link href={`/${lang}/public/sports`}>
-                  <Button size="large" className="min-w-[200px]">
+                  <Button size="lg" variant='primary' className="min-w-[200px]">
                     Register Now
                   </Button>
                 </Link>

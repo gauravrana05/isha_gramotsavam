@@ -111,37 +111,8 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
         updatedAt: serverTimestamp()
       };
 
-      // Get current player data to check if profile is now complete
-      const playerDoc = await playerDocRef.get();
-      const currentPlayerData = playerDoc.data();
-
-      if (currentPlayerData) {
-        // Check if all required fields and documents are now complete
-        const hasAllRequiredFields = currentPlayerData.firstName &&
-          currentPlayerData.lastName &&
-          currentPlayerData.whatsappNumber &&
-          currentPlayerData.dob &&
-          currentPlayerData.gender &&
-          currentPlayerData.pincode &&
-          currentPlayerData.panchayat;
-
-        // Check if all documents will be available after this upload
-        const updatedDocs = { ...currentPlayerData.documents };
-        updatedDocs[documentType] = {
-          ...updatedDocs[documentType],
-          url: downloadURL
-        };
-
-        const hasAllDocuments = updatedDocs.profilePhoto?.url &&
-          updatedDocs.aadhaarFront?.url &&
-          updatedDocs.aadhaarBack?.url;
-
-        const isComplete = hasAllRequiredFields && hasAllDocuments;
-        updateData.isProfileComplete = isComplete;
-
-        // Notify parent component about profile completion status
-        onProfileComplete?.(isComplete);
-      }
+      // Note: Profile completion will be handled by checkAndUpdateProfileCompletion 
+      // in the parent component after this upload succeeds
 
       await updateDoc(playerDocRef, updateData);
 

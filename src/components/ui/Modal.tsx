@@ -1,7 +1,5 @@
 'use client'
-import { useEffect } from 'react';
-import { ReactNode } from 'react';
-import { useRef } from 'react';
+import React, { useEffect, ReactNode, useRef } from 'react';
 import { X } from 'lucide-react';
 import { cn, BaseComponentProps, compositions } from '@/lib/component-patterns';
 
@@ -106,30 +104,31 @@ const ModalBackdrop = ({
 );
 
 // Modal content component
-const ModalContent = React.forwardRef<
-  HTMLDivElement,
-  {
-    size: ModalProps['size'];
-    onClick?: (e: React.MouseEvent) => void;
-    children: ReactNode;
-    className?: string;
-  }
->(({ size = 'base', onClick, children, className }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      'relative bg-white rounded-lg shadow-xl',
-      'w-full mx-auto my-8',
-      'transform transition-all duration-200',
-      'animate-in fade-in zoom-in-95',
-      sizeClasses[size],
-      className
-    )}
-    onClick={onClick}
-  >
-    {children}
-  </div>
-));
+interface ModalContentProps {
+  size?: ModalProps['size'];
+  onClick?: (e: React.MouseEvent) => void;
+  children: ReactNode;
+  className?: string;
+}
+
+const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
+  ({ size = 'base', onClick, children, className }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        'relative bg-white rounded-lg shadow-xl',
+        'w-full mx-auto my-8',
+        'transform transition-all duration-200',
+        'animate-in fade-in zoom-in-95',
+        sizeClasses[size],
+        className
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </div>
+  )
+);
 
 ModalContent.displayName = 'ModalContent';
 

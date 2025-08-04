@@ -5,23 +5,25 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
 import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
-import Container from '@/components/ui/Container';
-import Button from '@/components/ui/Button';
+import { 
+  Container,
+  DataTable,
+  StatsCard,
+  StatusBadge,
+  EmptyState,
+  ConfirmationModal,
+  Button
+} from '@/components/ui';
 import { 
   Plus, 
   Calendar,
-  MapPin,
-  Users,
-  Trophy,
   Edit,
   Eye,
   Trash2,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Loader2,
-  IndianRupee
+  Loader2
 } from 'lucide-react';
+import { getEventStatus } from '@/components/ui/StatusBadge';
+import type { Column, ActionButton } from '@/components/ui/DataTable';
 
 interface Event {
   eventId: string;
@@ -62,6 +64,10 @@ export default function EventsManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deletingEvent, setDeletingEvent] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{
+    isOpen: boolean;
+    event: Event | null;
+  }>({ isOpen: false, event: null });
 
   const { lang } = useParams();
   const router = useRouter();
@@ -104,12 +110,16 @@ export default function EventsManagement() {
     }
   };
 
-  const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm('Are you sure you want to deactivate this event?')) {
-      return;
-    }
+  const handleDeleteClick = (event: Event) => {
+    setConfirmDelete({ isOpen: true, event });
+  };
 
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete.event) return;
+
+    const eventId = confirmDelete.event.eventId;
     setDeletingEvent(eventId);
+    
     try {
       const eventDoc = doc(db, 'events', eventId);
       await updateDoc(eventDoc, {
@@ -131,9 +141,11 @@ export default function EventsManagement() {
       setError('Failed to deactivate event. Please try again.');
     } finally {
       setDeletingEvent(null);
+      setConfirmDelete({ isOpen: false, event: null });
     }
   };
 
+  // Helper function to check if registration is currently open
   const isRegistrationCurrentlyOpen = (event: Event) => {
     if (!event.isActive) return false;
     
@@ -160,23 +172,88 @@ export default function EventsManagement() {
     return now >= regStart && now <= regEnd;
   };
 
-  const getStatusColor = (event: Event) => {
-    if (!event.isActive) return 'bg-red-100 text-red-800';
-    if (isRegistrationCurrentlyOpen(event)) return 'bg-green-100 text-green-800';
-    return 'bg-yellow-100 text-yellow-800';
-  };
+  // Define table columns for DataTable
+  const columns: Column<Event>[] = [
+    {
+      key: 'name',
+      header: 'Event',
+      render: (_, event) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900">{event.name}</div>
+          <div className="text-sm text-gray-500">{event.description}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'dates',
+      header: 'Dates',
+      render: (_, event) => (
+        <div>
+          <div className="text-sm text-gray-900">{event.startDate?.toDate ? event.startDate.toDate().toLocaleDateString() : 'TBD'}</div>
+          <div className="text-xs text-gray-500">to {event.endDate?.toDate ? event.endDate.toDate().toLocaleDateString() : 'TBD'}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'teams',
+      header: 'Teams',
+      render: (_, event) => event.maxTeams,
+    },
+    {
+      key: 'sports',
+      header: 'Sports',
+      render: (_, event) => `${event.sports?.length || 0} sport${(event.sports?.length || 0) !== 1 ? 's' : ''}`,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (_, event) => (
+        <StatusBadge status={getEventStatus(event)} />
+      ),
+    },
+  ];
 
-  const getStatusIcon = (event: Event) => {
-    if (!event.isActive) return <XCircle className="w-4 h-4" />;
-    if (isRegistrationCurrentlyOpen(event)) return <CheckCircle className="w-4 h-4" />;
-    return <AlertCircle className="w-4 h-4" />;
-  };
+  // Define action buttons for DataTable
+  const actions: ActionButton<Event>[] = [
+    {
+      label: 'View',
+      icon: Eye,
+      onClick: (event) => router.push(`/${lang}/admin/events/${event.eventId}`),
+      variant: 'primary',
+    },
+    {
+      label: 'Edit',
+      icon: Edit,
+      onClick: (event) => router.push(`/${lang}/admin/events/${event.eventId}/edit`),
+      variant: 'secondary',
+    },
+    {
+      label: 'Deactivate',
+      icon: Trash2,
+      onClick: handleDeleteClick,
+      variant: 'danger',
+      loading: (event) => deletingEvent === event.eventId,
+    },
+  ];
 
-  const getStatusText = (event: Event) => {
-    if (!event.isActive) return 'Inactive';
-    if (isRegistrationCurrentlyOpen(event)) return 'Registration Open';
-    return 'Registration Closed';
-  };
+  // Define stats for StatsCard
+  const statsData = events.length > 0 ? [
+    {
+      label: 'Active',
+      value: events.filter(e => e.isActive).length,
+      color: 'success' as const,
+    },
+    {
+      label: 'Registration Open',
+      value: events.filter(e => isRegistrationCurrentlyOpen(e)).length,
+      color: 'info' as const,
+    },
+    {
+      label: 'Inactive',
+      value: events.filter(e => !e.isActive).length,
+      color: 'error' as const,
+    },
+  ] : [];
 
   if (authLoading || loading) {
     return (
@@ -194,17 +271,18 @@ export default function EventsManagement() {
     <Container>
       <div className="max-w-7xl mx-auto py-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Events Management</h1>
-            <p className="text-gray-600 text-sm">Manage tournaments, exhibitions, and ceremonies</p>
+            <h1 className="text-2xl font-bold text-gray-900 font-fira">Events Management</h1>
+            <p className="text-gray-600 text-sm font-roboto">Manage tournaments, exhibitions, and ceremonies</p>
           </div>
           
           <Button
             onClick={() => router.push(`/${lang}/admin/events/create`)}
-            className="bg-[#3A7F3F] hover:bg-green-700"
+            leftIcon={Plus}
+            variant="primary"
+            size="base"
           >
-            <Plus className="w-4 h-4 mr-2" />
             Add Event
           </Button>
         </div>
@@ -212,191 +290,51 @@ export default function EventsManagement() {
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-600 font-roboto">{error}</p>
           </div>
         )}
 
-        {/* Events Table - Desktop */}
-        {events.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg border">
-            <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
-            <p className="text-gray-600 mb-4">Create your first event to get started.</p>
-            <Button
-              onClick={() => router.push(`/${lang}/admin/events/create`)}
-              className="bg-[#3A7F3F] hover:bg-green-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Event
-            </Button>
-          </div>
-        ) : (
-          <>
-            {/* Desktop Table */}
-            <div className="hidden md:block bg-white rounded-lg border overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dates</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teams</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sports</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {events.map((event) => (
-                      <tr key={event.eventId} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{event.name}</div>
-                            <div className="text-sm text-gray-500">{event.description}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          <div>
-                            <div>{event.startDate?.toDate ? event.startDate.toDate().toLocaleDateString() : 'TBD'}</div>
-                            <div className="text-xs text-gray-500">to {event.endDate?.toDate ? event.endDate.toDate().toLocaleDateString() : 'TBD'}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {event.maxTeams}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {event.sports?.length || 0} sport{(event.sports?.length || 0) !== 1 ? 's' : ''}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(event)}`}>
-                            {getStatusIcon(event)}
-                            <span className="ml-1">{getStatusText(event)}</span>
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium">
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => router.push(`/${lang}/admin/events/${event.eventId}`)}
-                              className="text-indigo-600 hover:text-indigo-900"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => router.push(`/${lang}/admin/events/${event.eventId}/edit`)}
-                              className="text-yellow-600 hover:text-yellow-900"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteEvent(event.eventId)}
-                              disabled={deletingEvent === event.eventId}
-                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                            >
-                              {deletingEvent === event.eventId ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+        {/* Data Table with Mobile-First Design */}
+        <DataTable
+          data={events}
+          columns={columns}
+          actions={actions}
+          loading={loading}
+          emptyState={{
+            icon: Calendar,
+            title: 'No events found',
+            description: 'Create your first event to get started.',
+            action: {
+              label: 'Add Event',
+              onClick: () => router.push(`/${lang}/admin/events/create`),
+            },
+          }}
+          keyExtractor={(event) => event.eventId}
+        />
 
-            {/* Mobile Cards */}
-            <div className="md:hidden space-y-4">
-              {events.map((event) => (
-                <div key={event.eventId} className="bg-white rounded-lg border p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-medium text-gray-900">{event.name}</h3>
-                      <p className="text-sm text-gray-500 mt-1">{event.description}</p>
-                    </div>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(event)} ml-2`}>
-                      {getStatusIcon(event)}
-                      <span className="ml-1">{getStatusText(event)}</span>
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <span className="text-xs text-gray-500">Dates</span>
-                      <div className="mt-1">
-                        <div className="text-sm font-medium text-gray-900">{event.startDate?.toDate ? event.startDate.toDate().toLocaleDateString() : 'TBD'}</div>
-                        <div className="text-xs text-gray-500">to {event.endDate?.toDate ? event.endDate.toDate().toLocaleDateString() : 'TBD'}</div>
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-500">Max Teams</span>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{event.maxTeams}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-500">Sports</span>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{event.sports?.length || 0} sport{(event.sports?.length || 0) !== 1 ? 's' : ''}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-gray-500">Venues</span>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{event.venues?.length || 0} venue{(event.venues?.length || 0) !== 1 ? 's' : ''}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex space-x-2 pt-3 border-t">
-                    <button
-                      onClick={() => router.push(`/${lang}/admin/events/${event.eventId}`)}
-                      className="flex items-center justify-center px-3 py-2 text-sm text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-md flex-1"
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
-                    </button>
-                    <button
-                      onClick={() => router.push(`/${lang}/admin/events/${event.eventId}/edit`)}
-                      className="flex items-center justify-center px-3 py-2 text-sm text-yellow-600 hover:text-yellow-900 hover:bg-yellow-50 rounded-md flex-1"
-                    >
-                      <Edit className="w-4 h-4 mr-1" />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteEvent(event.eventId)}
-                      disabled={deletingEvent === event.eventId}
-                      className="flex items-center justify-center px-3 py-2 text-sm text-red-600 hover:text-red-900 hover:bg-red-50 rounded-md disabled:opacity-50"
-                    >
-                      {deletingEvent === event.eventId ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Trash2 className="w-4 h-4 mr-1" />
-                          Delete
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Simple Stats */}
-        {events.length > 0 && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-4 rounded-lg border text-center">
-              <div className="text-2xl font-bold text-green-600">{events.filter(e => e.isActive).length}</div>
-              <div className="text-sm text-gray-600">Active</div>
-            </div>
-            <div className="bg-white p-4 rounded-lg border text-center">
-              <div className="text-2xl font-bold text-blue-600">{events.filter(e => isRegistrationCurrentlyOpen(e)).length}</div>
-              <div className="text-sm text-gray-600">Registration Open</div>
-            </div>
-            <div className="bg-white p-4 rounded-lg border text-center">
-              <div className="text-2xl font-bold text-red-600">{events.filter(e => !e.isActive).length}</div>
-              <div className="text-sm text-gray-600">Inactive</div>
-            </div>
+        {/* Stats Cards */}
+        {statsData.length > 0 && (
+          <div className="mt-8">
+            <StatsCard 
+              stats={statsData}
+              columns={3}
+              size="base"
+              showBorder
+            />
           </div>
         )}
+
+        {/* Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={confirmDelete.isOpen}
+          onClose={() => setConfirmDelete({ isOpen: false, event: null })}
+          onConfirm={handleDeleteConfirm}
+          title="Deactivate Event"
+          description={`Are you sure you want to deactivate "${confirmDelete.event?.name}"? This action will make the event unavailable for new registrations.`}
+          confirmLabel="Deactivate"
+          confirmVariant="danger"
+          loading={deletingEvent !== null}
+        />
       </div>
     </Container>
   );

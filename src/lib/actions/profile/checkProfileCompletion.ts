@@ -29,8 +29,21 @@ export async function checkAndUpdateProfileCompletion(userId: string) {
         await teamRef.update({
           updatedAt: FieldValue.serverTimestamp(),
         });
+
+        const playerRef = adminDb
+        .collection("teams").doc(teamRef.id)
+        .collection("players").doc(userId);
+        await playerRef.update({
+          isProfileComplete: true,
+          'documents.profilePhoto.url': userData.documents.profilePhoto?.url || null,
+          'documents.aadhaarFront.url': userData.documents.aadhaarFront?.url || null,
+          'documents.aadhaarBack.url': userData.documents.aadhaarBack?.url || null,
+
+        updatedAt: FieldValue.serverTimestamp()
+      })
       }
-      
+     
+
       return { success: true, isComplete: true, message: 'Profile and team updated' };
     } 
     
@@ -121,6 +134,7 @@ function checkProfileCompletion(userData: any): boolean {
     userData?.panchayat
   );
   console.log(hasDocuments,"hasFields",  hasFields);
+  console.log(userData);
   return hasDocuments && hasFields;
 }
 

@@ -31,7 +31,8 @@ export default function Error({
         <Button
           onClick={reset}
           className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-medium ripple"
-          variant="large"
+          variant="primary"
+          size="lg"
           aria-label={t("try_again")}
         >
           {t("try_again")}

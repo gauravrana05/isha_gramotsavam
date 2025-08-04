@@ -15,6 +15,19 @@ interface SubmitTeamRequest {
   };
 }
 
+interface Player {
+  playerId: string;
+  userId: string;
+  name: string;
+  phone: string;
+  gender: 'M' | 'F';
+  position: 'main' | 'substitute';
+  isDeleted?: boolean;
+  isProfileComplete: boolean;
+  verificationStatus?: string;
+  [key: string]: any; // fallback for other props
+}
+
 async function validateTeamForSubmission(teamId: string, captainId: string): Promise<any> {
   const teamDoc = await adminDb.collection("teams").doc(teamId).get();
   
@@ -37,8 +50,8 @@ async function validateTeamForSubmission(teamId: string, captainId: string): Pro
       const sportDoc = await adminDb.collection('sports').doc(team.sportId).get();
       if (sportDoc.exists) {
         const sportData = sportDoc.data();
-        minPlayersRequired = sportData.teamConfig?.minPlayers || team.maxPlayers;
-        sportName = sportData.displayName || sportData.name || sportName;
+        minPlayersRequired = sportData?.teamConfig?.minPlayers || team.maxPlayers;
+        sportName = sportData?.displayName || sportData?.name || sportName;
       }
     }
   } catch (error) {
@@ -53,43 +66,47 @@ async function validateTeamForSubmission(teamId: string, captainId: string): Pro
     .collection("players")
     .get();
 
-  const allPlayers = playersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  
-  // Filter out deleted players manually (handles missing isDeleted field)
-  const players = allPlayers.filter(p => p.isDeleted !== true);
-  const mainPlayers = players.filter(p => p.position === 'main').length;
-
-  if (mainPlayers < minPlayersRequired) {
-    throw new Error(`${sportName} requires at least ${minPlayersRequired} main players. Currently have ${mainPlayers} main players. Please add ${minPlayersRequired - mainPlayers} more main players before submitting.`);
-  }
-
-  // Check if all players have complete documents
-  const playersWithIncompleteDocuments = players.filter(player => {
-    const docs = player.documents || {};
-    const hasProfilePhoto = docs.profilePhoto?.url;
-    const hasAadhaarFront = docs.aadhaarFront?.url;
-    const hasAadhaarBack = docs.aadhaarBack?.url;
-    
-    const isComplete = hasProfilePhoto && hasAadhaarFront && hasAadhaarBack;
-    
-    
-    return !isComplete;
+  const allPlayers: Player[] = playersSnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      playerId: data.playerId || doc.id,
+      userId: data.userId || doc.id,
+      name: data.name || '',
+      phone: data.phone || '',
+      gender: data.gender || 'M',
+      position: data.position || 'main',
+      isDeleted: data.isDeleted || false,
+      isProfileComplete: data.isProfileComplete || false,
+      verificationStatus: data.verificationStatus || 'pending',
+      ...data
+    };
   });
+  
+  // Filter out deleted players
+  const activePlayers = allPlayers.filter(p => p.isDeleted !== true);
+  const mainPlayers = activePlayers.filter(p => p.position === 'main');
+  const substitutePlayers = activePlayers.filter(p => p.position === 'substitute');
 
-  if (playersWithIncompleteDocuments.length > 0) {
-    const missingPlayerNames = playersWithIncompleteDocuments.map(p => p.name).join(', ');
-    throw new Error(`${playersWithIncompleteDocuments.length} player(s) have incomplete documents: ${missingPlayerNames}. Please ensure all documents are uploaded.`);
+  // Validate minimum main players
+  if (mainPlayers.length < minPlayersRequired) {
+    throw new Error(`${sportName} requires at least ${minPlayersRequired} main players. Currently have ${mainPlayers.length} main players. Please add ${minPlayersRequired - mainPlayers.length} more main players before submitting.`);
   }
 
-  // Validate gender requirements for sport
-  if (team.sportName === 'Throwball') {
-    const malePlayersCount = players.filter(p => p.gender === 'M').length;
-    if (malePlayersCount > 0) {
-      throw new Error(`Throwball is only for women. Found ${malePlayersCount} male player(s).`);
-    }
+  // Validate all players have valid user IDs
+  const playersWithInvalidIds = activePlayers.filter(player => !player.userId);
+  if (playersWithInvalidIds.length > 0) {
+    const invalidPlayerNames = playersWithInvalidIds.map(p => p.name).join(', ');
+    throw new Error(`${playersWithInvalidIds.length} player(s) have invalid user IDs: ${invalidPlayerNames}. Please remove and re-add these players.`);
   }
 
-  return { team, players };
+  // Validate all players have complete profiles
+  const playersWithIncompleteProfiles = activePlayers.filter(player => !player.isProfileComplete);
+  if (playersWithIncompleteProfiles.length > 0) {
+    const incompletePlayerNames = playersWithIncompleteProfiles.map(p => p.name).join(', ');
+    throw new Error(`${playersWithIncompleteProfiles.length} player(s) have incomplete profiles: ${incompletePlayerNames}. Please ensure all documents and profile information are complete.`);
+  }
+
+  return { team, players: activePlayers };
 }
 
 export async function submitTeamForVerification(request: SubmitTeamRequest) {

@@ -1,4 +1,4 @@
-'use server'
+'use server';
 
 import { adminDb, adminAuth } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -16,6 +16,7 @@ interface PlayerData {
   taluk: string;
   district: string;
   state: string;
+  pincode?: string;
   position: 'main' | 'substitute';
 }
 
@@ -33,274 +34,215 @@ function calculateAge(dob: string): number | null {
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDiff = today.getMonth() - birthDate.getMonth();
-  
+
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
     age--;
   }
-  
+
   return age;
 }
 
-async function checkPlayerExistsInEvent(playerIdentifier: string, eventId: string, identifierType: 'userId' | 'phone'): Promise<{ exists: boolean, teamId?: string, teamName?: string }> {
-  try {
-    // Query all teams in the event
-    const teamsQuery = await adminDb
-      .collection("teams")
-      .where("eventId", "==", eventId)
-      .get();
-
-    for (const teamDoc of teamsQuery.docs) {
-      // Check players in each team
-      const playersQuery = await adminDb
-        .collection("teams").doc(teamDoc.id)
-        .collection("players")
-        .where(identifierType, "==", playerIdentifier)
-        .get();
-
-      if (!playersQuery.empty) {
-        const teamData = teamDoc.data();
-        return {
-          exists: true,
-          teamId: teamDoc.id,
-          teamName: teamData.name
-        };
-      }
-    }
-
-    return { exists: false };
-  } catch (error) {
-    console.error("Error checking player existence in event:", error);
-    return { exists: false };
-  }
-}
-
-async function validatePlayerEligibility(playerData: PlayerData, teamInfo: any): Promise<void> {
-  // Age validation
-  const age = calculateAge(playerData.dateOfBirth);
-  if (age === null) {
-    throw new Error("Could not calculate player's age from the provided date of birth.");
-  }
-  if (age < 14 || age > 60) {
-    throw new Error(`Player age must be between 14 and 60, but is ${age}`);
-  }
-
-  // Gender validation for throwball
-  if (teamInfo.sportName === 'Throwball' && playerData.gender !== 'F') {
-    throw new Error("Throwball is only for women");
-  }
-
-  // Same panchayat validation
-  if (playerData.panchayat !== teamInfo.panchayat) {
-    throw new Error(`All players must be from the same panchayat (${teamInfo.panchayat}). Player is from ${playerData.panchayat}.`);
-  }
-}
-
-async function checkExistingMembership(phone: string, teamId: string): Promise<boolean> {
+async function checkPlayerExistsInTeam(phone: string, teamId: string): Promise<boolean> {
   const playersSnapshot = await adminDb
     .collection("teams").doc(teamId)
     .collection("players")
     .where("phone", "==", phone)
     .get();
 
-  return !playersSnapshot.empty;
+  const activePlayers = playersSnapshot.docs.filter(doc => {
+    const data = doc.data();
+    return !data.isDeleted;
+  });
+
+  return activePlayers.length > 0;
 }
 
-export async function addPlayerToTeam(request: AddPlayerRequest) {
+async function checkPlayerExistsInEvent(phone: string, eventId: string): Promise<{ exists: boolean; teamId?: string; teamName?: string }> {
   try {
-    const { teamId, playerData, captainId } = request;
-    
-    // Validate team ownership
+    const teamsRef = adminDb.collection("teams");
+    const query = teamsRef
+      .where("eventId", "==", eventId)
+      .where("captainProfile.phone", "==", phone);
+
+    const snapshot = await query.get();
+    if (!snapshot.empty) {
+      const teamDoc = snapshot.docs[0];
+      return {
+        exists: true,
+        teamId: teamDoc.id,
+        teamName: teamDoc.data().name,
+      };
+    }
+
+    return { exists: false };
+  } catch (error) {
+    console.error("Error checking player existence:", error);
+    return { exists: false };
+  }
+}
+
+export async function addPlayerToTeam({ teamId, playerData, captainId }: AddPlayerRequest) {
+  try {
+    console.log(`Adding player ${playerData.name} to team ${teamId}`);
+
+    // Basic validations first
     const teamDoc = await adminDb.collection("teams").doc(teamId).get();
     if (!teamDoc.exists) {
       return { success: false, error: "Team not found" };
     }
 
-    const teamInfo = teamDoc.data();
-    if (teamInfo?.captainId !== captainId) {
-      return { success: false, error: "Not authorized to manage this team" };
+    const teamData = teamDoc.data()!;
+    if (teamData.captainId !== captainId) {
+      return { success: false, error: "Unauthorized: You are not the captain of this team" };
     }
 
-    // Check team capacity
-    if (teamInfo.currentPlayers >= teamInfo.maxPlayers + teamInfo.maxSubstitutes) {
-      return { success: false, error: "Team is at maximum capacity" };
+    // Check if player already exists in this team
+    const playerExists = await checkPlayerExistsInTeam(playerData.phone, teamId);
+    if (playerExists) {
+      return { success: false, error: "Player already exists in this team" };
     }
 
-    // Check if player is already in another team for this event (by phone)
-    const eventId = teamInfo.eventId || "gramotsavam_2025";
-    const phoneExistsCheck = await checkPlayerExistsInEvent(playerData.phone, eventId, 'phone');
-    if (phoneExistsCheck.exists) {
-      return { 
-        success: false, 
-        error: `Player with phone ${playerData.phone} is already registered in team "${phoneExistsCheck.teamName}" for this event. Each player can only join one team per event.`
-      };
-    }
-
-    // Validate player eligibility
-    await validatePlayerEligibility(playerData, teamInfo);
-
-    // Check for existing membership in this specific team
-    const existingPlayer = await checkExistingMembership(playerData.phone, teamId);
-    if (existingPlayer) {
-      return { success: false, error: "Player is already in this team" };
-    }
-    
-    // Calculate player age
+    // Age validation
     const playerAge = calculateAge(playerData.dateOfBirth);
+    if (playerAge === null || playerAge < 14 || playerAge > 60) {
+      return { success: false, error: "Player age must be between 14 and 60" };
+    }
 
-    // Create or get Firebase user
-    let firebaseUserId = "";
-    let existingUserData = null;
-    
+    // Extract phone number without +91 prefix and format for Firebase Auth
+    const cleanPhone = playerData.phone.replace(/^\+91/, '');
+    const formattedPhone = `+91${cleanPhone}`;
+
+    // Check if Firebase Auth user already exists or create new one
+    let userId: string;
+    let existingUser = false;
+
     try {
-      // Check if user with this phone number already exists
-      try {
-        const existingUser = await adminAuth.getUserByPhoneNumber(`+91${playerData.phone}`);
-        firebaseUserId = existingUser.uid;
-        console.log(`Using existing Firebase user: ${firebaseUserId}`);
-        
-        // Fetch existing user profile data including documents
-        const userProfileDoc = await adminDb.collection("users").doc(firebaseUserId).get();
-        if (userProfileDoc.exists) {
-          existingUserData = userProfileDoc.data();
-          console.log(`Found existing user profile with documents:`, !!existingUserData?.documents);
-        }
-      } catch (error: any) {
-        if (error.code !== 'auth/user-not-found') {
-          console.error("Error checking existing user:", error);
-          throw error;
-        }
-        // Create new Firebase user
+      // Try to find existing Firebase Auth user
+      const existingAuthUser = await adminAuth.getUserByPhoneNumber(formattedPhone);
+      userId = existingAuthUser.uid;
+      existingUser = true;
+      
+      console.log(`Found existing Firebase Auth user: ${userId}`);
+      
+      // Update their profile with current team info
+      await adminDb.collection("users").doc(userId).update({
+        currentTeamId: teamId,
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        // Create new Firebase Auth user
         const userRecord = await adminAuth.createUser({
-          phoneNumber: `+91${playerData.phone}`,
+          phoneNumber: formattedPhone,
           displayName: playerData.name,
           disabled: false
         });
-        firebaseUserId = userRecord.uid;
-        console.log(`Created new Firebase user: ${firebaseUserId}`);
-      }
-      
-      // Update user profile in Firestore
-      const userProfileData = {
-        firstName: playerData.firstName,
-        lastName: playerData.lastName,
-        phoneNumber: playerData.phone,
-        whatsappNumber: playerData.whatsappNumber || playerData.phone,
-        dob: playerData.dateOfBirth,
-        gender: playerData.gender,
-        village: playerData.village,
-        panchayat: playerData.panchayat,
-        taluk: playerData.taluk,
-        district: playerData.district,
-        state: playerData.state,
-        role: "player",
-        isProfileComplete: false, // Will be updated when documents are uploaded
-        currentTeamId: teamId,
-        updatedAt: FieldValue.serverTimestamp()
-      };
-      
-      await adminDb.collection("users").doc(firebaseUserId).set(userProfileData, { merge: true });
-      console.log(`Updated user profile for: ${firebaseUserId}`);
-      
-    } catch (error) {
-      console.error("Error creating Firebase user:", error);
-      return { 
-        success: false, 
-        error: `Failed to create user account for player: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
-    
-    // Add player to team subcollection
-    const playerId = firebaseUserId;
-    
-    await adminDb
-      .collection("teams").doc(teamId)
-      .collection("players").doc(playerId)
-      .set({
-        playerId: playerId,
-        userId: firebaseUserId,
-        teamId: teamId,
         
-        // Player Info
-        name: playerData.name,
-        phone: playerData.phone,
-        dateOfBirth: playerData.dateOfBirth,
-        age: playerAge,
-        gender: playerData.gender,
+        userId = userRecord.uid;
+        existingUser = false;
         
-        // Team Role
-        position: playerData.position,
-        addedAt: FieldValue.serverTimestamp(),
-        addedBy: captainId,
+        console.log(`Created new Firebase Auth user: ${userId}`);
         
-        // Profile Data
-        profileComplete: existingUserData?.isProfileComplete || false,
-        profileData: {
+        // The beforeUserCreated trigger will create the basic profile
+        // We'll update it with player-specific data after
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for trigger
+        
+        // Update with player-specific data
+        await adminDb.collection("users").doc(userId).update({
           firstName: playerData.firstName,
           lastName: playerData.lastName,
-          whatsappNumber: playerData.whatsappNumber || playerData.phone,
+          phoneNumber: cleanPhone,
+          whatsappNumber: playerData.whatsappNumber || cleanPhone,
+          dob: playerData.dateOfBirth,
+          gender: playerData.gender,
           village: playerData.village,
           panchayat: playerData.panchayat,
           taluk: playerData.taluk,
           district: playerData.district,
           state: playerData.state,
-          pincode: ""
+          pincode: playerData.pincode || "",
+          role: "player",
+          currentTeamId: teamId,
+          isProfileComplete: false,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    // Now add the player to the team subcollection
+    await adminDb.runTransaction(async (transaction) => {
+      const playerRef = adminDb
+        .collection("teams").doc(teamId)
+        .collection("players").doc(userId);
+
+      // Get the user data to copy documents structure
+      const userDoc = await adminDb.collection("users").doc(userId).get();
+      const userData = userDoc.data();
+
+      transaction.set(playerRef, {
+        playerId: userId,
+        userId: userId,
+        teamId: teamId,
+
+        name: playerData.name,
+        phone: cleanPhone,
+        dateOfBirth: playerData.dateOfBirth,
+        age: playerAge,
+        gender: playerData.gender,
+
+        position: playerData.position,
+        addedAt: FieldValue.serverTimestamp(),
+        addedBy: captainId,
+
+        isProfileComplete: userData?.isProfileComplete || false,
+        profileData: {
+          firstName: playerData.firstName,
+          lastName: playerData.lastName,
+          whatsappNumber: playerData.whatsappNumber || cleanPhone,
+          village: playerData.village,
+          panchayat: playerData.panchayat,
+          taluk: playerData.taluk,
+          district: playerData.district,
+          state: playerData.state,
+          pincode: playerData.pincode || ""
+        },
+
+        documents: userData?.documents || {
+          profilePhoto: { storagePath: "", url: null, verified: false, uploadedAt: null, uploadedBy: null },
+          aadhaarFront: { storagePath: "", url: null, verified: false, uploadedAt: null, uploadedBy: null },
+          aadhaarBack: { storagePath: "", url: null, verified: false, uploadedAt: null, uploadedBy: null }
         },
         
-        // Document Management - copy from existing user or start empty
-        documents: (() => {
-          if (existingUserData?.documents) {
-            console.log(`Copying existing documents for user ${firebaseUserId}`);
-            return existingUserData.documents;
-          } else {
-            console.log(`No existing documents found, creating empty document structure for user ${firebaseUserId}`);
-            return {
-              profilePhoto: {
-                storagePath: "",
-                url: null,
-                verified: false,
-                uploadedAt: null,
-                uploadedBy: null
-              },
-              aadhaarFront: {
-                storagePath: "",
-                url: null,
-                verified: false,
-                uploadedAt: null,
-                uploadedBy: null
-              },
-              aadhaarBack: {
-                storagePath: "",
-                url: null,
-                verified: false,
-                uploadedAt: null,
-                uploadedBy: null
-              }
-            };
-          }
-        })(),
-        
-        // Verification Status - inherit from existing user if available
-        verificationStatus: existingUserData?.verificationStatus || "pending"
+        verificationStatus: userData?.verificationStatus || "pending",
+        isDeleted: false
       });
 
-    // Update team player count
-    const positionField = playerData.position === 'main' ? 'currentPlayers' : 'currentSubstitutes';
-    await adminDb.collection("teams").doc(teamId).update({
-      [positionField]: FieldValue.increment(1),
-      updatedAt: FieldValue.serverTimestamp()
+      // Update team player count
+      const teamRef = adminDb.collection("teams").doc(teamId);
+      const currentCount = teamData.currentPlayers || 0;
+      const currentSubs = teamData.currentSubstitutes || 0;
+
+      transaction.update(teamRef, {
+        currentPlayers: playerData.position === 'main' ? currentCount + 1 : currentCount,
+        currentSubstitutes: playerData.position === 'substitute' ? currentSubs + 1 : currentSubs,
+        updatedAt: FieldValue.serverTimestamp()
+      });
     });
 
-    console.log(`Player ${playerId} added to team ${teamId}`);
+    console.log(`Player ${userId} added to team ${teamId} using Firebase Auth`);
 
     return {
       success: true,
-      playerId: playerId,
-      message: "Player added successfully"
+      playerId: userId,
+      message: existingUser ? "Existing user linked to team" : "New user created and added to team"
     };
   } catch (error) {
     console.error("Error adding player to team:", error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : "Failed to add player to team"
     };
   }

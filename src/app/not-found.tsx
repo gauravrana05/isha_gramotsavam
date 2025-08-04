@@ -17,7 +17,8 @@ export default function NotFound() {
         <Button
           onClick={() => router.push("/en")}
           className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-medium ripple"
-          variant="large"
+          variant="primary"
+          size="lg"
           aria-label="Go Back Home"
         >
           Go Back Home

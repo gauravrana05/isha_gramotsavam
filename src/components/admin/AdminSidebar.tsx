@@ -105,7 +105,12 @@ export default function AdminSidebar({ className = '' }: AdminSidebarProps) {
   };
 
   const isActive = (href: string) => {
-    return pathname === href || pathname.startsWith(href + '/');
+    // Exact match first
+    if (pathname === href) return true;
+    
+    // Only activate parent for direct children, not nested routes
+    // This prevents multiple items from being highlighted simultaneously
+    return false;
   };
 
   const renderNavItem = (item: NavItem, depth = 0) => {

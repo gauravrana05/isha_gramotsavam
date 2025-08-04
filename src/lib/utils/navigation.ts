@@ -89,7 +89,7 @@ export const useRedirect = (allowedRoles?: string[]) => {
       const isProfileComplete = userData.isProfileComplete;
 
       const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
-
+      console.log("the role of the use is this ", role, specialRole);
       if (!isProfileComplete && !specialRole) {
         router.push(`/${lang}/complete-profile`);
         return;

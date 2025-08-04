@@ -231,22 +231,22 @@ export default function PlayerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="text-center mb-6 sm:mb-8">
-          <div className="mb-3 sm:mb-4">
+        <div className="text-center mb-8">
+          <div className="mb-4">
             <Image 
               src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" 
               alt="Isha Logo" 
-              width={60} 
-              height={60} 
-              className="mx-auto sm:w-20 sm:h-20"
+              width={80} 
+              height={80} 
+              className="mx-auto"
             />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
+          <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">
             Player Dashboard
           </h1>
-          <p className="text-sm sm:text-base text-gray-600 font-fira">
+          <p className="text-gray-600">
             Welcome back, {userProfile?.firstName || 'Player'}! Track your team memberships and profile.
           </p>
         </div>

@@ -147,6 +147,7 @@ export async function createTeamAndPromoteCaptain(request: CreateTeamRequest) {
       maxSubstitutes: sportConfig.maxSubstitutes,
       currentPlayers: 1,
       currentSubstitutes: 0,
+      pincode: userProfile.pincode,
       panchayat: userProfile.panchayat,
       taluk: userProfile.taluk || "",
       district: userProfile.district,
