@@ -83,23 +83,8 @@ export default function TeamVerificationPage() {
   const teamIdStr = Array.isArray(teamId) ? teamId[0] : teamId;
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading) return; 
     
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
-    }
-
-    if (!userProfile?.isProfileComplete) {
-      router.push(`/${lang}/complete-profile`);
-      return;
-    }
-
-    if (userProfile.role !== 'verification_volunteer' && userProfile.role !== 'admin') {
-      router.push(`/${lang}/player/dashboard`);
-      return;
-    }
-
     loadTeamData();
   }, [user, userProfile, authLoading, teamIdStr]);
 

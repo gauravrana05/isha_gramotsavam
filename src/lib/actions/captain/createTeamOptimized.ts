@@ -171,7 +171,7 @@ export async function createTeamAndPromoteCaptain(request: CreateTeamRequest) {
       position: "main",
       addedAt: FieldValue.serverTimestamp(),
       addedBy: captainId,
-      profileComplete: userProfile.isProfileComplete || false,
+      isProfileComplete: userProfile.isProfileComplete || false,
       profileData: {
         firstName: userProfile.firstName,
         lastName: userProfile.lastName || "",

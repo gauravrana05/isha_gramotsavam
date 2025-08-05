@@ -1,7 +1,6 @@
 'use server'
 
 import { adminDb } from '@/lib/firebase/admin';
-import { UserProfile } from '@/lib/types/user';
 import { FieldValue } from 'firebase-admin/firestore';
 
 export async function checkAndUpdateProfileCompletion(userId: string) {

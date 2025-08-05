@@ -6,7 +6,6 @@ import VenueVolunteerList from '@/components/admin/VenueVolunteerList';
 async function getVolunteers() {
   const volunteersSnapshot = await adminDb.collection('users')
     .where('role', 'in', ['verification_volunteer', 'general_volunteer', 'technical_volunteer'])
-    .where('isActive', '==', true)
     .get();
   return serializeFirestoreDocs(volunteersSnapshot.docs);
 }

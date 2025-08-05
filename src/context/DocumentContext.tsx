@@ -110,16 +110,6 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
         updatedAt: serverTimestamp()
       };
 
-      // Check if profile is complete with both Aadhaar documents
-      if (type === 'aadhaarFront' || type === 'aadhaarBack') {
-        const hasAadhaarFront = type === 'aadhaarFront' || documents.aadhaarFront.url;
-        const hasAadhaarBack = type === 'aadhaarBack' || documents.aadhaarBack.url;
-        
-        if (hasAadhaarFront && hasAadhaarBack) {
-          updateData.isProfileComplete = true;
-        }
-      }
-
       await updateDoc(userRef, updateData);
 
       updateDocumentState(type, { 

@@ -38,118 +38,104 @@ function calculateAge(dob: string): number | null {
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
     age--;
   }
-
   return age;
 }
 
 async function checkPlayerExistsInTeam(phone: string, teamId: string): Promise<boolean> {
   const playersSnapshot = await adminDb
-    .collection("teams").doc(teamId)
-    .collection("players")
-    .where("phone", "==", phone)
+    .collection('teams')
+    .doc(teamId)
+    .collection('players')
+    .where('phone', '==', phone)
+    .where('isDeleted', '==', false)
     .get();
-
-  const activePlayers = playersSnapshot.docs.filter(doc => {
-    const data = doc.data();
-    return !data.isDeleted;
-  });
-
-  return activePlayers.length > 0;
-}
-
-async function checkPlayerExistsInEvent(phone: string, eventId: string): Promise<{ exists: boolean; teamId?: string; teamName?: string }> {
-  try {
-    const teamsRef = adminDb.collection("teams");
-    const query = teamsRef
-      .where("eventId", "==", eventId)
-      .where("captainProfile.phone", "==", phone);
-
-    const snapshot = await query.get();
-    if (!snapshot.empty) {
-      const teamDoc = snapshot.docs[0];
-      return {
-        exists: true,
-        teamId: teamDoc.id,
-        teamName: teamDoc.data().name,
-      };
-    }
-
-    return { exists: false };
-  } catch (error) {
-    console.error("Error checking player existence:", error);
-    return { exists: false };
-  }
+  return !playersSnapshot.empty;
 }
 
 export async function addPlayerToTeam({ teamId, playerData, captainId }: AddPlayerRequest) {
   try {
-    console.log(`Adding player ${playerData.name} to team ${teamId}`);
+    // Validate captain authentication
+    const currentUser = await adminAuth.getUser(captainId);
+    if (!currentUser) {
+      return { success: false, error: { code: 'unauthenticated', message: 'User must be authenticated' } };
+    }
 
-    // Basic validations first
-    const teamDoc = await adminDb.collection("teams").doc(teamId).get();
+    // Validate team
+    const teamDoc = await adminDb.collection('teams').doc(teamId).get();
     if (!teamDoc.exists) {
-      return { success: false, error: "Team not found" };
+      return { success: false, error: { code: 'team-not-found', message: 'Team not found' } };
     }
 
     const teamData = teamDoc.data()!;
     if (teamData.captainId !== captainId) {
-      return { success: false, error: "Unauthorized: You are not the captain of this team" };
+      return { success: false, error: { code: 'permission-denied', message: 'Only team captain can add players' } };
     }
 
-    // Check if player already exists in this team
-    const playerExists = await checkPlayerExistsInTeam(playerData.phone, teamId);
-    if (playerExists) {
-      return { success: false, error: "Player already exists in this team" };
+    // Validate required fields
+    if (!playerData.phone || !playerData.firstName || !playerData.lastName || !playerData.dateOfBirth || !teamId) {
+      return { success: false, error: { code: 'invalid-argument', message: 'Missing required player information' } };
     }
 
-    // Age validation
+    // Validate player age
     const playerAge = calculateAge(playerData.dateOfBirth);
     if (playerAge === null || playerAge < 14 || playerAge > 60) {
-      return { success: false, error: "Player age must be between 14 and 60" };
+      return { success: false, error: { code: 'invalid-age', message: 'Player age must be between 14 and 60' } };
     }
 
-    // Extract phone number without +91 prefix and format for Firebase Auth
-    const cleanPhone = playerData.phone.replace(/^\+91/, '');
+    // Validate phone number
+    const cleanPhone = playerData.phone.replace(/^\+91/, '').replace(/\D/g, '');
+    if (cleanPhone.length !== 10) {
+      return { success: false, error: { code: 'invalid-phone', message: 'Invalid phone number: Must be 10 digits' } };
+    }
     const formattedPhone = `+91${cleanPhone}`;
 
-    // Check if Firebase Auth user already exists or create new one
+    // Check if player exists in team
+    const playerExists = await checkPlayerExistsInTeam(cleanPhone, teamId);
+    if (playerExists) {
+      return { success: false, error: { code: 'player-exists', message: 'Player already exists in this team' } };
+    }
+
     let userId: string;
     let existingUser = false;
 
+    // Default documents structure for new users
+    const defaultDocuments = {
+      profilePhoto: {
+        storagePath: '',
+        url: null,
+        verified: false,
+        uploadedAt: null,
+        uploadedBy: null,
+      },
+      aadhaarFront: {
+        storagePath: '',
+        url: null,
+        verified: false,
+        uploadedAt: null,
+        uploadedBy: null,
+      },
+      aadhaarBack: {
+        storagePath: '',
+        url: null,
+        verified: false,
+        uploadedAt: null,
+        uploadedBy: null,
+      },
+    };
+
+    // Check if user exists in Firebase Authentication
     try {
-      // Try to find existing Firebase Auth user
       const existingAuthUser = await adminAuth.getUserByPhoneNumber(formattedPhone);
       userId = existingAuthUser.uid;
       existingUser = true;
-      
-      console.log(`Found existing Firebase Auth user: ${userId}`);
-      
-      // Update their profile with current team info
-      await adminDb.collection("users").doc(userId).update({
-        currentTeamId: teamId,
-        updatedAt: FieldValue.serverTimestamp()
-      });
-      
-    } catch (error: any) {
-      if (error.code === 'auth/user-not-found') {
-        // Create new Firebase Auth user
-        const userRecord = await adminAuth.createUser({
-          phoneNumber: formattedPhone,
-          displayName: playerData.name,
-          disabled: false
-        });
-        
-        userId = userRecord.uid;
-        existingUser = false;
-        
-        console.log(`Created new Firebase Auth user: ${userId}`);
-        
-        // The beforeUserCreated trigger will create the basic profile
-        // We'll update it with player-specific data after
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for trigger
-        
-        // Update with player-specific data
-        await adminDb.collection("users").doc(userId).update({
+
+      // Fetch existing user profile to preserve documents
+      const userDoc = await adminDb.collection('users').doc(userId).get();
+      const existingUserData = userDoc.exists ? userDoc.data() : {};
+
+      // Update user profile, preserving existing documents
+      await adminDb.collection('users').doc(userId).set(
+        {
           firstName: playerData.firstName,
           lastName: playerData.lastName,
           phoneNumber: cleanPhone,
@@ -157,93 +143,124 @@ export async function addPlayerToTeam({ teamId, playerData, captainId }: AddPlay
           dob: playerData.dateOfBirth,
           gender: playerData.gender,
           village: playerData.village,
-          panchayat: playerData.panchayat,
-          taluk: playerData.taluk,
-          district: playerData.district,
-          state: playerData.state,
-          pincode: playerData.pincode || "",
-          role: "player",
+          panchayat: playerData.panchayat || teamData.panchayat,
+          taluk: playerData.taluk || teamData.taluk,
+          district: playerData.district || teamData.district,
+          state: playerData.state || teamData.state,
+          pincode: playerData.pincode || '',
+          role: 'player',
+          isProfileComplete: existingUserData?.isProfileComplete || false,
           currentTeamId: teamId,
-          isProfileComplete: false,
-          updatedAt: FieldValue.serverTimestamp()
+          updatedAt: FieldValue.serverTimestamp(),
+          documents: existingUserData?.documents || defaultDocuments,
+        },
+        { merge: true }
+      );
+
+      console.log(`Updated existing user profile: ${userId}`);
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        // Create new Firebase Auth user
+        const userRecord = await adminAuth.createUser({
+          phoneNumber: formattedPhone,
+          displayName: playerData.name,
+          disabled: false,
         });
+        userId = userRecord.uid;
+
+        // Create new user profile
+        await adminDb.collection('users').doc(userId).set({
+          uid: userId,
+          firstName: playerData.firstName,
+          lastName: playerData.lastName,
+          phoneNumber: cleanPhone,
+          whatsappNumber: playerData.whatsappNumber || cleanPhone,
+          dob: playerData.dateOfBirth,
+          gender: playerData.gender,
+          village: playerData.village,
+          panchayat: playerData.panchayat || teamData.panchayat,
+          taluk: playerData.taluk || teamData.taluk,
+          district: playerData.district || teamData.district,
+          state: playerData.state || teamData.state,
+          pincode: playerData.pincode || '',
+          role: 'player',
+          isProfileComplete: false,
+          currentTeamId: teamId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          documents: defaultDocuments,
+        });
+
+        console.log(`Created new user profile: ${userId}`);
       } else {
-        throw error;
+        console.error('Error checking existing user:', error);
+        return { success: false, error: { code: 'internal', message: 'Error checking existing user' } };
       }
     }
 
-    // Now add the player to the team subcollection
+    // Add player to team subcollection and update counts
     await adminDb.runTransaction(async (transaction) => {
-      const playerRef = adminDb
-        .collection("teams").doc(teamId)
-        .collection("players").doc(userId);
+      const playerRef = adminDb.collection('teams').doc(teamId).collection('players').doc(userId);
+      const teamRef = adminDb.collection('teams').doc(teamId);
 
-      // Get the user data to copy documents structure
-      const userDoc = await adminDb.collection("users").doc(userId).get();
-      const userData = userDoc.data();
+      // Fetch user profile to get documents
+      const userDoc = await adminDb.collection('users').doc(userId).get();
+      const userData = userDoc.exists ? userDoc.data() : {};
 
       transaction.set(playerRef, {
         playerId: userId,
         userId: userId,
         teamId: teamId,
-
         name: playerData.name,
         phone: cleanPhone,
         dateOfBirth: playerData.dateOfBirth,
         age: playerAge,
         gender: playerData.gender,
-
         position: playerData.position,
         addedAt: FieldValue.serverTimestamp(),
         addedBy: captainId,
-
         isProfileComplete: userData?.isProfileComplete || false,
         profileData: {
           firstName: playerData.firstName,
           lastName: playerData.lastName,
           whatsappNumber: playerData.whatsappNumber || cleanPhone,
           village: playerData.village,
-          panchayat: playerData.panchayat,
-          taluk: playerData.taluk,
-          district: playerData.district,
-          state: playerData.state,
-          pincode: playerData.pincode || ""
+          panchayat: playerData.panchayat || teamData.panchayat,
+          taluk: playerData.taluk || teamData.taluk,
+          district: playerData.district || teamData.district,
+          state: playerData.state || teamData.state,
+          pincode: playerData.pincode || '',
         },
-
-        documents: userData?.documents || {
-          profilePhoto: { storagePath: "", url: null, verified: false, uploadedAt: null, uploadedBy: null },
-          aadhaarFront: { storagePath: "", url: null, verified: false, uploadedAt: null, uploadedBy: null },
-          aadhaarBack: { storagePath: "", url: null, verified: false, uploadedAt: null, uploadedBy: null }
-        },
-        
-        verificationStatus: userData?.verificationStatus || "pending",
-        isDeleted: false
+        documents: userData?.documents || defaultDocuments,
+        verificationStatus: userData?.verificationStatus || 'pending',
+        isDeleted: false,
       });
 
-      // Update team player count
-      const teamRef = adminDb.collection("teams").doc(teamId);
       const currentCount = teamData.currentPlayers || 0;
       const currentSubs = teamData.currentSubstitutes || 0;
-
       transaction.update(teamRef, {
         currentPlayers: playerData.position === 'main' ? currentCount + 1 : currentCount,
         currentSubstitutes: playerData.position === 'substitute' ? currentSubs + 1 : currentSubs,
-        updatedAt: FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp(),
       });
     });
 
-    console.log(`Player ${userId} added to team ${teamId} using Firebase Auth`);
+    console.log(`Player ${userId} added to team ${teamId}`);
 
     return {
       success: true,
       playerId: userId,
-      message: existingUser ? "Existing user linked to team" : "New user created and added to team"
+      existed: existingUser,
+      message: existingUser ? 'Existing user linked to team' : 'New user created and added to team',
     };
   } catch (error) {
-    console.error("Error adding player to team:", error);
+    console.error('Error adding player to team:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to add player to team"
+      error: {
+        code: 'internal',
+        message: error instanceof Error ? error.message : 'Failed to add player to team',
+      },
     };
   }
 }

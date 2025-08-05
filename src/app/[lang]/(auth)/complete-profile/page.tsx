@@ -62,7 +62,7 @@ export default function CompleteProfilePage() {
 
   const phoneNumber = user?.phoneNumber?.replace(/^\+91/, '') || '';
   const whatsappNumber = userProfile?.whatsappNumber?.replace(/^\+91/, '') || '';
-  // Clean Firestore data by removing undefined values and converting dates
+
   const cleanFirestoreData = (obj: any): any => {
     if (obj === null || obj === undefined) return null;
     if (obj instanceof Date) return obj.toISOString();
@@ -93,7 +93,7 @@ export default function CompleteProfilePage() {
       router.push(dashboardRoute);
     }
 
-    if (userProfile) {
+    if (userProfile && Object.values(formData).every(value => !value)) {
       setFormData(prev => ({
         ...prev,
         firstName: userProfile.firstName || "",

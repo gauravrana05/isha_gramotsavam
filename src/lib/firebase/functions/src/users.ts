@@ -154,7 +154,6 @@ export const createPlayerUser = onCall(async (request: CallableRequest) => {
         district: district || teamData.district,
         state: state || teamData.state,
         role: "player",
-        isProfileComplete: true,
         isVerified: false,
         currentTeamId: teamId,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -219,7 +218,7 @@ export const createPlayerUser = onCall(async (request: CallableRequest) => {
       district: district || teamData.district,
       state: state || teamData.state,
       role: "player",
-      isProfileComplete: true,
+      isProfileComplete: false,
       currentTeamId: teamId,
       documents: {
         profilePhoto: {

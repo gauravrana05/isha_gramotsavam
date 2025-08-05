@@ -12,7 +12,8 @@ import {
   Trash2,
   Phone,
   Mail,
-  Shield
+  Shield,
+  XCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -29,7 +30,6 @@ async function getVolunteers() {
   try {
     const volunteersSnapshot = await adminDb.collection('users')
       .where('role', 'in', ['verification_volunteer', 'general_volunteer', 'technical_volunteer'])
-      .where('isActive', '==', true)
       .get();
     return serializeFirestoreDocs(volunteersSnapshot.docs);
   } catch (error) {
@@ -49,7 +49,7 @@ async function getVolunteerAssignments() {
 }
 
 export default async function VolunteersManagement({ params }: PageProps) {
-  const { lang } = params;
+  const { lang } = await params;
   const volunteers = await getVolunteers();
   const assignments = await getVolunteerAssignments();
 

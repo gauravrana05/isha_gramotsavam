@@ -41,21 +41,6 @@ export default function VerificationTeamsPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
-    }
-
-    if (!userProfile?.isProfileComplete) {
-      router.push(`/${lang}/complete-profile`);
-      return;
-    }
-
-    if (userProfile.role !== 'verification_volunteer' && userProfile.role !== 'admin') {
-      router.push(`/${lang}/player/dashboard`);
-      return;
-    }
 
     loadTeams();
   }, [user, userProfile, authLoading, router, lang]);
