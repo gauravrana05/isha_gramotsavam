@@ -104,7 +104,10 @@ export default function EditEventPage() {
     }
     
     // If both dates are set, registration is open between them
-    return now >= regStart && now <= regEnd;
+    if (regStart !== null && regEnd !== null) {
+      return now >= regStart && now <= regEnd;
+    }
+    return false;
   }, [formData.isRegistrationOpen, formData.registrationEndDate, formData.registrationStartDate]);
 
   // Update registration status whenever dates change
@@ -183,9 +186,9 @@ export default function EditEventPage() {
       const sportsSnapshot = await getDocs(sportsCollection);
       const sportsData = sportsSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data() as { [key: string]: any }
       }));
-      setAvailableSports(sportsData.filter(sport => sport.isActive));
+      setAvailableSports(sportsData.filter(sport => (sport as any).isActive));
     } catch (err: any) {
       console.error('Error loading sports:', err);
     } finally {
@@ -200,9 +203,9 @@ export default function EditEventPage() {
       const venuesSnapshot = await getDocs(venuesCollection);
       const venuesData = venuesSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data() as { [key: string]: any }
       }));
-      setAvailableVenues(venuesData.filter(venue => venue.isActive));
+      setAvailableVenues(venuesData.filter(venue => (venue as any).isActive));
     } catch (err: any) {
       console.error('Error loading venues:', err);
     } finally {
@@ -219,7 +222,7 @@ export default function EditEventPage() {
     setFormData(prev => ({
       ...prev,
       [parent]: {
-        ...prev[parent as keyof typeof prev],
+        ...(prev[parent] && typeof prev[parent] === 'object' ? prev[parent] : {}),
         [field]: value
       }
     }));

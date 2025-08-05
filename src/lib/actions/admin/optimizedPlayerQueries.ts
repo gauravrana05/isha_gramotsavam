@@ -3,6 +3,50 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { z } from 'zod';
 import { optimizePlayerDocument, createPaginatedResponse } from '@/lib/utils/documentOptimizer';
+import type { Query, CollectionGroup, DocumentData } from 'firebase-admin/firestore';
+
+// Player document interface
+interface PlayerDocument {
+  id: string;
+  name?: string;
+  phone?: string;
+  age?: number;
+  gender?: string;
+  position?: string;
+  verificationStatus?: string;
+  isDeleted?: boolean;
+  teamId?: string;
+  profileData?: {
+    panchayat?: string;
+    district?: string;
+  };
+  documents?: {
+    profilePhoto?: {
+      url?: string;
+      verified?: boolean;
+    };
+    aadhaarFront?: {
+      url?: string;
+      verified?: boolean;
+    };
+    aadhaarBack?: {
+      url?: string;
+      verified?: boolean;
+    };
+  };
+  addedAt?: any;
+  verifiedAt?: any;
+  team?: {
+    id: string;
+    name?: string;
+    sportName?: string;
+    status?: string;
+    genderCategory?: string;
+    panchayat?: string;
+    district?: string;
+  } | null;
+  [key: string]: any;
+}
 
 // Comprehensive filter schemas for admin player queries
 const AdminPlayerFiltersSchema = z.object({
@@ -83,7 +127,7 @@ export async function getAdminPlayers(
     const validatedFilters = AdminPlayerFiltersSchema.parse(filters);
     
     // Use collection group query for players across all teams
-    let playersQuery = adminDb.collectionGroup('players');
+    let playersQuery: Query<DocumentData> | CollectionGroup<DocumentData> = adminDb.collectionGroup('players');
     
     // Apply most selective filters first
     const appliedFilters: string[] = [];
@@ -146,62 +190,93 @@ export async function getAdminPlayers(
     const queryLimit = Math.min(validatedFilters.limit * 3, 300); // Buffer for client-side filtering
     
     let playersSnapshot;
+    let usedFallback = false;
+    
     try {
       playersSnapshot = await playersQuery.limit(queryLimit).get();
-    } catch (indexError) {
-      // If index error, fall back to a simpler query
-      console.warn('Falling back to simpler query due to index error:', indexError.message);
+    } catch (indexError: any) {
+      console.warn('Primary query failed, attempting fallbacks:', indexError?.message || indexError);
+      usedFallback = true;
       
-      // Try a simpler query with just isDeleted filter
-      const fallbackQuery = adminDb.collectionGroup('players')
-        .where('isDeleted', '!=', true)
-        .limit(queryLimit);
-      
+      // Try progressively simpler queries
       try {
-        playersSnapshot = await fallbackQuery.get();
-      } catch (fallbackError) {
-        // If even the fallback fails, return error
-        throw new Error(`Database query failed. Please ensure Firestore indexes are deployed. Original error: ${indexError.message}`);
+        // First fallback: Basic collection group query with just isDeleted filter
+        console.warn('Fallback 1: Basic collection group with isDeleted filter');
+        const fallback1Query = adminDb.collectionGroup('players')
+          .where('isDeleted', '!=', true)
+          .limit(queryLimit);
+        playersSnapshot = await fallback1Query.get();
+        console.warn('Fallback 1 successful');
+      } catch (fallback1Error) {
+        try {
+          // Second fallback: Pure collection group query without any filters
+          console.warn('Fallback 2: Pure collection group query');
+          const fallback2Query = adminDb.collectionGroup('players').limit(queryLimit);
+          playersSnapshot = await fallback2Query.get();
+          console.warn('Fallback 2 successful - will filter deleted items client-side');
+        } catch (fallback2Error) {
+          // Final attempt: Try to get individual team collections (requires knowing team IDs)
+          console.error('All collection group queries failed. This might indicate a deeper configuration issue.');
+          throw new Error(`All database query methods failed. Please check Firestore rules and indexes. Original error: ${indexError?.message || indexError}`);
+        }
       }
     }
     
     // Get unique team IDs for batch fetching team data
-    const teamIds = [...new Set(playersSnapshot.docs.map(doc => doc.data().teamId))];
+    const teamIds = Array.from(new Set(playersSnapshot.docs.map(doc => doc.data().teamId)));
     const teamsMap = new Map();
     
     if (teamIds.length > 0) {
-      // Batch fetch team data
-      const teamRefs = teamIds.map(id => adminDb.collection('teams').doc(id));
-      const teamDocs = await adminDb.getAll(...teamRefs);
-      
-      teamDocs.forEach(doc => {
-        if (doc.exists()) {
-          teamsMap.set(doc.id, doc.data());
+      try {
+        // Batch fetch team data - filter out null/undefined team IDs first
+        const validTeamIds = teamIds.filter(id => id && typeof id === 'string');
+        
+        if (validTeamIds.length > 0) {
+          const teamRefs = validTeamIds.map(id => adminDb.collection('teams').doc(id));
+          const teamDocs = await adminDb.getAll(...teamRefs);
+          
+          teamDocs.forEach(doc => {
+            if (doc && doc.exists) {
+              teamsMap.set(doc.id, doc.data());
+            }
+          });
         }
-      });
+      } catch (teamFetchError) {
+        console.warn('Error fetching team data, proceeding without team information:', teamFetchError instanceof Error ? teamFetchError.message : teamFetchError);
+      }
     }
     
     // Process players with team data
-    let players = playersSnapshot.docs.map(doc => {
-      const playerData = doc.data();
-      const teamData = teamsMap.get(playerData.teamId);
-      
-      return {
-        id: doc.id,
-        ...playerData,
-        addedAt: playerData.addedAt?.toDate?.()?.toISOString() || null,
-        verifiedAt: playerData.verifiedAt?.toDate?.()?.toISOString() || null,
-        team: teamData ? {
-          id: playerData.teamId,
-          name: teamData.name,
-          sportName: teamData.sportName,
-          status: teamData.status,
-          genderCategory: teamData.genderCategory
-        } : null
-      };
-    });
+    let players: PlayerDocument[] = playersSnapshot.docs.map(doc => {
+      try {
+        const playerData = doc.data();
+        if (!playerData) {
+          console.warn(`Empty player data for doc ${doc.id}`);
+          return null;
+        }
+        
+        const teamData = teamsMap.get(playerData.teamId);
+        
+        return {
+          id: doc.id,
+          ...playerData,
+          addedAt: playerData.addedAt?.toDate?.()?.toISOString() || null,
+          verifiedAt: playerData.verifiedAt?.toDate?.()?.toISOString() || null,
+          team: teamData ? {
+            id: playerData.teamId,
+            name: teamData.name,
+            sportName: teamData.sportName,
+            status: teamData.status,
+            genderCategory: teamData.genderCategory
+          } : null
+        };
+      } catch (playerProcessError) {
+        console.warn(`Error processing player doc ${doc.id}:`, playerProcessError instanceof Error ? playerProcessError.message : playerProcessError);
+        return null;
+      }
+    }).filter(player => player !== null); // Remove any null entries
     
-    // Apply client-side filters (for complex conditions)
+    // Apply client-side filters (for complex conditions and fallback cases)
     const clientSideFilters = {
       teamId: validatedFilters.teamId,
       teamStatus: validatedFilters.teamStatus,
@@ -212,8 +287,27 @@ export async function getAdminPlayers(
       profilePhotoVerified: validatedFilters.profilePhotoVerified,
       aadhaarVerified: validatedFilters.aadhaarVerified,
       documentsComplete: validatedFilters.documentsComplete,
-      searchQuery: validatedFilters.searchQuery?.toLowerCase()
+      searchQuery: validatedFilters.searchQuery?.toLowerCase(),
+      // Additional fallback filters
+      verificationStatus: validatedFilters.verificationStatus,
+      gender: validatedFilters.gender,
+      isDeleted: false // Always filter out deleted players
     };
+    
+    // Filter out deleted players first (important for fallback queries)
+    if (clientSideFilters.isDeleted === false) {
+      players = players.filter(player => !player.isDeleted);
+    }
+    
+    // Apply verification status filter if not handled server-side
+    if (clientSideFilters.verificationStatus !== 'all' && !appliedFilters.includes('verificationStatus')) {
+      players = players.filter(player => player.verificationStatus === clientSideFilters.verificationStatus);
+    }
+    
+    // Apply gender filter if not handled server-side  
+    if (clientSideFilters.gender !== 'all' && !appliedFilters.includes('gender')) {
+      players = players.filter(player => player.gender === clientSideFilters.gender);
+    }
     
     // Apply team-specific filters
     if (clientSideFilters.teamId) {
@@ -232,7 +326,7 @@ export async function getAdminPlayers(
     if (clientSideFilters.ageRange) {
       players = players.filter(player => {
         const age = player.age;
-        return age >= clientSideFilters.ageRange!.min && age <= clientSideFilters.ageRange!.max;
+        return age && age >= clientSideFilters.ageRange!.min && age <= clientSideFilters.ageRange!.max;
       });
     }
     
@@ -332,9 +426,11 @@ export async function getAdminPlayers(
       },
       appliedFilters,
       meta: {
-        queryOptimized: appliedFilters.length > 0,
+        queryOptimized: appliedFilters.length > 0 && !usedFallback,
         teamsLoaded: teamIds.length,
-        clientSideFiltersApplied: Object.values(clientSideFilters).some(v => v !== undefined && v !== 'all')
+        clientSideFiltersApplied: Object.values(clientSideFilters).some(v => v !== undefined && v !== 'all'),
+        usedFallback: usedFallback,
+        performanceNote: usedFallback ? 'Using fallback query due to missing indexes. Performance may be slower.' : 'Using optimized query with indexes.'
       }
     };
 
@@ -344,7 +440,7 @@ export async function getAdminPlayers(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`,
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`,
         players: []
       };
     }
@@ -371,7 +467,7 @@ export async function getAdminPlayerStats(
     const validatedFilters = AdminPlayerStatsFiltersSchema.parse(filters);
     
     // Use collection group query for comprehensive stats
-    let playersQuery = adminDb.collectionGroup('players');
+    let playersQuery: Query<DocumentData> | CollectionGroup<DocumentData> = adminDb.collectionGroup('players');
     playersQuery = playersQuery.where('isDeleted', '!=', true);
     
     // Apply filters
@@ -386,43 +482,82 @@ export async function getAdminPlayerStats(
     }
     
     let playersSnapshot;
+    let usedFallback = false;
+    
     try {
       playersSnapshot = await playersQuery.get();
-    } catch (indexError) {
-      console.warn('Falling back to simpler stats query due to index error:', indexError.message);
-      
-      // Fall back to basic query
-      const fallbackQuery = adminDb.collectionGroup('players')
-        .where('isDeleted', '!=', true);
+    } catch (indexError: any) {
+      console.warn('Stats query failed, attempting fallbacks:', indexError?.message || indexError);
+      usedFallback = true;
       
       try {
-        playersSnapshot = await fallbackQuery.get();
-      } catch (fallbackError) {
-        throw new Error(`Database query failed. Please ensure Firestore indexes are deployed. Original error: ${indexError.message}`);
+        // First fallback: Basic collection group query with just isDeleted filter
+        console.warn('Stats Fallback 1: Basic collection group with isDeleted filter');
+        const fallback1Query = adminDb.collectionGroup('players')
+          .where('isDeleted', '!=', true);
+        playersSnapshot = await fallback1Query.get();
+        console.warn('Stats Fallback 1 successful');
+      } catch (fallback1Error) {
+        try {
+          // Second fallback: Pure collection group query without any filters
+          console.warn('Stats Fallback 2: Pure collection group query');
+          const fallback2Query = adminDb.collectionGroup('players');
+          playersSnapshot = await fallback2Query.get();
+          console.warn('Stats Fallback 2 successful - will filter deleted items client-side');
+        } catch (fallback2Error) {
+          console.error('All stats collection group queries failed.');
+          throw new Error(`Stats database query failed. Please check Firestore rules and indexes. Original error: ${indexError?.message || indexError}`);
+        }
       }
     }
     
     // Get team data for filtering and aggregation
-    const teamIds = [...new Set(playersSnapshot.docs.map(doc => doc.data().teamId))];
+    const teamIds = Array.from(new Set(playersSnapshot.docs.map(doc => doc.data().teamId)));
     const teamsMap = new Map();
     
     if (teamIds.length > 0) {
-      const teamRefs = teamIds.map(id => adminDb.collection('teams').doc(id));
-      const teamDocs = await adminDb.getAll(...teamRefs);
-      
-      teamDocs.forEach(doc => {
-        if (doc.exists()) {
-          teamsMap.set(doc.id, doc.data());
+      try {
+        // Batch fetch team data - filter out null/undefined team IDs first
+        const validTeamIds = teamIds.filter(id => id && typeof id === 'string');
+        
+        if (validTeamIds.length > 0) {
+          const teamRefs = validTeamIds.map(id => adminDb.collection('teams').doc(id));
+          const teamDocs = await adminDb.getAll(...teamRefs);
+          
+          teamDocs.forEach(doc => {
+            if (doc && doc.exists) {
+              teamsMap.set(doc.id, doc.data());
+            }
+          });
         }
-      });
+      } catch (teamFetchError) {
+        console.warn('Error fetching team data for stats, proceeding without team information:', teamFetchError instanceof Error ? teamFetchError.message : teamFetchError);
+      }
     }
     
     // Filter and calculate statistics
-    let players = playersSnapshot.docs.map(doc => {
-      const playerData = doc.data();
-      const teamData = teamsMap.get(playerData.teamId);
-      return { ...playerData, team: teamData };
-    });
+    let players: PlayerDocument[] = playersSnapshot.docs.map(doc => {
+      try {
+        const playerData = doc.data();
+        if (!playerData) {
+          console.warn(`Empty player data for stats doc ${doc.id}`);
+          return null;
+        }
+        
+        const teamData = teamsMap.get(playerData.teamId);
+        return { 
+          id: doc.id,
+          ...playerData, 
+          team: teamData 
+        } as PlayerDocument;
+      } catch (playerProcessError) {
+        console.warn(`Error processing player doc for stats ${doc.id}:`, playerProcessError instanceof Error ? playerProcessError.message : playerProcessError);
+        return null;
+      }
+    }).filter(player => player !== null); // Remove any null entries
+    
+    // Filter out deleted players first (important for fallback queries)
+    players = players.filter(player => !player.isDeleted);
     
     // Apply team-based filters
     if (validatedFilters.sportName) {
@@ -563,7 +698,11 @@ export async function getAdminPlayerStats(
       stats,
       appliedFilters: Object.entries(validatedFilters)
         .filter(([_, value]) => value !== undefined && value !== 'all')
-        .map(([key, _]) => key)
+        .map(([key, _]) => key),
+      meta: {
+        usedFallback: usedFallback,
+        performanceNote: usedFallback ? 'Using fallback query for stats due to missing indexes.' : 'Using optimized stats query with indexes.'
+      }
     };
 
   } catch (error) {
@@ -572,7 +711,7 @@ export async function getAdminPlayerStats(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`
       };
     }
     
@@ -635,7 +774,7 @@ export async function bulkVerifyPlayers(
           await batch.commit();
           return { success: true, updates };
         } catch (error) {
-          return { success: false, error: error.message, updates };
+          return { success: false, error: error instanceof Error ? error.message : 'Unknown error', updates };
         }
       })
     );

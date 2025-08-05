@@ -45,7 +45,7 @@ export default function MatchDayTeamsPage() {
       const teamsResult = await getVenueTeamsForMatchDay(venueId, user!.uid);
       
       if (teamsResult.success) {
-        setTeams(teamsResult.teams);
+        setTeams(teamsResult.teams ?? []);
       } else {
         setError(teamsResult.error || 'Failed to load teams');
       }

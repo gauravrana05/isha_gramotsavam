@@ -279,7 +279,30 @@ export default function TeamVerificationPage() {
       }
       
       // Update team status based on the new list of players
-      await updateTeamStatus(updatedPlayers);
+      // (Fix: define updateTeamStatus inline here)
+      try {
+        // Determine new team status based on updatedPlayers
+        // Example: if all players are approved, set team as 'verified'
+        const allApproved = updatedPlayers.every(p => p.verificationStatus === 'approved');
+        const anyRejected = updatedPlayers.some(p => p.verificationStatus === 'rejected');
+        let newTeamStatus = 'pending';
+        if (allApproved) {
+          newTeamStatus = 'verified';
+        } else if (anyRejected) {
+          newTeamStatus = 'rejected';
+        }
+
+        // Update the team document in Firestore
+        const teamRef = doc(db, "teams", teamIdStr);
+        await updateDoc(teamRef, {
+          verificationStatus: newTeamStatus,
+          verifiedAt: newTeamStatus === 'verified' ? new Date().toISOString() : null,
+          verifiedBy: newTeamStatus === 'verified' ? user?.uid || null : null,
+        });
+      } catch (err) {
+        console.error('Error updating team status:', err);
+        // Optionally, show a user-facing error or handle as needed
+      }
       
     } catch (error) {
       console.error('Error updating player status:', error);
@@ -343,16 +366,20 @@ export default function TeamVerificationPage() {
           });
 
           // Update player document in team subcollection
-          const playerRef = doc(db, "teams", teamIdStr, "players", player.playerId);
-          batch.update(playerRef, {
-            verificationStatus: action,
-            verificationComments: reason ? [reason] : [],
-            verifiedAt: timestamp,
+          if (
+            typeof teamIdStr === "string" &&
+            typeof player.playerId === "string"
+          ) {
+            const playerRef = doc(db, "teams", teamIdStr, "players", player.playerId);
+            batch.update(playerRef, {
+              verificationStatus: action,
+              verificationComments: reason ? [reason] : [],
+              verifiedAt: timestamp,
             verifiedBy: user?.uid,
           });
         }
       }
-
+    }
       // Calculate new team status based on updated players
       const approvedCount = updatedPlayers.filter(p => p.verificationStatus === 'approved').length;
       const rejectedCount = updatedPlayers.filter(p => p.verificationStatus === 'rejected').length;
@@ -370,7 +397,7 @@ export default function TeamVerificationPage() {
       }
 
       // Add team status update to batch if it changed
-      if (newTeamStatus !== teamData?.status) {
+      if (typeof teamIdStr === "string" && newTeamStatus !== teamData?.status) {
         const teamRef = doc(db, "teams", teamIdStr);
         batch.update(teamRef, {
           status: newTeamStatus,
@@ -448,11 +475,11 @@ export default function TeamVerificationPage() {
       if (newTeamStatus === 'verified' && teamData?.status !== 'verified') {
         try {
           const result = await assignTeamToVenue({
-            id: teamData.id,
-            name: teamData.name,
-            state: teamData.state,
-            district: teamData.district,
-            panchayat: teamData.panchayat
+            id: (teamData as any)?.id,
+            name: (teamData as any)?.name,
+            state: (teamData as any)?.state,
+            district: (teamData as any)?.district,
+            panchayat: (teamData as any)?.panchayat
           });
           console.log('Venue assignment result:', result.message);
         } catch (error) {
@@ -463,7 +490,8 @@ export default function TeamVerificationPage() {
 
       alert(`Successfully ${action} ${selectedPlayersList.length} players!`);
       setSelectedPlayers(new Set()); // Clear selection
-    } catch (error) {
+
+    } catch(error) {
       console.error('Bulk action error:', error);
       alert(`Some ${actionText}s may have failed. Please check and try again.`);
       // Reload data on error to ensure UI consistency
@@ -1182,4 +1210,4 @@ export default function TeamVerificationPage() {
       )}
     </div>
   );
-}
+  }

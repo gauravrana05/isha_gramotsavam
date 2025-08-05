@@ -86,7 +86,7 @@ export async function createKnockoutDraw(
     const teams = sportTeams;
     
     // Sort teams by tournament number
-    teams.sort((a, b) => (a.tournamentNumber || 0) - (b.tournamentNumber || 0));
+    teams.sort((a: any, b: any) => (a.tournamentNumber || 0) - (b.tournamentNumber || 0));
     
     // Generate bracket
     const bracket = generateKnockoutBracket(teams);
@@ -117,16 +117,16 @@ export async function createKnockoutDraw(
       level: level as 'cluster' | 'division' | 'final',
       venueId,
       venueName: venueData?.name || 'Unknown Venue',
-      assignedTeams: teams.map(t => t.id),
-      checkedInTeams: teams.map(t => t.id),
+      assignedTeams: teams.map((t: any) => t.id),
+      checkedInTeams: teams.map((t: any) => t.id),
       bracket: {
         matches: bracket.matches,
         winners: []
       },
       status: 'in_progress',
       finalStandings: [],
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp() as any,
+      updatedAt: FieldValue.serverTimestamp() as any
     };
     
     const fixtureRef = await adminDb.collection('fixtures').add(fixtureData);

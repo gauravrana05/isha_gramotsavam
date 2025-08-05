@@ -11,13 +11,13 @@ import FAQSection from '@/components/public/FAQSection'
 import DecorativeElement from '@/components/ui/DecorativeElement'
 
 interface ThrowballPageProps {
-    params: {
+    params: Promise<{
         lang: string
-    }
+    }>
 }
 
-export default function ThrowballPage({ params }: ThrowballPageProps) {
-    const { lang } = params
+export default async function ThrowballPage({ params }: ThrowballPageProps) {
+    const { lang } = await params
 
     return (
         <main className="min-h-screen">
@@ -84,7 +84,7 @@ export default function ThrowballPage({ params }: ThrowballPageProps) {
 
                                 <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
                                     <Link href={`/${lang}/public/register/team/throwball`}>
-                                        <Button size="large" className="min-w-[200px]">
+                                        <Button size="lg" className="min-w-[200px]">
                                             Register Now
                                         </Button>
                                     </Link>
@@ -170,7 +170,7 @@ export default function ThrowballPage({ params }: ThrowballPageProps) {
                                 Make sure you read through all the rules carefully.
                             </p>
                             <Link href={`/${lang}/public/sports/throwball/rules`}>
-                                <Button variant="secondary" size="large" className="inline-flex items-center">
+                                <Button variant="secondary" size="lg" className="inline-flex items-center">
                                     <svg viewBox="0 0 27 27" className="w-6 h-6 mr-3" fill="currentColor">
                                         <g clipPath="url(#clip0_2085_23016)">
                                             <path d="M24.3857 13.651L25.7181 12.9618L26.0745 13.651L25.7181 14.3401L24.3857 13.651ZM2.97527 13.6508L1.64293 14.34L1.2865 13.6508L1.64293 12.9617L2.97527 13.6508ZM23.0534 14.3401C20.6732 9.7383 17.0721 7.65725 13.6805 7.65723C10.2889 7.6572 6.68776 9.73819 4.3076 14.34L1.64293 12.9617C4.43068 7.57193 8.95084 4.65719 13.6805 4.65723C18.4102 4.65726 22.9303 7.57205 25.7181 12.9618L23.0534 14.3401ZM25.7181 14.3401C22.9303 19.7299 18.4102 22.6446 13.6805 22.6446C8.95083 22.6445 4.43067 19.7297 1.64293 14.34L4.3076 12.9617C6.68776 17.5635 10.2889 19.6445 13.6805 19.6446C17.0721 19.6446 20.6732 17.5636 23.0534 12.9618L25.7181 14.3401ZM11.9689 13.6508C11.9689 14.5961 12.7352 15.3624 13.6805 15.3624V18.3624C11.0784 18.3624 8.96893 16.253 8.96893 13.6508H11.9689ZM13.6805 15.3624C14.6258 15.3624 15.3921 14.5961 15.3921 13.6508H18.3921C18.3921 16.253 16.2826 18.3624 13.6805 18.3624V15.3624ZM15.3921 13.6508C15.3921 12.7056 14.6258 11.9393 13.6805 11.9393V8.93927C16.2826 8.93927 18.3921 11.0487 18.3921 13.6508H15.3921ZM13.6805 11.9393C12.7352 11.9393 11.9689 12.7056 11.9689 13.6508H8.96893C8.96893 11.0487 11.0784 8.93927 13.6805 8.93927V11.9393Z" fill="#C75026"></path>

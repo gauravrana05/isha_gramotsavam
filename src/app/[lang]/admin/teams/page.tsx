@@ -92,10 +92,22 @@ export default function AdminTeamsPage() {
       const result = await getAdminTeams({
         limit: pageSize,
         offset: (currentPage - 1) * pageSize,
-        status: statusFilter as any,
+        status: statusFilter as
+          | "all"
+          | "verified"
+          | "rejected"
+          | "draft"
+          | "submitted"
+          | "active",
+        verificationStatus: "all", // or set based on a filter if you have one
+        currentTournamentLevel: "all", // or set based on a filter if you have one
         sportName: sportFilter !== 'all' ? sportFilter : undefined,
         district: districtFilter !== 'all' ? districtFilter : undefined,
-        genderCategory: genderFilter as any,
+        genderCategory: genderFilter === 'male'
+          ? 'men'
+          : genderFilter === 'female'
+          ? 'women'
+          : (genderFilter as "all" | "men" | "women" | "mixed"),
         searchQuery: searchTerm || undefined,
         sortBy: 'createdAt',
         sortOrder: 'desc'
@@ -105,11 +117,19 @@ export default function AdminTeamsPage() {
         throw new Error(result.error);
       }
 
-      setTeams(result.teams);
-      setHasMore(result.pagination.hasMore);
-      
+      // Fix: Map LightweightTeam[] to TeamData[] by filling missing fields with defaults/nulls
+      setTeams(
+        (result.teams ?? []).map((team: any) => ({
+          ...team,
+          sportId: team.sportId ?? null,
+          state: team.state ?? null,
+          createdAt: team.createdAt ?? null,
+          eventId: team.eventId ?? null,
+        }))
+      );
+      setHasMore(result.pagination?.hasMore ?? false);
+      setError('');
     } catch (err: any) {
-      console.error('Error loading teams:', err);
       setError(err.message || 'Failed to load teams. Please check your permissions.');
     } finally {
       setLoading(false);
@@ -123,7 +143,13 @@ export default function AdminTeamsPage() {
       const result = await getAdminTeamStats({
         district: districtFilter !== 'all' ? districtFilter : undefined,
         sportName: sportFilter !== 'all' ? sportFilter : undefined,
-        genderCategory: genderFilter as any
+        genderCategory:
+          genderFilter === 'male'
+            ? 'men'
+            : genderFilter === 'female'
+            ? 'women'
+            : (genderFilter as "all" | "men" | "women" | "mixed"),
+        currentTournamentLevel: "all", // or set based on a filter if you have one
       }, user.uid);
 
       if (result.success) {

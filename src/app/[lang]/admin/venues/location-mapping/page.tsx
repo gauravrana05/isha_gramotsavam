@@ -5,6 +5,11 @@ import VenueLocationMappingForm from './VenueLocationMappingForm';
 import { deleteVenueLocationMapping } from '@/lib/actions/admin/venueMapping';
 import { serializeFirestoreDocs } from '@/lib/utils/firestore';
 
+async function deleteMappingAction(mappingId: string) {
+  'use server';
+  await deleteVenueLocationMapping(mappingId);
+}
+
 async function getVenues() {
   const venuesSnapshot = await adminDb.collection('venues').where('isActive', '==', true).get();
   return venuesSnapshot.docs.map(doc => {
@@ -41,12 +46,15 @@ function analyzeVenueDistribution(venues: any[]) {
 
   // Return districts with multiple cluster venues
   return Object.entries(districtCounts)
-    .filter(([_, data]) => data.count > 1)
-    .map(([district, data]) => ({
-      district,
-      count: data.count,
-      state: data.state
-    }));
+    .filter(([_district, data]) => (data as { count: number; state: string }).count > 1)
+    .map(([district, data]) => {
+      const d = data as { count: number; state: string };
+      return {
+        district,
+        count: d.count,
+        state: d.state
+      };
+    });
 }
 
 async function getVenueLocationMappings() {
@@ -109,8 +117,8 @@ export default async function VenueLocationMappingPage() {
                   </div>
                 </div>
                 
-                <form action={deleteVenueLocationMapping.bind(null, mapping.id)}>
-                  <Button type="submit" variant="destructive" size="sm">
+                <form action={deleteMappingAction.bind(null, mapping.id)}>
+                  <Button type="submit" variant="danger" size="sm">
                     Deactivate
                   </Button>
                 </form>

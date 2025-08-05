@@ -57,7 +57,7 @@ export async function getFixtures(params: z.infer<typeof GetFixturesSchema>) {
     const validatedParams = GetFixturesSchema.parse(params);
     
     // Build query
-    let query = adminDb.collection('fixtures');
+    let query: any = adminDb.collection('fixtures');
     
     // Add filters
     if (validatedParams.status !== 'all') {
@@ -137,7 +137,7 @@ export async function getFixtures(params: z.infer<typeof GetFixturesSchema>) {
     if (error instanceof z.ZodError) {
       return { 
         success: false, 
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`,
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`,
         fixtures: [],
         hasMore: false
       };
@@ -158,8 +158,8 @@ export async function getFixtureStats(params: z.infer<typeof GetFixtureStatsSche
     const validatedParams = GetFixtureStatsSchema.parse(params);
     
     // Build base queries
-    let fixturesQuery = adminDb.collection('fixtures');
-    let matchesQuery = adminDb.collection('matches');
+    let fixturesQuery: any = adminDb.collection('fixtures');
+    let matchesQuery: any = adminDb.collection('matches');
     
     // Apply filters if provided
     if (validatedParams.venueId) {
@@ -185,7 +185,7 @@ export async function getFixtureStats(params: z.infer<typeof GetFixtureStatsSche
     };
     
     // Calculate stats from fixtures
-    fixturesSnapshot.docs.forEach(doc => {
+    fixturesSnapshot.docs.forEach((doc: any) => {
       const data = doc.data();
       
       // Count by status
@@ -212,7 +212,7 @@ export async function getFixtureStats(params: z.infer<typeof GetFixtureStatsSche
     if (error instanceof z.ZodError) {
       return { 
         success: false, 
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`,
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`,
         stats: {
           totalFixtures: 0,
           totalMatches: 0,
@@ -254,12 +254,12 @@ export async function getFixtureDetails(fixtureId: string, includeMatches: boole
     const fixtureData = fixtureDoc.data();
     
     // Get team details if needed
-    const teamIds = [...new Set([
+    const teamIds = Array.from(new Set([
       ...(fixtureData?.assignedTeams || []),
       ...(fixtureData?.bracket?.matches || []).flatMap((match: any) => 
         [match.team1Id, match.team2Id].filter(Boolean)
       )
-    ])];
+    ]));
     
     const teams: { [key: string]: any } = {};
     if (teamIds.length > 0) {

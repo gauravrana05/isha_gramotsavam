@@ -60,7 +60,7 @@ export default function CulturalEvents({ lang }: CulturalEventsProps) {
               
               <div className="flex justify-center lg:justify-start">
                 <Link href={`/${lang}/public/culturals`}>
-                  <Button variant="primary" size="large">
+                  <Button variant="primary" size="lg">
                     Learn More
                   </Button>
                 </Link>

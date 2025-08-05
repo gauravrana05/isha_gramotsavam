@@ -103,12 +103,12 @@ const TeamPhotoUpload: React.FC<TeamPhotoUploadProps> = ({
           <div className="mb-4">
             <img
               src={currentUrl}
-              alt="Current Team Photo"
-              className="w-48 h-32 object-cover rounded-lg mx-auto border border-gray-200"
+              alt="Team Photo"
+              className="w-32 h-20 object-cover rounded-lg mx-auto border border-gray-200"
             />
           </div>
         ) : (
-          <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
         )}
         
         <h3 className="text-lg font-medium text-gray-900 mb-2">Team Photo</h3>
@@ -124,10 +124,7 @@ const TeamPhotoUpload: React.FC<TeamPhotoUploadProps> = ({
               <span>Uploading...</span>
             </div>
           ) : (
-            <div className="flex items-center space-x-2">
-              <Upload className="w-4 h-4" />
-              <span>{currentUrl ? 'Replace Photo' : 'Upload Photo'}</span>
-            </div>
+            <span>{currentUrl ? 'Replace' : 'Upload'}</span>
           )}
         </button>
 

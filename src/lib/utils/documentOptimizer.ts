@@ -316,9 +316,17 @@ export function optimizeNotification(notification: any) {
  */
 export function optimizeArray<T>(arr: T[], keyFn?: (item: T) => any): T[] {
   if (!keyFn) {
-    return [...new Set(arr)];
+    const result: T[] = [];
+    const seen = new Set<T>();
+    for (const item of arr) {
+      if (!seen.has(item)) {
+        seen.add(item);
+        result.push(item);
+      }
+    }
+    return result;
   }
-  
+
   const seen = new Set();
   return arr.filter(item => {
     const key = keyFn(item);

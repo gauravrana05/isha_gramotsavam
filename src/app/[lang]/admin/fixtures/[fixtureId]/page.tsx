@@ -17,10 +17,10 @@ import {
 } from 'lucide-react';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     fixtureId: string;
     lang: string;
-  };
+  }>;
 }
 
 async function getFixtureDetails(fixtureId: string) {
@@ -91,7 +91,12 @@ async function getFixtureMatches(fixtureId: string) {
     }));
     
     // Sort in memory instead of using orderBy to avoid index requirement
-    return matches.sort((a, b) => (a.matchNumber || 0) - (b.matchNumber || 0));
+    return matches.sort((a, b) => {
+      const aNum = typeof (a as any).matchNumber === 'number' ? (a as any).matchNumber : 0;
+      const bNum = typeof (b as any).matchNumber === 'number' ? (b as any).matchNumber : 0;
+      return aNum - bNum;
+    });
+
   } catch (error) {
     console.error('Error fetching matches:', error);
     return [];
@@ -99,7 +104,7 @@ async function getFixtureMatches(fixtureId: string) {
 }
 
 export default async function AdminFixtureDetailPage({ params }: PageProps) {
-  const { fixtureId, lang } = params;
+  const { fixtureId, lang } = await params;
   
   const [fixtureResult, standaloneMatches] = await Promise.all([
     getFixtureDetails(fixtureId),
@@ -125,13 +130,13 @@ export default async function AdminFixtureDetailPage({ params }: PageProps) {
   
   const { fixture } = fixtureResult;
   
-  // Get all team IDs from bracket matches and assigned teams
+  // Get all team IDs from bracket matches and assigned teams, handling possible undefineds and type issues
   const allTeamIds = [
-    ...fixture.assignedTeams,
-    ...fixture.bracket.matches.flatMap((match: any) => [match.team1Id, match.team2Id, match.winnerId])
+    ...((fixture as any)?.assignedTeams ?? []),
+    ...(((fixture as any)?.bracket?.matches ?? []).flatMap((match: any) => [match.team1Id, match.team2Id, match.winnerId]))
   ].filter(Boolean);
-  
-  const teams = await getTeamDetails([...new Set(allTeamIds)]);
+
+  const teams = await getTeamDetails(Array.from(new Set(allTeamIds)));
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -191,42 +196,42 @@ export default async function AdminFixtureDetailPage({ params }: PageProps) {
         </div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{fixture.name}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{(fixture as any)?.name ?? 'Untitled Fixture'}</h1>
             <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
               <div className="flex items-center">
                 <MapPin className="w-4 h-4 mr-1" />
-                {fixture.venueName}
+                {(fixture as any)?.venueName}
               </div>
-              <div>{fixture.sportName} • {fixture.genderCategory}</div>
+              <div>{(fixture as any)?.sportName} • {(fixture as any)?.genderCategory}</div>
               <div className="flex items-center">
                 <Users className="w-4 h-4 mr-1" />
-                {fixture.assignedTeams?.length || 0} teams
+                {(fixture as any)?.assignedTeams?.length || 0} teams
               </div>
             </div>
           </div>
           <div className="text-right">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(fixture.status)}`}>
-              {getStatusIcon(fixture.status)}
-              <span className="ml-2 capitalize">{fixture.status?.replace('_', ' ')}</span>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor((fixture as any)?.status)}`}>
+              {getStatusIcon((fixture as any)?.status)}
+              <span className="ml-2 capitalize">{(fixture as any)?.status?.replace('_', ' ')}</span>
             </span>
             <div className="text-xs text-gray-500 mt-1">
-              Level: <span className="font-medium capitalize">{fixture.level}</span>
+              Level: <span className="font-medium capitalize">{(fixture as any)?.level}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Tournament Status & Champion */}
-      {fixture.status === 'completed' && fixture.championTeamName && (
+      {(fixture as any)?.status === 'completed' && (fixture as any)?.championTeamName && (
         <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg p-6 mb-6">
           <div className="flex items-center">
             <Crown className="w-8 h-8 text-yellow-600 mr-3" />
             <div>
               <h3 className="text-lg font-semibold text-yellow-900">Tournament Champion</h3>
-              <p className="text-yellow-800">{fixture.championTeamName}</p>
-              {fixture.completedAt && (
+              <p className="text-yellow-800">{(fixture as any)?.championTeamName}</p>
+              {(fixture as any)?.completedAt && (
                 <p className="text-sm text-yellow-700">
-                  Completed on {new Date(fixture.completedAt).toLocaleDateString()}
+                  Completed on {new Date((fixture as any)?.completedAt).toLocaleDateString()}
                 </p>
               )}
             </div>
@@ -254,7 +259,7 @@ export default async function AdminFixtureDetailPage({ params }: PageProps) {
                 </h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {roundMatches.map((match, index) => (
+                  {roundMatches.map((match: any, index: number) => (
                     <div key={match.id} className="border rounded-lg p-4 hover:shadow-sm transition-shadow">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center text-sm text-gray-600">
@@ -347,7 +352,7 @@ export default async function AdminFixtureDetailPage({ params }: PageProps) {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Completed</p>
               <p className="text-2xl font-bold text-gray-900">
-                {standaloneMatches.filter(m => m.status === 'completed').length}
+                {standaloneMatches.filter(m => (m as any)?.status === 'completed').length}
               </p>
             </div>
           </div>
@@ -359,7 +364,7 @@ export default async function AdminFixtureDetailPage({ params }: PageProps) {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">In Progress</p>
               <p className="text-2xl font-bold text-gray-900">
-                {standaloneMatches.filter(m => m.status === 'in_progress').length}
+                {standaloneMatches.filter(m => (m as any)?.status === 'in_progress').length}
               </p>
             </div>
           </div>

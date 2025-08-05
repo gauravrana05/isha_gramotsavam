@@ -134,7 +134,7 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link href={sportData.registrationLink}>
-                    <Button size="small" className="min-w-[200px] w-full">
+                    <Button size="sm" className="min-w-[200px] w-full">
                       Register Now
                     </Button>
                   </Link>

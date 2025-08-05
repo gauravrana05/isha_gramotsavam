@@ -4,6 +4,18 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { serializeFirestoreDocs } from '@/lib/utils/firestore';
 
+// Server action for creating mapping
+async function createMappingAction(formData: FormData) {
+  'use server';
+  await createClusterDivisionMapping(formData);
+}
+
+// Server action for deleting mapping
+async function deleteMappingAction(mappingId: string) {
+  'use server';
+  await deleteClusterDivisionMapping(mappingId);
+}
+
 async function getVenues() {
   const venuesSnapshot = await adminDb.collection('venues').where('isActive', '==', true).get();
   return serializeFirestoreDocs(venuesSnapshot.docs);
@@ -32,7 +44,7 @@ export default async function ClusterDivisionMappingPage() {
       {/* Create New Mapping Form */}
       <Card className="mb-8 p-6">
         <h2 className="text-lg font-semibold mb-4">Create New Mapping</h2>
-        <form action={createClusterDivisionMapping} className="space-y-4">
+        <form action={createMappingAction} className="space-y-4">
           <input type="hidden" name="eventId" value="isha_gramotsavam_2025" />
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -95,8 +107,8 @@ export default async function ClusterDivisionMappingPage() {
                   </div>
                 </div>
                 
-                <form action={deleteClusterDivisionMapping.bind(null, mapping.id)}>
-                  <Button type="submit" variant="destructive" size="sm">
+                <form action={deleteMappingAction.bind(null, mapping.id)}>
+                  <Button type="submit" variant="danger" size="sm">
                     Remove
                   </Button>
                 </form>

@@ -90,7 +90,7 @@ export default function VenueVolunteerList({
             
             <Button 
               onClick={() => handleRemoveAssignment(assignment.id)}
-              variant="destructive" 
+              variant="danger" 
               size="sm" 
               className="w-full mt-3"
             >

@@ -512,7 +512,7 @@ export default function CaptainPlayerManagement() {
   };
 
   // Handle document upload success - refresh player data
-  const handleDocumentUploadSuccess = async (playerId: string, documentType: string, url: string) => {
+  const handleDocumentUploadSuccess = async (playerId: string, documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack', url: string) => {
     // Update local state immediately (optimistic update)
     setPlayers(prev => prev.map(p => 
       p.playerId === playerId 
@@ -679,13 +679,16 @@ export default function CaptainPlayerManagement() {
         });
         
         console.log('handleAddPlayer: Server action result:', result);
-        
+
         if (!result.success) {
-          throw new Error(result.error || 'Failed to add player to team');
+          const errorMsg =
+            typeof (result as { error?: unknown }).error === 'string'
+              ? (result as { error?: unknown }).error as string
+              : 'Failed to add player to team';
+          throw new Error(errorMsg);
         }
-        
-        console.log(`Player added successfully with ID: ${result.playerId}`);
-        
+
+        console.log(`Player added successfully with ID: ${(result as { playerId?: string }).playerId}`);
         // Reload team data to get updated player list
         await loadTeamData();
         
@@ -1447,7 +1450,7 @@ export default function CaptainPlayerManagement() {
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.playerId, 'profilePhoto', url)}
                           onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.playerId, isComplete)}
                           variant="card"
-                          disabled={isReadOnly}
+                          disabled={isReadOnly === true}
                         />
                       )}
                     </div>
@@ -1477,7 +1480,7 @@ export default function CaptainPlayerManagement() {
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.playerId, 'aadhaarFront', url)}
                           onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.playerId, isComplete)}
                           variant="card"
-                          disabled={isReadOnly}
+                          disabled={isReadOnly === true}
                         />
                       )}
                     </div>
@@ -1505,19 +1508,17 @@ export default function CaptainPlayerManagement() {
                           label="Aadhaar Back"
                           currentUrl={selectedPlayer.documents.aadhaarBack.url}
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.playerId, 'aadhaarBack', url)}
-                          onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.playerId, isComplete)}
+                          onProfileComplete={(isComplete: boolean | undefined) => handleProfileComplete(selectedPlayer.playerId, isComplete === true)}
                           variant="card"
-                          disabled={isReadOnly}
+                          disabled={isReadOnly == true}
                         />
                       )}
                     </div>
-
                   </div>
                 </div>
-              </div>
 
-              {/* Action Buttons */}
-              <div className="mt-8 flex justify-end space-x-4">
+                {/* Action Buttons */}
+                <div className="mt-8 flex justify-end space-x-4">
                 <button
                   onClick={() => setSelectedPlayer(null)}
                   className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
@@ -1547,6 +1548,7 @@ export default function CaptainPlayerManagement() {
             </div>
           </div>
         </div>
+      </div>
       )}
     </div>
   );

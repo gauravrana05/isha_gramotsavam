@@ -140,8 +140,8 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
   ...props
 }) => {
   const defaultActions = role === 'captain' 
-    ? getCaptainActions(props)
-    : getPlayerActions(props);
+    ? getCaptainActions({ ...props, role })
+    : getPlayerActions({ ...props, role });
   
   const actions = customActions || defaultActions;
 

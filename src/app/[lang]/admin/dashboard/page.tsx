@@ -81,6 +81,7 @@ export default function AdminDashboard() {
       // Load optimized dashboard overview
       const [dashboardResult, tournamentResult] = await Promise.all([
         getAdminDashboardOverview({
+          level: 'all', // <-- Add this required property
           includeDetailed: true,
           refreshCache: refresh
         }, user.uid),
@@ -97,9 +98,16 @@ export default function AdminDashboard() {
       if (!tournamentResult.success) {
         throw new Error(tournamentResult.error);
       }
-
-      setDashboardOverview(dashboardResult.overview);
-      setTournamentOverview(tournamentResult.tournament);
+      if (dashboardResult?.overview) {
+        setDashboardOverview(dashboardResult.overview);
+      } else {
+        setDashboardOverview(null);
+      }
+      if (tournamentResult?.tournament) {
+        setTournamentOverview(tournamentResult.tournament);
+      } else {
+        setTournamentOverview(null);
+      }
       
     } catch (err: any) {
       console.error('Error loading dashboard data:', err);

@@ -3,6 +3,33 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { z } from 'zod';
 import { optimizeTeamDocument, optimizePlayerDocument, createPaginatedResponse } from '@/lib/utils/documentOptimizer';
+import type { Query, CollectionReference, DocumentData } from 'firebase-admin/firestore';
+
+// Team document interface
+interface TeamDocument {
+  id: string;
+  name?: string;
+  status?: string;
+  verificationStatus?: string;
+  panchayat?: string;
+  taluk?: string;
+  district?: string;
+  state?: string;
+  sportName?: string;
+  genderCategory?: string;
+  currentTournamentLevel?: string;
+  clusterVenueId?: string;
+  currentPlayers?: number;
+  maxPlayers?: number;
+  captainProfile?: {
+    name?: string;
+  };
+  createdAt?: any;
+  updatedAt?: any;
+  submittedAt?: any;
+  verifiedAt?: any;
+  [key: string]: any;
+}
 
 // Comprehensive filter schemas for admin team queries
 const AdminTeamFiltersSchema = z.object({
@@ -75,7 +102,7 @@ export async function getAdminTeams(
     const validatedFilters = AdminTeamFiltersSchema.parse(filters);
     
     // Build the base query
-    let query = adminDb.collection('teams');
+    let query: Query<DocumentData> | CollectionReference<DocumentData> = adminDb.collection('teams');
     
     // Apply filters dynamically based on available indexes
     const appliedFilters: string[] = [];
@@ -155,7 +182,7 @@ export async function getAdminTeams(
     
     const teamsSnapshot = await query.limit(queryLimit).offset(validatedFilters.offset).get();
     
-    let teams = teamsSnapshot.docs.map(doc => ({
+    let teams: TeamDocument[] = teamsSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
@@ -215,7 +242,7 @@ export async function getAdminTeams(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`,
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`,
         teams: []
       };
     }
@@ -285,10 +312,10 @@ export async function getAdminTeamDetails(teamId: string, requestingUserId: stri
         team: {
           id: teamDoc.id,
           ...teamDoc.data(),
-          createdAt: teamDoc.data().createdAt?.toDate?.()?.toISOString() || null,
-          updatedAt: teamDoc.data().updatedAt?.toDate?.()?.toISOString() || null,
-          submittedAt: teamDoc.data().submittedAt?.toDate?.()?.toISOString() || null,
-          verifiedAt: teamDoc.data().verifiedAt?.toDate?.()?.toISOString() || null
+          createdAt: teamDoc.data()?.createdAt?.toDate?.()?.toISOString() || null,
+          updatedAt: teamDoc.data()?.updatedAt?.toDate?.()?.toISOString() || null,
+          submittedAt: teamDoc.data()?.submittedAt?.toDate?.()?.toISOString() || null,
+          verifiedAt: teamDoc.data()?.verifiedAt?.toDate?.()?.toISOString() || null
         },
         players: players.map(optimizePlayerDocument),
         verification,
@@ -324,7 +351,7 @@ export async function getAdminTeamStats(
     const validatedFilters = AdminTeamStatsFiltersSchema.parse(filters);
     
     // Build optimized aggregation queries
-    let teamsQuery = adminDb.collection('teams');
+    let teamsQuery: Query<DocumentData> | CollectionReference<DocumentData> = adminDb.collection('teams');
     
     // Apply filters
     if (validatedFilters.panchayat) {
@@ -448,7 +475,7 @@ export async function getAdminTeamStats(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`
       };
     }
     
@@ -512,7 +539,7 @@ export async function bulkUpdateTeamStatus(
           await batch.commit();
           return { success: true, teamIds: batchTeamIds };
         } catch (error) {
-          return { success: false, error: error.message, teamIds: batchTeamIds };
+          return { success: false, error: error instanceof Error ? error.message : 'Unknown error', teamIds: batchTeamIds };
         }
       })
     );

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
 import { useDocumentManager } from '@/hooks/documents';
 import { DocumentType } from '@/context/DocumentContext';
@@ -31,6 +31,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 }) => {
   const {user} = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showModal, setShowModal] = useState(false);
   const { uploadDocument, isUploading, getUploadProgress, getError, clearError } = useDocumentManager({
     onSuccess: async (docType, url) => {
       if (docType === type) {
@@ -66,6 +67,12 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     }
   };
 
+  const handleImageClick = () => {
+    if (currentUrl && !uploading) {
+      setShowModal(true);
+    }
+  };
+
   const renderProfileVariant = () => (
     <div className={`relative ${className}`}>
       <div className="relative mb-4">
@@ -73,7 +80,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           <img
             src={currentUrl}
             alt={label}
-            className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+            className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 cursor-pointer"
+            onClick={handleImageClick}
           />
         ) : (
           <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
@@ -137,7 +145,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             <img
               src={currentUrl}
               alt={label}
-              className="w-32 h-20 object-cover rounded-lg mx-auto border border-gray-200"
+              className="w-32 h-20 object-cover rounded-lg mx-auto border border-gray-200 cursor-pointer"
+              onClick={handleImageClick}
             />
           </div>
         ) : (
@@ -196,7 +205,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           <img
             src={currentUrl}
             alt={label}
-            className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+            className="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-pointer"
+            onClick={handleImageClick}
           />
         )}
         
@@ -269,6 +279,26 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             >
               <X className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Full Screen Modal */}
+      {showModal && currentUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+          <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center p-4">
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
+            >
+              <X className="w-8 h-8" />
+            </button>
+            <img
+              src={currentUrl}
+              alt={label}
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}

@@ -17,10 +17,10 @@ import {
 } from 'lucide-react';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     venueId: string;
     lang: string;
-  };
+  }>;
 }
 
 async function getVenueFixtures(venueId: string) {
@@ -44,7 +44,7 @@ async function getVenueFixtures(venueId: string) {
 }
 
 export default async function FixturesPage({ params }: PageProps) {
-  const { venueId } = params;
+  const { venueId } = await params;
   const eventId = 'isha_gramotsavam_2025';
 
   const checkedInTeamsResult = await getVenueCheckedInTeams(venueId, eventId);
@@ -149,7 +149,7 @@ export default async function FixturesPage({ params }: PageProps) {
                         {sportId.replace('_', ' ')} - {genderCategory}
                       </h3>
                       <p className="text-sm text-gray-600">
-                        {sportTeams.length} teams checked in
+                        {(sportTeams as any)?.length} teams checked in
                       </p>
                     </div>
                   </div>
@@ -161,7 +161,7 @@ export default async function FixturesPage({ params }: PageProps) {
                         View Tournament
                       </button>
                     </Link>
-                  ) : sportTeams.length >= 2 ? (
+                  ) : (sportTeams as any)?.length >= 2 ? (
                     <Link href={`/en/volunteer/venues/${venueId}/fixtures/create-draw?sport=${sportId}&gender=${genderCategory}`}>
                       <button className="flex items-center px-3 py-2 text-sm text-white bg-[#F28C38] hover:bg-[#E67A26] rounded-md">
                         <Plus className="w-4 h-4 mr-1" />
@@ -213,7 +213,7 @@ export default async function FixturesPage({ params }: PageProps) {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
-                          {fixture.bracket?.matches?.filter(m => m.status === 'completed').length || 0} / {fixture.bracket?.matches?.length || 0}
+                          {fixture.bracket?.matches?.filter((m: { status?: string }) => m?.status === 'completed').length || 0} / {fixture.bracket?.matches?.length || 0}
                         </div>
                         <div className="text-xs text-gray-500">completed</div>
                       </td>
@@ -272,7 +272,7 @@ export default async function FixturesPage({ params }: PageProps) {
                   <div>
                     <span className="text-xs text-gray-500">Matches</span>
                     <p className="text-sm font-medium text-gray-900">
-                      {fixture.bracket?.matches?.filter(m => m.status === 'completed').length || 0} / {fixture.bracket?.matches?.length || 0}
+                      {fixture.bracket?.matches?.filter((m :{ status?: string }) => m?.status === 'completed').length || 0} / {fixture.bracket?.matches?.length || 0}
                     </p>
                   </div>
                 </div>

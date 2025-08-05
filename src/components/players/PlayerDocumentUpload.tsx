@@ -47,6 +47,7 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   const handleFileSelect = () => {
     if (disabled || uploading) return;
@@ -137,6 +138,12 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
     setError(null);
   };
 
+  const handleImageClick = () => {
+    if (currentUrl && !uploading) {
+      setShowModal(true);
+    }
+  };
+
   const renderProfileVariant = () => (
     <div className={`relative ${className}`}>
       <div className="relative mb-4">
@@ -144,7 +151,8 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
           <img
             src={currentUrl}
             alt={label}
-            className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+            className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 cursor-pointer"
+            onClick={handleImageClick}
           />
         ) : (
           <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
@@ -201,29 +209,30 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
   );
 
   const renderCardVariant = () => (
-    <div className={`border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-[#CE4520] transition-colors ${disabled ? 'opacity-50' : ''} ${className}`}>
+    <div className={`border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-[#CE4520] transition-colors ${disabled ? 'opacity-50' : ''} ${className}`}>
       <div className="text-center">
         {currentUrl ? (
-          <div className="mb-3">
+          <div className="mb-4">
             <img
               src={currentUrl}
               alt={label}
-              className="w-32 h-20 object-cover rounded-lg mx-auto border border-gray-200"
+              className="w-32 h-20 object-cover rounded-lg mx-auto border border-gray-200 cursor-pointer"
+              onClick={handleImageClick}
             />
           </div>
         ) : (
-          <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
         )}
         
-        <h4 className="text-sm font-medium text-gray-900 mb-2">{label}</h4>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">{label}</h3>
         
         <button
           onClick={handleFileSelect}
           disabled={disabled || uploading}
-          className="bg-[#CE4520] text-white px-3 py-1 rounded text-xs hover:bg-[#1565C0] transition-colors font-fira disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-[#CE4520] text-white px-4 py-2 rounded-lg hover:bg-[#1565C0] transition-colors font-fira disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {uploading ? (
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-2">
               <LoadingSpinner size="xs" color="white" />
               <span>Uploading...</span>
             </div>
@@ -233,14 +242,14 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
         </button>
 
         {progress > 0 && progress < 100 && (
-          <div className="mt-2">
-            <div className="w-full bg-gray-200 rounded-full h-1">
+          <div className="mt-4">
+            <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
-                className="bg-[#CE4520] h-1 rounded-full transition-all duration-300"
+                className="bg-[#CE4520] h-2 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">{Math.round(progress)}%</p>
+            <p className="text-xs text-gray-500 mt-1">{Math.round(progress)}% uploaded</p>
           </div>
         )}
       </div>
@@ -267,7 +276,8 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
           <img
             src={currentUrl}
             alt={label}
-            className="w-12 h-12 object-cover rounded border border-gray-200"
+            className="w-12 h-12 object-cover rounded border border-gray-200 cursor-pointer"
+            onClick={handleImageClick}
           />
         )}
         
@@ -340,6 +350,26 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
             >
               <X className="w-3 h-3" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Full Screen Modal */}
+      {showModal && currentUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+          <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center p-4">
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
+            >
+              <X className="w-8 h-8" />
+            </button>
+            <img
+              src={currentUrl}
+              alt={label}
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}

@@ -100,8 +100,13 @@ export async function updateMatchResult(
           completedAt: new Date(),
           updatedAt: new Date()
         });
-        
-        await checkAndTriggerLevelAdvancement(fixtureId, fixtureData, completionResult.winners);
+
+        // Filter out any nulls from winners before passing to checkAndTriggerLevelAdvancement
+        await checkAndTriggerLevelAdvancement(
+          fixtureId,
+          fixtureData,
+          (completionResult.winners ?? []).filter((id): id is string => id !== null)
+        );
       } else {
         await fixtureRef.update({
           'bracket.matches': finalMatches,
@@ -193,10 +198,10 @@ async function generateFinalStandings(matches: FixtureMatch[], teamIds: string[]
   for (const teamId of teamIds) {
     const teamDoc = await adminDb.collection('teams').doc(teamId).get();
     if (teamDoc.exists) {
-      teamData[teamId] = teamDoc.data();
+      (teamData as Record<string, any>)[teamId] = teamDoc.data();
     }
   }
-  
+
   const finalMatch = matches.find(match => match.roundName === 'Final' && match.status === 'completed');
   if (finalMatch) {
     standings.push({
@@ -553,7 +558,7 @@ async function checkAndCompleteTournament(
     
     const winners = [winnerId];
     
-    if ((fixtureData.level === 'cluster' || fixtureData.level === 'division') && finalStandings.length >= 2) {
+    if (((fixtureData as any)?.level === 'cluster' || (fixtureData as any)?.level === 'division') && finalStandings.length >= 2) {
       winners.push(finalStandings[1].teamId);
     }
     
@@ -569,8 +574,8 @@ async function checkAndCompleteTournament(
     
     await triggerLevelAdvancement(fixtureData, winners);
     
-    revalidatePath(`/volunteer/venues/${fixtureData.venueId}/fixtures`);
-    revalidatePath(`/volunteer/venues/${fixtureData.venueId}/fixtures/${fixtureId}`);
+    revalidatePath(`/volunteer/venues/${(fixtureData as any)?.venueId}/fixtures`);
+    revalidatePath(`/volunteer/venues/${(fixtureData as any)?.venueId}/fixtures/${fixtureId}`);
     
     console.log(`Tournament ${fixtureId} completed. Champion: ${winnerName}, Winners advancing: ${winners.length}`);
     
@@ -590,7 +595,7 @@ async function calculateFinalStandings(
   for (const teamId of fixtureData.assignedTeams) {
     const teamDoc = await adminDb.collection('teams').doc(teamId).get();
     if (teamDoc.exists) {
-      teamData[teamId] = teamDoc.data();
+      (teamData as Record<string, any>)[teamId] = teamDoc.data();
     }
   }
   
@@ -605,7 +610,7 @@ async function calculateFinalStandings(
   standings.push({
     position: 1,
     teamId: championId,
-    teamName: teamData[championId]?.name || 'Unknown Team',
+    teamName: (teamData as Record<string, any>)[championId]?.name || 'Unknown Team',
     qualifiesForNext: true
   });
   
@@ -613,23 +618,21 @@ async function calculateFinalStandings(
     standings.push({
       position: 2,
       teamId: runnerUpId,
-      teamName: teamData[runnerUpId]?.name || 'Unknown Team',
+      teamName: (teamData as Record<string, any>)[runnerUpId]?.name || 'Unknown Team',
       qualifiesForNext: fixtureData.level === 'cluster' || fixtureData.level === 'division'
     });
   }
+  const topTwoTeams: string[] = [championId, runnerUpId].filter((id): id is string => Boolean(id));
+  const remainingTeams: string[] = fixtureData.assignedTeams.filter((teamId: string) => !topTwoTeams.includes(teamId));
   
-  const topTwoTeams = [championId, runnerUpId].filter(Boolean);
-  const remainingTeams = fixtureData.assignedTeams.filter(teamId => !topTwoTeams.includes(teamId));
-  
-  remainingTeams.forEach((teamId, index) => {
+  remainingTeams.forEach((teamId: string, index: number) => {
     standings.push({
       position: index + 3,
       teamId,
-      teamName: teamData[teamId]?.name || 'Unknown Team',
+      teamName: (teamData as Record<string, any>)[teamId]?.name || 'Unknown Team',
       qualifiesForNext: false
     });
   });
-  
   return standings;
 }
 
@@ -723,13 +726,12 @@ export async function getFixtureDetails(fixtureId: string) {
     
     const fixtureData = fixtureDoc.data();
     
-    const teamIds = [...new Set([
-      ...fixtureData.assignedTeams,
-      ...fixtureData.bracket.matches.flatMap((match: FixtureMatch) => 
+    const teamIds = Array.from(new Set([
+      ...(fixtureData?.assignedTeams ?? []),
+      ...((fixtureData?.bracket?.matches ?? []) as FixtureMatch[]).flatMap((match: FixtureMatch) => 
         [match.team1Id, match.team2Id].filter(Boolean)
       )
-    ])];
-    
+    ]));
     const teams = {};
     if (teamIds.length > 0) {
       const teamRefs = teamIds.map(id => adminDb.collection('teams').doc(id));
@@ -738,7 +740,7 @@ export async function getFixtureDetails(fixtureId: string) {
       teamDocs.forEach(doc => {
         if (doc.exists) {
           const teamData = doc.data();
-          teams[doc.id] = {
+          (teams as Record<string, any>)[doc.id] = {
             id: doc.id,
             ...teamData
           };
@@ -776,8 +778,10 @@ export async function getAvailableMatches(fixtureId: string) {
     if (!result.success || !result.fixture) {
       return { success: false, error: result.error, matches: [] };
     }
-    
-    const availableMatches = result.fixture.bracket.matches.filter((match: FixtureMatch) => 
+
+    // Defensive: bracket may not exist on fixture
+    const matches = (result.fixture as any)?.bracket?.matches ?? [];
+    const availableMatches = matches.filter((match: FixtureMatch) => 
       match.team1Id && 
       match.team2Id && 
       match.status === 'scheduled'

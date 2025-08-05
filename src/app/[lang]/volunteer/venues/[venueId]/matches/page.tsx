@@ -14,13 +14,13 @@ import {
 } from 'lucide-react';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     venueId: string;
     lang: string;
-  };
-  searchParams: {
+  }>;
+  searchParams: Promise<{
     fixture?: string;
-  };
+  }>;
 }
 
 async function getVenueMatches(venueId: string, fixtureId?: string) {
@@ -67,7 +67,7 @@ async function getFixtureInfo(fixtureId: string) {
 
 export default async function MatchesPage({ params, searchParams }: PageProps) {
   const { venueId } = await params;
-  const { fixture: fixtureId } = searchParams;
+  const { fixture: fixtureId } = await searchParams;
 
   const matches = await getVenueMatches(venueId, fixtureId);
   const fixture = fixtureId ? await getFixtureInfo(fixtureId) : null;
@@ -127,7 +127,7 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
           </Link>
         </div>
         <h1 className="text-2xl font-bold text-gray-900">
-          {fixture ? `${fixture.name} - Matches` : 'Tournament Matches'}
+          {fixture ? `${(fixture as any)?.name} - Matches` : 'Tournament Matches'}
         </h1>
         <p className="text-gray-600 text-sm">
           {fixture ? 'Manage results for tournament matches' : 'All venue matches'}
@@ -141,15 +141,15 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
             <div className="flex items-center">
               <Trophy className="w-6 h-6 text-[#F28C38] mr-3" />
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{fixture.name}</h2>
+                <h2 className="text-lg font-semibold text-gray-900">{(fixture as any)?.name}</h2>
                 <p className="text-gray-600 text-sm">
-                  {fixture.assignedTeams?.length || 0} teams • Level: {fixture.level}
+                  {(fixture as any)?.assignedTeams?.length || 0} teams • Level: {(fixture as any)?.level}
                 </p>
               </div>
             </div>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(fixture.status)}`}>
-              {getStatusIcon(fixture.status)}
-              <span className="ml-1 capitalize">{fixture.status.replace('_', ' ')}</span>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor((fixture as any)?.status)}`}>
+              {getStatusIcon((fixture as any)?.status)}
+              <span className="ml-1 capitalize">{(fixture as any)?.status.replace('_', ' ')}</span>
             </span>
           </div>
         </div>
@@ -219,7 +219,7 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
               
               {/* Mobile Cards */}
               <div className="space-y-4">
-                {matchesByRound[roundName].map((match) => (
+                {matchesByRound[roundName].map((match: any) => (
                   <div key={match.matchId} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div>

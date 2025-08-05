@@ -99,7 +99,7 @@ export async function getAdminVenues(
     const validatedFilters = AdminVenueFiltersSchema.parse(filters);
     
     // Build optimized venue query
-    let venuesQuery = adminDb.collection('venues');
+    let venuesQuery: any = adminDb.collection('venues');
     const appliedFilters: string[] = [];
     
     // Level filter (most selective)
@@ -135,7 +135,7 @@ export async function getAdminVenues(
     const venuesSnapshot = await venuesQuery.get();
     
     // Get team assignment data for each venue
-    const venueIds = venuesSnapshot.docs.map(doc => doc.id);
+    const venueIds = venuesSnapshot.docs.map((doc: any) => doc.id);
     const assignmentsMap = new Map();
     
     if (venueIds.length > 0) {
@@ -155,7 +155,7 @@ export async function getAdminVenues(
     }
     
     // Process venues with assignment data
-    let venues = venuesSnapshot.docs.map(doc => {
+    let venues = venuesSnapshot.docs.map((doc: any) => {
       const venueData = doc.data();
       const assignments = assignmentsMap.get(doc.id) || [];
       
@@ -171,36 +171,36 @@ export async function getAdminVenues(
     
     // Apply client-side filters
     if (validatedFilters.minCapacity !== undefined) {
-      venues = venues.filter(venue => (venue.capacity || 0) >= validatedFilters.minCapacity!);
+      venues = venues.filter((venue: any) => ((venue as any).capacity || 0) >= validatedFilters.minCapacity!);
     }
     
     if (validatedFilters.maxCapacity !== undefined) {
-      venues = venues.filter(venue => (venue.capacity || 0) <= validatedFilters.maxCapacity!);
+      venues = venues.filter((venue: any) => ((venue as any).capacity || 0) <= validatedFilters.maxCapacity!);
     }
     
     if (validatedFilters.hasAssignedTeams !== undefined) {
-      venues = venues.filter(venue => {
+      venues = venues.filter((venue: any) => {
         const hasTeams = venue.assignedTeams > 0;
         return validatedFilters.hasAssignedTeams ? hasTeams : !hasTeams;
       });
     }
     
     if (validatedFilters.supportedSports && validatedFilters.supportedSports.length > 0) {
-      venues = venues.filter(venue => {
-        const venueSports = venue.supportedSports || [];
+      venues = venues.filter((venue: any) => {
+        const venueSports = (venue as any).supportedSports || [];
         return validatedFilters.supportedSports!.some(sport => venueSports.includes(sport));
       });
     }
     
     if (validatedFilters.assignmentStatus !== 'all') {
-      venues = venues.filter(venue => {
+      venues = venues.filter((venue: any) => {
         switch (validatedFilters.assignmentStatus) {
           case 'assigned':
             return venue.assignedTeams > 0;
           case 'unassigned':
             return venue.assignedTeams === 0;
           case 'partial':
-            return venue.assignedTeams > 0 && venue.assignedTeams < (venue.capacity || 0);
+            return venue.assignedTeams > 0 && venue.assignedTeams < ((venue as any).capacity || 0);
           default:
             return true;
         }
@@ -209,33 +209,33 @@ export async function getAdminVenues(
     
     if (validatedFilters.searchQuery) {
       const searchLower = validatedFilters.searchQuery.toLowerCase();
-      venues = venues.filter(venue =>
-        venue.name?.toLowerCase().includes(searchLower) ||
-        venue.address?.toLowerCase().includes(searchLower) ||
-        venue.district?.toLowerCase().includes(searchLower)
+      venues = venues.filter((venue: any) =>
+        (venue as any).name?.toLowerCase().includes(searchLower) ||
+        (venue as any).address?.toLowerCase().includes(searchLower) ||
+        (venue as any).district?.toLowerCase().includes(searchLower)
       );
     }
     
     // Sort venues
-    venues.sort((a, b) => {
+    venues.sort((a: any, b: any) => {
       let aValue: any, bValue: any;
       
       switch (validatedFilters.sortBy) {
         case 'capacity':
-          aValue = a.capacity || 0;
-          bValue = b.capacity || 0;
+          aValue = (a as any).capacity || 0;
+          bValue = (b as any).capacity || 0;
           break;
         case 'assignedTeams':
           aValue = a.assignedTeams || 0;
           bValue = b.assignedTeams || 0;
           break;
         case 'district':
-          aValue = a.district || '';
-          bValue = b.district || '';
+          aValue = (a as any).district || '';
+          bValue = (b as any).district || '';
           break;
         default: // name
-          aValue = a.name || '';
-          bValue = b.name || '';
+          aValue = (a as any).name || '';
+          bValue = (b as any).name || '';
       }
       
       const comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
@@ -248,7 +248,7 @@ export async function getAdminVenues(
     const paginatedVenues = venues.slice(startIndex, endIndex);
     
     // Optimize venue data for transfer
-    const optimizedVenues = paginatedVenues.map(venue => ({
+    const optimizedVenues = paginatedVenues.map((venue: any) => ({
       id: venue.id,
       name: venue.name,
       level: venue.level,
@@ -290,7 +290,7 @@ export async function getAdminVenues(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`,
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`,
         venues: []
       };
     }
@@ -317,7 +317,7 @@ export async function getTeamAssignments(
     const validatedFilters = TeamAssignmentFiltersSchema.parse(filters);
     
     // Build team assignment query
-    let assignmentsQuery = adminDb.collection('teamVenueAssignment');
+    let assignmentsQuery: any = adminDb.collection('teamVenueAssignment');
     const appliedFilters: string[] = [];
     
     // Venue filter
@@ -357,8 +357,8 @@ export async function getTeamAssignments(
       .get();
     
     // Get team and venue data
-    const teamIds = [...new Set(assignmentsSnapshot.docs.map(doc => doc.data().teamId))];
-    const venueIds = [...new Set(assignmentsSnapshot.docs.map(doc => doc.data().venueId))];
+    const teamIds = Array.from(new Set(assignmentsSnapshot.docs.map((doc: any) => doc.data().teamId))) as string[];
+    const venueIds = Array.from(new Set(assignmentsSnapshot.docs.map((doc: any) => doc.data().venueId))) as string[];
     
     const [teamsMap, venuesMap] = await Promise.all([
       getTeamsMap(teamIds),
@@ -366,7 +366,7 @@ export async function getTeamAssignments(
     ]);
     
     // Process assignments with related data
-    let assignments = assignmentsSnapshot.docs.map(doc => {
+    let assignments = assignmentsSnapshot.docs.map((doc: any) => {
       const assignmentData = doc.data();
       const teamData = teamsMap.get(assignmentData.teamId);
       const venueData = venuesMap.get(assignmentData.venueId);
@@ -398,38 +398,38 @@ export async function getTeamAssignments(
     
     // Apply client-side filters
     if (validatedFilters.district) {
-      assignments = assignments.filter(assignment => 
+      assignments = assignments.filter((assignment: any) => 
         assignment.team?.district === validatedFilters.district ||
         assignment.venue?.district === validatedFilters.district
       );
     }
     
     if (validatedFilters.panchayat) {
-      assignments = assignments.filter(assignment => 
+      assignments = assignments.filter((assignment: any) => 
         assignment.team?.panchayat === validatedFilters.panchayat
       );
     }
     
     if (validatedFilters.sportName) {
-      assignments = assignments.filter(assignment => 
+      assignments = assignments.filter((assignment: any) => 
         assignment.team?.sportName === validatedFilters.sportName
       );
     }
     
     if (validatedFilters.genderCategory !== 'all') {
-      assignments = assignments.filter(assignment => 
+      assignments = assignments.filter((assignment: any) => 
         assignment.team?.genderCategory === validatedFilters.genderCategory
       );
     }
     
     if (validatedFilters.teamStatus !== 'all') {
-      assignments = assignments.filter(assignment => 
+      assignments = assignments.filter((assignment: any) => 
         assignment.team?.status === validatedFilters.teamStatus
       );
     }
     
     if (validatedFilters.matchDayStatus !== 'all') {
-      assignments = assignments.filter(assignment => 
+      assignments = assignments.filter((assignment: any) => 
         assignment.matchDayStatus === validatedFilters.matchDayStatus
       );
     }
@@ -461,7 +461,7 @@ export async function getTeamAssignments(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`,
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`,
         assignments: []
       };
     }
@@ -490,7 +490,7 @@ export async function bulkAssignTeamsToVenues(
     
     // Validate all teams and venues exist
     const teamIds = assignments.map(a => a.teamId);
-    const venueIds = [...new Set(assignments.map(a => a.venueId))];
+    const venueIds = Array.from(new Set(assignments.map((a: any) => a.venueId)));
     
     const [teamsMap, venuesMap] = await Promise.all([
       getTeamsMap(teamIds),
@@ -583,7 +583,7 @@ export async function bulkAssignTeamsToVenues(
           await batch.commit();
           return { success: true, assignments: batchAssignments };
         } catch (error) {
-          return { success: false, error: error.message, assignments: batchAssignments };
+          return { success: false, error: (error as Error).message, assignments: batchAssignments };
         }
       })
     );
@@ -611,7 +611,7 @@ export async function bulkAssignTeamsToVenues(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`
       };
     }
     

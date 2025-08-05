@@ -252,110 +252,110 @@ export function useMultipleListeners() {
 /**
  * Hook for creating debounced Firestore listeners to reduce excessive updates
  */
-export function useDebouncedFirestoreListener<T = DocumentData>(
-  ref: DocumentReference | CollectionReference | Query | null,
-  delay: number = 500,
-  options: UseFirestoreListenerOptions = {}
-) {
-  const [debouncedData, setDebouncedData] = useState<T | T[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<FirestoreError | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
+// export function useDebouncedFirestoreListener<T = DocumentData>(
+//   ref: DocumentReference | CollectionReference | Query | null,
+//   delay: number = 500,
+//   options: UseFirestoreListenerOptions = {}
+// ) {
+//   const [debouncedData, setDebouncedData] = useState<T | T[] | null>(null);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState<FirestoreError | null>(null);
+//   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+//   const unsubscribeRef = useRef<(() => void) | null>(null);
   
-  const { enabled = true, onError } = options;
+//   const { enabled = true, onError } = options;
 
-  useEffect(() => {
-    // Cleanup previous listener and timeout
-    if (unsubscribeRef.current) {
-      unsubscribeRef.current();
-      unsubscribeRef.current = null;
-    }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
+//   useEffect(() => {
+//     // Cleanup previous listener and timeout
+//     if (unsubscribeRef.current) {
+//       unsubscribeRef.current();
+//       unsubscribeRef.current = null;
+//     }
+//     if (timeoutRef.current) {
+//       clearTimeout(timeoutRef.current);
+//       timeoutRef.current = null;
+//     }
 
-    // Reset state
-    setLoading(true);
-    setError(null);
+//     // Reset state
+//     setLoading(true);
+//     setError(null);
 
-    // Don't start listener if disabled or no ref
-    if (!enabled || !ref) {
-      setLoading(false);
-      return;
-    }
+//     // Don't start listener if disabled or no ref
+//     if (!enabled || !ref) {
+//       setLoading(false);
+//       return;
+//     }
 
-    try {
-      unsubscribeRef.current = onSnapshot(
-        ref,
-        (snapshot) => {
-          // Clear existing timeout
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-          }
+//     try {
+//       unsubscribeRef.current = onSnapshot(
+//         ref,
+//         (snapshot) => {
+//           // Clear existing timeout
+//           if (timeoutRef.current) {
+//             clearTimeout(timeoutRef.current);
+//           }
 
-          // Set new timeout for debounced update
-          timeoutRef.current = setTimeout(() => {
-            if ('docs' in snapshot) {
-              // Collection/Query snapshot
-              const docs = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-              })) as T[];
-              setDebouncedData(docs);
-            } else {
-              // Document snapshot
-              const docData = snapshot.exists() 
-                ? { id: snapshot.id, ...snapshot.data() } as T
-                : null;
-              setDebouncedData(docData);
-            }
+//           // Set new timeout for debounced update
+//           timeoutRef.current = setTimeout(() => {
+//             if ('docs' in snapshot) {
+//               // Collection/Query snapshot
+//               const docs = snapshot.docs.map(doc => ({
+//                 id: doc.id,
+//                 ...doc.data()
+//               })) as T[];
+//               setDebouncedData(docs);
+//             } else {
+//               // Document snapshot
+//               const docData = snapshot.exists() 
+//                 ? { id: snapshot.id, ...snapshot.data() } as T
+//                 : null;
+//               setDebouncedData(docData);
+//             }
             
-            setLoading(false);
-            setError(null);
-          }, delay);
-        },
-        (firestoreError: FirestoreError) => {
-          console.error('Debounced Firestore listener error:', firestoreError);
-          setError(firestoreError);
-          setLoading(false);
+//             setLoading(false);
+//             setError(null);
+//           }, delay);
+//         },
+//         (firestoreError: FirestoreError) => {
+//           console.error('Debounced Firestore listener error:', firestoreError);
+//           setError(firestoreError);
+//           setLoading(false);
           
-          if (onError) {
-            onError(firestoreError);
-          }
-        }
-      );
-    } catch (err) {
-      console.error('Error setting up debounced listener:', err);
-      setError(err as FirestoreError);
-      setLoading(false);
-    }
+//           if (onError) {
+//             onError(firestoreError);
+//           }
+//         }
+//       );
+//     } catch (err) {
+//       console.error('Error setting up debounced listener:', err);
+//       setError(err as FirestoreError);
+//       setLoading(false);
+//     }
 
-    // Cleanup function
-    return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
-  }, [ref, delay, enabled, onError]);
+//     // Cleanup function
+//     return () => {
+//       if (unsubscribeRef.current) {
+//         unsubscribeRef.current();
+//         unsubscribeRef.current = null;
+//       }
+//       if (timeoutRef.current) {
+//         clearTimeout(timeoutRef.current);
+//         timeoutRef.current = null;
+//       }
+//     };
+//   }, [ref, delay, enabled, onError]);
 
-  // Additional cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
+//   // Additional cleanup on unmount
+//   useEffect(() => {
+//     return () => {
+//       if (unsubscribeRef.current) {
+//         unsubscribeRef.current();
+//       }
+//       if (timeoutRef.current) {
+//         clearTimeout(timeoutRef.current);
+//       }
+//     };
+//   }, []);
 
-  return { data: debouncedData, loading, error };
-}
+//   return { data: debouncedData, loading, error };
+// }

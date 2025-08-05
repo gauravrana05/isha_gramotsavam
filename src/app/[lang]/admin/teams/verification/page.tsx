@@ -87,7 +87,7 @@ export default function AdminTeamVerificationPage() {
       return;
     }
 
-    if (!['admin', 'verification_volunteer'].includes(userProfile?.role)) {
+    if (!['admin', 'verification_volunteer'].includes(userProfile?.role ?? '')) {
       router.push(`/${lang}/player/dashboard`);
       return;
     }
@@ -103,26 +103,38 @@ export default function AdminTeamVerificationPage() {
         throw new Error('User not authenticated');
       }
 
-      const result = await getAdminVerificationQueue({
-        limit: pageSize,
-        offset: (currentPage - 1) * pageSize,
-        verificationStatus: verificationStatusFilter as any,
-        priority: priorityFilter as any,
-        urgency: urgencyFilter as any,
-        district: districtFilter || undefined,
-        sportName: sportFilter || undefined,
-        searchQuery: searchTerm || undefined,
-        sortBy: 'submittedAt',
-        sortOrder: 'desc'
-      }, user.uid);
+      const result = await getAdminVerificationQueue(
+        {
+          limit: pageSize,
+          offset: (currentPage - 1) * pageSize,
+          verificationStatus: verificationStatusFilter as 'pending' | 'all' | 'verified' | 'rejected',
+          teamStatus: 'all', // or set from a filter if you have one
+          priority: priorityFilter as 'high' | 'medium' | 'low' | 'all',
+          urgency: urgencyFilter as 'critical' | 'standard' | 'low' | 'all',
+          district: districtFilter || undefined,
+          sportName: sportFilter || undefined,
+          genderCategory: 'all', // or set from a filter if you have one
+          documentCompleteness: 'all', // or set from a filter if you have one
+          searchQuery: searchTerm || undefined,
+          sortBy: 'submittedAt',
+          sortOrder: 'desc'
+        },
+        user.uid
+      );
 
       if (!result.success) {
         throw new Error(result.error);
       }
 
-      setTeams(result.teams);
-      setHasMore(result.pagination.hasMore);
-      
+      // Ensure each team has the required 'verificationStatus' property
+      const teamsWithStatus = (result.teams ?? []).map((team: any) => ({
+        ...team,
+        verificationStatus: team.verificationStatus ?? (team.verification?.status ?? 'pending'),
+      }));
+
+      setTeams(teamsWithStatus);
+      setHasMore(result.pagination?.hasMore ?? false);
+
     } catch (err: any) {
       console.error('Error loading verification queue:', err);
       setError(err.message || 'Failed to load verification queue');

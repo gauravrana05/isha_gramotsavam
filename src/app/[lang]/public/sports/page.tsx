@@ -173,7 +173,7 @@ export default function SportsOverviewPage() {
                   >
                     Learn More
                   </Link>
-                  <Button size="small" className="min-w-[200px]">
+                  <Button size="sm" className="min-w-[200px]">
                     Register Now
                   </Button>
                 </div>
@@ -232,7 +232,7 @@ export default function SportsOverviewPage() {
                   >
                     Learn More
                   </Link>
-                  <Button size="small" className="min-w-[200px]">
+                  <Button size="sm" className="min-w-[200px]">
                     Register Now
                   </Button>
                 </div>

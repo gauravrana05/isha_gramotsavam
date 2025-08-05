@@ -16,16 +16,41 @@ import {
 } from 'lucide-react';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     lang: string;
+  }>;
+}
+
+interface Match {
+  id: string;
+  matchNumber?: number;
+  status?: string;
+  roundName?: string;
+  fixtureName?: string;
+  sportName?: string;
+  genderCategory?: string;
+  venueName?: string;
+  team1?: {
+    teamName?: string;
   };
+  team2?: {
+    teamName?: string;
+  };
+  result?: {
+    winnerName?: string;
+    resultEnteredAt?: any;
+  };
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  resultEnteredAt?: string | null;
+  [key: string]: any;
 }
 
 async function getAllMatches() {
   try {
     const matchesSnapshot = await adminDb.collection('matches').get();
     
-    const matches = [];
+    const matches: Match[] = [];
     
     for (const doc of matchesSnapshot.docs) {
       const matchData = doc.data();
@@ -92,7 +117,7 @@ async function getMatchStats() {
 }
 
 export default async function AdminMatchesPage({ params }: PageProps) {
-  const { lang } = params;
+  const { lang } = await params;
   
   const [matchesResult, stats] = await Promise.all([
     getAllMatches(),
@@ -121,13 +146,13 @@ export default async function AdminMatchesPage({ params }: PageProps) {
     }
   };
 
-  const formatMatchTeams = (match: any) => {
+  const formatMatchTeams = (match: Match) => {
     const team1Name = match.team1?.teamName || 'TBD';
     const team2Name = match.team2?.teamName || 'TBD';
     return `${team1Name} vs ${team2Name}`;
   };
 
-  const getWinnerInfo = (match: any) => {
+  const getWinnerInfo = (match: Match) => {
     if (match.result?.winnerName) {
       return `Winner: ${match.result.winnerName}`;
     }
@@ -142,7 +167,7 @@ export default async function AdminMatchesPage({ params }: PageProps) {
     }
     acc[venueKey].push(match);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, Match[]>);
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -287,9 +312,9 @@ export default async function AdminMatchesPage({ params }: PageProps) {
                         <div className="text-sm text-gray-900">{match.fixtureName}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(match.status)}`}>
-                          {getStatusIcon(match.status)}
-                          <span className="ml-1 capitalize">{match.status?.replace('_', ' ')}</span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor((match as any)?.status || 'scheduled')}`}>
+                          {getStatusIcon(match.status || 'scheduled')}
+                          <span className="ml-1 capitalize">{match.status?.replace('_', ' ') || 'scheduled'}</span>
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

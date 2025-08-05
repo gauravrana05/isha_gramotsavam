@@ -7,7 +7,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 export async function assignVolunteerToVenue(formData: FormData) {
   try {
-    const assignmentData: Omit<VolunteerVenueAssignment, 'assignmentId' | 'createdAt' | 'updatedAt'> = {
+    const assignmentData: any = {
       eventId: formData.get('eventId') as string,
       volunteerId: formData.get('volunteerId') as string,
       volunteerName: formData.get('volunteerName') as string,

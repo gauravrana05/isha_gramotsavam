@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Eye, Download, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Eye, Download, Trash2, CheckCircle, XCircle, X } from 'lucide-react';
 import { useDocumentManager } from '@/hooks/documents';
 import { DocumentType } from '@/context/DocumentContext';
 
@@ -30,6 +30,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 }) => {
   const { deleteDocument, isUploading } = useDocumentManager();
   const loading = isUploading(type);
+  const [showModal, setShowModal] = useState(false);
 
   const handleDelete = async () => {
     if (window.confirm(`Are you sure you want to delete ${label}?`)) {
@@ -42,8 +43,14 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
   const handleView = () => {
     if (url) {
-      window.open(url, '_blank');
+      setShowModal(true);
       onView?.();
+    }
+  };
+
+  const handleImageClick = () => {
+    if (url && !loading) {
+      setShowModal(true);
     }
   };
 
@@ -76,17 +83,10 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         <img
           src={url}
           alt={label}
-          className="w-full h-full object-cover rounded-lg border border-gray-200"
+          className="w-full h-full object-cover rounded-lg border border-gray-200 cursor-pointer"
+          onClick={handleImageClick}
         />
         
-        {/* Verification Status */}
-        <div className="absolute top-1 right-1">
-          {verified ? (
-            <CheckCircle className="w-5 h-5 text-green-500 bg-white rounded-full" />
-          ) : (
-            <XCircle className="w-5 h-5 text-yellow-500 bg-white rounded-full" />
-          )}
-        </div>
 
         {/* Loading Overlay */}
         {loading && (
@@ -127,13 +127,30 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         )}
       </div>
       
-      {/* Label and Status */}
+      {/* Label */}
       <div className="mt-2 text-center">
         <p className="text-xs font-medium text-gray-700">{label}</p>
-        <p className={`text-xs ${verified ? 'text-green-600' : 'text-yellow-600'}`}>
-          {verified ? 'Verified' : 'Pending Verification'}
-        </p>
       </div>
+
+      {/* Full Screen Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+          <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center p-4">
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
+            >
+              <X className="w-8 h-8" />
+            </button>
+            <img
+              src={url!}
+              alt={label}
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

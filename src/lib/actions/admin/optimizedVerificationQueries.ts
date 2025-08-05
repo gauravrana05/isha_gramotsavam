@@ -94,7 +94,7 @@ export async function getAdminVerificationQueue(
     const validatedFilters = AdminVerificationQueueFiltersSchema.parse(filters);
     
     // Build optimized teams query for verification
-    let teamsQuery = adminDb.collection('teams');
+    let teamsQuery: any = adminDb.collection('teams');
     const appliedFilters: string[] = [];
     
     // Most selective filters first
@@ -151,7 +151,7 @@ export async function getAdminVerificationQueue(
       .get();
     
     // Get team IDs for fetching players and verification records
-    const teamIds = teamsSnapshot.docs.map(doc => doc.id);
+    const teamIds = teamsSnapshot.docs.map((doc: any) => doc.id);
     
     // Batch fetch players and verification records
     const [playersMap, verificationsMap] = await Promise.all([
@@ -160,7 +160,7 @@ export async function getAdminVerificationQueue(
     ]);
     
     // Process teams with verification data
-    let teams = teamsSnapshot.docs.map(doc => {
+    let teams = teamsSnapshot.docs.map((doc : any) => {
       const teamData = doc.data();
       const players = playersMap.get(doc.id) || [];
       const verification = verificationsMap.get(doc.id);
@@ -199,18 +199,18 @@ export async function getAdminVerificationQueue(
     
     // Apply priority filter
     if (clientSideFilters.priority !== 'all') {
-      teams = teams.filter(team => team.priority === clientSideFilters.priority);
+      teams = teams.filter((team:any) => team.priority === clientSideFilters.priority);
     }
     
     // Apply urgency filter
     if (clientSideFilters.urgency !== 'all') {
-      teams = teams.filter(team => team.urgency === clientSideFilters.urgency);
+      teams = teams.filter((team:any) => team.urgency === clientSideFilters.urgency);
     }
     
     // Player count range filter
     if (clientSideFilters.playerCountRange) {
-      teams = teams.filter(team => {
-        const playerCount = team.currentPlayers || 0;
+      teams = teams.filter((team:any) => {
+        const playerCount = (team as any).currentPlayers || team.players?.length || 0;
         return playerCount >= clientSideFilters.playerCountRange!.min && 
                playerCount <= clientSideFilters.playerCountRange!.max;
       });
@@ -218,19 +218,19 @@ export async function getAdminVerificationQueue(
     
     // Document completeness filters
     if (clientSideFilters.hasIncompleteDocuments !== undefined) {
-      teams = teams.filter(team => 
+      teams = teams.filter((team:any) => 
         team.metrics.hasIncompleteDocuments === clientSideFilters.hasIncompleteDocuments
       );
     }
     
     if (clientSideFilters.hasRejectedPlayers !== undefined) {
-      teams = teams.filter(team => 
+      teams = teams.filter((team:any) => 
         team.metrics.hasRejectedPlayers === clientSideFilters.hasRejectedPlayers
       );
     }
     
     if (clientSideFilters.documentCompleteness !== 'all') {
-      teams = teams.filter(team => {
+      teams = teams.filter((team:any) => {
         const completeness = team.metrics.documentCompleteness;
         return completeness === clientSideFilters.documentCompleteness;
       });
@@ -238,13 +238,13 @@ export async function getAdminVerificationQueue(
     
     // Assignment filters
     if (clientSideFilters.assignedToVolunteer) {
-      teams = teams.filter(team => 
+      teams = teams.filter((team:any) => 
         team.verification?.assignedTo === clientSideFilters.assignedToVolunteer
       );
     }
     
     if (clientSideFilters.unassigned !== undefined) {
-      teams = teams.filter(team => {
+      teams = teams.filter((team:any) => {
         const isUnassigned = !team.verification?.assignedTo;
         return clientSideFilters.unassigned ? isUnassigned : !isUnassigned;
       });
@@ -252,17 +252,17 @@ export async function getAdminVerificationQueue(
     
     // Search filter
     if (clientSideFilters.searchQuery) {
-      teams = teams.filter(team =>
-        team.name?.toLowerCase().includes(clientSideFilters.searchQuery!) ||
-        team.captainProfile?.name?.toLowerCase().includes(clientSideFilters.searchQuery!) ||
-        team.captainProfile?.phone?.includes(clientSideFilters.searchQuery!)
+      teams = teams.filter((team:any) =>
+        (team as any).name?.toLowerCase().includes(clientSideFilters.searchQuery!) ||
+        (team as any).captainProfile?.name?.toLowerCase().includes(clientSideFilters.searchQuery!) ||
+        (team as any).captainProfile?.phone?.includes(clientSideFilters.searchQuery!)
       );
     }
     
     // Last activity filters
     if (clientSideFilters.lastActivityAfter) {
       const afterDate = new Date(clientSideFilters.lastActivityAfter);
-      teams = teams.filter(team => {
+      teams = teams.filter((team:any) => {
         const lastActivity = new Date(team.updatedAt || team.submittedAt || 0);
         return lastActivity >= afterDate;
       });
@@ -270,7 +270,7 @@ export async function getAdminVerificationQueue(
     
     if (clientSideFilters.lastActivityBefore) {
       const beforeDate = new Date(clientSideFilters.lastActivityBefore);
-      teams = teams.filter(team => {
+      teams = teams.filter((team:any) => {
         const lastActivity = new Date(team.updatedAt || team.submittedAt || 0);
         return lastActivity <= beforeDate;
       });
@@ -280,7 +280,7 @@ export async function getAdminVerificationQueue(
     const paginatedTeams = teams.slice(0, validatedFilters.limit);
     
     // Optimize teams for transfer
-    const optimizedTeams = paginatedTeams.map(team => ({
+    const optimizedTeams = paginatedTeams.map((team:any) => ({
       ...optimizeTeamDocument(team),
       players: team.players,
       verification: team.verification,
@@ -304,11 +304,20 @@ export async function getAdminVerificationQueue(
       appliedFilters,
       summary: {
         totalInQueue: teams.length,
-        highPriority: teams.filter(t => t.priority === 'high').length,
-        critical: teams.filter(t => t.urgency === 'critical').length,
-        avgPlayersPerTeam: teams.length > 0 ? 
-          Math.round(teams.reduce((sum, t) => sum + (t.currentPlayers || 0), 0) / teams.length * 100) / 100 : 0,
-        documentsIncomplete: teams.filter(t => t.metrics.hasIncompleteDocuments).length
+        highPriority: teams.filter((t : any) => t.priority === 'high').length,
+        critical: teams.filter((t: any) => t.urgency === 'critical').length,
+        avgPlayersPerTeam: teams.length > 0
+          ? Math.round(
+              teams.reduce(
+                (sum: number, t: any) =>
+                  sum + (t.currentPlayers ?? t.players?.length ?? 0),
+                0
+              ) /
+                teams.length *
+                100
+            ) / 100
+          : 0,
+        documentsIncomplete: teams.filter((t: any) => t.metrics.hasIncompleteDocuments).length
       },
       meta: {
         queryOptimized: appliedFilters.length > 0,
@@ -323,7 +332,7 @@ export async function getAdminVerificationQueue(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`,
+        error: `Validation error: ${error.issues.map(e => e.message).join(', ')}`,
         teams: []
       };
     }
@@ -351,7 +360,7 @@ export async function getVerificationWorkload(
     const targetVolunteerId = validatedFilters.volunteerId || requestingUserId;
     
     // Build queries for workload analysis
-    let teamsQuery = adminDb.collection('teams');
+    let teamsQuery: any = adminDb.collection('teams');
     
     // Date range filter
     if (validatedFilters.dateRange) {
@@ -402,7 +411,11 @@ export async function getVerificationWorkload(
       
       if (status === 'verified' || status === 'rejected') {
         workload.summary.totalCompleted++;
-        workload.byStatus[status]++;
+        if (status === 'verified') {
+          workload.byStatus.verified++;
+        } else if (status === 'rejected') {
+          workload.byStatus.rejected++;
+        }
         
         // Calculate verification time if available
         if (data.verifiedAt && data.createdAt) {
@@ -468,7 +481,7 @@ export async function getVerificationWorkload(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+        error: `Validation error: ${error.issues.map(e => e.message).join(', ')}`
       };
     }
     
@@ -554,11 +567,16 @@ export async function bulkProcessVerifications(
           await batch.commit();
           return { success: true, verifications: batchVerifications };
         } catch (error) {
-          return { success: false, error: error.message, verifications: batchVerifications };
+          let errorMessage = 'Unknown error';
+          if (error instanceof Error) {
+            errorMessage = error.message;
+          } else if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as any).message === 'string') {
+            errorMessage = (error as any).message;
+          }
+          return { success: false, error: errorMessage, verifications: batchVerifications };
         }
       })
     );
-    
     const successful = results.filter(r => r.success).flatMap(r => r.verifications);
     const failed = results.filter(r => !r.success);
     
@@ -579,7 +597,7 @@ export async function bulkProcessVerifications(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+        error: `Validation error: ${error.issues.map(e => e.message).join(', ')}`
       };
     }
     
@@ -633,7 +651,7 @@ async function getTeamVerificationsMap(teamIds: string[]): Promise<Map<string, a
         .collection('verification').doc('initial')
         .get();
       
-      if (verificationDoc.exists()) {
+      if (verificationDoc.exists) {
         const data = verificationDoc.data();
         verificationsMap.set(teamId, {
           ...data,
@@ -732,7 +750,7 @@ async function getTeamsMap(teamIds: string[]): Promise<Map<string, any>> {
   const teamDocs = await adminDb.getAll(...teamRefs);
   
   teamDocs.forEach(doc => {
-    if (doc.exists()) {
+    if (doc.exists) {
       teamsMap.set(doc.id, doc.data());
     }
   });

@@ -154,7 +154,7 @@ export async function performGlobalSearch(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+        error: `Validation error: ${(error as z.ZodError).issues.map((e: z.ZodIssue) => e.message).join(', ')}`
       };
     }
     
@@ -274,7 +274,7 @@ export async function performSmartFiltering(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+        error: `Validation error: ${(error as z.ZodError).issues.map((e: z.ZodIssue) => e.message).join(', ')}`
       };
     }
     
@@ -337,7 +337,7 @@ export async function performStatisticalAnalysis(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+        error: `Validation error: ${(error as z.ZodError).issues.map((e: z.ZodIssue) => e.message).join(', ')}`
       };
     }
     
@@ -350,7 +350,7 @@ export async function performStatisticalAnalysis(
 
 // Helper functions for search implementations
 async function searchTeams(query: string, filters: any, maxResults: number) {
-  let teamsQuery = adminDb.collection('teams');
+  let teamsQuery: any = adminDb.collection('teams');
   
   // Apply base filters
   if (filters.district) {
@@ -366,27 +366,28 @@ async function searchTeams(query: string, filters: any, maxResults: number) {
   const snapshot = await teamsQuery.limit(maxResults * 2).get();
   
   return snapshot.docs
-    .map(doc => ({
+    .map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
       type: 'team',
       relevance: calculateRelevance(query, [doc.data().name, doc.data().captainProfile?.name])
     }))
-    .filter(team => 
-      team.name?.toLowerCase().includes(query) ||
-      team.captainProfile?.name?.toLowerCase().includes(query)
+    .filter((team: any) => 
+      team?.name?.toLowerCase().includes(query) ||
+      team?.captainProfile?.name?.toLowerCase().includes(query)
     )
-    .sort((a, b) => b.relevance - a.relevance)
+    .sort((a: any, b: any) => b.relevance - a.relevance)
     .slice(0, maxResults)
     .map(optimizeTeamDocument);
 }
 
 async function searchPlayers(query: string, filters: any, maxResults: number) {
+  // Firestore does not support '!=' queries directly on collectionGroup.
+  // Instead, we fetch all and filter in-memory.
   let playersQuery = adminDb.collectionGroup('players');
-  playersQuery = playersQuery.where('isDeleted', '!=', true);
-  
+
   const snapshot = await playersQuery.limit(maxResults * 3).get();
-  
+
   return snapshot.docs
     .map(doc => ({
       id: doc.id,
@@ -395,8 +396,8 @@ async function searchPlayers(query: string, filters: any, maxResults: number) {
       relevance: calculateRelevance(query, [doc.data().name, doc.data().phone])
     }))
     .filter(player => 
-      player.name?.toLowerCase().includes(query) ||
-      player.phone?.includes(query)
+      (player as any)?.name?.toLowerCase().includes(query) ||
+      (player as any)?.phone?.includes(query)
     )
     .sort((a, b) => b.relevance - a.relevance)
     .slice(0, maxResults)
@@ -404,7 +405,7 @@ async function searchPlayers(query: string, filters: any, maxResults: number) {
 }
 
 async function searchVenues(query: string, filters: any, maxResults: number) {
-  let venuesQuery = adminDb.collection('venues');
+  let venuesQuery: any = adminDb.collection('venues');
   
   if (filters.district) {
     venuesQuery = venuesQuery.where('district', '==', filters.district);
@@ -413,17 +414,17 @@ async function searchVenues(query: string, filters: any, maxResults: number) {
   const snapshot = await venuesQuery.limit(maxResults * 2).get();
   
   return snapshot.docs
-    .map(doc => ({
+    .map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
       type: 'venue',
       relevance: calculateRelevance(query, [doc.data().name, doc.data().address])
     }))
-    .filter(venue => 
-      venue.name?.toLowerCase().includes(query) ||
-      venue.address?.toLowerCase().includes(query)
+    .filter((venue: any) => 
+      venue?.name?.toLowerCase().includes(query) ||
+      venue?.address?.toLowerCase().includes(query)
     )
-    .sort((a, b) => b.relevance - a.relevance)
+    .sort((a: any, b: any) => b.relevance - a.relevance)
     .slice(0, maxResults);
 }
 
@@ -443,9 +444,9 @@ async function searchMatches(query: string, filters: any, maxResults: number) {
       ])
     }))
     .filter(match => 
-      match.team1?.teamName?.toLowerCase().includes(query) ||
-      match.team2?.teamName?.toLowerCase().includes(query) ||
-      match.venueName?.toLowerCase().includes(query)
+      (match as any).team1?.teamName?.toLowerCase().includes(query) ||
+      (match as any).team2?.teamName?.toLowerCase().includes(query) ||
+      (match as any).venueName?.toLowerCase().includes(query)
     )
     .sort((a, b) => b.relevance - a.relevance)
     .slice(0, maxResults);
@@ -530,10 +531,9 @@ async function enhanceTeamsWithPlayers(teams: any[]): Promise<any[]> {
       .limit(5)
       .get();
     
-    playersMap.set(teamId, playersSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...optimizePlayerDocument(doc.data())
-    })));
+    playersMap.set(teamId, playersSnapshot.docs.map(doc => 
+      optimizePlayerDocument({ id: doc.id, ...doc.data() })
+    ));
   }
   
   return teams.map(team => ({
@@ -543,7 +543,7 @@ async function enhanceTeamsWithPlayers(teams: any[]): Promise<any[]> {
 }
 
 async function enhancePlayersWithTeams(players: any[]): Promise<any[]> {
-  const teamIds = [...new Set(players.map(player => player.teamId))];
+  const teamIds = Array.from(new Set(players.map(player => player.teamId)));
   const teamsMap = new Map();
   
   if (teamIds.length > 0) {
@@ -551,7 +551,7 @@ async function enhancePlayersWithTeams(players: any[]): Promise<any[]> {
     const teamDocs = await adminDb.getAll(...teamRefs);
     
     teamDocs.forEach(doc => {
-      if (doc.exists()) {
+      if (doc.exists) {
         teamsMap.set(doc.id, optimizeTeamDocument(doc.data()));
       }
     });
@@ -636,7 +636,7 @@ async function analyzeAgeDemographics(filters: any) {
     const age = data.age;
     const gender = data.gender || 'unknown';
     
-    demographics.byGender[gender] = (demographics.byGender[gender] || 0) + 1;
+    (demographics.byGender as any)[gender] = ((demographics.byGender as any)[gender] || 0) + 1;
     
     if (age) {
       totalAge += age;

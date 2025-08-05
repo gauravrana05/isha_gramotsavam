@@ -196,6 +196,67 @@ export default function EditVenuePage() {
     }
   };
 
+  const fetchState = async (pincode: string) => {
+    if (pincode.length !== 6) return;
+
+    setAddressLoading(true);
+    setError('');
+
+    try {
+      const addressData = await pincodeService.getAddressByPincode(pincode);
+      setFormData(prev => ({
+        ...prev,
+        state: addressData.state,
+        district: '',
+        taluk: '',
+        panchayat: ''
+      }));
+      if (addressData.state) {
+        await fetchDistricts(addressData.state);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Invalid pincode. Please check and try again.');
+    } finally {
+      setAddressLoading(false);
+    }
+  }; 
+
+  const fetchDistricts = async (state: string) => {
+    setAddressLoading(true);
+    try {
+      const districtList = await pincodeService.getDistrictsByState(state);
+      setDistricts(districtList);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch districts. Please try again.');
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const fetchTaluks = async (state: string, district: string) => {
+    setAddressLoading(true);
+    try {
+      const { taluks } = await pincodeService.getTaluksByDistrict(state, district);
+      setTaluks(taluks);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch taluks. Please try again.');
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
+  const fetchPanchayats = async (state: string, district: string, taluk: string) => {
+    setAddressLoading(true);
+    try {
+      const panchayatList = await pincodeService.getPanchayatsByTaluk(state, district, taluk);
+      setPanchayats(panchayatList);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch panchayats. Please try again.');
+    } finally {
+      setAddressLoading(false);
+    }
+  };
+
   const loadEventsForVenue = async (currentVenueId: string) => {
     try {
       const eventsCollection = collection(db, 'events');
@@ -318,11 +379,10 @@ export default function EditVenuePage() {
     setFormData(prev => ({
       ...prev,
       [parent]: {
-        ...prev[parent as keyof typeof prev],
+        ...(prev[parent] && typeof prev[parent] === 'object' ? prev[parent] : {}),
         [field]: value
       }
     }));
-  };
 
   const addSupportedSport = () => {
     setFormData(prev => ({
@@ -394,67 +454,6 @@ export default function EditVenuePage() {
       setSelectedEvents(prev => [...prev, eventId]);
     } else {
       setSelectedEvents(prev => prev.filter(e => e !== eventId));
-    }
-  };
-
-  const fetchState = async (pincode: string) => {
-    if (pincode.length !== 6) return;
-
-    setAddressLoading(true);
-    setError('');
-
-    try {
-      const addressData = await pincodeService.getAddressByPincode(pincode);
-      setFormData(prev => ({
-        ...prev,
-        state: addressData.state,
-        district: '',
-        taluk: '',
-        panchayat: ''
-      }));
-      if (addressData.state) {
-        await fetchDistricts(addressData.state);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Invalid pincode. Please check and try again.');
-    } finally {
-      setAddressLoading(false);
-    }
-  };
-
-  const fetchDistricts = async (state: string) => {
-    setAddressLoading(true);
-    try {
-      const districtList = await pincodeService.getDistrictsByState(state);
-      setDistricts(districtList);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch districts. Please try again.');
-    } finally {
-      setAddressLoading(false);
-    }
-  };
-
-  const fetchTaluks = async (state: string, district: string) => {
-    setAddressLoading(true);
-    try {
-      const { taluks } = await pincodeService.getTaluksByDistrict(state, district);
-      setTaluks(taluks);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch taluks. Please try again.');
-    } finally {
-      setAddressLoading(false);
-    }
-  };
-
-  const fetchPanchayats = async (state: string, district: string, taluk: string) => {
-    setAddressLoading(true);
-    try {
-      const panchayatList = await pincodeService.getPanchayatsByTaluk(state, district, taluk);
-      setPanchayats(panchayatList);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch panchayats. Please try again.');
-    } finally {
-      setAddressLoading(false);
     }
   };
 
@@ -1082,4 +1081,4 @@ export default function EditVenuePage() {
         </div>
       </Container>
     );
-  }
+  }}

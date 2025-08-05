@@ -163,7 +163,7 @@ export default function CaptainFixturesPage() {
               sportId: fixtureData.sportId || '',
               genderCategory: fixtureData.genderCategory || '',
               venueId: fixtureData.venueId || '',
-              venue,
+              venue: venue ?? undefined,
               status: fixtureData.status || 'scheduled',
               level: fixtureData.level || 'Panchayat',
               assignedTeams: fixtureData.assignedTeams || [],

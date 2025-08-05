@@ -7,10 +7,10 @@ import { ArrowLeft, MapPin } from 'lucide-react';
 import Link from 'next/link';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     lang: string;
     venueId: string;
-  };
+  }>;
 }
 
 async function getVenue(venueId: string) {
@@ -40,7 +40,7 @@ async function getVenueAssignments(venueId: string) {
 }
 
 export default async function VenueVolunteersPage({ params }: PageProps) {
-  const { lang, venueId } = params;
+  const { lang, venueId } = await params;
   
   const [venue, volunteers, assignments] = await Promise.all([
     getVenue(venueId),
@@ -66,9 +66,9 @@ export default async function VenueVolunteersPage({ params }: PageProps) {
           <div className="flex items-center space-x-3 mb-4">
             <MapPin className="w-6 h-6 text-green-600" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{venue.name}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{(venue as any).name}</h1>
               <p className="text-gray-600">
-                {venue.address?.district || venue.district}, {venue.address?.state || venue.state}
+                {(venue as any).address?.district || (venue as any).district}, {(venue as any).address?.state || (venue as any).state}
               </p>
             </div>
           </div>
@@ -76,15 +76,15 @@ export default async function VenueVolunteersPage({ params }: PageProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="text-gray-500">Type:</span>
-              <span className="ml-2 font-medium capitalize">{venue.type}</span>
+              <span className="ml-2 font-medium capitalize">{(venue as any).type || 'N/A'}</span>
             </div>
             <div>
               <span className="text-gray-500">Capacity:</span>
-              <span className="ml-2 font-medium">{venue.capacity || 'N/A'}</span>
+              <span className="ml-2 font-medium">{(venue as any).capacity || 'N/A'}</span>
             </div>
             <div>
               <span className="text-gray-500">Sports:</span>
-              <span className="ml-2 font-medium">{venue.supportedSports?.length || 0}</span>
+              <span className="ml-2 font-medium">{Array.isArray((venue as any).supportedSports) ? (venue as any).supportedSports.length : 0}</span>
             </div>
           </div>
         </div>
@@ -95,7 +95,7 @@ export default async function VenueVolunteersPage({ params }: PageProps) {
         <VolunteerAssignmentForm 
           volunteers={volunteers} 
           preSelectedVenueId={venueId}
-          preSelectedVenueName={venue.name}
+          preSelectedVenueName={(venue as any)?.name}
         />
       </div>
 

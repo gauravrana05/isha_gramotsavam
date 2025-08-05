@@ -16,11 +16,11 @@ import {
 } from 'lucide-react';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     venueId: string;
     fixtureId: string;
     lang: string;
-  };
+  }>;
 }
 
 async function getFixtureDetails(fixtureId: string) {
@@ -104,7 +104,7 @@ async function getFixtureMatches(fixtureId: string) {
 }
 
 export default async function FixtureDetailPage({ params }: PageProps) {
-  const { venueId, fixtureId } = params;
+  const { venueId, fixtureId } = await params;
   
   console.log(`Loading fixture detail page for: ${fixtureId}`);
   const pageStartTime = Date.now();
@@ -135,24 +135,31 @@ export default async function FixtureDetailPage({ params }: PageProps) {
   const { fixture } = fixtureResult;
   
   // Get all team IDs from bracket matches and assigned teams
+  // Defensive: fallback to empty array if assignedTeams or bracket/matches are missing
   const allTeamIds = [
-    ...fixture.assignedTeams,
-    ...fixture.bracket.matches.flatMap((match: any) => [match.team1Id, match.team2Id, match.winnerId])
+    ...((fixture && 'assignedTeams' in fixture && Array.isArray((fixture as any).assignedTeams)) ? (fixture as any).assignedTeams : []),
+    ...((fixture && 'bracket' in fixture && fixture.bracket && 'matches' in (fixture as any).bracket && Array.isArray((fixture.bracket as any).matches))
+      ? (fixture.bracket as any).matches.flatMap((match: any) => [match?.team1Id, match?.team2Id, match?.winnerId])
+      : [])
   ].filter(Boolean);
-  
+
   // Load team details with unique IDs only
-  const teams = await getTeamDetails([...new Set(allTeamIds)]);
-  
+  const uniqueTeamIds = Array.from(new Set(allTeamIds));
+  const teams = await getTeamDetails(uniqueTeamIds);
   const pageEndTime = Date.now();
   console.log(`Fixture detail page loaded completely (took ${pageEndTime - pageStartTime}ms)`);
-  
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'teams_assigned': return 'bg-yellow-100 text-yellow-800';
-      case 'draft': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'teams_assigned':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'draft':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -176,7 +183,7 @@ export default async function FixtureDetailPage({ params }: PageProps) {
   };
 
   // Group matches by round for bracket visualization
-  const matchesByRound = fixture.bracket.matches.reduce((acc: any, match: any) => {
+  const matchesByRound = (fixture as any)?.bracket.matches.reduce((acc: any, match: any) => {
     const round = match.roundName;
     if (!acc[round]) {
       acc[round] = [];
@@ -209,7 +216,7 @@ export default async function FixtureDetailPage({ params }: PageProps) {
             Back to Fixtures
           </Link>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">{fixture.name}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{(fixture as any)?.name}</h1>
         <p className="text-gray-600 text-sm">Tournament Bracket & Match Progress</p>
       </div>
 
@@ -219,16 +226,16 @@ export default async function FixtureDetailPage({ params }: PageProps) {
           <div className="flex items-center mb-4 lg:mb-0">
             <Trophy className="w-6 h-6 text-[#F28C38] mr-3" />
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">{fixture.name}</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{(fixture as any)?.name}</h2>
               <p className="text-gray-600 text-sm">
-                {fixture.assignedTeams?.length || 0} teams • {fixture.level} level • {fixture.venueName}
+                {(fixture as any)?.assignedTeams?.length || 0} teams • {(fixture as any)?.level} level • {(fixture as any)?.venueName}
               </p>
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(fixture.status)}`}>
-              {getStatusIcon(fixture.status)}
-              <span className="ml-1 capitalize">{fixture.status.replace('_', ' ')}</span>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor((fixture as any)?.status)}`}>
+              {getStatusIcon((fixture as any)?.status)}
+              <span className="ml-1 capitalize">{(fixture as any)?.status.replace('_', ' ')}</span>
             </span>
             <Link href={`/en/volunteer/venues/${venueId}/matches?fixture=${fixtureId}`}>
               <button className="flex items-center px-4 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors">
@@ -246,7 +253,7 @@ export default async function FixtureDetailPage({ params }: PageProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Total Teams</p>
-              <p className="text-2xl font-bold text-gray-900">{fixture.assignedTeams?.length || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">{(fixture as any)?.assignedTeams?.length || 0}</p>
             </div>
             <Users className="w-8 h-8 text-gray-400" />
           </div>
@@ -256,7 +263,7 @@ export default async function FixtureDetailPage({ params }: PageProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Total Matches</p>
-              <p className="text-2xl font-bold text-blue-600">{fixture.bracket.matches.length}</p>
+              <p className="text-2xl font-bold text-blue-600">{(fixture as any)?.bracket.matches.length}</p>
             </div>
             <Calendar className="w-8 h-8 text-blue-400" />
           </div>
@@ -267,7 +274,7 @@ export default async function FixtureDetailPage({ params }: PageProps) {
             <div>
               <p className="text-gray-600 text-sm">Completed</p>
               <p className="text-2xl font-bold text-green-600">
-                {fixture.bracket.matches.filter((m: any) => m.status === 'completed').length}
+                {(fixture as any)?.bracket.matches.filter((m: any) => m.status === 'completed').length}
               </p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-400" />
@@ -421,13 +428,13 @@ export default async function FixtureDetailPage({ params }: PageProps) {
         </div>
 
         {/* Tournament Winner */}
-        {fixture.status === 'completed' && fixture.bracket.winners && fixture.bracket.winners.length > 0 && (
+        {(fixture as any)?.status === 'completed' && (fixture as any)?.bracket.winners && (fixture as any)?.bracket.winners.length > 0 && (
           <div className="mt-8 p-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-lg">
             <div className="text-center">
               <Crown className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
               <h3 className="text-xl font-bold text-gray-900 mb-2">Tournament Complete!</h3>
               <div className="space-y-2">
-                {fixture.bracket.winners.map((winnerId: string, index: number) => (
+                {(fixture as any)?.bracket.winners.map((winnerId: string, index: number) => (
                   <div key={winnerId} className="flex items-center justify-center">
                     <Trophy className="w-5 h-5 text-yellow-500 mr-2" />
                     <span className="font-semibold text-lg">

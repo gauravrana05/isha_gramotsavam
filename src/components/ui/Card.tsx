@@ -85,18 +85,18 @@ const Card = forwardRef<HTMLDivElement, CardProps>(({
         
         // Padding styles
         paddingClasses[padding],
-        
         // Interactive styles
-        isInteractive && [
-          'cursor-pointer',
-          'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
-          hover && 'hover:shadow-md hover:border-gray-300',
-          'active:scale-[0.99] active:shadow-sm',
-        ],
-        
+        ...(isInteractive
+          ? [
+              'cursor-pointer',
+              'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+              hover && 'hover:shadow-md hover:border-gray-300',
+              'active:scale-[0.99] active:shadow-sm',
+            ].filter(Boolean)
+          : []),
+
         // Hover effect for non-interactive cards
         !isInteractive && hover && 'hover:shadow-md transition-shadow',
-        
         className
       )}
       {...props}

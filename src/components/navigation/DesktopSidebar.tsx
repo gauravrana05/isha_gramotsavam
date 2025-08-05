@@ -17,7 +17,6 @@ import {
   Settings
 } from 'lucide-react';
 import { cn } from '@/lib/component-patterns';
-import { tokens } from '@/lib/design-tokens';
 
 export interface SidebarNavItem {
   id: string;

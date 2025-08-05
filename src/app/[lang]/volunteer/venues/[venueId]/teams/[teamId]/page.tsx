@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { getTeamForMatchDayVerification, verifyPlayerMatchDay } from '@/lib/actions/volunteer/matchDayVerification';
 import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
 import DocumentPreview from '@/components/documents/DocumentPreview';
+import PlayerDocumentUpload from '@/components/players/PlayerDocumentUpload';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { 
@@ -21,7 +22,9 @@ import {
   Upload,
   ArrowLeft,
   Eye,
-  Edit3
+  Edit3,
+  Check,
+  X
 } from 'lucide-react';
 
 
@@ -44,15 +47,16 @@ interface TeamData {
 
 interface PlayerData {
   id: string;
+  userId?: string;
   name: string;
   phone: string;
   age: number;
   gender: string;
   position: string;
   documents: {
-    profilePhoto: { url?: string | null; verified: boolean };
-    aadhaarFront: { url?: string | null; verified: boolean };
-    aadhaarBack: { url?: string | null; verified: boolean };
+    profilePhoto: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
+    aadhaarFront: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
+    aadhaarBack: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
   };
   verificationStatus: string;
   matchDayVerificationStatus?: string;
@@ -72,6 +76,7 @@ export default function TeamMatchDayVerificationPage() {
   const [error, setError] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const [showImageUpload, setShowImageUpload] = useState(false);
+  const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (authLoading) return;
@@ -91,8 +96,8 @@ export default function TeamMatchDayVerificationPage() {
       const result = await getTeamForMatchDayVerification(teamId, user!.uid);
       
       if (result.success) {
-        setTeam(result.team);
-        setPlayers(result.players);
+        setTeam(result.team ?? null);
+        setPlayers(result.players ?? []);
       } else {
         setError(result.error || 'Failed to load team data');
       }
@@ -136,6 +141,105 @@ export default function TeamMatchDayVerificationPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleBulkAction = async (action: 'verified' | 'rejected') => {
+    if (selectedPlayers.size === 0) {
+      alert('Please select players to perform bulk action.');
+      return;
+    }
+    
+    const selectedPlayersList = players.filter(p => selectedPlayers.has(p.id));
+    const eligiblePlayers = selectedPlayersList.filter(p => 
+      p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected'
+    );
+    
+    if (eligiblePlayers.length === 0) {
+      alert('No eligible players selected. Only unverified players can be bulk processed.');
+      return;
+    }
+    
+    const actionText = action === 'verified' ? 'verify' : 'reject';
+    
+    let reason = '';
+    if (action === 'rejected') {
+      reason = prompt('Reason for rejection:') || '';
+      if (!reason) return;
+    } else {
+      reason = 'Bulk verified by match day volunteer';
+    }
+    
+    if (!confirm(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} ${eligiblePlayers.length} selected players?`)) {
+      return;
+    }
+    
+    setSubmitting(true);
+    
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const player of eligiblePlayers) {
+        try {
+          const result = await verifyPlayerMatchDay({
+            playerId: player.id,
+            status: action,
+            comments: reason,
+            verifiedBy: user!.uid,
+            verificationIssues: action === 'rejected' ? ['Bulk rejection by match day volunteer'] : [],
+            teamId: teamId,
+            venueId: venueId
+          });
+
+          if (result.success) {
+            successCount++;
+          } else {
+            errorCount++;
+            console.error(`Failed to ${actionText} player ${player.name}:`, result.error);
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`Error ${actionText}ing player ${player.name}:`, error);
+        }
+      }
+
+      // Reload data after bulk operation
+      await loadTeamData();
+      
+      if (errorCount === 0) {
+        alert(`Successfully ${action} ${successCount} players!`);
+      } else {
+        alert(`Completed bulk ${actionText}: ${successCount} successful, ${errorCount} failed. Please check and retry failed players individually.`);
+      }
+      
+      setSelectedPlayers(new Set()); // Clear selection
+    } catch (error) {
+      console.error('Bulk action error:', error);
+      alert(`Bulk ${actionText} failed. Please try again.`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSelectAll = () => {
+    const unverifiedPlayers = players.filter(p => 
+      p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected'
+    );
+    if (selectedPlayers.size === unverifiedPlayers.length) {
+      setSelectedPlayers(new Set());
+    } else {
+      setSelectedPlayers(new Set(unverifiedPlayers.map(p => p.id)));
+    }
+  };
+
+  const handlePlayerSelection = (playerId: string) => {
+    const newSelection = new Set(selectedPlayers);
+    if (newSelection.has(playerId)) {
+      newSelection.delete(playerId);
+    } else {
+      newSelection.add(playerId);
+    }
+    setSelectedPlayers(newSelection);
   };
 
   const getPlayerStatusColor = (player: PlayerData) => {
@@ -326,27 +430,6 @@ export default function TeamMatchDayVerificationPage() {
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="bg-white rounded-lg border shadow-sm p-4 mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-700">Verification Progress</span>
-          <span className="text-sm text-gray-500">{verifiedCount}/{players.length} completed</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            className={`h-2 rounded-full transition-all duration-300 ${
-              allVerified ? 'bg-green-500' : 'bg-[#F28C38]'
-            }`}
-            style={{ width: `${(verifiedCount / players.length) * 100}%` }}
-          />
-        </div>
-        {allVerified && (
-          <div className="mt-2 flex items-center text-green-600">
-            <CheckCircle className="w-4 h-4 mr-2" />
-            <span className="text-sm font-medium">Team Auto-Checked In - All Players Verified</span>
-          </div>
-        )}
-      </div>
 
       {/* Players Table - Desktop */}
       {players.length === 0 ? (
@@ -357,12 +440,67 @@ export default function TeamMatchDayVerificationPage() {
         </div>
       ) : (
         <>
+          {/* Bulk Actions */}
+          {players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedPlayers.size === players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length && players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length > 0}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
+                    />
+                    <span className="ml-2 text-sm font-medium text-gray-700">
+                      Select All Unverified ({players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length})
+                    </span>
+                  </label>
+                  {selectedPlayers.size > 0 && (
+                    <span className="text-sm text-gray-600">
+                      {selectedPlayers.size} selected
+                    </span>
+                  )}
+                </div>
+                
+                {selectedPlayers.size > 0 && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleBulkAction('verified')}
+                      disabled={submitting}
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      Verify ({selectedPlayers.size})
+                    </button>
+                    <button
+                      onClick={() => handleBulkAction('rejected')}
+                      disabled={submitting}
+                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Reject ({selectedPlayers.size})
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Desktop Table */}
           <div className="hidden lg:block bg-white rounded-lg border overflow-hidden mb-6">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <input
+                        type="checkbox"
+                        checked={selectedPlayers.size === players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length && players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length > 0}
+                        onChange={handleSelectAll}
+                        className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
+                      />
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Player</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Position</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Documents</th>
@@ -375,19 +513,18 @@ export default function TeamMatchDayVerificationPage() {
                     const docStatus = getDocumentStatus(player);
                     return (
                       <tr key={player.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {player.matchDayVerificationStatus !== 'verified' && player.matchDayVerificationStatus !== 'rejected' && (
+                            <input
+                              type="checkbox"
+                              checked={selectedPlayers.has(player.id)}
+                              onChange={() => handlePlayerSelection(player.id)}
+                              className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
+                            />
+                          )}
+                        </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center">
-                            {player.documents.profilePhoto?.url && (
-                              <DocumentPreview
-                                type="profilePhoto"
-                                url={player.documents.profilePhoto.url}
-                                label="Profile Photo"
-                                verified={player.documents.profilePhoto.verified}
-                                showActions={false}
-                                size="sm"
-                                className="mr-3"
-                              />
-                            )}
+                          <div className="flex items-center"> 
                             <div>
                               <div className="text-sm font-medium text-gray-900">{player.name}</div>
                               <div className="text-sm text-gray-500">{player.age} years • {player.gender === 'M' ? 'Male' : 'Female'}</div>
@@ -451,6 +588,14 @@ export default function TeamMatchDayVerificationPage() {
                 <div key={player.id} className="bg-white rounded-lg border p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center flex-1">
+                      {player.matchDayVerificationStatus !== 'verified' && player.matchDayVerificationStatus !== 'rejected' && (
+                        <input
+                          type="checkbox"
+                          checked={selectedPlayers.has(player.id)}
+                          onChange={() => handlePlayerSelection(player.id)}
+                          className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38] mr-3 mt-1"
+                        />
+                      )}
                       {player.documents.profilePhoto?.url && (
                         <DocumentPreview
                           type="profilePhoto"
@@ -524,18 +669,6 @@ export default function TeamMatchDayVerificationPage() {
         </>
       )}
 
-      {/* Success Banner */}
-      {allVerified && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-            <div>
-              <h3 className="text-sm font-medium text-green-800">Team Auto-Checked In Successfully</h3>
-              <p className="text-sm text-green-700 mt-1">All {players.length} players have been verified and the team is ready for matches.</p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Player Details Modal */}
       {selectedPlayer && (
@@ -591,37 +724,52 @@ export default function TeamMatchDayVerificationPage() {
               {/* Documents */}
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">Documents</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  {selectedPlayer.documents.profilePhoto?.url && (
-                    <DocumentPreview
-                      type="profilePhoto"
-                      url={selectedPlayer.documents.profilePhoto.url}
-                      label="Profile Photo"
-                      verified={selectedPlayer.documents.profilePhoto.verified}
-                      showActions={true}
-                      size="md"
-                    />
-                  )}
-                  {selectedPlayer.documents.aadhaarFront?.url && (
-                    <DocumentPreview
-                      type="aadhaarFront"
-                      url={selectedPlayer.documents.aadhaarFront.url}
-                      label="Aadhaar Front"
-                      verified={selectedPlayer.documents.aadhaarFront.verified}
-                      showActions={true}
-                      size="md"
-                    />
-                  )}
-                  {selectedPlayer.documents.aadhaarBack?.url && (
-                    <DocumentPreview
-                      type="aadhaarBack"
-                      url={selectedPlayer.documents.aadhaarBack.url}
-                      label="Aadhaar Back"
-                      verified={selectedPlayer.documents.aadhaarBack.verified}
-                      showActions={true}
-                      size="md"
-                    />
-                  )}
+                <div className="grid grid-cols-1 gap-6">
+                  <PlayerDocumentUpload
+                    playerId={selectedPlayer.id}
+                    playerUserId={selectedPlayer.userId || selectedPlayer.id}
+                    documentType="profilePhoto"
+                    label="Profile Photo"
+                    currentUrl={selectedPlayer.documents.profilePhoto?.url}
+                    onSuccess={(url) => {
+                      // Reload team data to update the document URL
+                      loadTeamData();
+                    }}
+                    onError={(error) => {
+                      alert(`Upload failed: ${error}`);
+                    }}
+                    variant="card"
+                  />
+                  <PlayerDocumentUpload
+                    playerId={selectedPlayer.id}
+                    playerUserId={selectedPlayer.userId || selectedPlayer.id}
+                    documentType="aadhaarFront"
+                    label="Aadhaar Front"
+                    currentUrl={selectedPlayer.documents.aadhaarFront?.url}
+                    onSuccess={(url) => {
+                      // Reload team data to update the document URL
+                      loadTeamData();
+                    }}
+                    onError={(error) => {
+                      alert(`Upload failed: ${error}`);
+                    }}
+                    variant="card"
+                  />
+                  <PlayerDocumentUpload
+                    playerId={selectedPlayer.id}
+                    playerUserId={selectedPlayer.userId || selectedPlayer.id}
+                    documentType="aadhaarBack"
+                    label="Aadhaar Back"
+                    currentUrl={selectedPlayer.documents.aadhaarBack?.url}
+                    onSuccess={(url) => {
+                      // Reload team data to update the document URL
+                      loadTeamData();
+                    }}
+                    onError={(error) => {
+                      alert(`Upload failed: ${error}`);
+                    }}
+                    variant="card"
+                  />
                 </div>
               </div>
 
@@ -706,8 +854,8 @@ export default function TeamMatchDayVerificationPage() {
                 </Button>
               </div>
             </div>
-            </div>
           </div>
+        </div>
       )}
     </div>
   );

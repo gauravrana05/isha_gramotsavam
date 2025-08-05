@@ -7,11 +7,11 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     venueId: string;
     teamId: string;
     lang: string;
-  };
+  }>;
 }
 
 interface Player {
@@ -23,8 +23,8 @@ interface Player {
   verificationIssues: string[];
 }
 
-export default function TeamCheckInPage({ params }: PageProps) {
-  const { venueId, teamId } = params;
+export default async function TeamCheckInPage({ params }: PageProps) {
+  const { venueId, teamId } = await params;
   const router = useRouter();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +38,16 @@ export default function TeamCheckInPage({ params }: PageProps) {
     setLoading(true);
     const result = await getTeamPlayersForVerification(teamId);
     if (result.success) {
-      setPlayers(result.players);
+      // Ensure each player has all Player fields, fallback to empty string/array if missing
+      const playersWithAllFields: Player[] = result.players.map((p: any) => ({
+        id: p.id,
+        name: p.name ?? '',
+        aadhaarNumber: p.aadhaarNumber ?? '',
+        matchDayVerified: p.matchDayVerified ?? false,
+        verificationNotes: p.verificationNotes ?? '',
+        verificationIssues: p.verificationIssues ?? [],
+      }));
+      setPlayers(playersWithAllFields);
     }
     setLoading(false);
   };

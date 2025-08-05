@@ -35,11 +35,12 @@ interface DocumentProviderProps {
 
 export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) => {
   const { user, userProfile } = useAuth();
-  
+
   const [documents, setDocuments] = useState<Record<DocumentType, DocumentState>>({
     profilePhoto: { url: null, uploading: false, progress: 0, error: null },
     aadhaarFront: { url: null, uploading: false, progress: 0, error: null },
-    aadhaarBack: { url: null, uploading: false, progress: 0, error: null }
+    aadhaarBack: { url: null, uploading: false, progress: 0, error: null },
+    teamPhoto: { url: null, uploading: false, progress: 0, error: null }
   });
 
   // Initialize documents from user profile (based on schema structure)
@@ -139,6 +140,11 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
     updateDocumentState(type, { error: null });
 
     try {
+      // Only allow deletion for valid document types
+      if (type !== 'profilePhoto' && type !== 'aadhaarFront' && type !== 'aadhaarBack') {
+        throw new Error(`Invalid document type: ${type}`);
+      }
+
       await documentUploadService.deleteDocument(user.uid, type);
 
       // Update Firestore user document
@@ -174,6 +180,11 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
         updateDocumentState(type, { progress: progress.progress });
       };
 
+      // Only allow replacement for valid document types
+      if (type !== 'profilePhoto' && type !== 'aadhaarFront' && type !== 'aadhaarBack') {
+        throw new Error(`Invalid document type: ${type}`);
+      }
+
       const downloadURL = await documentUploadService.replaceDocument(user.uid, type, file, onProgress);
 
       // Update Firestore user document
@@ -203,14 +214,14 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
   }, [user, updateDocumentState]);
 
   const getDocumentUrl = useCallback((type: DocumentType): string | null => {
-    return documents[type].url;
+    return documents[type]?.url || null;
   }, [documents]);
 
   const isUploading = useCallback((type?: DocumentType): boolean => {
     if (type) {
-      return documents[type].uploading;
+      return documents[type]?.uploading || false;
     }
-    return Object.values(documents).some(doc => doc.uploading);
+    return Object.values(documents).some(doc => doc?.uploading);
   }, [documents]);
 
   const clearError = useCallback((type: DocumentType) => {
@@ -224,8 +235,8 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
       const types: DocumentType[] = ['profilePhoto', 'aadhaarFront', 'aadhaarBack'];
       
       for (const type of types) {
-        const url = await documentUploadService.getDocumentURL(user.uid, type);
-        updateDocumentState(type, { url, error: null });
+        const url = await documentUploadService.getDocumentURL(user.uid, type as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack');
+        updateDocumentState(type as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack', { url, error: null });
       }
     } catch (error) {
       console.error('Error refreshing documents:', error);

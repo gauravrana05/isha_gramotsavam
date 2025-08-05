@@ -10,7 +10,7 @@ import {
   Trophy
 } from 'lucide-react';
 import { cn } from '@/lib/component-patterns';
-import { tokens } from '@/lib/design-tokens';
+;
 
 export interface NavItem {
   id: string;

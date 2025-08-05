@@ -207,8 +207,8 @@ export const PresetEmptyState: React.FC<PresetEmptyStateProps> = ({
   description,
   ...props
 }) => {
-  const config = presetConfigs[type];
-  
+  const config = presetConfigs[type as keyof typeof presetConfigs];
+
   if (!config && type !== 'custom') {
     console.warn(`Unknown empty state type: ${type}`);
     return null;

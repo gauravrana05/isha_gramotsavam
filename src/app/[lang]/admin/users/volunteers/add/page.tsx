@@ -5,13 +5,13 @@ import Link from 'next/link';
 import AddVolunteerForm from './AddVolunteerForm';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     lang: string;
-  };
+  }>;
 }
 
-export default function AddVolunteerPage({ params }: PageProps) {
-  const { lang } = params;
+export default async function AddVolunteerPage({ params }: PageProps) {
+  const { lang } = await params;
 
   return (
     <div className="p-8 space-y-6">

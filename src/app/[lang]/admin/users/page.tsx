@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { getAdminPlayers, getAdminPlayerStats } from '@/lib/actions/admin/optimizedPlayerQueries';
@@ -66,8 +66,10 @@ export default function AdminPlayersPage() {
   const [players, setPlayers] = useState<PlayerData[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [tableLoading, setTableLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeSearchTerm, setActiveSearchTerm] = useState(''); // This is what gets sent to the query
   const [verificationFilter, setVerificationFilter] = useState<string>('all');
   const [genderFilter, setGenderFilter] = useState<string>('all');
   const [teamStatusFilter, setTeamStatusFilter] = useState<string>('all');
@@ -83,6 +85,7 @@ export default function AdminPlayersPage() {
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
 
+  // Initial auth check and data loading
   useEffect(() => {
     if (authLoading) return;
     
@@ -96,13 +99,60 @@ export default function AdminPlayersPage() {
       return;
     }
 
+    // Only load data on initial mount
     loadPlayers();
     loadStats();
-  }, [user, userProfile, authLoading, lang, router, verificationFilter, genderFilter, teamStatusFilter, sportFilter, districtFilter, currentPage]);
+  }, [user, userProfile, authLoading, lang, router]);
+
+  // Separate effect for filter changes - only reload data, not redirect
+  useEffect(() => {
+    if (user && userProfile?.role === 'admin') {
+      loadPlayers();
+    }
+  }, [verificationFilter, genderFilter, teamStatusFilter, sportFilter, districtFilter, activeSearchTerm, currentPage]);
+
+  // Separate effect for stats when filters change (exclude currentPage as stats don't paginate)
+  useEffect(() => {
+    if (user && userProfile?.role === 'admin') {
+      loadStats();
+    }
+  }, [verificationFilter, genderFilter, teamStatusFilter, sportFilter, districtFilter]);
+
+  const handleSearch = useCallback(() => {
+    setActiveSearchTerm(searchTerm);
+    setCurrentPage(1); // Reset to first page when searching
+  }, [searchTerm]);
+
+  const handleFilterChange = useCallback((filterType: string, value: string) => {
+    setCurrentPage(1); // Reset to first page when filters change
+    
+    switch (filterType) {
+      case 'verification':
+        setVerificationFilter(value);
+        break;
+      case 'gender':
+        setGenderFilter(value);
+        break;
+      case 'teamStatus':
+        setTeamStatusFilter(value);
+        break;
+      case 'sport':
+        setSportFilter(value);
+        break;
+      case 'district':
+        setDistrictFilter(value);
+        break;
+    }
+  }, []);
 
   const loadPlayers = async () => {
     try {
-      setLoading(true);
+      // Use tableLoading for filter changes, loading for initial load
+      if (players.length > 0) {
+        setTableLoading(true);
+      } else {
+        setLoading(true);
+      }
       
       if (!user?.uid) {
         throw new Error('User not authenticated');
@@ -111,14 +161,16 @@ export default function AdminPlayersPage() {
       const result = await getAdminPlayers({
         limit: pageSize,
         offset: (currentPage - 1) * pageSize,
-        verificationStatus: verificationFilter as any,
-        gender: genderFilter as any,
-        teamStatus: teamStatusFilter as any,
+        verificationStatus: verificationFilter as "pending" | "verified" | "rejected" | "all",
+        gender: genderFilter as "all" | "M" | "F",
+        teamStatus: teamStatusFilter as "verified" | "rejected" | "all" | "draft" | "submitted" | "active",
         sportName: sportFilter || undefined,
         district: districtFilter || undefined,
-        searchQuery: searchTerm || undefined,
+        searchQuery: activeSearchTerm || undefined,
         sortBy: 'addedAt',
-        sortOrder: 'desc'
+        sortOrder: 'desc',
+        position: "all",
+        genderCategory: "all"
       }, user.uid);
 
       if (!result.success) {
@@ -130,9 +182,21 @@ export default function AdminPlayersPage() {
         return;
       }
 
-      setPlayers(result.players);
-      setHasMore(result.pagination.hasMore);
+      // Fix: Ensure all required PlayerData fields are present
+      setPlayers(
+        (result.players ?? []).map((p: any) => ({
+          ...p,
+          addedAt: p.addedAt ?? null,
+          verifiedAt: p.verifiedAt ?? null,
+        }))
+      );
+      setHasMore(result.pagination?.hasMore ?? false);
       setError(''); // Clear any previous errors
+      
+      // Log performance information
+      if (result.meta?.usedFallback) {
+        console.warn('Player query used fallback:', result.meta.performanceNote);
+      }
       
     } catch (err: any) {
       console.error('Error loading players:', err);
@@ -141,6 +205,7 @@ export default function AdminPlayersPage() {
       setError(err.message || 'Failed to load players. Please check your permissions and that Firestore indexes are deployed.');
     } finally {
       setLoading(false);
+      setTableLoading(false);
     }
   };
 
@@ -157,6 +222,11 @@ export default function AdminPlayersPage() {
 
       if (result.success) {
         setStats(result.stats);
+        
+        // Log performance information for stats
+        if (result.meta?.usedFallback) {
+          console.warn('Stats query used fallback:', result.meta.performanceNote);
+        }
       } else {
         console.error('Error loading player stats:', result.error);
         // Set stats to null on error so fallbacks are used
@@ -354,7 +424,7 @@ export default function AdminPlayersPage() {
                   placeholder="Search players by name, phone, or team..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && loadPlayers()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
                 />
               </div>
@@ -363,7 +433,7 @@ export default function AdminPlayersPage() {
             <div className="flex gap-2">
               <select
                 value={verificationFilter}
-                onChange={(e) => setVerificationFilter(e.target.value)}
+                onChange={(e) => handleFilterChange('verification', e.target.value)}
                 className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
               >
                 <option value="all">All Status</option>
@@ -374,7 +444,7 @@ export default function AdminPlayersPage() {
 
               <select
                 value={genderFilter}
-                onChange={(e) => setGenderFilter(e.target.value)}
+                onChange={(e) => handleFilterChange('gender', e.target.value)}
                 className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
               >
                 <option value="all">All Gender</option>
@@ -384,7 +454,7 @@ export default function AdminPlayersPage() {
 
               <select
                 value={teamStatusFilter}
-                onChange={(e) => setTeamStatusFilter(e.target.value)}
+                onChange={(e) => handleFilterChange('teamStatus', e.target.value)}
                 className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
               >
                 <option value="all">All Teams</option>
@@ -397,7 +467,7 @@ export default function AdminPlayersPage() {
                 type="text"
                 placeholder="Sport"
                 value={sportFilter}
-                onChange={(e) => setSportFilter(e.target.value)}
+                onChange={(e) => handleFilterChange('sport', e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-2 w-24 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
               />
 
@@ -405,7 +475,7 @@ export default function AdminPlayersPage() {
                 type="text"
                 placeholder="District"
                 value={districtFilter}
-                onChange={(e) => setDistrictFilter(e.target.value)}
+                onChange={(e) => handleFilterChange('district', e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-2 w-24 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
               />
 
@@ -420,7 +490,7 @@ export default function AdminPlayersPage() {
           </div>
 
           {/* Applied Filters */}
-          {(verificationFilter !== 'all' || genderFilter !== 'all' || teamStatusFilter !== 'all' || sportFilter || districtFilter || searchTerm) && (
+          {(verificationFilter !== 'all' || genderFilter !== 'all' || teamStatusFilter !== 'all' || sportFilter || districtFilter || activeSearchTerm) && (
             <div className="flex flex-wrap gap-2">
               <span className="text-sm text-gray-600">Active filters:</span>
               {verificationFilter !== 'all' && (
@@ -448,7 +518,7 @@ export default function AdminPlayersPage() {
                   District: {districtFilter}
                 </span>
               )}
-              {searchTerm && (
+              {activeSearchTerm && (
                 <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
                   Search: &quot;{searchTerm}&quot;
                 </span>
@@ -461,6 +531,7 @@ export default function AdminPlayersPage() {
                   setSportFilter('');
                   setDistrictFilter('');
                   setSearchTerm('');
+                  setActiveSearchTerm('');
                   setCurrentPage(1);
                 }}
                 className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs hover:bg-red-200 transition-colors"
@@ -479,7 +550,7 @@ export default function AdminPlayersPage() {
               No players found
             </h3>
             <p className="text-gray-600 font-fira">
-              {searchTerm || verificationFilter !== 'all' || genderFilter !== 'all' || teamStatusFilter !== 'all' || sportFilter || districtFilter
+              {activeSearchTerm || verificationFilter !== 'all' || genderFilter !== 'all' || teamStatusFilter !== 'all' || sportFilter || districtFilter
                 ? 'Try adjusting your search or filters' 
                 : 'Players will appear here as they register'}
             </p>
@@ -487,7 +558,15 @@ export default function AdminPlayersPage() {
         ) : (
           <>
             {/* Desktop Table View */}
-            <div className="hidden md:block bg-white rounded-lg shadow-sm border mb-6 overflow-hidden">
+            <div className="hidden md:block bg-white rounded-lg shadow-sm border mb-6 overflow-hidden relative">
+              {tableLoading && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="w-5 h-5 animate-spin text-[#F28C38]" />
+                    <span className="text-gray-600">Updating results...</span>
+                  </div>
+                </div>
+              )}
               <div className="overflow-x-auto">
                 <table className="w-full divide-y divide-gray-200" style={{minWidth: '800px'}}>
                 <thead className="bg-gray-50">
@@ -564,7 +643,15 @@ export default function AdminPlayersPage() {
             </div>
 
             {/* Mobile Card View */}
-            <div className="md:hidden space-y-4 mb-6">
+            <div className="md:hidden space-y-4 mb-6 relative">
+              {tableLoading && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="w-5 h-5 animate-spin text-[#F28C38]" />
+                    <span className="text-gray-600">Updating results...</span>
+                  </div>
+                </div>
+              )}
               {filteredPlayers.map((player) => {
                 const docStatus = getDocumentStatus(player);
                 return (

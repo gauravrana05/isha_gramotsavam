@@ -231,7 +231,7 @@ export default function CreateVenuePage() {
     setFormData(prev => ({
       ...prev,
       [parent]: {
-        ...prev[parent as keyof typeof prev],
+        ...(typeof prev[parent] === 'object' && prev[parent] !== null ? prev[parent] : {}),
         [field]: value
       }
     }));

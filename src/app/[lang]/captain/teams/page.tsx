@@ -477,7 +477,7 @@ export default function MyTeamPage() {
   };
 
   // Handle document upload success - refresh player data
-  const handleDocumentUploadSuccess = async (playerId: string, documentType: string, url: string) => {
+  const handleDocumentUploadSuccess = async (playerId: string, documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack', url: string) => {
     // Update local state immediately (optimistic update)
     setPlayers(prev => prev.map(p => 
       p.playerId === playerId 
@@ -632,7 +632,10 @@ export default function MyTeamPage() {
         console.log('handleAddPlayer: Server action result:', result);
         
         if (!result.success) {
-          throw new Error(result.error || 'Failed to add player to team');
+          const errorMsg = typeof (result as any).error === 'string' 
+            ? (result as any).error 
+            : (result as any).error?.message || 'Failed to add player to team';
+          throw new Error(errorMsg);
         }
         
         console.log(`Player added successfully with ID: ${result.playerId}`);
@@ -1376,7 +1379,7 @@ export default function MyTeamPage() {
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.playerId, 'profilePhoto', url)}
                           onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.playerId, isComplete)}
                           variant="card"
-                          disabled={isReadOnly}
+                          disabled={isReadOnly === true}
                         />
                       )}
                     </div>
@@ -1406,7 +1409,7 @@ export default function MyTeamPage() {
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.playerId, 'aadhaarFront', url)}
                           onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.playerId, isComplete)}
                           variant="card"
-                          disabled={isReadOnly}
+                          disabled={isReadOnly === true}
                         />
                       )}
                     </div>
@@ -1436,7 +1439,7 @@ export default function MyTeamPage() {
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.playerId, 'aadhaarBack', url)}
                           onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.playerId, isComplete)}
                           variant="card"
-                          disabled={isReadOnly}
+                          disabled={isReadOnly === true}
                         />
                       )}
                     </div>

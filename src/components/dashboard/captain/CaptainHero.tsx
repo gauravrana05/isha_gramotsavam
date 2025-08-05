@@ -155,17 +155,17 @@ export const CaptainHero: React.FC<CaptainHeroProps> = ({
               height={32} 
             />
             <h1 className="text-xl md:text-2xl font-bold font-fira">
-              {team.teamName}
+              {team?.teamName}
             </h1>
             <StatusBadge 
-              status={team.status as any}
+              status={team?.status as any}
               variant="soft"
               className="bg-white/20 text-white border-white/30"
             />
           </div>
           
           <p className="text-primary-100 text-sm md:text-base">
-            Welcome back, {displayName} • {team.sportId}
+            Welcome back, {displayName} • {team?.sportId}
           </p>
         </div>
 
@@ -199,10 +199,10 @@ export const CaptainHero: React.FC<CaptainHeroProps> = ({
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-bold">
-              {team.players?.length || 0}
+              {team?.players?.length || 0}
             </span>
             <span className="text-primary-200 text-sm">
-              / {team.maxPlayers}
+              / {team?.maxPlayers}
             </span>
           </div>
           <p className="text-primary-200 text-xs mt-1">
@@ -211,7 +211,7 @@ export const CaptainHero: React.FC<CaptainHeroProps> = ({
         </div>
 
         {/* Next Match */}
-        {team.nextMatch ? (
+        {team?.nextMatch ? (
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
             <div className="flex items-center gap-3 mb-3">
               <Calendar className="w-5 h-5 text-primary-200" />
@@ -219,14 +219,14 @@ export const CaptainHero: React.FC<CaptainHeroProps> = ({
             </div>
             <div className="space-y-1">
               <p className="font-semibold text-sm">
-                vs {team.nextMatch.opponent}
+                vs {team?.nextMatch.opponent}
               </p>
               <p className="text-primary-200 text-xs">
-                {team.nextMatch.date.toLocaleDateString()}
+                {team?.nextMatch.date.toLocaleDateString()}
               </p>
               <div className="flex items-center gap-1 text-xs text-primary-300">
                 <Clock className="w-3 h-3" />
-                {getTimeUntilMatch(team.nextMatch.date)}
+                {getTimeUntilMatch(team?.nextMatch.date)}
               </div>
             </div>
           </div>
@@ -243,7 +243,7 @@ export const CaptainHero: React.FC<CaptainHeroProps> = ({
         )}
 
         {/* Venue Info */}
-        {team.venue ? (
+        {team?.venue ? (
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
             <div className="flex items-center gap-3 mb-3">
               <MapPin className="w-5 h-5 text-primary-200" />
@@ -251,10 +251,10 @@ export const CaptainHero: React.FC<CaptainHeroProps> = ({
             </div>
             <div className="space-y-1">
               <p className="font-semibold text-sm">
-                {team.venue.name}
+                {team?.venue.name}
               </p>
               <p className="text-primary-200 text-xs">
-                {team.venue.address}
+                {team?.venue.address}
               </p>
             </div>
           </div>
@@ -272,13 +272,13 @@ export const CaptainHero: React.FC<CaptainHeroProps> = ({
       </div>
 
       {/* Quick Actions Alert */}
-      {team.status === 'draft' && (
+      {team?.status === 'draft' && (
         <div className="mt-6 bg-yellow-500/20 border border-yellow-400/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-yellow-300 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-yellow-100 font-medium text-sm mb-1">
-                Complete your team registration
+                Complete your team? registration
               </p>
               <p className="text-yellow-200 text-xs">
                 Add players to your roster and submit for verification to participate in tournaments.

@@ -98,7 +98,7 @@ export async function getAdminDashboardOverview(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`
       };
     }
     
@@ -123,7 +123,7 @@ export async function getTournamentOverview(
     const validatedFilters = TournamentOverviewFiltersSchema.parse(filters);
     
     // Build fixtures query
-    let fixturesQuery = adminDb.collection('fixtures');
+    let fixturesQuery: any = adminDb.collection('fixtures');
     
     if (validatedFilters.level !== 'all') {
       fixturesQuery = fixturesQuery.where('level', '==', validatedFilters.level);
@@ -149,7 +149,7 @@ export async function getTournamentOverview(
     ]);
     
     // Process fixtures data
-    const fixturesData = fixturesSnapshot.docs.map(doc => ({
+    const fixturesData = fixturesSnapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
@@ -188,7 +188,7 @@ export async function getTournamentOverview(
     };
     
     // Aggregate fixture statistics
-    fixturesData.forEach(fixture => {
+    fixturesData.forEach((fixture: any) => {
       // By level
       const level = fixture.level || 'unknown';
       tournamentStats.fixtures.byLevel[level] = (tournamentStats.fixtures.byLevel[level] || 0) + 1;
@@ -219,18 +219,18 @@ export async function getTournamentOverview(
     }
     
     // Calculate progression statistics
-    const completedFixtures = fixturesData.filter(f => f.status === 'completed');
+    const completedFixtures = fixturesData.filter((f: any) => f.status === 'completed');
     tournamentStats.progression.completed = completedFixtures.length;
     
     // Count teams that advanced from cluster to division
-    const clusterCompletedFixtures = completedFixtures.filter(f => f.level === 'cluster');
-    tournamentStats.progression.clusterToDiv = clusterCompletedFixtures.reduce((count, fixture) => {
+    const clusterCompletedFixtures = completedFixtures.filter((f: any) => f.level === 'cluster');
+    tournamentStats.progression.clusterToDiv = clusterCompletedFixtures.reduce((count: any, fixture: any) => {
       return count + (fixture.bracket?.winners?.length || 0);
     }, 0);
     
     // Count teams that advanced from division to final
-    const divisionCompletedFixtures = completedFixtures.filter(f => f.level === 'division');
-    tournamentStats.progression.divToFinal = divisionCompletedFixtures.reduce((count, fixture) => {
+    const divisionCompletedFixtures = completedFixtures.filter((f: any) => f.level === 'division');
+    tournamentStats.progression.divToFinal = divisionCompletedFixtures.reduce((count: any, fixture: any) => {
       return count + (fixture.bracket?.winners?.length || 0);
     }, 0);
     
@@ -280,7 +280,7 @@ export async function getTournamentOverview(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation error: ${error.errors.map(e => e.message).join(', ')}`
+        error: `Validation error: ${error.issues.map((e: any) => e.message).join(', ')}`
       };
     }
     
@@ -294,7 +294,7 @@ export async function getTournamentOverview(
 // Helper functions for dashboard data aggregation
 async function getTeamsOverview(filters: any) {
   try {
-    let teamsQuery = adminDb.collection('teams');
+    let teamsQuery: any = adminDb.collection('teams');
     
     if (filters.district) {
       teamsQuery = teamsQuery.where('district', '==', filters.district);
@@ -328,7 +328,7 @@ async function getTeamsOverview(filters: any) {
   let completeTeams = 0;
   let verifiedTeams = 0;
   
-  teamsSnapshot.docs.forEach(doc => {
+  teamsSnapshot.docs.forEach((doc: any) => {
     const data = doc.data();
     
     // Count by status
@@ -384,7 +384,7 @@ async function getTeamsOverview(filters: any) {
 async function getPlayersOverview(filters: any) {
   try {
     // Use collection group query for all players
-    let playersQuery = adminDb.collectionGroup('players');
+    let playersQuery: any = adminDb.collectionGroup('players');
     playersQuery = playersQuery.where('isDeleted', '!=', true);
   
   if (filters.dateRange) {
@@ -415,7 +415,7 @@ async function getPlayersOverview(filters: any) {
   let totalAge = 0;
   let ageCount = 0;
   
-  playersSnapshot.docs.forEach(doc => {
+  playersSnapshot.docs.forEach((doc: any) => {
     const data = doc.data();
     
     // Verification status
@@ -492,7 +492,7 @@ async function getVerificationOverview(filters: any) {
   let processedCount = 0;
   let oldestSubmission = Date.now();
   
-  teamsSnapshot.docs.forEach(doc => {
+  teamsSnapshot.docs.forEach((doc: any) => {
     const data = doc.data();
     const verificationStatus = data.verificationStatus || 'pending';
     
@@ -555,7 +555,7 @@ async function getVerificationOverview(filters: any) {
 
 async function getVenuesOverview(filters: any) {
   try {
-    let venuesQuery = adminDb.collection('venues');
+    let venuesQuery: any = adminDb.collection('venues');
   
   if (filters.district) {
     venuesQuery = venuesQuery.where('district', '==', filters.district);
@@ -577,7 +577,7 @@ async function getVenuesOverview(filters: any) {
     assignedTeams: 0
   };
   
-  venuesSnapshot.docs.forEach(doc => {
+  venuesSnapshot.docs.forEach((doc: any) => {
     const data = doc.data();
     
     if (data.isActive) overview.active++;
@@ -612,7 +612,7 @@ async function getVenuesOverview(filters: any) {
 
 async function getMatchesOverview(filters: any) {
   try {
-    let matchesQuery = adminDb.collection('matches');
+    let matchesQuery: any = adminDb.collection('matches');
     
     if (filters.level !== 'all') {
       matchesQuery = matchesQuery.where('level', '==', filters.level);
@@ -635,7 +635,7 @@ async function getMatchesOverview(filters: any) {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     
-    matchesSnapshot.docs.forEach(doc => {
+    matchesSnapshot.docs.forEach((doc: any) => {
       const data = doc.data();
       const status = data.status || 'scheduled';
       

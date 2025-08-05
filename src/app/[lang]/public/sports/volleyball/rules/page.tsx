@@ -7,13 +7,13 @@ import SectionDivider from '@/components/ui/SectionDivider'
 import { ChevronLeft } from 'lucide-react'
 import Image from 'next/image';
 interface ThrowballRulesPageProps {
-    params: {
+    params: Promise<{
         lang: string
-    }
+    }>
 }
 
-export default function ThrowballRulesPage({ params }: ThrowballRulesPageProps) {
-    const { lang } = params
+export default async function ThrowballRulesPage({ params }: ThrowballRulesPageProps) {
+    const { lang } = await params
 
     return (
         <main className="min-h-screen font-fira bg-[url('/images/backgrounds/rules_background.jpg')]">

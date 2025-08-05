@@ -22,6 +22,7 @@ export interface UserDocuments {
   profilePhoto: DocumentInfo;
   aadhaarFront: DocumentInfo;
   aadhaarBack: DocumentInfo;
+  teamPhoto: DocumentInfo;
 }
 
 export interface User {

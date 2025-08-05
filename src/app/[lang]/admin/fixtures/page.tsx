@@ -14,9 +14,9 @@ import {
 } from 'lucide-react';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     lang: string;
-  };
+  }>;
 }
 
 async function getAllFixtures() {
@@ -63,10 +63,14 @@ async function getFixtureStats() {
     
     fixturesSnapshot.docs.forEach(doc => {
       const data = doc.data();
-      if (data.status) stats.byStatus[data.status]++;
-      if (data.level) stats.byLevel[data.level]++;
+      if (typeof data.status === 'string' && data.status in stats.byStatus) {
+        stats.byStatus[data.status as keyof typeof stats.byStatus]++;
+      }
+      if (typeof data.level === 'string' && data.level in stats.byLevel) {
+        stats.byLevel[data.level as keyof typeof stats.byLevel]++;
+      }
     });
-    
+
     return stats;
   } catch (error) {
     console.error('Error fetching stats:', error);
@@ -80,7 +84,7 @@ async function getFixtureStats() {
 }
 
 export default async function AdminFixturesPage({ params }: PageProps) {
-  const { lang } = params;
+  const { lang } = await params;
   
   const [fixturesResult, stats] = await Promise.all([
     getAllFixtures(),
@@ -232,31 +236,31 @@ export default async function AdminFixturesPage({ params }: PageProps) {
                 <tr key={fixture.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{fixture.name}</div>
-                      <div className="text-sm text-gray-500">{fixture.sportName} • {fixture.genderCategory}</div>
+                      <div className="text-sm font-medium text-gray-900">{(fixture as any)?.name}</div>
+                      <div className="text-sm text-gray-500">{(fixture as any)?.sportName} • {(fixture as any)?.genderCategory}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center text-sm text-gray-900">
                       <MapPin className="w-4 h-4 text-gray-400 mr-1" />
-                      {fixture.venueName}
+                      {(fixture as any)?.venueName}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getLevelColor(fixture.level)}`}>
-                      {fixture.level}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getLevelColor((fixture as any)?.level)}`}>
+                      {(fixture as any)?.level}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <div className="flex items-center">
                       <Users className="w-4 h-4 text-gray-400 mr-1" />
-                      {fixture.assignedTeams?.length || 0}
+                      {(fixture as any)?.assignedTeams?.length || 0}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(fixture.status)}`}>
-                      {getStatusIcon(fixture.status)}
-                      <span className="ml-1 capitalize">{fixture.status?.replace('_', ' ')}</span>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor((fixture as any)?.status)}`}>
+                      {getStatusIcon((fixture as any)?.status)}
+                      <span className="ml-1 capitalize">{(fixture as any)?.status?.replace('_', ' ')}</span>
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

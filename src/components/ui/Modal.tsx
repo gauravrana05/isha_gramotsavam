@@ -238,7 +238,7 @@ export const Modal: React.FC<ModalProps> = ({
   }, [isOpen, closeOnEscape, onClose]);
 
   // Use custom hooks
-  useFocusTrap(isOpen, modalRef);
+  useFocusTrap(isOpen, modalRef as React.RefObject<HTMLElement>);
   useBodyScrollLock(isOpen && preventScroll);
 
   // Don't render if not open
@@ -360,9 +360,18 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   );
 };
 
-// Export compound components
-Modal.Header = ModalHeader;
-Modal.Body = ModalBody;
-Modal.Footer = ModalFooter;
+// Export compound components with proper typing
+import type { FC } from 'react';
 
-export default Modal;
+type ModalCompoundComponent = FC<ModalProps> & {
+  Header: typeof ModalHeader;
+  Body: typeof ModalBody;
+  Footer: typeof ModalFooter;
+};
+
+const ModalWithCompounds = Modal as ModalCompoundComponent;
+ModalWithCompounds.Header = ModalHeader;
+ModalWithCompounds.Body = ModalBody;
+ModalWithCompounds.Footer = ModalFooter;
+
+export default ModalWithCompounds;

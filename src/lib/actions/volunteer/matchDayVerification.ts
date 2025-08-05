@@ -3,7 +3,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
-
+import { Timestamp } from 'firebase-admin/firestore';
 interface MatchDayPlayerVerification {
   playerId: string;
   status: 'verified' | 'rejected';
@@ -42,9 +42,9 @@ interface MatchDayPlayerData {
   position: string;
   profileComplete: boolean;
   documents: {
-    profilePhoto: { url?: string | null; verified: boolean };
-    aadhaarFront: { url?: string | null; verified: boolean };
-    aadhaarBack: { url?: string | null; verified: boolean };
+    profilePhoto: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
+    aadhaarFront: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
+    aadhaarBack: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
   };
   verificationStatus: string;
   matchDayVerificationStatus?: 'pending' | 'verified' | 'rejected';
@@ -53,12 +53,32 @@ interface MatchDayPlayerData {
   matchDayComments?: string;
 }
 
+function serializeFirestoreData(data: any): any {
+  if (data instanceof Timestamp) {
+    return data.toDate().toISOString();
+  }
+
+  if (Array.isArray(data)) {
+    return data.map(serializeFirestoreData);
+  }
+
+  if (data !== null && typeof data === 'object') {
+    const result: any = {};
+    for (const key in data) {
+      result[key] = serializeFirestoreData(data[key]);
+    }
+    return result;
+  }
+
+  return data;
+}
+
+
 export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: string) {
   try {
     console.log(`Getting match day teams for venue: ${venueId}`);
     const startTime = Date.now();
 
-    // Check if user has technical volunteer permissions
     const userDoc = await adminDb.collection("users").doc(volunteerId).get();
     if (!userDoc.exists) {
       return { success: false, error: "User not found" };
@@ -69,7 +89,6 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
       return { success: false, error: "Not authorized to perform match day verification" };
     }
 
-    // Get teams assigned to this venue
     const teamVenueQuery = await adminDb
       .collection('teamVenueAssignment')
       .where('venueId', '==', venueId)
@@ -80,45 +99,31 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
       return { success: true, teams: [] };
     }
 
-    console.log(`Found ${teamVenueQuery.docs.length} team assignments`);
-
-    // Extract team IDs for batch query
     const teamIds = teamVenueQuery.docs.map(doc => doc.data().teamId);
-    
-    // Batch query all teams and their players in parallel
-    console.log(`Batch querying ${teamIds.length} teams and their players...`);
-    
+
     const [teamDocs, ...playerSnapshots] = await Promise.all([
-      // Batch query all teams
       adminDb.getAll(...teamIds.map(id => adminDb.collection('teams').doc(id))),
-      // Parallel query all team players
       ...teamIds.map(teamId => 
         adminDb.collection('teams').doc(teamId).collection('players').get()
       )
     ]);
 
-    // Create team lookup for fast access
     const teamLookup = new Map();
     teamDocs.forEach(doc => {
       if (doc.exists) {
-        teamLookup.set(doc.id, doc.data());
+        teamLookup.set(doc.id, serializeFirestoreData(doc.data())); // serialize here
       }
     });
 
-    // Process teams in parallel
-    console.log(`Processing ${teamIds.length} teams in parallel...`);
     const teamProcessingPromises = teamVenueQuery.docs.map(async (assignmentDoc, index) => {
       const assignment = assignmentDoc.data();
       const teamData = teamLookup.get(assignment.teamId);
       const playersSnapshot = playerSnapshots[index];
 
-      if (!teamData) {
-        return null; // Team not found
-      }
+      if (!teamData) return null;
 
-      // Filter out deleted players and count verified players efficiently
       const activePlayers = playersSnapshot.docs.filter(doc => doc.data().isDeleted !== true);
-      const verifiedPlayersCount = activePlayers.filter(doc => 
+      const verifiedPlayersCount = activePlayers.filter(doc =>
         doc.data().matchDayVerificationStatus === 'verified'
       ).length;
 
@@ -135,15 +140,12 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
         matchDayStatus: teamData.matchDayStatus || 'pending',
         clusterVenue: teamData.clusterVenue,
         teamImageUrl: teamData.teamImageUrl,
-        verifiedPlayersCount // Add verified players count for UI
+        verifiedPlayersCount
       };
     });
 
-    // Wait for all team processing to complete
     const processedTeams = await Promise.all(teamProcessingPromises);
-    
-    // Filter out null values
-    const teams = processedTeams.filter(team => team !== null) as MatchDayTeamData[];
+    const teams = processedTeams.filter(team => team !== null);
 
     const endTime = Date.now();
     console.log(`Loaded ${teams.length} match day teams (took ${endTime - startTime}ms)`);
@@ -155,8 +157,8 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
 
   } catch (error) {
     console.error("Error getting venue teams for match day:", error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : "Failed to get venue teams"
     };
   }
@@ -181,7 +183,7 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
       return { success: false, error: "Team not found" };
     }
 
-    const teamData = teamDoc.data();
+    const teamData = serializeFirestoreData(teamDoc.data());
 
     // Get team players (excluding deleted players)
     // Note: Using get() without filter as isDeleted field may not exist on older documents
@@ -207,7 +209,7 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
         try {
           const userDocRef = adminDb.collection("users").doc(playerData.userId);
           const userDoc = await userDocRef.get();
-          if (userDoc.exists()) {
+          if (userDoc.exists) {
             const freshUserData = userDoc.data();
             if (freshUserData?.documents) {
               userDocuments = freshUserData.documents;
@@ -231,15 +233,24 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
         documents: {
           profilePhoto: {
             url: userDocuments?.profilePhoto?.url || null,
-            verified: userDocuments?.profilePhoto?.verified || false
+            verified: userDocuments?.profilePhoto?.verified || false,
+            storagePath: userDocuments?.profilePhoto?.storagePath || null,
+            uploadedBy: userDocuments?.profilePhoto?.uploadedBy || null,
+            uploadedAt: userDocuments?.profilePhoto?.uploadedAt?.toDate?.()?.toISOString() || null
           },
           aadhaarFront: {
             url: userDocuments?.aadhaarFront?.url || null,
-            verified: userDocuments?.aadhaarFront?.verified || false
+            verified: userDocuments?.aadhaarFront?.verified || false,
+            storagePath: userDocuments?.aadhaarFront?.storagePath || null,
+            uploadedBy: userDocuments?.aadhaarFront?.uploadedBy || null,
+            uploadedAt: userDocuments?.aadhaarFront?.uploadedAt?.toDate?.()?.toISOString() || null
           },
           aadhaarBack: {
             url: userDocuments?.aadhaarBack?.url || null,
-            verified: userDocuments?.aadhaarBack?.verified || false
+            verified: userDocuments?.aadhaarBack?.verified || false,
+            storagePath: userDocuments?.aadhaarBack?.storagePath || null,
+            uploadedBy: userDocuments?.aadhaarBack?.uploadedBy || null,
+            uploadedAt: userDocuments?.aadhaarBack?.uploadedAt?.toDate?.()?.toISOString() || null
           }
         },
         verificationStatus: playerData.verificationStatus || 'pending',
@@ -254,22 +265,22 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
       success: true,
       team: {
         id: teamDoc.id,
-        name: teamData.name,
-        sportName: teamData.sportName,
-        captainProfile: teamData.captainProfile,
-        panchayat: teamData.panchayat,
-        district: teamData.district,
-        currentPlayers: teamData.currentPlayers || 0,
-        maxPlayers: teamData.maxPlayers || 0,
-        status: teamData.status,
-        matchDayStatus: teamData.matchDayStatus || 'pending',
-        teamImageUrl: teamData.teamImageUrl,
-        clusterVenue: teamData.clusterVenue,
+        name: teamData?.name,
+        sportName: teamData?.sportName,
+        captainProfile: teamData?.captainProfile,
+        panchayat: teamData?.panchayat,
+        district: teamData?.district,
+        currentPlayers: teamData?.currentPlayers || 0,
+        maxPlayers: teamData?.maxPlayers || 0,
+        status: teamData?.status,
+        matchDayStatus: teamData?.matchDayStatus || 'pending',
+        teamImageUrl: teamData?.teamImageUrl,
+        clusterVenue: teamData?.clusterVenue,
         // Convert Firestore timestamps to strings
-        createdAt: teamData.createdAt?.toDate?.()?.toISOString() || null,
-        submittedAt: teamData.submittedAt?.toDate?.()?.toISOString() || null,
-        verifiedAt: teamData.verifiedAt?.toDate?.()?.toISOString() || null,
-        updatedAt: teamData.updatedAt?.toDate?.()?.toISOString() || null
+        createdAt: teamData?.createdAt?.toDate?.()?.toISOString() || null,
+        submittedAt: teamData?.submittedAt?.toDate?.()?.toISOString() || null,
+        verifiedAt: teamData?.verifiedAt?.toDate?.()?.toISOString() || null,
+        updatedAt: teamData?.updatedAt?.toDate?.()?.toISOString() || null
       },
       players: players
     };
@@ -344,8 +355,11 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
     });
 
     // Check if all players in the team are now verified
+    if (!finalTeamId) {
+      return { success: false, error: "Could not determine team for player" };
+    }
     const allPlayersQuery = await adminDb
-      .collection('teams').doc(finalTeamId)
+      .collection('teams').doc(finalTeamId as string)
       .collection('players')
       .get();
 

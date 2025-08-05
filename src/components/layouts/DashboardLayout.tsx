@@ -4,7 +4,6 @@ import { useAuth } from '@/context/AuthContext';
 import { MobileBottomNav, DesktopSidebar, NavigationProvider } from '@/components/navigation';
 import { Container } from '@/components/ui';
 import { cn } from '@/lib/component-patterns';
-import { tokens } from '@/lib/design-tokens';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -47,10 +46,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {showNavigation && (
           <DesktopSidebar 
             role={role} 
-            userProfile={userProfile}
+            userProfile={userProfile ?? undefined}
           />
         )}
-
         {/* Main Content Area */}
         <div className={cn(
           // Desktop: account for sidebar
@@ -61,8 +59,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           'min-h-screen pb-20 md:pb-0'
         )}>
           {/* Content Container */}
-          <Container 
-            maxWidth={containerProps.maxWidth}
+          <Container
             className={cn(
               'min-h-screen',
               containerProps.padding && 'py-4 md:py-6',

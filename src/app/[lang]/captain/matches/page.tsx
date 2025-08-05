@@ -199,7 +199,7 @@ export default function CaptainMatchesPage() {
                 fixtureId: matchData.fixtureId || '',
                 fixtureName,
                 venueId: matchData.venueId || '',
-                venue,
+                venue: venue ?? undefined,
                 roundName: matchData.roundName || 'Round',
                 matchNumber: matchData.matchNumber || 0,
                 status: matchData.status || 'scheduled',

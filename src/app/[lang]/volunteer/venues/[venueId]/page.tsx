@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { adminDb } from '@/lib/firebase/admin';
 import { getVenueTeamsForMatchDay } from '@/lib/actions/volunteer/matchDayVerification';
 import { getVenueCheckedInTeams } from '@/lib/actions/tournament/fixtureManagement';
 import { Card } from '@/components/ui/Card';
@@ -48,11 +47,10 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
       const teamsResult = await getVenueTeamsForMatchDay(venueId, user!.uid);
       
       if (teamsResult.success) {
-        setTeams(teamsResult.teams);
+        setTeams(teamsResult.teams ?? []);
       } else {
         setError(teamsResult.error || 'Failed to load teams');
       }
-      
       // Fetch checked-in teams for sports overview
       const checkedInResult = await getVenueCheckedInTeams(venueId, 'isha_gramotsavam_2025');
       setCheckedInTeamsResult(checkedInResult);
@@ -245,10 +243,10 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
                     {sportId.replace('_', ' ')} - {genderCategory}
                   </h4>
                   <div className="mt-2 text-sm text-gray-600">
-                    {sportTeams.length} teams checked in
+                    {(sportTeams as any)?.length} teams checked in
                   </div>
                   
-                  {sportTeams.length >= 2 && (
+                  {(sportTeams as any)?.length >= 2 && (
                     <Link href={`/volunteer/venues/${venueId}/fixtures/create-draw?sport=${sportId}&gender=${genderCategory}`}>
                       <button className="mt-3 bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors text-sm">
                         Create Tournament
@@ -277,13 +275,13 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
                 </div>
                 <div className="flex space-x-2">
                   <Link href={`/volunteer/venues/${venueId}/fixtures/${fixture.id}`}>
-                    <Button size="small" variant="outline">
+                    <Button size="sm" variant="outline">
                       Manage
                     </Button>
                   </Link>
                   {fixture.status === 'in_progress' && (
                     <Link href={`/volunteer/venues/${venueId}/matches?fixture=${fixture.id}`}>
-                      <Button size="small">
+                      <Button size="sm">
                         Live Matches
                       </Button>
                     </Link>

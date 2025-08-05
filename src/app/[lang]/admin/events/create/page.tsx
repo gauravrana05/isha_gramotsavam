@@ -103,7 +103,10 @@ export default function CreateEventPage() {
     }
     
     // If both dates are set, registration is open between them
-    return now >= regStart && now <= regEnd;
+    if (regStart !== null && regEnd !== null) {
+      return now >= regStart && now <= regEnd;
+    }
+    return false;
   }, [formData.registrationEndDate, formData.registrationStartDate]);
 
   // Update registration status whenever dates change
@@ -133,7 +136,7 @@ export default function CreateEventPage() {
         id: doc.id,
         ...doc.data()
       }));
-      setAvailableSports(sportsData.filter(sport => sport.isActive));
+      setAvailableSports(sportsData.filter(sport => (sport as any).isActive))
     } catch (err: any) {
       console.error('Error loading sports:', err);
     } finally {
@@ -150,7 +153,7 @@ export default function CreateEventPage() {
         id: doc.id,
         ...doc.data()
       }));
-      setAvailableVenues(venuesData.filter(venue => venue.isActive));
+      setAvailableVenues(venuesData.filter(venue => (venue as any).isActive));
     } catch (err: any) {
       console.error('Error loading venues:', err);
     } finally {
@@ -167,7 +170,7 @@ export default function CreateEventPage() {
     setFormData(prev => ({
       ...prev,
       [parent]: {
-        ...prev[parent as keyof typeof prev],
+        ...(prev[parent] && typeof prev[parent] === 'object' ? prev[parent] : {}),
         [field]: value
       }
     }));

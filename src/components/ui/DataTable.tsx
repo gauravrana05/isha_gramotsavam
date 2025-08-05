@@ -135,9 +135,13 @@ const MobileCard = <T,>({
     >
       <div className="space-y-3">
         {visibleColumns.map((column) => {
-          const value = column.accessor
-            ? getNestedValue(item, column.accessor)
-            : getNestedValue(item, column.key);
+          // Ensure accessor is only string or function, fallback to key otherwise
+          let value;
+          if (typeof column.accessor === 'string' || typeof column.accessor === 'function') {
+            value = getNestedValue(item, column.accessor);
+          } else {
+            value = getNestedValue(item, column.key);
+          }
           
           return (
             <div key={column.key} className="flex justify-between items-start">
@@ -257,9 +261,12 @@ export const DataTable = <T,>({
                     onClick={() => onRowClick?.(item)}
                   >
                     {columns.map((column) => {
-                      const value = column.accessor
-                        ? getNestedValue(item, column.accessor)
-                        : getNestedValue(item, column.key);
+                      let value;
+                      if (typeof column.accessor === 'string' || typeof column.accessor === 'function') {
+                        value = getNestedValue(item, column.accessor);
+                      } else {
+                        value = getNestedValue(item, column.key);
+                      }
                       
                       return (
                         <td

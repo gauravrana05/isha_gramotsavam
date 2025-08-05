@@ -15,13 +15,13 @@ import AwardsRecognition from '@/components/public/AwardsRecognition'
 import FAQSection from '@/components/public/FAQSection'
 
 interface PublicPageProps {
-  params: {
+  params: Promise<{
     lang: string
-  }
+  }>
 }
 
-export default function PublicPage({ params }: PublicPageProps) {
-  const { lang } = params
+export default async function PublicPage({ params }: PublicPageProps) {
+  const { lang } = await params;
 
   return (
     <main className="min-h-screen">

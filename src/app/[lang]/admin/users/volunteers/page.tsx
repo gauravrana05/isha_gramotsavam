@@ -21,9 +21,9 @@ import Link from 'next/link';
 import { serializeFirestoreDocs } from '@/lib/utils/firestore';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     lang: string;
-  };
+  }>;
 }
 
 async function getVolunteers() {
@@ -266,11 +266,19 @@ export default async function VolunteersManagement({ params }: PageProps) {
                   <div className="border-t pt-4">
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Venue Assignments:</h4>
                     <div className="flex flex-wrap gap-2">
-                      {assignments.map((assignment, index) => (
-                        <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {assignment.venueName}
-                        </span>
-                      ))}
+                      {assignments.map(
+                        (
+                          assignment: { venueName: string },
+                          index: number
+                        ) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                          >
+                            {assignment.venueName}
+                          </span>
+                        )
+                      )}
                     </div>
                   </div>
                 )}

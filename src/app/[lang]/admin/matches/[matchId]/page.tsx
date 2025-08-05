@@ -18,10 +18,10 @@ import {
 } from 'lucide-react';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     matchId: string;
     lang: string;
-  };
+  }>;
 }
 
 async function getMatchDetails(matchId: string) {
@@ -72,7 +72,7 @@ async function getFixtureInfo(fixtureId: string) {
 }
 
 export default async function AdminMatchDetailPage({ params }: PageProps) {
-  const { matchId, lang } = params;
+  const { matchId, lang } = await params;
   
   const matchResult = await getMatchDetails(matchId);
   
@@ -94,7 +94,7 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
   }
   
   const { match } = matchResult;
-  const fixture = await getFixtureInfo(match.fixtureId);
+  const fixture = await getFixtureInfo((match as any)?.fixtureId);
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -123,7 +123,7 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
   };
 
   const isWinner = (teamId: string) => {
-    return match.result?.winnerId === teamId;
+    return (match as any)?.result?.winnerId === teamId;
   };
 
   return (
@@ -141,27 +141,27 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
         </div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Match #{match.matchNumber}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Match #{(match as any)?.matchNumber}</h1>
             <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
               <div className="flex items-center">
                 <MapPin className="w-4 h-4 mr-1" />
-                {match.venueName}
+                {(match as any)?.venueName}
               </div>
               <div className="flex items-center">
                 <Target className="w-4 h-4 mr-1" />
-                {match.roundName}
+                {(match as any)?.roundName}
               </div>
-              <div>{match.sportName} • {match.genderCategory}</div>
+              <div>{(match as any)?.sportName} • {(match as any)?.genderCategory}</div>
             </div>
           </div>
           <div className="text-right">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(match.status)}`}>
-              {getStatusIcon(match.status)}
-              <span className="ml-2 capitalize">{match.status?.replace('_', ' ')}</span>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor((match as any)?.status)}`}>
+              {getStatusIcon((match as any)?.status)}
+              <span className="ml-2 capitalize">{(match as any)?.status?.replace('_', ' ')}</span>
             </span>
-            {match.createdAt && (
+            {(match as any)?.createdAt && (
               <div className="text-xs text-gray-500 mt-1">
-                Created: {new Date(match.createdAt).toLocaleString()}
+                Created: {new Date((match as any)?.createdAt).toLocaleString()}
               </div>
             )}
           </div>
@@ -169,16 +169,16 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
       </div>
 
       {/* Match Result Banner */}
-      {match.result && (
+      {(match as any)?.result && (
         <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-6 mb-6">
           <div className="flex items-center">
             <Crown className="w-8 h-8 text-green-600 mr-3" />
             <div>
               <h3 className="text-lg font-semibold text-green-900">Match Complete</h3>
-              <p className="text-green-800">Winner: {match.result.winnerName}</p>
-              {match.result.resultEnteredAt && (
+              <p className="text-green-800">Winner: {(match as any)?.result.winnerName}</p>
+              {(match as any)?.result.resultEnteredAt && (
                 <p className="text-sm text-green-700">
-                  Completed: {new Date(match.result.resultEnteredAt).toLocaleString()}
+                  Completed: {new Date((match as any)?.result.resultEnteredAt).toLocaleString()}
                 </p>
               )}
             </div>
@@ -197,17 +197,17 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
             <div className="p-6">
               <div className="space-y-6">
                 {/* Team 1 */}
-                <div className={`p-4 rounded-lg border ${isWinner(match.team1?.teamId) ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className={`p-4 rounded-lg border ${isWinner((match as any)?.team1?.teamId) ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-lg font-medium text-gray-900">
-                        {formatTeamName(match.team1)}
+                        {formatTeamName((match as any)?.team1)}
                       </h4>
-                      {match.team1?.teamName && match.team1?.teamName !== 'TBD' && (
+                      {(match as any)?.team1?.teamName && (match as any)?.team1?.teamName !== 'TBD' && (
                         <p className="text-sm text-gray-600 mt-1">Team 1</p>
                       )}
                     </div>
-                    {isWinner(match.team1?.teamId) && (
+                    {isWinner((match as any)?.team1?.teamId) && (
                       <div className="flex items-center text-green-600">
                         <Crown className="w-5 h-5 mr-1" />
                         <span className="font-medium">Winner</span>
@@ -224,17 +224,17 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
                 </div>
 
                 {/* Team 2 */}
-                <div className={`p-4 rounded-lg border ${isWinner(match.team2?.teamId) ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className={`p-4 rounded-lg border ${isWinner((match as any)?.team2?.teamId) ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-lg font-medium text-gray-900">
-                        {formatTeamName(match.team2)}
+                        {formatTeamName((match as any)?.team2)}
                       </h4>
-                      {match.team2?.teamName && match.team2?.teamName !== 'TBD' && (
+                      {(match as any)?.team2?.teamName && (match as any)?.team2?.teamName !== 'TBD' && (
                         <p className="text-sm text-gray-600 mt-1">Team 2</p>
                       )}
                     </div>
-                    {isWinner(match.team2?.teamId) && (
+                    {isWinner((match as any)?.team2?.teamId) && (
                       <div className="flex items-center text-green-600">
                         <Crown className="w-5 h-5 mr-1" />
                         <span className="font-medium">Winner</span>
@@ -245,27 +245,27 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
               </div>
 
               {/* Score Details */}
-              {match.result?.score && (
+              {(match as any)?.result?.score && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <h4 className="text-md font-medium text-gray-900 mb-3">Score Details</h4>
                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="grid grid-cols-2 gap-4 text-center">
                       <div>
                         <div className="text-2xl font-bold text-gray-900">
-                          {match.result.score.team1Score || 0}
+                          {(match as any)?.result.score.team1Score || 0}
                         </div>
-                        <div className="text-sm text-gray-600">{formatTeamName(match.team1)}</div>
+                        <div className="text-sm text-gray-600">{formatTeamName((match as any)?.team1)}</div>
                       </div>
                       <div>
                         <div className="text-2xl font-bold text-gray-900">
-                          {match.result.score.team2Score || 0}
+                          {(match as any)?.result.score.team2Score || 0}
                         </div>
-                        <div className="text-sm text-gray-600">{formatTeamName(match.team2)}</div>
+                        <div className="text-sm text-gray-600">{formatTeamName((match as any)?.team2)}</div>
                       </div>
                     </div>
-                    {match.result.score.details && (
+                    {(match as any)?.result.score.details && (
                       <div className="mt-4 text-sm text-gray-600">
-                        <strong>Details:</strong> {match.result.score.details}
+                        <strong>Details:</strong> {(match as any)?.result.score.details}
                       </div>
                     )}
                   </div>
@@ -283,19 +283,19 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
             <div className="space-y-3">
               <div>
                 <div className="text-sm text-gray-600">Tournament</div>
-                <div className="font-medium">{match.fixtureName}</div>
+                <div className="font-medium">{(match as any)?.fixtureName}</div>
               </div>
               <div>
                 <div className="text-sm text-gray-600">Round</div>
-                <div className="font-medium">{match.roundName}</div>
+                <div className="font-medium">{(match as any)?.roundName}</div>
               </div>
               <div>
                 <div className="text-sm text-gray-600">Sport</div>
-                <div className="font-medium">{match.sportName} ({match.genderCategory})</div>
+                <div className="font-medium">{(match as any)?.sportName} ({(match as any)?.genderCategory})</div>
               </div>
               <div>
                 <div className="text-sm text-gray-600">Venue</div>
-                <div className="font-medium">{match.venueName}</div>
+                <div className="font-medium">{(match as any)?.venueName}</div>
               </div>
               {fixture && (
                 <div>
@@ -321,7 +321,7 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
               )}
               
               <Link 
-                href={`/${lang}/volunteer/venues/${match.venueId}/matches/${match.id}`}
+                href={`/${lang}/volunteer/venues/${(match as any)?.venueId}/matches/${(match as any)?.id}`}
                 className="flex items-center text-blue-600 hover:text-blue-800 text-sm"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
@@ -338,15 +338,15 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
                 <div className="flex-shrink-0 w-2 h-2 bg-gray-400 rounded-full mt-2"></div>
                 <div className="ml-3">
                   <div className="text-sm font-medium text-gray-900">Match Created</div>
-                  {match.createdAt && (
+                  {(match as any)?.createdAt && (
                     <div className="text-xs text-gray-500">
-                      {new Date(match.createdAt).toLocaleString()}
+                      {new Date((match as any)?.createdAt).toLocaleString()}
                     </div>
                   )}
                 </div>
               </div>
               
-              {match.status !== 'scheduled' && (
+              {(match as any)?.status !== 'scheduled' && (
                 <div className="flex items-start">
                   <div className="flex-shrink-0 w-2 h-2 bg-yellow-400 rounded-full mt-2"></div>
                   <div className="ml-3">
@@ -356,7 +356,7 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
                 </div>
               )}
               
-              {match.status === 'in_progress' && (
+              {(match as any)?.status === 'in_progress' && (
                 <div className="flex items-start">
                   <div className="flex-shrink-0 w-2 h-2 bg-blue-400 rounded-full mt-2"></div>
                   <div className="ml-3">
@@ -366,14 +366,14 @@ export default async function AdminMatchDetailPage({ params }: PageProps) {
                 </div>
               )}
               
-              {match.result && (
+              {(match as any)?.result && (
                 <div className="flex items-start">
                   <div className="flex-shrink-0 w-2 h-2 bg-green-400 rounded-full mt-2"></div>
                   <div className="ml-3">
                     <div className="text-sm font-medium text-gray-900">Match Completed</div>
-                    {match.resultEnteredAt && (
+                    {(match as any)?.resultEnteredAt && (
                       <div className="text-xs text-gray-500">
-                        {new Date(match.resultEnteredAt).toLocaleString()}
+                        {new Date((match as any)?.resultEnteredAt).toLocaleString()}
                       </div>
                     )}
                   </div>
