@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
@@ -70,16 +70,7 @@ export default function EditSportPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!user || userProfile?.role !== 'admin') {
-      router.push(`/${lang}/login`);
-      return;
-    }
-
-    loadSport();
-  }, [user, userProfile, sportId]);
-
-  const loadSport = async () => {
+  const loadSport = useCallback(async () => {
     try {
       setLoading(true);
       const sportDoc = doc(db, 'sports', sportId as string);
@@ -121,7 +112,16 @@ export default function EditSportPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [sportId]);
+
+  useEffect(() => {
+    if (!user || userProfile?.role !== 'admin') {
+      router.push(`/${lang}/login`);
+      return;
+    }
+
+    loadSport();
+  }, [user, userProfile, sportId, lang, router, loadSport]);
 
   const handleInputChange = (field: keyof SportFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));

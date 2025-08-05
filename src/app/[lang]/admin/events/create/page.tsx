@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
@@ -82,7 +82,7 @@ export default function CreateEventPage() {
   const [error, setError] = useState('');
 
   // Calculate if registration should be open based on dates
-  const calculateRegistrationStatus = () => {
+  const calculateRegistrationStatus = useCallback(() => {
     const now = new Date();
     const regStart = formData.registrationStartDate ? new Date(formData.registrationStartDate) : null;
     const regEnd = formData.registrationEndDate ? new Date(formData.registrationEndDate) : null;
@@ -104,7 +104,7 @@ export default function CreateEventPage() {
     
     // If both dates are set, registration is open between them
     return now >= regStart && now <= regEnd;
-  };
+  }, [formData.registrationEndDate, formData.registrationStartDate]);
 
   // Update registration status whenever dates change
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function CreateEventPage() {
     if (newStatus !== formData.isRegistrationOpen) {
       setFormData(prev => ({ ...prev, isRegistrationOpen: newStatus }));
     }
-  }, [formData.registrationStartDate, formData.registrationEndDate]);
+  }, [formData.registrationStartDate, formData.registrationEndDate, calculateRegistrationStatus, formData.isRegistrationOpen]);
 
   useEffect(() => {
     if (!user || userProfile?.role !== 'admin') {
@@ -122,7 +122,7 @@ export default function CreateEventPage() {
 
     loadSports();
     loadVenues();
-  }, [user, userProfile]);
+  }, [user, userProfile, lang, router]);
 
   const loadSports = async () => {
     try {

@@ -168,7 +168,7 @@ export default function AdminDashboard() {
               Admin Dashboard
             </h1>
             <p className="text-sm sm:text-base text-gray-600 font-fira">
-              Welcome back, {userProfile?.firstName}! Here's your system overview.
+              Welcome back, {userProfile?.firstName}! Here&apos;s your system overview.
             </p>
           </div>
           <button

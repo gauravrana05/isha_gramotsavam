@@ -17,7 +17,9 @@ import {
   Clock,
   Target,
   Award,
-  Zap
+  Zap,
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
@@ -52,16 +52,7 @@ export default function EventDetailPage() {
   const { lang, eventId } = useParams();
   const { user, userProfile } = useAuth();
 
-  useEffect(() => {
-    if (!user || userProfile?.role !== 'admin') {
-      router.push(`/${lang}/login`);
-      return;
-    }
-
-    loadEvent();
-  }, [user, userProfile, eventId]);
-
-  const loadEvent = async () => {
+  const loadEvent = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -93,7 +84,18 @@ export default function EventDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  },[eventId]);
+
+  useEffect(() => {
+    if (!user || userProfile?.role !== 'admin') {
+      router.push(`/${lang}/login`);
+      return;
+    }
+
+    loadEvent();
+  }, [user, userProfile, eventId, lang, router, loadEvent]);
+
+  
 
   const getStatusColor = (isActive: boolean, isRegistrationOpen: boolean) => {
     if (!isActive) return 'bg-red-100 text-red-800';

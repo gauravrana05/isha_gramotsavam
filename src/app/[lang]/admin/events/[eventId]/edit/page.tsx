@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
@@ -83,7 +83,7 @@ export default function EditEventPage() {
   const [error, setError] = useState('');
 
   // Calculate if registration should be open based on dates
-  const calculateRegistrationStatus = () => {
+  const calculateRegistrationStatus = useCallback(() => {
     const now = new Date();
     const regStart = formData.registrationStartDate ? new Date(formData.registrationStartDate) : null;
     const regEnd = formData.registrationEndDate ? new Date(formData.registrationEndDate) : null;
@@ -105,7 +105,7 @@ export default function EditEventPage() {
     
     // If both dates are set, registration is open between them
     return now >= regStart && now <= regEnd;
-  };
+  }, [formData.isRegistrationOpen, formData.registrationEndDate, formData.registrationStartDate]);
 
   // Update registration status whenever dates change
   useEffect(() => {
@@ -113,20 +113,9 @@ export default function EditEventPage() {
     if (newStatus !== formData.isRegistrationOpen) {
       setFormData(prev => ({ ...prev, isRegistrationOpen: newStatus }));
     }
-  }, [formData.registrationStartDate, formData.registrationEndDate]);
+  }, [formData.registrationStartDate, formData.registrationEndDate, calculateRegistrationStatus, formData.isRegistrationOpen]);
 
-  useEffect(() => {
-    if (!user || userProfile?.role !== 'admin') {
-      router.push(`/${lang}/login`);
-      return;
-    }
-
-    loadEvent();
-    loadSports();
-    loadVenues();
-  }, [user, userProfile, eventId]);
-
-  const loadEvent = async () => {
+  const loadEvent = useCallback(async () => {
     try {
       setLoading(true);
       const eventDoc = doc(db, 'events', eventId as string);
@@ -172,7 +161,20 @@ export default function EditEventPage() {
     } finally {
       setLoading(false);
     }
-  };
+  },[eventId]);
+
+  useEffect(() => {
+    if (!user || userProfile?.role !== 'admin') {
+      router.push(`/${lang}/login`);
+      return;
+    }
+
+    loadEvent();
+    loadSports();
+    loadVenues();
+  }, [user, userProfile, eventId, lang, router, loadEvent]);
+
+  
 
   const loadSports = async () => {
     try {
