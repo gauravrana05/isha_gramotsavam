@@ -37,6 +37,28 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next",
+    "out",
+    "build",
+    "dist",
+    // Exclude Firebase Functions completely from TypeScript compilation
+    "firebase",
+    "firebase/**/*",
+    "functions",
+    "functions/**/*",
+    "**/functions/**/*",
+    // Exclude Firebase config files
+    "firebase.json",
+    ".firebaserc",
+    "firestore.rules",
+    "storage.rules",
+    "database.rules",
+    // Exclude Firebase cache and logs
+    ".firebase",
+    "**/.firebase/**/*",
+    "**/firebase-debug.log",
+    "**/firestore-debug.log",
+    "**/ui-debug.log"
   ]
 }
