@@ -308,7 +308,7 @@ export default function ThrowballRulesPage({ params }: ThrowballRulesPageProps) 
                                         • Code of Conduct
                                     </h3>
                                     <p className="text-[#4A2F1D] leading-relaxed font-fira">
-                                        Participants agree to adhere to the tournament's rules, regulations, and code of conduct
+                                        Participants agree to adhere to the tournament&apos;s rules, regulations, and code of conduct
                                         prescribed by the organizers from time to time. Participants acknowledge that failure to
                                         comply with the rules and regulations may result in their removal from the tournament
                                         without any liability on the part of the organizers.
