@@ -5,24 +5,17 @@ import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { 
   LayoutDashboard,
-  MapPin,
   Users,
-  Trophy,
+  Shield,
   CheckCircle,
-  Calendar,
-  Camera,
-  BarChart3,
   Menu,
   X,
   LogOut,
-  Home,
-  ChevronDown,
-  ChevronRight,
-  User
+  Home
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
-interface VolunteerSidebarProps {
+interface VerificationSidebarProps {
   className?: string;
 }
 
@@ -34,62 +27,29 @@ interface NavItem {
   badge?: string;
 }
 
-export default function VolunteerSidebar({ className = '' }: VolunteerSidebarProps) {
+export default function VerificationSidebar({ className = '' }: VerificationSidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<string[]>(['Venues']);
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
   
   const pathname = usePathname();
   const { lang } = useParams();
   const { user, userProfile, logout } = useAuth();
 
-  // Extract venueId from pathname if available
-  const venueId = pathname.includes('/venues/') 
-    ? pathname.split('/venues/')[1]?.split('/')[0] 
-    : null;
-
   const navigation: NavItem[] = [
     {
       name: 'Dashboard',
-      href: `/${lang}/volunteer/dashboard`,
+      href: `/${lang}/verification/dashboard`,
       icon: LayoutDashboard,
     },
-    ...(venueId ? [
-      {
-        name: 'Venue Overview',
-        href: `/${lang}/volunteer/venues/${venueId}`,
-        icon: MapPin,
-      },
-      {
-        name: 'Teams',
-        href: `/${lang}/volunteer/venues/${venueId}/teams`,
-        icon: Users,
-      },
-      {
-        name: 'Fixtures',
-        href: `/${lang}/volunteer/venues/${venueId}/fixtures`,
-        icon: Trophy,
-      },
-      {
-        name: 'Matches',
-        href: `/${lang}/volunteer/venues/${venueId}/matches`,
-        icon: Calendar,
-      },
-      {
-        name: 'Media',
-        href: `/${lang}/volunteer/venues/${venueId}/media`,
-        icon: Camera,
-      }
-    ] : [
-      {
-        name: 'All Venues',
-        href: `/${lang}/volunteer/venues`,
-        icon: MapPin,
-      }
-    ]),
+    {
+      name: 'Team Verification',
+      href: `/${lang}/verification/teams`,
+      icon: Users,
+    },
     {
       name: 'Profile',
-      href: `/${lang}/volunteer/profile`,
-      icon: User,
+      href: `/${lang}/verification/profile`,
+      icon: Shield,
     },
   ];
 
@@ -102,7 +62,15 @@ export default function VolunteerSidebar({ className = '' }: VolunteerSidebarPro
   };
 
   const isActive = (href: string) => {
-    return pathname === href || pathname.startsWith(href + '/');
+    // Exact match first
+    if (pathname === href) return true;
+    
+    // For child routes, only match direct children
+    if (pathname.startsWith(href + '/')) {
+      return true;
+    }
+    
+    return false;
   };
 
   const renderNavItem = (item: NavItem, depth = 0) => {
@@ -141,13 +109,6 @@ export default function VolunteerSidebar({ className = '' }: VolunteerSidebarPro
           >
             <item.icon className={`w-5 h-5 ${depth > 0 ? 'mr-2' : 'mr-3'}`} />
             <span className="flex-1 text-left">{item.name}</span>
-            {hasChildren && (
-              isExpanded ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )
-            )}
             {item.badge && (
               <span className="ml-2 bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full">
                 {item.badge}
@@ -208,7 +169,7 @@ export default function VolunteerSidebar({ className = '' }: VolunteerSidebarPro
                 <CheckCircle className="w-5 h-5 text-white" />
               </div>
               <div className="ml-3">
-                <h2 className="text-lg font-semibold text-gray-900">Volunteer Panel</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Verification Panel</h2>
                 <p className="text-sm text-gray-600">Isha Gramotsavam</p>
               </div>
             </div>
@@ -234,7 +195,7 @@ export default function VolunteerSidebar({ className = '' }: VolunteerSidebarPro
                   <p className="text-sm font-medium text-gray-900">
                     {userProfile.firstName} {userProfile.lastName}
                   </p>
-                  <p className="text-xs text-gray-600 capitalize">{userProfile.role}</p>
+                  <p className="text-xs text-gray-600 capitalize">Verification Volunteer</p>
                 </div>
               </div>
             </div>

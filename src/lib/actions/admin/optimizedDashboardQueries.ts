@@ -293,23 +293,24 @@ export async function getTournamentOverview(
 
 // Helper functions for dashboard data aggregation
 async function getTeamsOverview(filters: any) {
-  let teamsQuery = adminDb.collection('teams');
-  
-  if (filters.district) {
-    teamsQuery = teamsQuery.where('district', '==', filters.district);
-  }
-  
-  if (filters.sportName) {
-    teamsQuery = teamsQuery.where('sportName', '==', filters.sportName);
-  }
-  
-  if (filters.dateRange) {
-    teamsQuery = teamsQuery
-      .where('createdAt', '>=', new Date(filters.dateRange.start))
-      .where('createdAt', '<=', new Date(filters.dateRange.end));
-  }
-  
-  const teamsSnapshot = await teamsQuery.get();
+  try {
+    let teamsQuery = adminDb.collection('teams');
+    
+    if (filters.district) {
+      teamsQuery = teamsQuery.where('district', '==', filters.district);
+    }
+    
+    if (filters.sportName) {
+      teamsQuery = teamsQuery.where('sportName', '==', filters.sportName);
+    }
+    
+    if (filters.dateRange) {
+      teamsQuery = teamsQuery
+        .where('createdAt', '>=', new Date(filters.dateRange.start))
+        .where('createdAt', '<=', new Date(filters.dateRange.end));
+    }
+    
+    const teamsSnapshot = await teamsQuery.get();
   
   const overview = {
     total: teamsSnapshot.size,
@@ -364,12 +365,27 @@ async function getTeamsOverview(filters: any) {
     Math.round((verifiedTeams / overview.total) * 100) : 0;
   
   return overview;
+  } catch (error) {
+    console.error('Error in getTeamsOverview:', error);
+    return {
+      total: 0,
+      byStatus: {},
+      bySport: {},
+      byDistrict: {},
+      byGenderCategory: {},
+      averagePlayersPerTeam: 0,
+      totalPlayers: 0,
+      completionRate: 0,
+      verificationRate: 0
+    };
+  }
 }
 
 async function getPlayersOverview(filters: any) {
-  // Use collection group query for all players
-  let playersQuery = adminDb.collectionGroup('players');
-  playersQuery = playersQuery.where('isDeleted', '!=', true);
+  try {
+    // Use collection group query for all players
+    let playersQuery = adminDb.collectionGroup('players');
+    playersQuery = playersQuery.where('isDeleted', '!=', true);
   
   if (filters.dateRange) {
     playersQuery = playersQuery
@@ -437,11 +453,26 @@ async function getPlayersOverview(filters: any) {
   overview.averageAge = ageCount > 0 ? Math.round((totalAge / ageCount) * 100) / 100 : 0;
   
   return overview;
+  } catch (error) {
+    console.error('Error in getPlayersOverview:', error);
+    return {
+      total: 0,
+      byVerificationStatus: {},
+      byGender: {},
+      byAgeGroup: {
+        '14-20': 0, '21-30': 0, '31-40': 0, '41-50': 0, '51-60': 0, unknown: 0
+      },
+      documentsUploaded: 0,
+      documentsVerified: 0,
+      averageAge: 0
+    };
+  }
 }
 
 async function getVerificationOverview(filters: any) {
-  const teamsQuery = adminDb.collection('teams').where('status', '==', 'submitted');
-  const teamsSnapshot = await teamsQuery.get();
+  try {
+    const teamsQuery = adminDb.collection('teams').where('status', '==', 'submitted');
+    const teamsSnapshot = await teamsQuery.get();
   
   const overview = {
     totalInQueue: teamsSnapshot.size,
@@ -507,10 +538,24 @@ async function getVerificationOverview(filters: any) {
   }
   
   return overview;
+  } catch (error) {
+    console.error('Error in getVerificationOverview:', error);
+    return {
+      totalInQueue: 0,
+      processed: 0,
+      pending: 0,
+      verified: 0,
+      rejected: 0,
+      averageProcessingTime: 0,
+      backlogDays: 0,
+      todayProcessed: 0
+    };
+  }
 }
 
 async function getVenuesOverview(filters: any) {
-  let venuesQuery = adminDb.collection('venues');
+  try {
+    let venuesQuery = adminDb.collection('venues');
   
   if (filters.district) {
     venuesQuery = venuesQuery.where('district', '==', filters.district);
@@ -551,135 +596,165 @@ async function getVenuesOverview(filters: any) {
     Math.round((overview.assignedTeams / overview.totalCapacity) * 100) : 0;
   
   return overview;
+  } catch (error) {
+    console.error('Error in getVenuesOverview:', error);
+    return {
+      total: 0,
+      active: 0,
+      byLevel: {},
+      byDistrict: {},
+      totalCapacity: 0,
+      utilizationRate: 0,
+      assignedTeams: 0
+    };
+  }
 }
 
 async function getMatchesOverview(filters: any) {
-  let matchesQuery = adminDb.collection('matches');
-  
-  if (filters.level !== 'all') {
-    matchesQuery = matchesQuery.where('level', '==', filters.level);
-  }
-  
-  const matchesSnapshot = await matchesQuery.get();
-  
-  const overview = {
-    total: matchesSnapshot.size,
-    completed: 0,
-    inProgress: 0,
-    scheduled: 0,
-    byRound: {} as Record<string, number>,
-    todayMatches: 0,
-    completionRate: 0
-  };
-  
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  
-  matchesSnapshot.docs.forEach(doc => {
-    const data = doc.data();
-    const status = data.status || 'scheduled';
+  try {
+    let matchesQuery = adminDb.collection('matches');
     
-    if (status === 'completed') overview.completed++;
-    else if (status === 'in_progress') overview.inProgress++;
-    else overview.scheduled++;
-    
-    const round = data.roundName || 'Unknown';
-    overview.byRound[round] = (overview.byRound[round] || 0) + 1;
-    
-    // Count today's matches
-    if (data.scheduledAt) {
-      const matchDate = data.scheduledAt.toDate();
-      if (matchDate >= today && matchDate < tomorrow) {
-        overview.todayMatches++;
-      }
+    if (filters.level !== 'all') {
+      matchesQuery = matchesQuery.where('level', '==', filters.level);
     }
-  });
-  
-  overview.completionRate = overview.total > 0 ? 
-    Math.round((overview.completed / overview.total) * 100) : 0;
-  
-  return overview;
+    
+    const matchesSnapshot = await matchesQuery.get();
+    
+    const overview = {
+      total: matchesSnapshot.size,
+      completed: 0,
+      inProgress: 0,
+      scheduled: 0,
+      byRound: {} as Record<string, number>,
+      todayMatches: 0,
+      completionRate: 0
+    };
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    matchesSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const status = data.status || 'scheduled';
+      
+      if (status === 'completed') overview.completed++;
+      else if (status === 'in_progress') overview.inProgress++;
+      else overview.scheduled++;
+      
+      const round = data.roundName || 'Unknown';
+      overview.byRound[round] = (overview.byRound[round] || 0) + 1;
+      
+      // Count today's matches
+      if (data.scheduledAt) {
+        const matchDate = data.scheduledAt.toDate();
+        if (matchDate >= today && matchDate < tomorrow) {
+          overview.todayMatches++;
+        }
+      }
+    });
+    
+    overview.completionRate = overview.total > 0 ? 
+      Math.round((overview.completed / overview.total) * 100) : 0;
+    
+    return overview;
+  } catch (error) {
+    console.error('Error in getMatchesOverview:', error);
+    return {
+      total: 0,
+      completed: 0,
+      inProgress: 0,
+      scheduled: 0,
+      byRound: {},
+      todayMatches: 0,
+      completionRate: 0
+    };
+  }
 }
 
 async function getRecentActivity(filters: any) {
-  // Get recent activities from multiple collections
-  const recentLimit = 20;
-  
-  const [recentTeams, recentVerifications, recentMatches] = await Promise.all([
-    adminDb.collection('teams')
-      .orderBy('updatedAt', 'desc')
-      .limit(recentLimit)
-      .get(),
-    adminDb.collectionGroup('verification')
-      .where('status', 'in', ['verified', 'rejected'])
-      .orderBy('verifiedAt', 'desc')
-      .limit(recentLimit)
-      .get(),
-    adminDb.collection('matches')
-      .where('status', '==', 'completed')
-      .orderBy('updatedAt', 'desc')
-      .limit(recentLimit)
-      .get()
-  ]);
-  
-  const activities: any[] = [];
-  
-  // Process recent team activities
-  recentTeams.docs.forEach(doc => {
-    const data = doc.data();
-    activities.push({
-      type: 'team',
-      action: data.status === 'submitted' ? 'submitted' : 'updated',
-      entityId: doc.id,
-      entityName: data.name,
-      timestamp: data.updatedAt?.toDate?.()?.toISOString() || null,
-      details: {
-        status: data.status,
-        sportName: data.sportName,
-        playerCount: data.currentPlayers
-      }
+  try {
+    // Get recent activities from multiple collections
+    const recentLimit = 20;
+    
+    const [recentTeams, recentVerifications, recentMatches] = await Promise.all([
+      adminDb.collection('teams')
+        .orderBy('updatedAt', 'desc')
+        .limit(recentLimit)
+        .get(),
+      adminDb.collectionGroup('verification')
+        .where('status', 'in', ['verified', 'rejected'])
+        .orderBy('verifiedAt', 'desc')
+        .limit(recentLimit)
+        .get(),
+      adminDb.collection('matches')
+        .where('status', '==', 'completed')
+        .orderBy('updatedAt', 'desc')
+        .limit(recentLimit)
+        .get()
+    ]);
+    
+    const activities: any[] = [];
+    
+    // Process recent team activities
+    recentTeams.docs.forEach(doc => {
+      const data = doc.data();
+      activities.push({
+        type: 'team',
+        action: data.status === 'submitted' ? 'submitted' : 'updated',
+        entityId: doc.id,
+        entityName: data.name,
+        timestamp: data.updatedAt?.toDate?.()?.toISOString() || null,
+        details: {
+          status: data.status,
+          sportName: data.sportName,
+          playerCount: data.currentPlayers
+        }
+      });
     });
-  });
-  
-  // Process verification activities
-  recentVerifications.docs.forEach(doc => {
-    const data = doc.data();
-    activities.push({
-      type: 'verification',
-      action: data.status,
-      entityId: data.teamId,
-      entityName: `Team verification`,
-      timestamp: data.verifiedAt?.toDate?.()?.toISOString() || null,
-      details: {
-        verifiedBy: data.verifiedBy,
-        status: data.status
-      }
+    
+    // Process verification activities
+    recentVerifications.docs.forEach(doc => {
+      const data = doc.data();
+      activities.push({
+        type: 'verification',
+        action: data.status,
+        entityId: data.teamId,
+        entityName: `Team verification`,
+        timestamp: data.verifiedAt?.toDate?.()?.toISOString() || null,
+        details: {
+          verifiedBy: data.verifiedBy,
+          status: data.status
+        }
+      });
     });
-  });
-  
-  // Process match activities
-  recentMatches.docs.forEach(doc => {
-    const data = doc.data();
-    activities.push({
-      type: 'match',
-      action: 'completed',
-      entityId: doc.id,
-      entityName: `${data.team1?.teamName || 'TBD'} vs ${data.team2?.teamName || 'TBD'}`,
-      timestamp: data.updatedAt?.toDate?.()?.toISOString() || null,
-      details: {
-        winner: data.result?.winnerName,
-        round: data.roundName,
-        venue: data.venueName
-      }
+    
+    // Process match activities
+    recentMatches.docs.forEach(doc => {
+      const data = doc.data();
+      activities.push({
+        type: 'match',
+        action: 'completed',
+        entityId: doc.id,
+        entityName: `${data.team1?.teamName || 'TBD'} vs ${data.team2?.teamName || 'TBD'}`,
+        timestamp: data.updatedAt?.toDate?.()?.toISOString() || null,
+        details: {
+          winner: data.result?.winnerName,
+          round: data.roundName,
+          venue: data.venueName
+        }
+      });
     });
-  });
-  
-  // Sort by timestamp and limit
-  return activities
-    .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
-    .slice(0, recentLimit);
+    
+    // Sort by timestamp and limit
+    return activities
+      .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+      .slice(0, recentLimit);
+  } catch (error) {
+    console.error('Error in getRecentActivity:', error);
+    return [];
+  }
 }
 
 function calculateSystemHealth(data: any) {

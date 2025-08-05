@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase/config";
-import { doc, getDoc, collection, getDocs, updateDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, updateDoc, writeBatch } from "firebase/firestore";
 import { auditLogService } from "@/lib/services/auditLogService";
 import { assignTeamToVenue } from "@/lib/actions/admin/teamVenueAssignment";
 import Image from "next/image";
@@ -66,6 +66,7 @@ interface TeamData {
 export default function TeamVerificationPage() {
   const [teamData, setTeamData] = useState<TeamData | null>(null);
   const [players, setPlayers] = useState<TeamPlayer[]>([]);
+  const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayer | null>(null);
   const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -231,48 +232,197 @@ export default function TeamVerificationPage() {
       return;
     }
     try {
-    setSaving(true);
+      setSaving(true);
 
-    
-    // Find the player *before* updating the state to get the old status
-    const player = players.find(p => p.playerId === playerId);
-    if (!player) {
-      throw new Error("Player not found in local state.");
+      // Find the player *before* updating the state to get the old status
+      const player = players.find(p => p.playerId === playerId);
+      if (!player) {
+        throw new Error("Player not found in local state.");
+      }
+
+      // Update local state first for a responsive UI
+      const updatedPlayers = players.map(p => 
+        p.playerId === playerId 
+          ? { 
+              ...p, 
+              verificationStatus: status, 
+              verificationComments: comments ? [comments] : [] 
+            } 
+          : p
+      );
+      setPlayers(updatedPlayers);
+
+      // Update in database
+      if (player.userId) {
+        const userRef = doc(db, "users", player.userId);
+        await updateDoc(userRef, {
+          [`teams.${teamIdStr}.verificationStatus`]: status,
+          [`teams.${teamIdStr}.verificationComments`]: comments ? [comments] : [],
+          [`teams.${teamIdStr}.verifiedAt`]: new Date().toISOString(),
+          [`teams.${teamIdStr}.verifiedBy`]: user?.uid,
+        });
+
+        const playerRef = doc(db, "teams", teamIdStr, "players", playerId);
+        await updateDoc(playerRef, {
+          verificationStatus: status,
+          verificationComments: comments ? [comments] : [],
+          verifiedAt: new Date().toISOString(),
+          verifiedBy: user?.uid,
+        });
+
+        // Log the verification action
+        if (teamData && user && userProfile) {
+          await auditLogService.logPlayerVerification(
+            { // actor
+              uid: user.uid,
+              name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+              role: userProfile.role
+            },
+            { // team
+              id: teamData.id,
+              name: teamData.name
+            },
+            { // player
+              id: player.playerId,
+              name: player.name
+            },
+            player.verificationStatus, // oldStatus
+            status, // newStatus
+            comments || null // reason
+          );
+        }
+      }
+      
+      // Update team status based on the new list of players
+      await updateTeamStatus(updatedPlayers);
+      
+    } catch (error) {
+      console.error('Error updating player status:', error);
+      alert('Failed to save verification. Please try again.');
+      loadTeamData(); // Reload data on error
+    } finally {
+      setSaving(false);
     }
+  };
 
-    // Update local state first for a responsive UI
-    const updatedPlayers = players.map(p => 
-      p.playerId === playerId 
-        ? { 
-            ...p, 
-            verificationStatus: status, 
-            verificationComments: comments ? [comments] : [] 
-          } 
-        : p
-    );
-    setPlayers(updatedPlayers);
+  const handleBulkAction = async (action: 'approved' | 'rejected') => {
+    if (selectedPlayers.size === 0) {
+      alert('Please select players to perform bulk action.');
+      return;
+    }
+    
+    const selectedPlayersList = players.filter(p => selectedPlayers.has(p.playerId));
+    const actionText = action === 'approved' ? 'approve' : 'reject';
+    
+    let reason = '';
+    if (action === 'rejected') {
+      reason = prompt('Reason for rejection:') || '';
+      if (!reason) return;
+    } else {
+      reason = 'Bulk approved by verification volunteer';
+    }
+    
+    if (!confirm(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} ${selectedPlayersList.length} selected players?`)) {
+      return;
+    }
+    
+    setSaving(true);
+    
+    try {
+      // Update local state first for responsive UI
+      const updatedPlayers = players.map(p => 
+        selectedPlayers.has(p.playerId) 
+          ? { 
+              ...p, 
+              verificationStatus: action, 
+              verificationComments: reason ? [reason] : [] 
+            } 
+          : p
+      );
+      setPlayers(updatedPlayers);
 
-    // Update in database
-    if (player.userId) {
-      const userRef = doc(db, "users", player.userId);
-      await updateDoc(userRef, {
-        [`teams.${teamIdStr}.verificationStatus`]: status,
-        [`teams.${teamIdStr}.verificationComments`]: comments ? [comments] : [],
-        [`teams.${teamIdStr}.verifiedAt`]: new Date().toISOString(),
-        [`teams.${teamIdStr}.verifiedBy`]: user?.uid,
-      });
+      // Create Firebase batch operation
+      const batch = writeBatch(db);
+      const timestamp = new Date().toISOString();
+      
+      // Batch update all selected players
+      for (const player of selectedPlayersList) {
+        if (player.userId) {
+          // Update user document
+          const userRef = doc(db, "users", player.userId);
+          batch.update(userRef, {
+            [`teams.${teamIdStr}.verificationStatus`]: action,
+            [`teams.${teamIdStr}.verificationComments`]: reason ? [reason] : [],
+            [`teams.${teamIdStr}.verifiedAt`]: timestamp,
+            [`teams.${teamIdStr}.verifiedBy`]: user?.uid,
+          });
 
-      const playerRef = doc(db, "teams", teamIdStr, "players", playerId);
-      await updateDoc(playerRef, {
-        verificationStatus: status,
-        verificationComments: comments ? [comments] : [],
-        verifiedAt: new Date().toISOString(),
-        verifiedBy: user?.uid,
-      });
+          // Update player document in team subcollection
+          const playerRef = doc(db, "teams", teamIdStr, "players", player.playerId);
+          batch.update(playerRef, {
+            verificationStatus: action,
+            verificationComments: reason ? [reason] : [],
+            verifiedAt: timestamp,
+            verifiedBy: user?.uid,
+          });
+        }
+      }
 
-      // Log the verification action - CORRECTED CALL
+      // Calculate new team status based on updated players
+      const approvedCount = updatedPlayers.filter(p => p.verificationStatus === 'approved').length;
+      const rejectedCount = updatedPlayers.filter(p => p.verificationStatus === 'rejected').length;
+      const totalPlayers = updatedPlayers.length;
+      
+      let newTeamStatus = teamData?.status || 'pending';
+      if (rejectedCount > 0) {
+        newTeamStatus = 'rejected';
+      } else if (approvedCount === totalPlayers) {
+        newTeamStatus = 'verified';
+      } else if (approvedCount > 0) {
+        newTeamStatus = 'partial_verification';
+      } else {
+        newTeamStatus = 'pending';
+      }
+
+      // Add team status update to batch if it changed
+      if (newTeamStatus !== teamData?.status) {
+        const teamRef = doc(db, "teams", teamIdStr);
+        batch.update(teamRef, {
+          status: newTeamStatus,
+          verifiedAt: timestamp,
+          verifiedBy: user?.uid,
+          updatedAt: timestamp,
+        });
+      }
+
+      // Commit the batch
+      await batch.commit();
+
+      // Log individual player verifications for audit trail
       if (teamData && user && userProfile) {
-        await auditLogService.logPlayerVerification(
+        for (const player of selectedPlayersList) {
+          await auditLogService.logPlayerVerification(
+            { // actor
+              uid: user.uid,
+              name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+              role: userProfile.role
+            },
+            { // team
+              id: teamData.id,
+              name: teamData.name
+            },
+            { // player
+              id: player.playerId,
+              name: player.name
+            },
+            player.verificationStatus, // oldStatus
+            action, // newStatus
+            reason || null // reason
+          );
+        }
+
+        // Log the bulk action
+        await auditLogService.logBulkPlayerVerification(
           { // actor
             uid: user.uid,
             name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
@@ -282,29 +432,61 @@ export default function TeamVerificationPage() {
             id: teamData.id,
             name: teamData.name
           },
-          { // player
-            id: player.playerId,
-            name: player.name
-          },
-          player.verificationStatus, // oldStatus
-          status, // newStatus
-          comments || null // reason
+          selectedPlayersList.length, // playerCount
+          action, // status
+          reason // reason
         );
-      }
-    }
-    
-    // Update team status based on the new list of players
-    await updateTeamStatus(updatedPlayers);
-    
-  } catch (error) {
-    console.error('Error updating player status:', error);
-    alert('Failed to save verification. Please try again.');
-    loadTeamData(); // Reload data on error
-  } finally {
-    setSaving(false);
-  }
-};
 
+        // Log team status change if it occurred
+        if (newTeamStatus !== teamData.status) {
+          await auditLogService.logTeamStatusChange(
+            {
+              uid: user.uid,
+              name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+              role: userProfile.role
+            },
+            {
+              id: teamData.id,
+              name: teamData.name
+            },
+            teamData.status,
+            newTeamStatus,
+            `Team status changed based on bulk player verification`
+          );
+        }
+      }
+
+      // Update local team status
+      setTeamData(prev => prev ? { ...prev, status: newTeamStatus } : null);
+
+      // Trigger venue assignment when team becomes verified
+      if (newTeamStatus === 'verified' && teamData?.status !== 'verified') {
+        try {
+          const result = await assignTeamToVenue({
+            id: teamData.id,
+            name: teamData.name,
+            state: teamData.state,
+            district: teamData.district,
+            panchayat: teamData.panchayat
+          });
+          console.log('Venue assignment result:', result.message);
+        } catch (error) {
+          console.error('Error assigning team to venue:', error);
+          // Don't fail the verification process if venue assignment fails
+        }
+      }
+
+      alert(`Successfully ${action} ${selectedPlayersList.length} players!`);
+      setSelectedPlayers(new Set()); // Clear selection
+    } catch (error) {
+      console.error('Bulk action error:', error);
+      alert(`Some ${actionText}s may have failed. Please check and try again.`);
+      // Reload data on error to ensure UI consistency
+      loadTeamData();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const updateTeamStatus = async (updatedPlayers: TeamPlayer[]) => {
     if (!teamData) return;
@@ -374,55 +556,29 @@ export default function TeamVerificationPage() {
     setTeamData(prev => prev ? { ...prev, status: newStatus } : null);
   };
 
-  const handleBulkApprove = async () => {
-    const pendingPlayers = players.filter(p => p.verificationStatus === 'pending');
-    
-    if (pendingPlayers.length === 0) {
-      alert('No pending players to approve.');
-      return;
-    }
-    
-    if (!confirm(`Approve all ${pendingPlayers.length} pending players?`)) {
-      return;
-    }
-    
-    setSaving(true);
-    
-    try {
-      for (const player of pendingPlayers) {
-        await handlePlayerStatusChange(player.playerId, 'approved', 'Bulk approved by verification volunteer');
-      }
-
-      // Log the bulk action
-      if (teamData && user && userProfile) {
-        await auditLogService.logBulkPlayerVerification(
-          { // actor
-            uid: user.uid,
-            name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-            role: userProfile.role
-          },
-          { // team
-            id: teamData.id,
-            name: teamData.name
-          },
-          pendingPlayers.length, // playerCount
-          'approved', // status
-          'Bulk approved by verification volunteer' // reason
-        ); 
-      }
-
-      alert(`Successfully approved ${pendingPlayers.length} players!`);
-    } catch (error) {
-      alert('Some approvals may have failed. Please check and try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleViewImage = (url: string, title: string) => {
     setSelectedImageUrl(url);
     setSelectedImageTitle(title);
     setShowImageModal(true);
+  };
+
+  const handleSelectAll = () => {
+    const pendingPlayers = players.filter(p => p.verificationStatus === 'pending');
+    if (selectedPlayers.size === pendingPlayers.length) {
+      setSelectedPlayers(new Set());
+    } else {
+      setSelectedPlayers(new Set(pendingPlayers.map(p => p.playerId)));
+    }
+  };
+
+  const handlePlayerSelection = (playerId: string) => {
+    const newSelection = new Set(selectedPlayers);
+    if (newSelection.has(playerId)) {
+      newSelection.delete(playerId);
+    } else {
+      newSelection.add(playerId);
+    }
+    setSelectedPlayers(newSelection);
   };
 
   const getDocumentIcon = (doc: DocumentStatus) => {
@@ -459,7 +615,7 @@ export default function TeamVerificationPage() {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#CE4520]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
       </div>
     );
   }
@@ -473,7 +629,7 @@ export default function TeamVerificationPage() {
           <p className="text-gray-600 mb-4">{error || "Team not found"}</p>
           <button 
             onClick={() => router.push(`/${lang}/verification/dashboard`)}
-            className="bg-[#CE4520] text-white px-6 py-2 rounded-lg hover:bg-[#1565C0] transition-colors"
+            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
             Back to Dashboard
           </button>
@@ -487,6 +643,8 @@ export default function TeamVerificationPage() {
     rejected: players.filter(p => p.verificationStatus === 'rejected').length,
     pending: players.filter(p => p.verificationStatus === 'pending').length
   };
+
+  const pendingPlayers = players.filter(p => p.verificationStatus === 'pending');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -511,10 +669,10 @@ export default function TeamVerificationPage() {
                 className="mx-auto"
               />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
+            <h1 className="text-2xl sm:text-3xl font-semibold mb-2 text-[#4A2F1D]">
               {teamData.name}
             </h1>
-            <p className="text-sm sm:text-base text-gray-600 font-fira">
+            <p className="text-sm sm:text-base text-gray-600">
               {teamData.sportName} • {teamData.genderCategory} • {teamData.panchayat}
             </p>
           </div>
@@ -561,20 +719,56 @@ export default function TeamVerificationPage() {
                   <div className="text-xs text-gray-600">Pending</div>
                 </div>
               </div>
-              
-              {stats.pending > 0 && (
-                <button
-                  onClick={handleBulkApprove}
-                  disabled={saving}
-                  className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center disabled:opacity-50"
-                >
-                  <UserCheck className="w-4 h-4 mr-2" />
-                  Approve All Pending ({stats.pending})
-                </button>
-              )}
             </div>
           </div>
         </div>
+
+        {/* Bulk Actions */}
+        {pendingPlayers.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedPlayers.size === pendingPlayers.length && pendingPlayers.length > 0}
+                    onChange={handleSelectAll}
+                    className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Select All Pending ({pendingPlayers.length})
+                  </span>
+                </label>
+                {selectedPlayers.size > 0 && (
+                  <span className="text-sm text-gray-600">
+                    {selectedPlayers.size} selected
+                  </span>
+                )}
+              </div>
+              
+              {selectedPlayers.size > 0 && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleBulkAction('approved')}
+                    disabled={saving}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
+                  >
+                    <Check className="w-4 h-4 mr-1" />
+                    Approve ({selectedPlayers.size})
+                  </button>
+                  <button
+                    onClick={() => handleBulkAction('rejected')}
+                    disabled={saving}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    Reject ({selectedPlayers.size})
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Players Table - Desktop */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden hidden md:block">
@@ -582,6 +776,14 @@ export default function TeamVerificationPage() {
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <input
+                      type="checkbox"
+                      checked={selectedPlayers.size === pendingPlayers.length && pendingPlayers.length > 0}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
@@ -592,6 +794,16 @@ export default function TeamVerificationPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {players.map((player) => (
                   <tr key={player.playerId} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {player.verificationStatus === 'pending' && (
+                        <input
+                          type="checkbox"
+                          checked={selectedPlayers.has(player.playerId)}
+                          onChange={() => handlePlayerSelection(player.playerId)}
+                          className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
+                        />
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-medium text-gray-900">{player.name}</div>
                       <div className="text-sm text-gray-500">
@@ -642,7 +854,7 @@ export default function TeamVerificationPage() {
                             <button
                               onClick={() => handlePlayerStatusChange(player.playerId, 'approved', 'Approved by verification volunteer')}
                               disabled={saving}
-                              className="text-green-600 hover:text-green-800 font-medium text-sm disabled:opacity-50"
+                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
                             >
                               Approve
                             </button>
@@ -654,7 +866,7 @@ export default function TeamVerificationPage() {
                                 }
                               }}
                               disabled={saving}
-                              className="text-red-600 hover:text-red-800 font-medium text-sm disabled:opacity-50"
+                              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
                             >
                               Reject
                             </button>
@@ -665,7 +877,7 @@ export default function TeamVerificationPage() {
                             setSelectedPlayer(player);
                             setShowPlayerModal(true);
                           }}
-                          className="text-[#F28C38] hover:text-[#E67A26] font-medium text-sm"
+                          className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
                         >
                           Details
                         </button>
@@ -679,27 +891,37 @@ export default function TeamVerificationPage() {
         </div>
 
         {/* Players Cards - Mobile */}
-        <div className="md:hidden space-y-4">
+        <div className="md:hidden space-y-3">
           {players.map((player) => (
-            <div key={player.playerId} className="bg-white rounded-lg shadow-sm p-4">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{player.name}</h3>
-                  <p className="text-sm text-gray-600">{player.phone}</p>
-                  <p className="text-sm text-gray-500">Age: {player.age} • {player.gender === 'M' ? 'Male' : 'Female'}</p>
+            <div key={player.playerId} className="bg-white rounded-lg shadow-sm p-3">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start gap-3">
+                  {player.verificationStatus === 'pending' && (
+                    <input
+                      type="checkbox"
+                      checked={selectedPlayers.has(player.playerId)}
+                      onChange={() => handlePlayerSelection(player.playerId)}
+                      className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38] mt-1"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 text-sm">{player.name}</h3>
+                    <p className="text-xs text-gray-600">{player.phone}</p>
+                    <p className="text-xs text-gray-500">Age: {player.age} • {player.gender === 'M' ? 'Male' : 'Female'}</p>
+                  </div>
                 </div>
                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(player.verificationStatus)}`}>
                   {player.verificationStatus}
                 </span>
               </div>
 
-              <div className="flex justify-between items-center mb-3">
-                <div className="text-sm text-gray-600">{player.profileData.village}</div>
-                <div className="flex space-x-2">
+              <div className="flex justify-between items-center mb-2">
+                <div className="text-xs text-gray-600">{player.profileData.village}</div>
+                <div className="flex space-x-1">
                   <button
                     onClick={() => player.documents.profilePhoto.url && handleViewImage(player.documents.profilePhoto.url, 'Profile Photo')}
                     disabled={!player.documents.profilePhoto.url}
-                    className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
+                    className="flex items-center justify-center w-6 h-6 rounded border disabled:opacity-50"
                     title="Profile Photo"
                   >
                     {getDocumentIcon(player.documents.profilePhoto)}
@@ -707,7 +929,7 @@ export default function TeamVerificationPage() {
                   <button
                     onClick={() => player.documents.aadhaarFront.url && handleViewImage(player.documents.aadhaarFront.url, 'Aadhaar Front')}
                     disabled={!player.documents.aadhaarFront.url}
-                    className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
+                    className="flex items-center justify-center w-6 h-6 rounded border disabled:opacity-50"
                     title="Aadhaar Front"
                   >
                     {getDocumentIcon(player.documents.aadhaarFront)}
@@ -715,7 +937,7 @@ export default function TeamVerificationPage() {
                   <button
                     onClick={() => player.documents.aadhaarBack.url && handleViewImage(player.documents.aadhaarBack.url, 'Aadhaar Back')}
                     disabled={!player.documents.aadhaarBack.url}
-                    className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
+                    className="flex items-center justify-center w-6 h-6 rounded border disabled:opacity-50"
                     title="Aadhaar Back"
                   >
                     {getDocumentIcon(player.documents.aadhaarBack)}
@@ -723,15 +945,15 @@ export default function TeamVerificationPage() {
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 {player.verificationStatus === 'pending' ? (
                   <>
                     <button
                       onClick={() => handlePlayerStatusChange(player.playerId, 'approved', 'Approved by verification volunteer')}
                       disabled={saving}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
                     >
-                      <Check className="w-4 h-4 mr-1" />
+                      <Check className="w-3 h-3 mr-1" />
                       Approve
                     </button>
                     <button
@@ -742,9 +964,9 @@ export default function TeamVerificationPage() {
                         }
                       }}
                       disabled={saving}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
                     >
-                      <X className="w-4 h-4 mr-1" />
+                      <X className="w-3 h-3 mr-1" />
                       Reject
                     </button>
                   </>
@@ -754,9 +976,9 @@ export default function TeamVerificationPage() {
                     setSelectedPlayer(player);
                     setShowPlayerModal(true);
                   }}
-                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg font-medium transition-colors flex items-center justify-center"
+                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-1 px-2 rounded text-xs font-medium transition-colors flex items-center justify-center"
                 >
-                  <Eye className="w-4 h-4 mr-1" />
+                  <Eye className="w-3 h-3 mr-1" />
                   Details
                 </button>
               </div>
@@ -768,10 +990,10 @@ export default function TeamVerificationPage() {
         {players.length === 0 && !loading && (
           <div className="text-center py-12">
             <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 font-fira mb-2">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
               No players found
             </h3>
-            <p className="text-gray-600 font-fira">
+            <p className="text-gray-600">
               This team has no players registered yet.
             </p>
           </div>

@@ -144,7 +144,26 @@ export async function getAdminPlayers(
     
     // Limit initial query for performance
     const queryLimit = Math.min(validatedFilters.limit * 3, 300); // Buffer for client-side filtering
-    const playersSnapshot = await playersQuery.limit(queryLimit).get();
+    
+    let playersSnapshot;
+    try {
+      playersSnapshot = await playersQuery.limit(queryLimit).get();
+    } catch (indexError) {
+      // If index error, fall back to a simpler query
+      console.warn('Falling back to simpler query due to index error:', indexError.message);
+      
+      // Try a simpler query with just isDeleted filter
+      const fallbackQuery = adminDb.collectionGroup('players')
+        .where('isDeleted', '!=', true)
+        .limit(queryLimit);
+      
+      try {
+        playersSnapshot = await fallbackQuery.get();
+      } catch (fallbackError) {
+        // If even the fallback fails, return error
+        throw new Error(`Database query failed. Please ensure Firestore indexes are deployed. Original error: ${indexError.message}`);
+      }
+    }
     
     // Get unique team IDs for batch fetching team data
     const teamIds = [...new Set(playersSnapshot.docs.map(doc => doc.data().teamId))];
@@ -366,7 +385,22 @@ export async function getAdminPlayerStats(
         .where('addedAt', '<=', new Date(validatedFilters.dateRange.end));
     }
     
-    const playersSnapshot = await playersQuery.get();
+    let playersSnapshot;
+    try {
+      playersSnapshot = await playersQuery.get();
+    } catch (indexError) {
+      console.warn('Falling back to simpler stats query due to index error:', indexError.message);
+      
+      // Fall back to basic query
+      const fallbackQuery = adminDb.collectionGroup('players')
+        .where('isDeleted', '!=', true);
+      
+      try {
+        playersSnapshot = await fallbackQuery.get();
+      } catch (fallbackError) {
+        throw new Error(`Database query failed. Please ensure Firestore indexes are deployed. Original error: ${indexError.message}`);
+      }
+    }
     
     // Get team data for filtering and aggregation
     const teamIds = [...new Set(playersSnapshot.docs.map(doc => doc.data().teamId))];

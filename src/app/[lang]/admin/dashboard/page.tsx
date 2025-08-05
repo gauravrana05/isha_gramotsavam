@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { getAdminDashboardOverview, getTournamentOverview } from '@/lib/actions/admin/optimizedDashboardQueries';
 import { 
   Users, 
   Trophy, 
@@ -12,36 +11,44 @@ import {
   CheckCircle,
   Clock,
   Activity,
-  Loader2
+  Loader2,
+  AlertTriangle,
+  TrendingUp,
+  Calendar,
+  Target,
+  Settings
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
-interface DashboardStats {
-  totalUsers: number;
-  totalTeams: number;
-  totalSports: number;
-  totalVenues: number;
-  pendingVerifications: number;
-  completedVerifications: number;
+interface DashboardOverview {
+  teams: any;
+  players: any;
+  verification: any;
+  venues: any;
+  matches: any;
+  systemHealth: any;
+  insights: any[];
+  recentActivity: any[] | null;
+}
+
+interface TournamentOverview {
+  stats: any;
+  upcomingMatches: any[];
+  insights: any[];
+  summary: any;
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalUsers: 0,
-    totalTeams: 0,
-    totalSports: 0,
-    totalVenues: 0,
-    pendingVerifications: 0,
-    completedVerifications: 0
-  });
+  const [dashboardOverview, setDashboardOverview] = useState<DashboardOverview | null>(null);
+  const [tournamentOverview, setTournamentOverview] = useState<TournamentOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   const { user, userProfile, loading: authLoading } = useAuth();
   const { lang } = useParams();
   const router = useRouter();
-
 
   useEffect(() => {
     if (authLoading) return;
@@ -59,56 +66,47 @@ export default function AdminDashboard() {
     loadDashboardData();
   }, [user, userProfile, authLoading, lang, router]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (refresh = false) => {
     try {
-      setLoading(true);
+      if (refresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       
-      // Load users count
-      const usersCollection = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersCollection);
-      const totalUsers = usersSnapshot.size;
-      
-      // Load teams count and verification status
-      const teamsCollection = collection(db, 'teams');
-      const teamsSnapshot = await getDocs(teamsCollection);
-      const totalTeams = teamsSnapshot.size;
-      
-      let pendingVerifications = 0;
-      let completedVerifications = 0;
-      
-      teamsSnapshot.docs.forEach(doc => {
-        const team = doc.data();
-        if (team.status === 'submitted' || team.status === 'pending') {
-          pendingVerifications++;
-        } else if (team.status === 'verified') {
-          completedVerifications++;
-        }
-      });
-      
-      // Load sports count
-      const sportsCollection = collection(db, 'sports');
-      const sportsSnapshot = await getDocs(sportsCollection);
-      const totalSports = sportsSnapshot.size;
-      
-      // Load venues count
-      const venuesCollection = collection(db, 'venues');
-      const venuesSnapshot = await getDocs(venuesCollection);
-      const totalVenues = venuesSnapshot.size;
-      
-      setStats({
-        totalUsers,
-        totalTeams,
-        totalSports,
-        totalVenues,
-        pendingVerifications,
-        completedVerifications
-      });
+      if (!user?.uid) {
+        throw new Error('User not authenticated');
+      }
+
+      // Load optimized dashboard overview
+      const [dashboardResult, tournamentResult] = await Promise.all([
+        getAdminDashboardOverview({
+          includeDetailed: true,
+          refreshCache: refresh
+        }, user.uid),
+        getTournamentOverview({
+          level: 'all',
+          status: 'all'
+        }, user.uid)
+      ]);
+
+      if (!dashboardResult.success) {
+        throw new Error(dashboardResult.error);
+      }
+
+      if (!tournamentResult.success) {
+        throw new Error(tournamentResult.error);
+      }
+
+      setDashboardOverview(dashboardResult.overview);
+      setTournamentOverview(tournamentResult.tournament);
       
     } catch (err: any) {
       console.error('Error loading dashboard data:', err);
-      setError('Failed to load dashboard data. Please check your permissions.');
+      setError(err.message || 'Failed to load dashboard data. Please check your permissions.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -141,37 +139,97 @@ export default function AdminDashboard() {
     );
   }
 
+  const getHealthColor = (health: string) => {
+    switch (health) {
+      case 'healthy': return 'text-green-600';
+      case 'warning': return 'text-yellow-600';
+      case 'critical': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const getHealthIcon = (health: string) => {
+    switch (health) {
+      case 'healthy': return <CheckCircle className="w-5 h-5" />;
+      case 'warning': return <AlertTriangle className="w-5 h-5" />;
+      case 'critical': return <Activity className="w-5 h-5" />;
+      default: return <Activity className="w-5 h-5" />;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
-            Admin Dashboard
-          </h1>
-          <p className="text-sm sm:text-base text-gray-600 font-fira">
-            Welcome back, {userProfile?.firstName}! Here's your system overview.
-          </p>
+        <div className="mb-6 flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
+              Admin Dashboard
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600 font-fira">
+              Welcome back, {userProfile?.firstName}! Here's your system overview.
+            </p>
+          </div>
+          <button
+            onClick={() => loadDashboardData(true)}
+            disabled={refreshing}
+            className="flex items-center px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            {refreshing ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : (
+              <Activity className="w-4 h-4 mr-2" />
+            )}
+            Refresh
+          </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-lg p-4 shadow-sm">
+        {/* System Health */}
+        {dashboardOverview?.systemHealth && (
+          <div className="mb-6 bg-white rounded-lg shadow-sm border p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Total Users</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{stats.totalUsers}</p>
+              <div className="flex items-center">
+                <div className={`${getHealthColor(dashboardOverview.systemHealth.overall)} mr-3`}>
+                  {getHealthIcon(dashboardOverview.systemHealth.overall)}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">System Health</h3>
+                  <p className="text-sm text-gray-600">Score: {dashboardOverview.systemHealth.score}/100</p>
+                </div>
               </div>
-              <Users className="w-8 h-8 text-gray-400" />
+              <div className="text-right">
+                <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${
+                  dashboardOverview.systemHealth.overall === 'healthy' ? 'bg-green-100 text-green-800' :
+                  dashboardOverview.systemHealth.overall === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
+                  {dashboardOverview.systemHealth.overall}
+                </span>
+              </div>
             </div>
+            {dashboardOverview.systemHealth.issues.length > 0 && (
+              <div className="mt-3 space-y-1">
+                {dashboardOverview.systemHealth.issues.slice(0, 3).map((issue: string, index: number) => (
+                  <p key={index} className="text-sm text-gray-600">• {issue}</p>
+                ))}
+              </div>
+            )}
           </div>
-          
+        )}
+
+        {/* Overview Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Total Teams</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{stats.totalTeams}</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">
+                  {dashboardOverview?.teams?.total || 0}
+                </p>
+                <p className="text-xs text-green-600">
+                  {dashboardOverview?.teams?.verificationRate || 0}% verified
+                </p>
               </div>
               <Users className="w-8 h-8 text-gray-400" />
             </div>
@@ -180,8 +238,28 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Pending Verifications</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.pendingVerifications}</p>
+                <p className="text-gray-600 text-sm">Total Players</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">
+                  {dashboardOverview?.players?.total || 0}
+                </p>
+                <p className="text-xs text-blue-600">
+                  Avg age: {dashboardOverview?.players?.averageAge || 0}
+                </p>
+              </div>
+              <Trophy className="w-8 h-8 text-gray-400" />
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Verification Queue</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {dashboardOverview?.verification?.pending || 0}
+                </p>
+                <p className="text-xs text-gray-600">
+                  {dashboardOverview?.verification?.backlogDays || 0} days backlog
+                </p>
               </div>
               <Clock className="w-8 h-8 text-orange-400" />
             </div>
@@ -190,45 +268,136 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Verified Teams</p>
-                <p className="text-2xl font-bold text-green-600">{stats.completedVerifications}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-400" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Sports</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.totalSports}</p>
-              </div>
-              <Trophy className="w-8 h-8 text-blue-400" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Venues</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.totalVenues}</p>
+                <p className="text-gray-600 text-sm">Active Venues</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {dashboardOverview?.venues?.active || 0}
+                </p>
+                <p className="text-xs text-gray-600">
+                  {dashboardOverview?.venues?.utilizationRate || 0}% utilized
+                </p>
               </div>
               <MapPin className="w-8 h-8 text-purple-400" />
             </div>
           </div>
         </div>
 
+        {/* Tournament Progress */}
+        {tournamentOverview && (
+          <div className="mb-6 bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 font-fira">Tournament Progress</h2>
+              <div className="flex items-center text-sm text-gray-600">
+                <TrendingUp className="w-4 h-4 mr-1" />
+                {tournamentOverview.summary.overallProgress}% Complete
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-2">Matches</h3>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Completed</span>
+                    <span className="font-medium">{tournamentOverview.stats.matches.completed}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>In Progress</span>
+                    <span className="font-medium">{tournamentOverview.stats.matches.inProgress}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Scheduled</span>
+                    <span className="font-medium">{tournamentOverview.stats.matches.scheduled}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-2">Fixtures</h3>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Total</span>
+                    <span className="font-medium">{tournamentOverview.stats.fixtures.total}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Active</span>
+                    <span className="font-medium">{tournamentOverview.summary.activeFixtures}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Completed</span>
+                    <span className="font-medium">{tournamentOverview.summary.completedTournaments}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-2">Teams Advanced</h3>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Total</span>
+                    <span className="font-medium">{tournamentOverview.summary.teamsAdvanced}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Cluster→Division</span>
+                    <span className="font-medium">{tournamentOverview.stats.progression.clusterToDiv}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Division→Final</span>
+                    <span className="font-medium">{tournamentOverview.stats.progression.divToFinal}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Insights */}
+        {dashboardOverview?.insights && dashboardOverview.insights.length > 0 && (
+          <div className="mb-6 bg-white rounded-lg shadow-sm border p-6">
+            <h2 className="text-lg font-semibold text-gray-900 font-fira mb-4">System Insights</h2>
+            <div className="space-y-3">
+              {dashboardOverview.insights.slice(0, 5).map((insight: any, index: number) => (
+                <div key={index} className={`p-3 rounded-lg border-l-4 ${
+                  insight.type === 'alert' ? 'bg-red-50 border-red-400 text-red-800' :
+                  insight.type === 'warning' ? 'bg-yellow-50 border-yellow-400 text-yellow-800' :
+                  'bg-blue-50 border-blue-400 text-blue-800'
+                }`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium">{insight.message}</p>
+                      {insight.action && (
+                        <p className="text-sm mt-1 opacity-80">Action: {insight.action}</p>
+                      )}
+                    </div>
+                    <span className="text-xs px-2 py-1 rounded-full bg-white bg-opacity-50 capitalize">
+                      {insight.category}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Quick Access */}
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <h2 className="text-lg font-semibold text-gray-900 font-fira mb-4">Quick Access</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Link
-              href={`/${lang}/admin/sports`}
+              href={`/${lang}/admin/teams`}
               className="p-4 border border-gray-200 rounded-lg hover:border-[#F28C38] hover:bg-orange-50 transition-colors group"
             >
-              <Trophy className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
-              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Sports</h3>
-              <p className="text-sm text-gray-600">Manage sports</p>
+              <Users className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
+              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Teams</h3>
+              <p className="text-sm text-gray-600">{dashboardOverview?.teams?.total || 0} registered</p>
+            </Link>
+            
+            <Link
+              href={`/${lang}/admin/teams/verification`}
+              className="p-4 border border-gray-200 rounded-lg hover:border-[#F28C38] hover:bg-orange-50 transition-colors group"
+            >
+              <Clock className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
+              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Verification</h3>
+              <p className="text-sm text-gray-600">{dashboardOverview?.verification?.pending || 0} pending</p>
             </Link>
             
             <Link
@@ -237,45 +406,19 @@ export default function AdminDashboard() {
             >
               <MapPin className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
               <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Venues</h3>
-              <p className="text-sm text-gray-600">Manage venues</p>
+              <p className="text-sm text-gray-600">{dashboardOverview?.venues?.total || 0} venues</p>
             </Link>
             
             <Link
-              href={`/${lang}/admin/teams`}
+              href={`/${lang}/admin/analytics`}
               className="p-4 border border-gray-200 rounded-lg hover:border-[#F28C38] hover:bg-orange-50 transition-colors group"
             >
-              <Users className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
-              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Teams</h3>
-              <p className="text-sm text-gray-600">View teams</p>
-            </Link>
-            
-            <Link
-              href={`/${lang}/admin/users`}
-              className="p-4 border border-gray-200 rounded-lg hover:border-[#F28C38] hover:bg-orange-50 transition-colors group"
-            >
-              <UserCheck className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
-              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Users</h3>
-              <p className="text-sm text-gray-600">Manage users</p>
+              <Target className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
+              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Analytics</h3>
+              <p className="text-sm text-gray-600">View reports</p>
             </Link>
           </div>
         </div>
-        
-        {/* System Status */}
-        {stats.pendingVerifications > 0 && (
-          <div className="mt-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <Clock className="w-5 h-5 text-orange-500 mr-3" />
-              <div>
-                <h3 className="text-sm font-medium text-orange-800">
-                  {stats.pendingVerifications} teams awaiting verification
-                </h3>
-                <p className="text-sm text-orange-700 mt-1">
-                  Review pending team verifications to keep the system up to date.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

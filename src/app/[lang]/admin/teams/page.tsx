@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { getAdminTeams, getAdminTeamStats } from '@/lib/actions/admin/optimizedTeamQueries';
 import { 
   Users,
   Trophy,
@@ -47,11 +46,19 @@ interface TeamData {
 
 export default function AdminTeamsPage() {
   const [teams, setTeams] = useState<TeamData[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sportFilter, setSportFilter] = useState<string>('all');
+  const [districtFilter, setDistrictFilter] = useState<string>('all');
+  const [genderFilter, setGenderFilter] = useState<string>('all');
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const pageSize = 25;
 
   const router = useRouter();
   const { lang } = useParams();
@@ -71,58 +78,64 @@ export default function AdminTeamsPage() {
     }
 
     loadTeams();
-  }, [user, userProfile, authLoading, lang, router]);
+    loadStats();
+  }, [user, userProfile, authLoading, lang, router, statusFilter, sportFilter, districtFilter, genderFilter, currentPage]);
 
   const loadTeams = async () => {
     try {
       setLoading(true);
-      const teamsCollection = collection(db, 'teams');
-      const teamsQuery = query(teamsCollection, orderBy('createdAt', 'desc'));
-      const teamsSnapshot = await getDocs(teamsQuery);
       
-      const teamsData: TeamData[] = teamsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.name || '',
-          sportName: data.sportName || '',
-          sportId: data.sportId || '',
-          captainProfile: {
-            name: data.captainProfile?.name || '',
-            phone: data.captainProfile?.phone || ''
-          },
-          panchayat: data.panchayat || '',
-          district: data.district || '',
-          state: data.state || '',
-          genderCategory: data.genderCategory || 'mixed',
-          currentPlayers: data.currentPlayers || 0,
-          maxPlayers: data.maxPlayers || 12,
-          status: data.status || 'draft',
-          createdAt: data.createdAt,
-          eventId: data.eventId || 'gramotsavam_2025',
-          clusterVenue: data.clusterVenue || undefined
-        };
-      });
+      if (!user?.uid) {
+        throw new Error('User not authenticated');
+      }
+
+      const result = await getAdminTeams({
+        limit: pageSize,
+        offset: (currentPage - 1) * pageSize,
+        status: statusFilter as any,
+        sportName: sportFilter !== 'all' ? sportFilter : undefined,
+        district: districtFilter !== 'all' ? districtFilter : undefined,
+        genderCategory: genderFilter as any,
+        searchQuery: searchTerm || undefined,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      }, user.uid);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      setTeams(result.teams);
+      setHasMore(result.pagination.hasMore);
       
-      setTeams(teamsData);
     } catch (err: any) {
       console.error('Error loading teams:', err);
-      setError('Failed to load teams. Please check your permissions.');
+      setError(err.message || 'Failed to load teams. Please check your permissions.');
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredTeams = teams.filter(team => {
-    const matchesSearch = team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         team.captainProfile.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         team.panchayat.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         team.district.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || team.status === statusFilter;
-    const matchesSport = sportFilter === 'all' || team.sportName.toLowerCase() === sportFilter.toLowerCase();
-    
-    return matchesSearch && matchesStatus && matchesSport;
-  });
+  const loadStats = async () => {
+    try {
+      if (!user?.uid) return;
+
+      const result = await getAdminTeamStats({
+        district: districtFilter !== 'all' ? districtFilter : undefined,
+        sportName: sportFilter !== 'all' ? sportFilter : undefined,
+        genderCategory: genderFilter as any
+      }, user.uid);
+
+      if (result.success) {
+        setStats(result.stats);
+      }
+    } catch (err: any) {
+      console.error('Error loading team stats:', err);
+    }
+  };
+
+  // Remove client-side filtering since it's now handled by the server
+  const filteredTeams = teams;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -214,7 +227,7 @@ export default function AdminTeamsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Total</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{teams.length}</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{stats?.total || teams.length}</p>
               </div>
               <Users className="w-8 h-8 text-gray-400" />
             </div>
@@ -224,7 +237,7 @@ export default function AdminTeamsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Verified</p>
-                <p className="text-2xl font-bold text-green-600">{teams.filter(t => t.status === 'verified').length}</p>
+                <p className="text-2xl font-bold text-green-600">{stats?.byStatus?.verified || teams.filter(t => t.status === 'verified').length}</p>
               </div>
               <CheckCircle className="w-8 h-8 text-green-400" />
             </div>
@@ -234,7 +247,7 @@ export default function AdminTeamsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Submitted</p>
-                <p className="text-2xl font-bold text-blue-600">{teams.filter(t => t.status === 'submitted').length}</p>
+                <p className="text-2xl font-bold text-blue-600">{stats?.byStatus?.submitted || teams.filter(t => t.status === 'submitted').length}</p>
               </div>
               <Clock className="w-8 h-8 text-blue-400" />
             </div>
@@ -244,7 +257,7 @@ export default function AdminTeamsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{teams.filter(t => t.status === 'pending').length}</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats?.byStatus?.pending || teams.filter(t => t.status === 'pending').length}</p>
               </div>
               <AlertCircle className="w-8 h-8 text-yellow-400" />
             </div>
@@ -254,7 +267,7 @@ export default function AdminTeamsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Players</p>
-                <p className="text-2xl font-bold text-purple-600">{teams.reduce((total, team) => total + team.currentPlayers, 0)}</p>
+                <p className="text-2xl font-bold text-purple-600">{stats?.playerStats?.totalPlayers || teams.reduce((total, team) => total + team.currentPlayers, 0)}</p>
               </div>
               <Trophy className="w-8 h-8 text-purple-400" />
             </div>
@@ -263,7 +276,7 @@ export default function AdminTeamsPage() {
 
         {/* Search and Filters */}
         <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex flex-col lg:flex-row gap-4 mb-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -272,40 +285,61 @@ export default function AdminTeamsPage() {
                   placeholder="Search teams, captains, or locations..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && loadTeams()}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
                 />
               </div>
             </div>
             
-            <div className="flex gap-4">
-              <div className="relative">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-                >
-                  <option value="all">All Status</option>
-                  <option value="draft">Draft</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="pending">Pending</option>
-                  <option value="verified">Verified</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              </div>
+            <div className="flex gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
+              >
+                <option value="all">All Status</option>
+                <option value="draft">Draft</option>
+                <option value="submitted">Submitted</option>
+                <option value="pending">Pending</option>
+                <option value="verified">Verified</option>
+                <option value="rejected">Rejected</option>
+              </select>
 
-              <div className="relative">
-                <select
-                  value={sportFilter}
-                  onChange={(e) => setSportFilter(e.target.value)}
-                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-                >
-                  <option value="all">All Sports</option>
-                  <option value="volleyball">Volleyball</option>
-                  <option value="throwball">Throwball</option>
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              </div>
+              <select
+                value={sportFilter}
+                onChange={(e) => setSportFilter(e.target.value)}
+                className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
+              >
+                <option value="all">All Sports</option>
+                <option value="Volleyball">Volleyball</option>
+                <option value="Throwball">Throwball</option>
+                <option value="Football">Football</option>
+                <option value="Cricket">Cricket</option>
+                <option value="Badminton">Badminton</option>
+                <option value="Kabaddi">Kabaddi</option>
+              </select>
+
+              <select
+                value={districtFilter}
+                onChange={(e) => setDistrictFilter(e.target.value)}
+                className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
+              >
+                <option value="all">All Districts</option>
+                {stats?.byDistrict && Object.keys(stats.byDistrict).sort().map(district => (
+                  <option key={district} value={district}>{district} ({stats.byDistrict[district]})</option>
+                ))}
+              </select>
+
+              <select
+                value={genderFilter}
+                onChange={(e) => setGenderFilter(e.target.value)}
+                className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
+              >
+                <option value="all">All Gender</option>
+                <option value="men">Men</option>
+                <option value="women">Women</option>
+                <option value="mixed">Mixed</option>
+              </select>
 
               <button
                 onClick={exportTeamsData}
@@ -316,6 +350,51 @@ export default function AdminTeamsPage() {
               </button>
             </div>
           </div>
+
+          {/* Applied Filters */}
+          {(statusFilter !== 'all' || sportFilter !== 'all' || districtFilter !== 'all' || genderFilter !== 'all' || searchTerm) && (
+            <div className="flex flex-wrap gap-2">
+              <span className="text-sm text-gray-600">Active filters:</span>
+              {statusFilter !== 'all' && (
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                  Status: {statusFilter}
+                </span>
+              )}
+              {sportFilter !== 'all' && (
+                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                  Sport: {sportFilter}
+                </span>
+              )}
+              {districtFilter !== 'all' && (
+                <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">
+                  District: {districtFilter}
+                </span>
+              )}
+              {genderFilter !== 'all' && (
+                <span className="px-2 py-1 bg-pink-100 text-pink-800 rounded-full text-xs">
+                  Gender: {genderFilter}
+                </span>
+              )}
+              {searchTerm && (
+                <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
+                  Search: "{searchTerm}"
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  setStatusFilter('all');
+                  setSportFilter('all');
+                  setDistrictFilter('all');
+                  setGenderFilter('all');
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs hover:bg-red-200 transition-colors"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Teams List */}
@@ -434,6 +513,26 @@ export default function AdminTeamsPage() {
               ))}
             </div>
           </>
+        )}
+
+        {/* Pagination */}
+        {hasMore && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              disabled={loading}
+              className="px-6 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors disabled:opacity-50 flex items-center mx-auto"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Loading...
+                </>
+              ) : (
+                'Load More Teams'
+              )}
+            </button>
+          </div>
         )}
     </div>
   );
