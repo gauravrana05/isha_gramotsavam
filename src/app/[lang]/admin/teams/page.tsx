@@ -377,7 +377,7 @@ export default function AdminTeamsPage() {
               )}
               {searchTerm && (
                 <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
-                  Search: "{searchTerm}"
+                  Search: &quot;{searchTerm}&quot;
                 </span>
               )}
               <button

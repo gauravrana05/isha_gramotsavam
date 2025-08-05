@@ -114,7 +114,7 @@ const OfflineIndicator: React.FC = () => {
       'md:ml-64'
     )}>
       <span className="inline-block w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></span>
-      You're offline. Some features may not be available.
+      You@apos;re offline. Some features may not be available.
     </div>
   );
 };

@@ -226,7 +226,7 @@ export default function PlayerTeamsPage() {
             My Teams
           </h1>
           <p className="text-gray-600">
-            Teams you're part of and their details
+            Teams you&apos;re part of and their details
           </p>
         </div>
 
@@ -235,7 +235,7 @@ export default function PlayerTeamsPage() {
           <div className="bg-white rounded-lg border p-8 text-center">
             <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Team Memberships</h3>
-            <p className="text-gray-600">You haven't joined any teams yet. Contact team captains to get added to teams.</p>
+            <p className="text-gray-600">You haven&apos;t joined any teams yet. Contact team captains to get added to teams.</p>
           </div>
         ) : (
           <div className="space-y-6">

@@ -255,8 +255,8 @@ export default function TestDataPage() {
           <h3 className="text-lg font-semibold text-gray-900 mb-3">Testing Instructions</h3>
           <div className="space-y-2 text-sm text-gray-700">
             <p><strong>1.</strong> Create test teams using the button above</p>
-            <p><strong>2.</strong> Go to the Fixtures page and you'll see teams grouped by sport/gender</p>
-            <p><strong>3.</strong> Click "Create Draw" for any sport with 2+ teams</p>
+            <p><strong>2.</strong> Go to the Fixtures page and you&apos;ll see teams grouped by sport/gender</p>
+            <p><strong>3.</strong> Click &quot;Create Draw&quot; for any sport with 2+ teams</p>
             <p><strong>4.</strong> Test the tournament number assignment and draw creation</p>
             <p><strong>5.</strong> View the created fixture and test match management</p>
             <p><strong>6.</strong> Clean up test data when done testing</p>

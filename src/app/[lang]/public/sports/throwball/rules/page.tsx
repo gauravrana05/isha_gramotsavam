@@ -22,7 +22,7 @@ export default function ThrowballRulesPage({ params }: ThrowballRulesPageProps) 
                 <Container>
                     <div className="text-center">
                         <h1 className="text-3xl md:text-5xl lg:text-5xl font-semibold text-white mb-4 font-fira">
-                            Isha Gramotsavam Throwball (Women's) Rules
+                            Isha Gramotsavam Throwball (Women&apos;s) Rules
                         </h1>
                     </div>
                 </Container>
@@ -219,13 +219,13 @@ export default function ThrowballRulesPage({ params }: ThrowballRulesPageProps) 
 
                                     <li>
                                         <p className="leading-relaxed font-semibold">
-                                            The referee's decision is final.
+                                            The referee&apos;s decision is final.
                                         </p>
                                     </li>
 
                                     <li>
                                         <p className="leading-relaxed">
-                                            Only a team's captain can speak to the referee or management committee during a game.
+                                            Only a team&apos;s captain can speak to the referee or management committee during a game.
                                             Coaches and other players are not allowed to argue. Failure to comply may result in
                                             the team being disqualified from the tournament.
                                         </p>
@@ -308,7 +308,7 @@ export default function ThrowballRulesPage({ params }: ThrowballRulesPageProps) 
                                         • Code of Conduct
                                     </h3>
                                     <p className="text-[#4A2F1D] leading-relaxed font-fira">
-                                        Participants agree to adhere to the tournament's rules, regulations, and code of conduct
+                                        Participants agree to adhere to the tournament&apos;s rules, regulations, and code of conduct
                                         prescribed by the organizers from time to time. Participants acknowledge that failure to
                                         comply with the rules and regulations may result in their removal from the tournament
                                         without any liability on the part of the organizers.

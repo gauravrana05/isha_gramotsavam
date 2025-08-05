@@ -422,7 +422,7 @@ export default function PlayerFixturesPage() {
           <div className="bg-white rounded-lg border p-8 text-center">
             <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Team Memberships</h3>
-            <p className="text-gray-600">You haven't joined any teams yet. Contact team captains to get added to teams.</p>
+            <p className="text-gray-600">You haven&apos;t joined any teams yet. Contact team captains to get added to teams.</p>
           </div>
         )}
       </div>

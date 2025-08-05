@@ -87,7 +87,7 @@ export default function CelebrityTestimonials() {
 
                   {/* Quote */}
                   <blockquote className="text-gray-700 text-center mb-6 leading-relaxed">
-                    "{testimonial.quote}"
+                    &quot;{testimonial.quote}&quot;
                   </blockquote>
 
                   {/* Name and Title */}

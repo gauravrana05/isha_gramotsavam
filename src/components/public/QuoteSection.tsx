@@ -34,7 +34,7 @@ export default function QuoteSection() {
           {/* Quote Content */}
           <div className="lg:col-span-8 text-center">
             <blockquote className="text-xl md:text-2xl lg:text-3xl font-light text-[#4A2F1D] leading-relaxed italic mb-8 font-fira">
-              "Isha Gramotsavam is about raising the Human Spirit – that is what is most needed right now for rural communities to overcome social and economic challenges, and to live Healthy, Joyful, and Successful Lives."
+            &quot;Isha Gramotsavam is about raising the Human Spirit – that is what is most needed right now for rural communities to overcome social and economic challenges, and to live Healthy, Joyful, and Successful Lives.&quot;
             </blockquote>
 
             {/* Signature */}

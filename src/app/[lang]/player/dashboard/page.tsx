@@ -333,7 +333,7 @@ export default function PlayerDashboard() {
                 No team memberships
               </h3>
               <p className="text-gray-600 font-fira mb-4">
-                You haven't joined any teams yet. Contact team captains to get added to teams.
+                You haven&apos;t joined any teams yet. Contact team captains to get added to teams.
               </p>
             </div>
           ) : (

@@ -3,7 +3,6 @@ import { Loader2 } from 'lucide-react';
 import { cn, BaseComponentProps, SizeVariant, focusClasses, disabledClasses } from '@/lib/component-patterns';
 import { designTokens } from '@/lib/design-tokens';
 
-// Extended button props with mobile-first design
 export interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'size'>, BaseComponentProps {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
   size?: SizeVariant;
@@ -15,27 +14,13 @@ export interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonE
   rounded?: 'sm' | 'base' | 'lg' | 'full';
 }
 
-// Mobile-first size classes with proper touch targets
 const sizeClasses = {
-  sm: cn(
-    'h-9 px-3 text-sm gap-1.5',  // 36px height
-    'min-w-[36px]'  // Minimum touch target
-  ),
-  base: cn(
-    'h-11 px-4 text-base gap-2',  // 44px height - perfect touch target
-    'min-w-[44px]'
-  ),
-  lg: cn(
-    'h-12 px-6 text-lg gap-2',    // 48px height - comfortable touch
-    'min-w-[48px]'
-  ),
-  xl: cn(
-    'h-14 px-8 text-xl gap-3',    // 56px height - hero buttons
-    'min-w-[56px]'
-  ),
+  sm: cn('h-9 px-3 text-sm gap-1.5', 'min-w-[36px]'),
+  base: cn('h-11 px-4 text-base gap-2', 'min-w-[44px]'),
+  lg: cn('h-12 px-6 text-lg gap-2', 'min-w-[48px]'),
+  xl: cn('h-14 px-8 text-xl gap-3', 'min-w-[56px]'),
 };
 
-// Enhanced variant classes using design tokens
 const variantClasses = {
   primary: cn(
     'bg-primary-500 text-white shadow-sm',
@@ -81,7 +66,6 @@ const variantClasses = {
   ),
 };
 
-// Rounded classes
 const roundedClasses = {
   sm: 'rounded-sm',
   base: 'rounded-lg',
@@ -89,11 +73,10 @@ const roundedClasses = {
   full: 'rounded-full',
 };
 
-// Loading spinner component
 const LoadingSpinner = ({ size }: { size: SizeVariant }) => {
   const spinnerSizes = {
     sm: 'w-3 h-3',
-    base: 'w-4 h-4', 
+    base: 'w-4 h-4',
     lg: 'w-5 h-5',
     xl: 'w-6 h-6',
   };
@@ -103,7 +86,6 @@ const LoadingSpinner = ({ size }: { size: SizeVariant }) => {
   );
 };
 
-// Main Button component with mobile-first design
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   variant = 'primary',
   size = 'base',
@@ -119,12 +101,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   ...props
 }, ref) => {
   const isDisabled = disabled || loading;
-  
-  // Icon size based on button size
+
   const iconSizes = {
     sm: 'w-3 h-3',
     base: 'w-4 h-4',
-    lg: 'w-5 h-5', 
+    lg: 'w-5 h-5',
     xl: 'w-6 h-6',
   };
 
@@ -146,34 +127,17 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
       ref={ref}
       disabled={isDisabled}
       className={cn(
-        // Base styles
         'inline-flex items-center justify-center',
         'font-medium font-fira tracking-wide',
         'transition-all duration-200 ease-in-out',
-        'transform active:scale-[0.98]', // Subtle press feedback
-        
-        // Mobile-optimized focus styles
+        'transform active:scale-[0.98]',
         focusClasses,
-        
-        // Disabled styles
         disabledClasses,
-        
-        // Size classes
         sizeClasses[size],
-        
-        // Variant classes  
         variantClasses[variant],
-        
-        // Rounded classes
         roundedClasses[rounded],
-        
-        // Full width
         fullWidth && 'w-full',
-        
-        // Loading state
         loading && 'cursor-wait',
-        
-        // Custom className
         className
       )}
       {...props}
@@ -185,35 +149,44 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
 
 Button.displayName = 'Button';
 
-// Convenience button variants
+// --------------------------
+// Named Variant Components
+// --------------------------
+
 export const PrimaryButton = forwardRef<HTMLButtonElement, Omit<ButtonProps, 'variant'>>(
   (props, ref) => <Button ref={ref} variant="primary" {...props} />
 );
+PrimaryButton.displayName = 'PrimaryButton';
 
 export const SecondaryButton = forwardRef<HTMLButtonElement, Omit<ButtonProps, 'variant'>>(
   (props, ref) => <Button ref={ref} variant="secondary" {...props} />
 );
+SecondaryButton.displayName = 'SecondaryButton';
 
 export const OutlineButton = forwardRef<HTMLButtonElement, Omit<ButtonProps, 'variant'>>(
   (props, ref) => <Button ref={ref} variant="outline" {...props} />
 );
+OutlineButton.displayName = 'OutlineButton';
 
 export const GhostButton = forwardRef<HTMLButtonElement, Omit<ButtonProps, 'variant'>>(
   (props, ref) => <Button ref={ref} variant="ghost" {...props} />
 );
+GhostButton.displayName = 'GhostButton';
 
 export const DangerButton = forwardRef<HTMLButtonElement, Omit<ButtonProps, 'variant'>>(
   (props, ref) => <Button ref={ref} variant="danger" {...props} />
 );
+DangerButton.displayName = 'DangerButton';
 
 export const SuccessButton = forwardRef<HTMLButtonElement, Omit<ButtonProps, 'variant'>>(
   (props, ref) => <Button ref={ref} variant="success" {...props} />
 );
+SuccessButton.displayName = 'SuccessButton';
 
-// Icon button component for square buttons with just icons
+
 export interface IconButtonProps extends Omit<ButtonProps, 'leftIcon' | 'rightIcon' | 'children'> {
   icon: React.ComponentType<{ className?: string }>;
-  'aria-label': string; // Required for accessibility
+  'aria-label': string;
 }
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(({
@@ -229,30 +202,24 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(({
     xl: 'w-6 h-6',
   };
 
-  // Square button sizing
   const squareSizes = {
-    sm: 'w-9 h-9',   // 36px
-    base: 'w-11 h-11', // 44px
-    lg: 'w-12 h-12',  // 48px  
-    xl: 'w-14 h-14',  // 56px
+    sm: 'w-9 h-9',
+    base: 'w-11 h-11',
+    lg: 'w-12 h-12',
+    xl: 'w-14 h-14',
   };
 
   return (
     <Button
       ref={ref}
       size={size}
-      className={cn(
-        squareSizes[size],
-        'p-0', // Remove padding for square buttons
-        className
-      )}
+      className={cn(squareSizes[size], 'p-0', className)}
       {...props}
     >
       <Icon className={iconSizes[size]} />
     </Button>
   );
 });
-
 IconButton.displayName = 'IconButton';
 
 export default Button;

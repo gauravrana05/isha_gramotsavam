@@ -250,7 +250,7 @@ export default function AdminPlayersPage() {
           {error.includes('index') && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-left">
               <p className="text-sm text-yellow-800">
-                <strong>Firestore Index Required:</strong> This error occurs when the required database indexes haven't been deployed yet. 
+                <strong>Firestore Index Required:</strong> This error occurs when the required database indexes haven&apos;t been deployed yet. 
                 The indexes are defined in the codebase but need to be deployed to Firebase.
               </p>
             </div>
@@ -450,7 +450,7 @@ export default function AdminPlayersPage() {
               )}
               {searchTerm && (
                 <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
-                  Search: "{searchTerm}"
+                  Search: &quot;{searchTerm}&quot;
                 </span>
               )}
               <button

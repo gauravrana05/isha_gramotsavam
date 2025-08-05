@@ -441,7 +441,7 @@ export default function CaptainFixturesPage() {
           <div className="bg-white rounded-lg border p-8 text-center">
             <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Teams Created</h3>
-            <p className="text-gray-600 mb-4">You haven't created any teams yet. Create a team to see fixture schedules.</p>
+            <p className="text-gray-600 mb-4">You haven&apos;t created any teams yet. Create a team to see fixture schedules.</p>
             <button
               onClick={() => router.push(`/${lang}/captain/teams`)}
               className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"

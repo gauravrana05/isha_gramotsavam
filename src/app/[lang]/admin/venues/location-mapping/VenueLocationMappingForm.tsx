@@ -179,7 +179,7 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-2">
-            Teams will be automatically assigned to their district's cluster venue.
+            Teams will be automatically assigned to their district&apos;s cluster venue.
           </p>
         </div>
       </Card>

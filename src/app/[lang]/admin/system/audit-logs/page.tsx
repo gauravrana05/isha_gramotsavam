@@ -20,7 +20,8 @@ import {
   Loader2,
   Filter,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  FileText
 } from 'lucide-react';
 
 interface AuditLog {

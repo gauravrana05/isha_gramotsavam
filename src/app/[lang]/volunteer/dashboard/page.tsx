@@ -146,7 +146,7 @@ export default function VolunteerDashboard() {
         <div className="bg-white rounded-lg border p-8 text-center">
           <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-3" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No venue assignments</h3>
-          <p className="text-gray-600">You haven't been assigned to any venues yet. Please contact the admin.</p>
+          <p className="text-gray-600">You haven&apos;t been assigned to any venues yet. Please contact the admin.</p>
         </div>
       ) : (
         <div className="space-y-6">
