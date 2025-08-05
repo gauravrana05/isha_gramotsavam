@@ -54,7 +54,7 @@ const paddingClasses = {
 };
 
 // Main Card component
-export const Card = forwardRef<HTMLDivElement, CardProps>(({
+const Card = forwardRef<HTMLDivElement, CardProps>(({
   variant = 'default',
   size = 'base',
   padding = 'base',
@@ -223,7 +223,7 @@ export const CardFooter = forwardRef<HTMLDivElement, CardFooterProps>(({
 CardFooter.displayName = 'CardFooter';
 
 // Add compound components to Card
-const CardWithCompounds = Card as CompoundComponentType<CardProps>;
+const CardWithCompounds = Card as unknown as CompoundComponentType<CardProps>;
 CardWithCompounds.Header = CardHeader;
 CardWithCompounds.Content = CardContent;
 CardWithCompounds.Footer = CardFooter;
