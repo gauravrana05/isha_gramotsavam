@@ -14,7 +14,7 @@ const AuthProvider = dynamic(() => import("@/context/AuthContext").then(mod => (
 const NotificationProvider = dynamic(() => import("@/context/NotificationContext").then(mod => ({ default: mod.NotificationProvider })), { ssr: false });
 const LoadingProvider = dynamic(() => import("@/context/LoadingContext").then(mod => ({ default: mod.LoadingProvider })), { ssr: false });
 const DocumentProvider = dynamic(() => import("@/context/DocumentContext").then(mod => ({ default: mod.DocumentProvider })), { ssr: false });
-const OfflineIndicator = dynamic(() => import("@/components/common/OfflineIndicator"), { ssr: false });
+const OfflineIndicator = dynamic(() => import("@/components/system/OfflineIndicator"), { ssr: false });
 
 const ClientProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (

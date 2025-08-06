@@ -127,7 +127,7 @@ export default async function AboutPage({ params }: AboutPageProps) {
                                 </div>
                             </div>
                             <p className="text-[#4A2F1D] font-fira text-lg">
-                                Awarded Government of India's Rashtriya Khel Protsahan Puraskar in 2018
+                                Awarded Government of India&apos;s Rashtriya Khel Protsahan Puraskar in 2018
                             </p>
                         </div>
                         
