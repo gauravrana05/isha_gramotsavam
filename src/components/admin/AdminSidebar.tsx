@@ -18,9 +18,11 @@ import {
   Menu,
   X,
   LogOut,
-  Home
+  Home,
+  User
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface AdminSidebarProps {
   className?: string;
@@ -40,7 +42,8 @@ export default function AdminSidebar({ className = '' }: AdminSidebarProps) {
   
   const pathname = usePathname();
   const { lang } = useParams();
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, logout } = useAuth();
+  const router = useRouter();
 
   const navigation: NavItem[] = [
     {
@@ -248,6 +251,15 @@ export default function AdminSidebar({ className = '' }: AdminSidebarProps) {
           {/* Footer Actions */}
           <div className="border-t border-gray-200 p-4 space-y-2">
             <Link
+              href={`/${lang}/admin/profile`}
+              className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors"
+              onClick={() => setIsMobileOpen(false)}
+            >
+              <User className="w-5 h-5 mr-3" />
+              Profile
+            </Link>
+            
+            <Link
               href={`/${lang}/player/dashboard`}
               className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors"
               onClick={() => setIsMobileOpen(false)}
@@ -257,9 +269,14 @@ export default function AdminSidebar({ className = '' }: AdminSidebarProps) {
             </Link>
             
             <button
-              onClick={() => {
-                // Add logout logic here
-                setIsMobileOpen(false);
+              onClick={async () => {
+                try {
+                  await logout();
+                  router.push(`/${lang}/login`);
+                  setIsMobileOpen(false);
+                } catch (error) {
+                  console.error('Error logging out:', error);
+                }
               }}
               className="w-full flex items-center px-4 py-2 text-sm font-medium text-red-700 rounded-lg hover:bg-red-50 hover:text-red-900 transition-colors"
             >
