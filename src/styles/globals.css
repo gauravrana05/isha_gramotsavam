@@ -1,8 +1,4 @@
-@import "tailwindcss";
-/* src/app/globals.css - Complete Fixed Version */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* src/styles/globals.css - Tailwind v4 with Design Tokens */
 
 /* Fira Sans Font Family - Local Font Files */
 @font-face {
@@ -45,41 +41,138 @@
   font-display: swap;
 }
 
-/* Isha Color Palette Variables */
+/* Theme Variables and Safelisted Classes */
+@import "tailwindcss";
+
+@source inline("bg-primary-{50,100,500,600,700}");
+@source inline("text-primary-{500,600,700}");
+@source inline("border-primary-{500,600}");
+@source inline("{hover:}bg-primary-{50,600,700}");
+@source inline("{hover:}border-primary-600");
+@source inline("{active:}bg-primary-{100,700}");
+@source inline("{focus:}ring-primary-500");
+@source inline("bg-secondary-{50,100,200,300,900}");
+@source inline("text-secondary-{700,900}");
+@source inline("border-secondary-{300,400}");
+@source inline("{hover:}bg-secondary-{50,100}");
+@source inline("{hover:}border-secondary-400");
+@source inline("{active:}bg-secondary-{100,200}");
+@source inline("{focus:}ring-secondary-500");
+@source inline("bg-isha-{saffron,cream,brown}");
+@source inline("text-isha-{saffron,brown,cream}");
+@source inline("border-isha-{saffron,brown}");
+@source inline("min-h-touch-{sm,base,lg,xl}");
+@source inline("{focus:}ring-{red-500,green-500}");
+@source inline("bg-{red,green}-{600,700,800}");
+@source inline("{hover:}bg-{red,green}-700");
+@source inline("{active:}bg-{red,green}-800");
+
+@theme {
+  --color-primary-50: #fef5ef;
+  --color-primary-100: #fce7d8;
+  --color-primary-500: #F28C38; /* Matches isha-saffron for bg-primary-500 */
+  --color-primary-600: #E65100;
+  --color-primary-700: #c2410c;
+  --color-secondary-50: #f8fafc;
+  --color-secondary-100: #F5F5F5; /* Matches isha-cream */
+  --color-secondary-200: #e5e7eb;
+  --color-secondary-300: #d1d5db;
+  --color-secondary-400: #9ca3af;
+  --color-secondary-900: #4A3728; /* Matches isha-earth-brown */
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-700: #374151;
+  --color-gray-900: #111827;
+  --color-white: #fff;
+  --color-success: #3A7F3F;
+  --color-warning: #C79016;
+  --color-error: #AF0000;
+  --color-info: #1565C0;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+  --color-red-700: #b91c1c;
+  --color-red-800: #991b1b;
+  --color-green-500: #22c55e;
+  --color-green-600: #16a34a;
+  --color-green-700: #15803d;
+  --color-green-800: #166534;
+  --font-fira: 'Fira Sans', sans-serif;
+  --animate-fade-in-up: fadeInUp 0.6s ease-out forwards;
+  --animate-fade-in-left: fadeInLeft 0.6s ease-out forwards;
+  --animate-fade-in-right: fadeInRight 0.6s ease-out forwards;
+  --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-spin: spin 1s linear infinite;
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+  --breakpoint-2xl: 96rem;
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0em;
+  --letter-spacing-wide: 0.025em;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Legacy Isha Color Variables (for compatibility) */
 :root {
-  /* Isha Primary Colors */
-  --isha-background: #F3F0E5;
-  --isha-cream: #F3F0E5;
-  --isha-saffron: #F28C38;
-  --isha-saffron-dark: #CE4520;
-  --isha-earth-brown: #4A2F1D;
-  --isha-forest-green: #3A7F3F;
-  --isha-ochre: #C79016;
+  /* Map legacy variables to design tokens */
+  --isha-background: var(--color-secondary-100);
+  --isha-cream: var(--color-secondary-100);
+  --isha-saffron: var(--color-primary-500);
+  --isha-saffron-dark: var(--color-primary-600);
+  --isha-earth-brown: var(--color-secondary-900);
+  --isha-forest-green: var(--color-success);
+  --isha-ochre: var(--color-warning);
   
-  /* Semantic Colors */
-  --primary: #F28C38;
-  --primary-dark: #CE4520;
-  --secondary: #4A2F1D;
-  --success: #3A7F3F;
-  --warning: #C79016;
-  --error: #af0000;
-  --info: #1565C0;
+  /* Semantic Colors from Design Tokens */
+  --primary: var(--color-primary-500);
+  --primary-dark: var(--color-primary-600);
+  --secondary: var(--color-secondary-900);
+  --success: var(--color-success);
+  --warning: var(--color-warning);
+  --error: var(--color-error);
+  --info: var(--color-info);
   
   /* Text Colors */
-  --text-primary: #1f1f1f;
-  --text-secondary: #3c3c3c;
-  --text-muted: #5c5c5c;
-  --text-light: #7e7e7e;
+  --text-primary: var(--color-gray-900);
+  --text-secondary: var(--color-gray-700);
+  --text-muted: var(--color-gray-500);
+  --text-light: var(--color-gray-400);
   
   /* Background Colors */
-  --background: #F3F0E5;
-  --surface: #ffffff;
-  --divider: #d4c9b4;
+  --background: var(--color-secondary-100);
+  --surface: var(--color-white);
+  --divider: var(--color-secondary-300);
   
   /* Interactive States */
-  --hover: #1565C0;
-  --focus: #F28C38;
-  --disabled: #c6c6c6;
+  --hover: var(--color-info);
+  --focus: var(--color-primary-500);
+  --disabled: var(--color-gray-400);
 }
 
 /* Base Styles */
@@ -101,8 +194,8 @@
     margin: 0;
     padding: 0;
     font-family: 'Fira Sans', sans-serif;
-    font-weight: 400;
-    line-height: 1.5;
+    font-weight: var(--font-weight-normal);
+    line-height: var(--line-height-normal);
     color: var(--text-primary);
     background-color: var(--isha-background);
     height: 100%;
@@ -183,25 +276,25 @@
   .card {
     background-color: var(--surface);
     border: 1px solid var(--divider);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     padding: 20px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-sm);
     transition: box-shadow 0.2s ease-in-out;
   }
 
   .card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-md);
   }
 
   /* Form components */
   .form-group {
-    margin-bottom: 16px;
+    margin-bottom: var(--spacing-4);
   }
 
   .form-label {
     display: block;
     margin-bottom: 6px;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--text-primary);
   }
 
@@ -209,9 +302,9 @@
     width: 100%;
     padding: 12px;
     border: 1px solid var(--divider);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background-color: var(--surface);
-    font-size: 16px;
+    font-size: var(--text-base);
     transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
   }
 
@@ -222,7 +315,7 @@
 
   .form-error {
     color: var(--error);
-    font-size: 14px;
+    font-size: var(--text-sm);
     margin-top: 4px;
   }
 
@@ -231,11 +324,11 @@
     display: inline-flex;
     align-items: center;
     padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-medium);
     text-transform: uppercase;
-    letter-spacing: 0.025em;
+    letter-spacing: var(--letter-spacing-wide);
   }
 
   .badge-success {
@@ -291,10 +384,10 @@
   /* Offline Indicator */
   .offline-banner {
     background-color: var(--error);
-    color: white;
+    color: var(--color-white);
     padding: 8px 16px;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
     text-align: center;
     position: fixed;
     top: 0;
@@ -330,16 +423,11 @@
   }
   
   .bg-isha-saffron {
-    background-color: var(--isha-saffron);
+    background: var(--isha-saffron);
   }
   
   .bg-isha-brown {
     background-color: var(--isha-earth-brown);
-  }
-
-  /* Font utilities */
-  .font-fira {
-    font-family: 'Fira Sans', sans-serif;
   }
 
   /* Text utilities */
@@ -400,7 +488,6 @@
   }
 }
 
-
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -412,7 +499,7 @@
 
 ::-webkit-scrollbar-thumb {
   background: var(--isha-saffron);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -492,27 +579,6 @@ textarea:focus-visible {
   }
 }
 
-/* Animation Classes */
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out forwards;
-}
-
-.animate-fade-in-left {
-  animation: fadeInLeft 0.6s ease-out forwards;
-}
-
-.animate-fade-in-right {
-  animation: fadeInRight 0.6s ease-out forwards;
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
 /* Divider with Text */
 .hr-sect {
   display: flex;
@@ -520,7 +586,7 @@ textarea:focus-visible {
   align-items: center;
   color: var(--text-muted);
   margin: 8px 0;
-  font-size: 14px;
+  font-size: var(--text-sm);
 }
 
 .hr-sect::before,
@@ -540,7 +606,7 @@ textarea:focus-visible {
   
   .form-input {
     padding: 10px;
-    font-size: 16px; /* Prevent zoom on iOS */
+    font-size: var(--text-base); /* Prevent zoom on iOS */
   }
   
   .card {

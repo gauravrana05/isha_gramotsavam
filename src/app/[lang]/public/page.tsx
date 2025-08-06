@@ -37,9 +37,6 @@ export default async function PublicPage({ params }: PublicPageProps) {
       {/* Key Components Section */}
       <KeyComponents />
       
-      {/* Impact Section with statistics */}
-      <ImpactSection />
-      
       {/* Celebrity Testimonials */}
       <CelebrityTestimonials />
       

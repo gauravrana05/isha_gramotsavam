@@ -1,8 +1,16 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
+import RegistrationButton from '@/components/common/RegistrationButton';
 
-export default function SportsOverviewPage() {
+interface SportsOverviewPageProps {
+  params: Promise<{
+    lang: string
+  }>
+}
+
+export default async function SportsOverviewPage({ params }: SportsOverviewPageProps) {
+  const { lang } = await params
   return (
     <div className="bg-[#F3F0E5]">
       {/* Hero Section with Background Images */}
@@ -68,7 +76,7 @@ export default function SportsOverviewPage() {
                 Volleyball, throwball and kabaddi matches are conducted at three levels: clusters, divisionals, and finals.
               </p>
             </div>
-            
+
             {/* Decorative Element */}
             <div className="flex justify-center mb-8">
               <Image
@@ -81,31 +89,59 @@ export default function SportsOverviewPage() {
             </div>
           </div>
         </div>
-      
 
-      {/* Sports Statistics Banner */}
-      <div className="relative bg-earth-brown text-white py-2 md:pt-48 pb-8">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-2xl md:text-3xl font-bold text-isha-saffron font-fira">2+</div>
-              <div className="text-sm md:text-base font-fira">Traditional Sports</div>
-            </div>
-            <div>
-              <div className="text-2xl md:text-3xl font-bold text-isha-saffron font-fira">18,000+</div>
-              <div className="text-sm md:text-base font-fira">Teams Participating</div>
-            </div>
-            <div>
-              <div className="text-2xl md:text-3xl font-bold text-isha-saffron font-fira">2,00,000+</div>
-              <div className="text-sm md:text-base font-fira">Players</div>
-            </div>
-            <div>
-              <div className="text-2xl md:text-3xl font-bold text-isha-saffron font-fira">35,000+</div>
-              <div className="text-sm md:text-base font-fira">Villages</div>
+
+        {/* Sports Statistics Banner */}
+        <div className="relative bg-earth-brown text-white py-2 md:pt-16 pb-8">
+          <div className="container mx-auto px-1">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+              <div className='flex flex-col items-center justify-center'>
+                <Image
+                  src="/images/backgrounds/grms_sports_bg_bottom_right_doll.png"
+                  alt="Background decoration"
+                  width={60}
+                  height={80}
+                  className="scale-x-[-1] opacity-90"
+                />
+                <div className="text-2xl md:text-3xl font-bold text-isha-saffron font-fira">2+</div>
+                <div className="text-sm md:text-base font-fira">Traditional Sports</div>
+              </div>
+              <div className='flex flex-col items-center justify-center'>
+                <Image
+                  src="/images/backgrounds/grms_sports_bg_bottom_left_doll.png"
+                  alt="Background decoration"
+                  width={40}
+                  height={60}
+                  className="opacity-90"
+                />
+                <div className="text-2xl md:text-3xl font-bold text-isha-saffron font-fira">18,000+</div>
+                <div className="text-sm md:text-base font-fira">Teams Participating</div>
+              </div>
+              <div className='flex flex-col items-center justify-center'>
+                <Image
+                  src="/images/backgrounds/grms_sports_bg_bottom_left_doll.png"
+                  alt="Background decoration"
+                  width={40}
+                  height={60}
+                  className="scale-x-[-1] opacity-90"
+                />
+                <div className="text-2xl md:text-3xl font-bold text-isha-saffron font-fira">2,00,000+</div>
+                <div className="text-sm md:text-base font-fira">Players</div>
+              </div>
+              <div className='flex flex-col items-center justify-center'>
+                <Image
+                  src="/images/backgrounds/grms_sports_bg_bottom_right_doll.png"
+                  alt="Background decoration"
+                  width={60}
+                  height={80}
+                  className="opacity-100 "
+                />
+                <div className="text-2xl md:text-3xl font-bold text-isha-saffron font-fira">35,000+</div>
+                <div className="text-sm md:text-base font-fira">Villages</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       </section>
 
       {/* Sports Overview */}
@@ -134,10 +170,10 @@ export default function SportsOverviewPage() {
               <div className="p-6">
                 <h3 className="text-2xl font-bold text-earth-brown mb-3 font-fira">Volleyball</h3>
                 <p className="text-earth-brown/80 mb-4 leading-relaxed font-fira">
-                  The most popular sport at Gramotsavam, volleyball brings teams together in intense, 
+                  The most popular sport at Gramotsavam, volleyball brings teams together in intense,
                   fast-paced matches. Experience the thrill of teamwork and precision in this beloved traditional game.
                 </p>
-                
+
                 <div className="mb-4">
                   <h4 className="font-semibold text-earth-brown mb-2">Key Features:</h4>
                   <ul className="list-disc list-inside text-sm text-earth-brown/80 space-y-1 font-fira">
@@ -167,15 +203,18 @@ export default function SportsOverviewPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <Link 
-                    href="/en/public/sports/volleyball" 
+                  <Link
+                    href={`/${lang}/public/sports/volleyball`}
                     className="flex-1 bg-saffron lg:pl-3 py-2 rounded-lg font-semibold hover:bg-saffron/90 transition-colors"
                   >
                     Learn More
                   </Link>
-                  <Button size="sm" className="min-w-[200px]">
-                    Register Now
-                  </Button>
+                  <RegistrationButton 
+                    lang={lang} 
+                    sport="volleyball" 
+                    size="sm" 
+                    className="min-w-[200px]"
+                  />
                 </div>
               </div>
             </div>
@@ -193,10 +232,10 @@ export default function SportsOverviewPage() {
               <div className="p-6">
                 <h3 className="text-2xl font-bold text-earth-brown mb-3">Throwball</h3>
                 <p className="text-earth-brown/80 mb-4 leading-relaxed">
-                  A dynamic sport that combines agility, strategy, and teamwork. Popular among women participants, 
+                  A dynamic sport that combines agility, strategy, and teamwork. Popular among women participants,
                   throwball showcases incredible athleticism and community spirit.
                 </p>
-                
+
                 <div className="mb-4">
                   <h4 className="font-semibold text-earth-brown mb-2">Key Features:</h4>
                   <ul className="list-disc list-inside text-sm text-earth-brown/80 space-y-1">
@@ -225,16 +264,19 @@ export default function SportsOverviewPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-between">
-                  <Link 
-                    href="/en/public/sports/throwball" 
+                <div className="flex gap-3">
+                  <Link
+                    href={`/${lang}/public/sports/throwball`}
                     className="flex-1 bg-saffron lg:pl-3 py-2 rounded-lg font-semibold hover:bg-saffron/90 transition-colors"
                   >
                     Learn More
                   </Link>
-                  <Button size="sm" className="min-w-[200px]">
-                    Register Now
-                  </Button>
+                  <RegistrationButton 
+                    lang={lang} 
+                    sport="throwball" 
+                    size="sm" 
+                    className="min-w-[200px]"
+                  />
                 </div>
               </div>
             </div>

@@ -3,6 +3,7 @@ import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import Button from '../ui/Button'
+import RegistrationButton from '../common/RegistrationButton'
 
 interface SportsPreviewProps {
   lang: string
@@ -24,15 +25,16 @@ interface SportData {
 }
 
 export default function SportsPreview({ lang }: SportsPreviewProps) {
+  // Using hardcoded sports data for better performance and reliability
   const sports: SportData[] = [
     {
       id: 'volleyball',
       name: 'Volleyball',
-      category: 'For Men',
+      category: 'For Men & Women',
       players: '6 + 6 Players Per Team',
       prize: 'INR 5,00,000',
       image: '/images/sports/volleyball_1.jpg',
-      registrationLink: `/${lang}/auth/register`,
+      registrationLink: `/${lang}/public/register/team/volleyball`,
       learnMoreLink: `/${lang}/public/sports/volleyball`,
       eventInfo: {
         registrationStart: '2025-01-01',
@@ -43,10 +45,10 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
       id: 'throwball',
       name: 'Throwball',
       category: 'For Women',
-      players: '7 + 5 Players Per Team',
+      players: '7 + 6 Players Per Team',
       prize: 'INR 5,00,000',
       image: '/images/sports/throwball_1.jpg',
-      registrationLink: `/${lang}/auth/register`,
+      registrationLink: `/${lang}/public/register/team/throwball`,
       learnMoreLink: `/${lang}/public/sports/throwball`,
       eventInfo: {
         registrationStart: '2025-01-01',
@@ -69,7 +71,7 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
   }
 
   return (
-    <section className="bg-isha py-16 lg:py-24">
+    <section id="sports-preview" className="bg-isha font-fira py-16 lg:py-24">
       <div className="max-w-7xl mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-16">
@@ -133,11 +135,12 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Link href={sportData.registrationLink}>
-                    <Button size="sm" className="min-w-[200px] w-full">
-                      Register Now
-                    </Button>
-                  </Link>
+                  <RegistrationButton 
+                    lang={lang} 
+                    sport={sportData.id} 
+                    size="sm" 
+                    className="min-w-[200px]"
+                  />
                   <Link
                     href={sportData.learnMoreLink}
                     className="btn-secondary flex-1 text-center py-3 px-6"

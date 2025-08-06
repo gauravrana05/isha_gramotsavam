@@ -1,4 +1,5 @@
 // src/components/public/HeroSection.tsx
+'use client'
 import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -10,6 +11,16 @@ interface HeroSectionProps {
 }
 
 export default function HeroSection({ lang }: HeroSectionProps) {
+  const scrollToSports = () => {
+    const sportsSection = document.getElementById('sports-preview');
+    if (sportsSection) {
+      sportsSection.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  };
+
   return (
     <section className="relative flex min-h-screen flex-col overflow-hidden">
       {/* Top Image Container: Stacks on mobile, becomes a background on desktop */}
@@ -63,20 +74,23 @@ export default function HeroSection({ lang }: HeroSectionProps) {
                 Isha Gramotsavam
               </h1>
 
-              <div className="font-roboto mb-6 text-xl font-semibold text-black md:text-2xl">
+              <div className="font-fira mb-6 text-xl font-semibold text-black md:text-2xl">
                 Sporting Spirit of Bharat
               </div>
 
-              <p className="font-roboto md:text-md mx-auto mb-8 max-w-3xl text-lg leading-relaxed text-[#4A2F1D] md:mx-36">
+              <p className="font-fira md:text-md mx-auto mb-8 max-w-3xl text-lg leading-relaxed text-[#4A2F1D] md:mx-36">
                 Aims to rejuvenate the spirit of rural India and foster a sense of community, tradition and healthy competition
               </p>
 
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <Link href={`/${lang}/public/sports`}>
-                  <Button size="lg" variant='primary' className="min-w-[200px]">
-                    Register Now
-                  </Button>
-                </Link>
+                <Button 
+                  size="lg" 
+                  variant='primary' 
+                  className="min-w-[200px]"
+                  onClick={scrollToSports}
+                >
+                  Register Now
+                </Button>
               </div>
             </div>
           </div>

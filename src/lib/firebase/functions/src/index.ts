@@ -12,7 +12,7 @@ setGlobalOptions({
   maxInstances: 20,
   region: "us-central1",
 });
-
+//testing
 // Export Role Management Functions (keep - complex role system)
 export {
   assignEventRole,

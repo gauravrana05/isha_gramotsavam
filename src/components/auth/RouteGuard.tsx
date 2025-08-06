@@ -67,7 +67,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({ children }) => {
         return;
       }
       if (!userProfile?.isProfileComplete) {
-        router.push(`/${lang}/complete-profile`);
+        router.push(`/${lang}/profile/complete`);
         return;
       }
       return; // Authenticated users can access
@@ -80,7 +80,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({ children }) => {
     }
 
     if (!userProfile?.isProfileComplete) {
-      router.push(`/${lang}/complete-profile`);
+      router.push(`/${lang}/profile/complete`);
       return;
     }
 

@@ -79,17 +79,17 @@ export default function Header({ lang }: HeaderProps) {
               </div>
 
               <Link
-                href={`/${lang}/public/cultural`}
-                className="text-white hover:text-[#F28C38] transition-colors duration-200 font-medium"
-              >
-                Cultural Events
-              </Link>
-
-              <Link
                 href={`/${lang}/public/about`}
                 className="text-white hover:text-[#F28C38] transition-colors duration-200 font-medium"
               >
                 About Us
+              </Link>
+
+              <Link
+                href={`/${lang}/profile`}
+                className="text-white hover:text-[#F28C38] transition-colors duration-200 font-medium"
+              >
+                Profile
               </Link>
 
               {/* Language Dropdown */}
@@ -223,19 +223,19 @@ export default function Header({ lang }: HeaderProps) {
               </div>
 
               <Link
-                href={`/${lang}/public/cultural`}
-                className="block text-white hover:text-[#F28C38] transition-colors font-medium"
-                onClick={closeMobileMenu}
-              >
-                Cultural Events
-              </Link>
-
-              <Link
                 href={`/${lang}/public/about`}
                 className="block text-white hover:text-[#F28C38] transition-colors font-medium"
                 onClick={closeMobileMenu}
               >
                 About Us
+              </Link>
+
+              <Link
+                href={`/${lang}/profile`}
+                className="block text-white hover:text-[#F28C38] transition-colors font-medium"
+                onClick={closeMobileMenu}
+              >
+                Profile
               </Link>
             </div>
           </div>

@@ -6,13 +6,13 @@ import Button from '@/components/ui/Button'
 import SectionDivider from '@/components/ui/SectionDivider'
 import { ChevronLeft } from 'lucide-react'
 import Image from 'next/image';
-interface ThrowballRulesPageProps {
+interface VolleyballRulesPageProps {
     params: Promise<{
         lang: string
     }>
 }
 
-export default async function ThrowballRulesPage({ params }: ThrowballRulesPageProps) {
+export default async function VolleyballRulesPage({ params }: VolleyballRulesPageProps) {
     const { lang } = await params
 
     return (
@@ -32,11 +32,11 @@ export default async function ThrowballRulesPage({ params }: ThrowballRulesPageP
                 <section className="py-4">
                     <Container>
                         <Link
-                            href={`/${lang}/public/sports/throwball`}
+                            href={`/${lang}/public/sports/volleyball`}
                             className="inline-flex items-center text-[#F28C38] hover:text-[#4A2F1D] transition-colors font-fira font-semibold"
                         >
                             <ChevronLeft className="w-5 h-5 mr-1" />
-                            Back to Throwball
+                            Back to Volleyball
                         </Link>
                     </Container>
                 </section>
@@ -68,20 +68,14 @@ export default async function ThrowballRulesPage({ params }: ThrowballRulesPageP
 
                                     <li>
                                         <p className="leading-relaxed">
-                                            In one team, there should be a minimum of 7 players and 1 substitute (7+1), and a maximum
-                                            of 7 players and 3 substitutes (7+3). One player can participate only in one team.
+                                            In one team, there should be a minimum of 6 players and 1 substitute (6+1), and a maximum
+                                            of 6 players and 6 substitutes (6+6). One player can only participate in one team.
                                         </p>
                                     </li>
 
                                     <li>
-                                        <p className="leading-relaxed mb-4">
-                                            The minimum age for players is 13 and only a maximum of three persons will be allowed below
-                                            21 years of age in a team. One physical education trainer (PET) can participate in one team.
-                                            If the rules are found to be violated, the team will be disqualified at any stage of the tournament.
-                                        </p>
-                                        <p className="leading-relaxed pl-4">
-                                            a. If any players are unable to participate, the team may continue with a minimum of 6 players,
-                                            but not fewer. In such cases, medical certificates for the absent players must be submitted.
+                                        <p className="leading-relaxed">
+                                            Minimum age: 14 years. Maximum: No age limit as long as the player is physically fit.
                                         </p>
                                     </li>
 
@@ -110,8 +104,8 @@ export default async function ThrowballRulesPage({ params }: ThrowballRulesPageP
                                             </p>
                                             <p>
                                                 <span className="font-semibold">d. Central and state university players</span> and
-                                                <span className="font-semibold"> players selected for integrated universities</span> (south zone)
-                                                and <span className="font-semibold">Form 3 players</span> are not allowed to participate.
+                                                <span className="font-semibold"> players selected for integrated universities</span> (South Zone)
+                                                and <span className="font-semibold">Form 3 and 4 players</span> are not allowed to participate.
                                             </p>
                                             <p>
                                                 <span className="font-semibold">e.</span> If the rules are found to be broken, the team
@@ -181,21 +175,21 @@ export default async function ThrowballRulesPage({ params }: ThrowballRulesPageP
 
                                     <li>
                                         <p className="leading-relaxed">
-                                            The main 7 players should arrive at the match venue and ensure their presence 30 minutes
-                                            before the commencement of the match.
+                                            <strong>The main 6 players should arrive at the match venue and ensure their presence 30 minutes
+                                            before the commencement of the match.</strong>
                                         </p>
                                     </li>
 
                                     <li>
                                         <p className="leading-relaxed">
-                                            If the players fail to arrive before the scheduled match start time, the opposing team
-                                            will be declared the winner.
+                                            <strong>If the players fail to arrive before the scheduled match start time, the opposing team
+                                            will be declared the winner.</strong>
                                         </p>
                                     </li>
 
                                     <li>
-                                        <p className="leading-relaxed font-semibold">
-                                            The Standing Player Method will be used in all matches.
+                                        <p className="leading-relaxed">
+                                            The Standing Method will be enforced for the cluster level matches. The Rotational Method will be enforced for divisional and final level matches.
                                         </p>
                                     </li>
 
@@ -211,7 +205,7 @@ export default async function ThrowballRulesPage({ params }: ThrowballRulesPageP
                                     <li>
                                         <p className="leading-relaxed">
                                             If there is any complaint regarding the participation of certain players or opposing teams,
-                                            it must be reported at least three days in advance. Complaints raised after that will not
+                                            it must be reported at least three days in advance. Complaints given after that will not
                                             be considered for action. If the complaint and evidence are proven to be true, necessary
                                             action will be taken against the team.
                                         </p>
@@ -226,7 +220,7 @@ export default async function ThrowballRulesPage({ params }: ThrowballRulesPageP
                                     <li>
                                         <p className="leading-relaxed">
                                             Only a team&apos;s captain can speak to the referee or management committee during a game.
-                                            Coaches and other players are not allowed to argue. Failure to comply may result in
+                                            Coaches and other players are not allowed to argue. Failure to comply will result in
                                             the team being disqualified from the tournament.
                                         </p>
                                     </li>

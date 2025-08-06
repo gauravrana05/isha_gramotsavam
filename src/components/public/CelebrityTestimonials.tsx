@@ -30,6 +30,7 @@ export default function CelebrityTestimonials() {
       title: "Indian Paralympic Badminton Medalist",
       image: "/images/celebrity/thulasi.jpg"
     }
+
   ]
 
   const nextSlide = () => {

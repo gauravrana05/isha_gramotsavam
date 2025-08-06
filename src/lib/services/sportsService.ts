@@ -250,6 +250,60 @@ class SportsService {
   }
 
   /**
+   * Get sports data formatted for preview components
+   */
+  async getSportsForPreview(lang: string = 'en'): Promise<{
+    id: string;
+    name: string;
+    category: string;
+    players: string;
+    prize: string;
+    image: string;
+    registrationLink: string;
+    learnMoreLink: string;
+    eventInfo: {
+      registrationStart: string;
+      registrationEnd: string;
+    };
+  }[]> {
+    try {
+      const sports = await this.getAllActiveSports();
+      
+      return sports.map(sport => {
+        // Format gender category for display
+        const genderDisplay = sport.genderCategories.map(gender => 
+          gender === 'men' ? 'For Men' : 'For Women'
+        ).join(' & ');
+        
+        // Format players count
+        const playersText = `${sport.maxPlayers} + ${sport.maxSubstitutes} Players Per Team`;
+        
+        // Use existing images or fallback to default
+        const imageUrl = sport.bannerImageURL || 
+          `/images/sports/${sport.name.toLowerCase().replace(/\s+/g, '_')}_1.jpg`;
+        
+        return {
+          id: sport.sportId,
+          name: sport.displayName || sport.name,
+          category: genderDisplay,
+          players: playersText,
+          prize: 'INR 5,00,000', // Default prize - could be added to schema later
+          image: imageUrl,
+          registrationLink: `/${lang}/auth/register`,
+          learnMoreLink: `/${lang}/public/sports/${sport.sportId}`,
+          eventInfo: {
+            registrationStart: '2025-01-01',
+            registrationEnd: '2025-02-15'
+          }
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching sports for preview:', error);
+      throw new Error('Failed to fetch sports for preview');
+    }
+  }
+
+  /**
    * Initialize default sports data (run once during setup)
    */
   async initializeDefaultSports(): Promise<void> {

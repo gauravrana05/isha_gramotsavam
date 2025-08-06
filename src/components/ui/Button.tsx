@@ -4,7 +4,7 @@ import { cn, BaseComponentProps, SizeVariant, focusClasses, disabledClasses } fr
 import { designTokens } from '@/lib/design-tokens';
 
 export interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'size'>, BaseComponentProps {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
+  variant?: 'main' | 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
   size?: SizeVariant;
   loading?: boolean;
   loadingText?: string;
@@ -29,6 +29,7 @@ const variantClasses = {
     'focus:ring-primary-500',
     'border border-transparent'
   ),
+  
   secondary: cn(
     'bg-white text-secondary-900 shadow-sm',
     'border border-secondary-300',
@@ -56,6 +57,13 @@ const variantClasses = {
     'hover:bg-red-700 hover:shadow-md',
     'active:bg-red-800',
     'focus:ring-red-500'
+  ),
+  main: cn(
+    'bg-primary-500 text-white shadow-sm',
+    'border border-transparent',
+    'hover:bg-primary-600 hover:shadow-md',
+    'active:bg-primary-700',
+    'focus:ring-primary-500'
   ),
   success: cn(
     'bg-green-600 text-white shadow-sm',

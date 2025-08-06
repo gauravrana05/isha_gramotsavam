@@ -410,7 +410,7 @@ export default function ProfilePage() {
   };
 
   const handleCompleteProfile = () => {
-    router.push(`/${lang}/complete-profile`);
+    router.push(`/${lang}/profile/complete`);
   };
 
   const isProfileComplete = userProfile?.isProfileComplete || false;

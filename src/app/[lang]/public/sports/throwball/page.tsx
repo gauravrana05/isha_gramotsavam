@@ -9,6 +9,7 @@ import CelebrityTestimonials from '@/components/public/CelebrityTestimonials'
 import TransformationStories from '@/components/public/TransformationStories'
 import FAQSection from '@/components/public/FAQSection'
 import DecorativeElement from '@/components/ui/DecorativeElement'
+import RegistrationButton from '@/components/common/RegistrationButton'
 
 interface ThrowballPageProps {
     params: Promise<{
@@ -21,14 +22,13 @@ export default async function ThrowballPage({ params }: ThrowballPageProps) {
 
     return (
         <main className="min-h-screen">
-
             <section className="relative flex min-h-screen flex-col overflow-hidden">
                 {/* Top Image Container: Stacks on mobile, becomes a background on desktop */}
                 <div className="relative h-[50vh] md:absolute md:inset-0 md:h-full">
                     {/* Mobile Background */}
                     <Image
                         src="/images/sports/mobile_throwball_3.png"
-                        alt="Isha Gramotsavam Mobile Background"
+                        alt="Volleyball Mobile Background"
                         fill
                         className="object-cover md:hidden"
                         priority
@@ -38,7 +38,7 @@ export default async function ThrowballPage({ params }: ThrowballPageProps) {
                     {/* Desktop/Web Background */}
                     <Image
                         src="/images/sports/web_throwball_3.png"
-                        alt="Isha Gramotsavam Web Background"
+                        alt="Volleyball Background"
                         fill
                         className="hidden object-cover md:block"
                         priority
@@ -78,16 +78,17 @@ export default async function ThrowballPage({ params }: ThrowballPageProps) {
                                     (For Women)
                                 </div>
 
-                                <p className="font-roboto md:text-md mx-auto mb-8 max-w-3xl text-lg leading-relaxed text-[#4A2F1D] md:mx-36">
+                                <p className="font-fira md:text-md mx-auto mb-8 max-w-3xl text-lg text-[#4A2F1D] md:mx-36">
                                     Registration is free and mandatory.
                                 </p>
 
                                 <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                                    <Link href={`/${lang}/public/register/team/throwball`}>
-                                        <Button size="lg" className="min-w-[200px]">
-                                            Register Now
-                                        </Button>
-                                    </Link>
+                                    <RegistrationButton 
+                                        lang={lang} 
+                                        sport="throwball" 
+                                        size="lg" 
+                                        className="min-w-[200px]"
+                                    />
                                 </div>
                             </div>
                         </div>

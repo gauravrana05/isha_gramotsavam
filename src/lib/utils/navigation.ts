@@ -51,10 +51,10 @@ export const handleRedirect = async (user: any, lang: string, router: AppRouterI
         const dashboardRoute = getDashboardRoute(role, lang as string);
         router.push(dashboardRoute);
       } else {
-        router.push(`/${lang}/complete-profile`);
+        router.push(`/${lang}/profile/complete`);
       }
     } else {
-      router.push(`/${lang}/complete-profile`);
+      router.push(`/${lang}/profile/complete`);
     }
   } catch (error) {
     console.error("Error checking profile:", error);
@@ -80,7 +80,7 @@ export const useRedirect = (allowedRoles?: string[]) => {
     const checkUser = async () => {
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (!userDoc.exists()) {
-        router.push(`/${lang}/complete-profile`);
+        router.push(`/${lang}/profile/complete`);
         return
       }
 
@@ -91,7 +91,7 @@ export const useRedirect = (allowedRoles?: string[]) => {
       const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
       console.log("the role of the use is this ", role, specialRole);
       if (!isProfileComplete && !specialRole) {
-        router.push(`/${lang}/complete-profile`);
+        router.push(`/${lang}/profile/complete`);
         return;
       }
       

@@ -10,6 +10,7 @@ import TransformationStories from '@/components/public/TransformationStories'
 import FAQSection from '@/components/public/FAQSection'
 import DecorativeElement from '@/components/ui/DecorativeElement'
 import PrizeDisplay from '@/components/public/PrizeDisplay'
+import RegistrationButton from '@/components/common/RegistrationButton'
 interface VolleyballPageProps {
     params: Promise<{
         lang: string
@@ -27,8 +28,8 @@ export default async function VolleyballPage({ params }: VolleyballPageProps) {
                 <div className="relative h-[50vh] md:absolute md:inset-0 md:h-full">
                     {/* Mobile Background */}
                     <Image
-                        src="/images/sports/mobile_throwball_3.png"
-                        alt="Isha Gramotsavam Mobile Background"
+                        src="/images/sports/mobile_volleyball_3.jpg"
+                        alt="Volleyball Mobile Background"
                         fill
                         className="object-cover md:hidden"
                         priority
@@ -37,8 +38,8 @@ export default async function VolleyballPage({ params }: VolleyballPageProps) {
 
                     {/* Desktop/Web Background */}
                     <Image
-                        src="/images/sports/web_throwball_3.png"
-                        alt="Isha Gramotsavam Web Background"
+                        src="/images/sports/web_volleyball_3.jpg"
+                        alt="Volleyball Background"
                         fill
                         className="hidden object-cover md:block"
                         priority
@@ -75,19 +76,20 @@ export default async function VolleyballPage({ params }: VolleyballPageProps) {
                                 </h1>
 
                                 <div className="font-fira mb-6 text-xl font-semibold text-black md:text-2xl">
-                                    (For Women)
+                                    (For Men)
                                 </div>
 
-                                <p className="font-roboto md:text-md mx-auto mb-8 max-w-3xl text-lg leading-relaxed text-[#4A2F1D] md:mx-36">
+                                <p className="font-fira md:text-md mx-auto mb-8 max-w-3xl text-lg text-[#4A2F1D] md:mx-36">
                                     Registration is free and mandatory.
                                 </p>
 
                                 <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                                    <Link href={`/${lang}/public/register/team/volleyball`}>
-                                        <Button size="lg" className="min-w-[200px]">
-                                            Register Now
-                                        </Button>
-                                    </Link>
+                                    <RegistrationButton 
+                                        lang={lang} 
+                                        sport="volleyball" 
+                                        size="lg" 
+                                        className="min-w-[200px]"
+                                    />
                                 </div>
                             </div>
                         </div>

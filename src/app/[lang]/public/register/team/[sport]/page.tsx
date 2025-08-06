@@ -51,7 +51,7 @@ export default function TeamRegistrationPage() {
     }
     // Redirect if profile incomplete
     if (!userProfile?.isProfileComplete) {
-      router.push(`/${lang}/complete-profile`);
+      router.push(`/${lang}/profile/complete`);
       return;
     }
 

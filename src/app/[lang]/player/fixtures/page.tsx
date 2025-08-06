@@ -72,7 +72,7 @@ export default function PlayerFixturesPage() {
     }
 
     if (!userProfile?.isProfileComplete) {
-      router.push(`/${lang}/complete-profile`);
+      router.push(`/${lang}/profile/complete`);
       return;
     }
 

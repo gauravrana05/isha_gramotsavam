@@ -60,7 +60,7 @@ export default function PlayerTeamsPage() {
     }
 
     if (!userProfile?.isProfileComplete) {
-      router.push(`/${lang}/complete-profile`);
+      router.push(`/${lang}/profile/complete`);
       return;
     }
 
