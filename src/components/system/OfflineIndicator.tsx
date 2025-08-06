@@ -50,7 +50,7 @@ export default function OfflineIndicator() {
       ) : (
         <>
           <WifiOff className="w-4 h-4" />
-          <span className="text-sm font-fira">You're Offline</span>
+          <span className="text-sm font-fira">You&apos;re Offline</span>
         </>
       )}
     </div>
