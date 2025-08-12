@@ -145,6 +145,10 @@ export default function CaptainPlayerManagement() {
   // Document upload states
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [documentPlayer, setDocumentPlayer] = useState<TeamPlayer | null>(null);
+  
+  // Team submission states
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
   if (!teamId || (Array.isArray(teamId) && teamId.length === 0)) {
     throw new Error("Team ID is missing or invalid");
   }
@@ -573,19 +577,31 @@ export default function CaptainPlayerManagement() {
     });
     setPlayerExists(false);
   };
-  const normalizePhone = (phone: string) =>{
+  const normalizePhone = (phone: string): string => {
     const digitsOnly = phone.replace(/\D/g, "");
-    if (digitsOnly.startsWith("91") && digitsOnly.length === 12) {
-      return `+${digitsOnly}`;
-    }
+    
+    // Handle 10-digit Indian mobile number
     if (digitsOnly.length === 10) {
       return `+91${digitsOnly}`;
     }
-    if (phone.startsWith("+")) {
+    
+    // Handle 12-digit number starting with 91
+    if (digitsOnly.startsWith("91") && digitsOnly.length === 12) {
+      return `+${digitsOnly}`;
+    }
+    
+    // Handle already formatted number
+    if (phone.startsWith("+91") && digitsOnly.length === 12) {
       return phone;
     }
-    throw new Error("Invalid phone number format");
-
+    
+    // If none of the above, return the digits with +91 prefix as best effort
+    if (digitsOnly.length >= 10) {
+      const last10Digits = digitsOnly.slice(-10);
+      return `+91${last10Digits}`;
+    }
+    
+    throw new Error(`Invalid phone number format: ${phone}. Please enter a 10-digit mobile number.`);
   }
   const handleAddPlayer = async () => {
     if (!teamData) {
@@ -657,13 +673,21 @@ export default function CaptainPlayerManagement() {
       console.log('handleAddPlayer: Calling addPlayerToTeam server action');
       
       try {
+        // Validate phone number format before sending to server
+        let normalizedPhone: string;
+        try {
+          normalizedPhone = normalizePhone(playerFormData.phone);
+        } catch (phoneError) {
+          throw new Error(phoneError instanceof Error ? phoneError.message : 'Invalid phone number format');
+        }
+
         const result = await addPlayerToTeam({
           teamId: teamData.teamId,
           playerData: {
             name: `${playerFormData.firstName} ${playerFormData.lastName}`,
             firstName: playerFormData.firstName,
             lastName: playerFormData.lastName,
-            phone: normalizePhone(playerFormData.phone),
+            phone: normalizedPhone,
             dateOfBirth: playerFormData.dob,
             gender: sportData?.genderCategories[0] === 'women' ? 'F' : 'M',
             whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
@@ -681,10 +705,41 @@ export default function CaptainPlayerManagement() {
         console.log('handleAddPlayer: Server action result:', result);
 
         if (!result.success) {
-          const errorMsg =
-            typeof (result as { error?: unknown }).error === 'string'
-              ? (result as { error?: unknown }).error as string
-              : 'Failed to add player to team';
+          // Handle different types of error responses
+          let errorMsg = 'Failed to add player to team';
+          
+          const error = (result as any).error;
+          if (error && typeof error === 'object') {
+            if ('message' in error && typeof error.message === 'string') {
+              errorMsg = error.message;
+            } else if ('code' in error) {
+              switch (error.code) {
+                case 'invalid-phone':
+                  errorMsg = 'Invalid phone number format. Please enter a valid 10-digit mobile number.';
+                  break;
+                case 'player-exists':
+                  errorMsg = 'This player is already in the team.';
+                  break;
+                case 'invalid-age':
+                  errorMsg = 'Player age must be between 14 and 60 years.';
+                  break;
+                case 'invalid-argument':
+                  errorMsg = 'Missing required player information. Please fill all fields.';
+                  break;
+                case 'permission-denied':
+                  errorMsg = 'You are not authorized to add players to this team.';
+                  break;
+                case 'team-not-found':
+                  errorMsg = 'Team not found. Please refresh the page and try again.';
+                  break;
+                default:
+                  errorMsg = `Error: ${error.code}`;
+              }
+            }
+          } else if (typeof error === 'string') {
+            errorMsg = error;
+          }
+          
           throw new Error(errorMsg);
         }
 
@@ -703,7 +758,6 @@ export default function CaptainPlayerManagement() {
     } catch (error) {
       console.error('Error adding player:', error);
       alert(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -819,12 +873,16 @@ export default function CaptainPlayerManagement() {
       return;
     }
 
-    const confirmMessage = `Submit team "${teamData.name}" for ${sportData.displayName}?\n\nPlayers: ${currentPlayers}\nDocuments: Complete\nSport: ${sportData.displayName}\n\nThis action cannot be undone.`;
-    if (!confirm(confirmMessage)) {
-      return;
-    }
+    setShowSubmissionModal(true);
+  };
+
+  const confirmSubmitTeam = async () => {
+    if (!teamData || !sportData || !user) return;
+
+    const playersWithIncompleteDocuments = players.filter(player => !player.isProfileComplete);
 
     try {
+      setIsSubmittingTeam(true);
       console.log('Submitting team for verification...', {
         teamId: teamData.teamId,
         sportId: sportData.id,
@@ -844,6 +902,7 @@ export default function CaptainPlayerManagement() {
       });
       
       if (result.success) {
+        setShowSubmissionModal(false);
         alert(`Team "${teamData.name}" submitted for verification successfully!\n\nYou will be notified once the review is complete.`);
         router.push(`/${lang}/captain/dashboard`);
       } else {
@@ -852,6 +911,8 @@ export default function CaptainPlayerManagement() {
     } catch (error) {
       console.error('Error submitting team:', error);
       alert(`Failed to submit team: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again or contact support.`);
+    } finally {
+      setIsSubmittingTeam(false);
     }
   };
 
@@ -1549,6 +1610,103 @@ export default function CaptainPlayerManagement() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Team Submission Confirmation Modal */}
+      {showSubmissionModal && teamData && sportData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-[#F28C38] rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-[#4A2F1D]">Submit Team</h2>
+                  <p className="text-gray-600">Confirm team submission</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-[#4A2F1D] mb-3">Team Summary</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Team Name:</span>
+                      <span className="font-medium">{teamData.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Sport:</span>
+                      <span className="font-medium">{sportData.displayName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Total Players:</span>
+                      <span className="font-medium">{currentPlayers}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Main Players:</span>
+                      <span className="font-medium">{mainPlayers}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Substitutes:</span>
+                      <span className="font-medium">{substitutes}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Documents:</span>
+                      <span className="font-medium text-[#3A7F3F]">
+                        {players.filter(p => p.isProfileComplete).length === players.length ? 'Complete' : 'Incomplete'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-2">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium text-yellow-800">Important Notice</h4>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Once submitted, your team will be locked for verification. You won't be able to make changes until the review is complete.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-center text-gray-600">
+                  Are you sure you want to submit this team for verification?
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200">
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowSubmissionModal(false)}
+                  disabled={isSubmittingTeam}
+                  className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-lg font-semibold hover:bg-gray-300 disabled:opacity-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmSubmitTeam}
+                  disabled={isSubmittingTeam}
+                  className="flex-1 bg-[#3A7F3F] hover:bg-green-700 disabled:bg-gray-400 text-white py-3 px-6 rounded-lg font-semibold transition-colors flex items-center justify-center"
+                >
+                  {isSubmittingTeam ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Team'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

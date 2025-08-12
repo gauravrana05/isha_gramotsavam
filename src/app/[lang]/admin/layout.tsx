@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import { useRedirect } from '@/lib/utils/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import { useAuth } from '@/context/AuthContext';
@@ -10,6 +11,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   useRedirect(['admin']);
   const { user, loading } = useAuth();
 
@@ -25,10 +27,13 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <AdminSidebar />
-      <div className="flex-1 lg:ml-0 min-w-0 overflow-hidden">
+      <AdminSidebar 
+        isDesktopCollapsed={isDesktopSidebarCollapsed}
+        onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
+      />
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <div className="lg:hidden h-16"></div>
-        <main className="flex-1 relative">
+        <main className="flex-1 overflow-auto">
           {children}
         </main>
       </div>

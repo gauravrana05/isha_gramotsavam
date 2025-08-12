@@ -204,7 +204,7 @@ export default function PlayerDashboard() {
   if (authLoading || loading) {
     return (
       <PageLoader 
-        title="Loading Player Dashboard..."
+        title={t('loading_player_dashboard', 'Loading Player Dashboard...')}
         variant="brand"
         size="lg"
       />
@@ -216,13 +216,13 @@ export default function PlayerDashboard() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('error', 'Error')}</h1>
           <p className="text-gray-600 mb-4">{error}</p>
           <button 
             onClick={() => window.location.reload()}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
-            Retry
+            {t('retry', 'Retry')}
           </button>
         </div>
       </div>
@@ -244,10 +244,10 @@ export default function PlayerDashboard() {
             />
           </div>
           <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">
-            Player Dashboard
+            {t('player_dashboard', 'Player Dashboard')}
           </h1>
           <p className="text-gray-600">
-            Welcome back, {userProfile?.firstName || 'Player'}! Track your team memberships and profile.
+            {t('welcome_back_player', 'Welcome back, {name}! Track your team memberships and profile.').replace('{name}', userProfile?.firstName || 'Player')}
           </p>
         </div>
 
@@ -258,17 +258,17 @@ export default function PlayerDashboard() {
               <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
               <div className="flex-1">
                 <h3 className="text-sm font-medium text-yellow-800 font-fira">
-                  Complete Your Profile
+                  {t('complete_your_profile', 'Complete Your Profile')}
                 </h3>
                 <p className="text-sm text-yellow-700 mt-1 font-fira">
-                  Upload your documents (Profile Photo, Aadhaar Front & Back) to participate in teams.
+                  {t('upload_documents_message', 'Upload your documents (Profile Photo, Aadhaar Front & Back) to participate in teams.')}
                 </p>
               </div>
               <button
                 onClick={handleUploadDocuments}
                 className="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
-                Upload Documents
+                {t('upload_documents', 'Upload Documents')}
               </button>
             </div>
           </div>
@@ -279,7 +279,7 @@ export default function PlayerDashboard() {
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Teams</p>
+                <p className="text-gray-600 text-sm">{t('teams', 'Teams')}</p>
                 <p className="text-2xl font-bold text-[#4A2F1D]">{stats.totalTeams}</p>
               </div>
               <Users className="w-8 h-8 text-gray-400" />
@@ -289,7 +289,7 @@ export default function PlayerDashboard() {
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Verified</p>
+                <p className="text-gray-600 text-sm">{t('verified', 'Verified')}</p>
                 <p className="text-2xl font-bold text-green-600">{stats.verifiedTeams}</p>
               </div>
               <CheckCircle className="w-8 h-8 text-green-400" />
@@ -299,7 +299,7 @@ export default function PlayerDashboard() {
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Pending</p>
+                <p className="text-gray-600 text-sm">{t('pending', 'Pending')}</p>
                 <p className="text-2xl font-bold text-yellow-600">{stats.pendingTeams}</p>
               </div>
               <Clock className="w-8 h-8 text-yellow-400" />
@@ -309,7 +309,7 @@ export default function PlayerDashboard() {
           <div className="bg-white rounded-lg p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Documents</p>
+                <p className="text-gray-600 text-sm">{t('documents', 'Documents')}</p>
                 <p className="text-2xl font-bold text-gray-900">
                   {stats.documentsComplete ? '✓' : '✗'}
                 </p>
@@ -323,17 +323,17 @@ export default function PlayerDashboard() {
         {/* Teams Section */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="p-4 sm:p-6 border-b border-gray-200">
-            <h2 className="text-lg sm:text-xl font-semibold text-[#4A2F1D]">Your Teams</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-[#4A2F1D]">{t('your_teams', 'Your Teams')}</h2>
           </div>
 
           {teams.length === 0 ? (
             <div className="text-center py-12">
               <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 font-fira mb-2">
-                No team memberships
+                {t('no_team_memberships', 'No team memberships')}
               </h3>
               <p className="text-gray-600 font-fira mb-4">
-                You haven&apos;t joined any teams yet. Contact team captains to get added to teams.
+                {t('no_team_memberships_message', "You haven't joined any teams yet. Contact team captains to get added to teams.")}
               </p>
             </div>
           ) : (
@@ -343,13 +343,13 @@ export default function PlayerDashboard() {
                 <table className="w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sport</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Captain</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('team', 'Team')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('sport', 'Sport')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('captain', 'Captain')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('location', 'Location')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('status', 'Status')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('joined', 'Joined')}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions', 'Actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -377,7 +377,7 @@ export default function PlayerDashboard() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {team.joinedAt ? team.joinedAt.toDate?.() ? team.joinedAt.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date(team.joinedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unknown'}
+                          {team.joinedAt ? team.joinedAt.toDate?.() ? team.joinedAt.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date(team.joinedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : t('unknown', 'Unknown')}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button
@@ -385,7 +385,7 @@ export default function PlayerDashboard() {
                             className="text-[#F28C38] hover:text-[#E67A26] font-medium text-sm flex items-center"
                           >
                             <Eye className="w-4 h-4 mr-1" />
-                            View
+                            {t('view', 'View')}
                           </button>
                         </td>
                       </tr>
@@ -410,10 +410,10 @@ export default function PlayerDashboard() {
                     </div>
 
                     <div className="space-y-2 text-sm text-gray-600 mb-4">
-                      <div><strong>Captain:</strong> {team.captainProfile.name}</div>
-                      <div><strong>Phone:</strong> +91 {team.captainProfile.phone}</div>
-                      <div><strong>Location:</strong> {team.panchayat}, {team.district}</div>
-                      <div><strong>Joined:</strong> {team.joinedAt ? team.joinedAt.toDate?.() ? team.joinedAt.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date(team.joinedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unknown'}</div>
+                      <div><strong>{t('captain', 'Captain')}:</strong> {team.captainProfile.name}</div>
+                      <div><strong>{t('phone', 'Phone')}:</strong> +91 {team.captainProfile.phone}</div>
+                      <div><strong>{t('location', 'Location')}:</strong> {team.panchayat}, {team.district}</div>
+                      <div><strong>{t('joined', 'Joined')}:</strong> {team.joinedAt ? team.joinedAt.toDate?.() ? team.joinedAt.toDate().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date(team.joinedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : t('unknown', 'Unknown')}</div>
                     </div>
 
                     <button
@@ -421,7 +421,7 @@ export default function PlayerDashboard() {
                       className="w-full bg-[#F28C38] hover:bg-[#E67A26] text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
                     >
                       <Eye className="w-4 h-4 mr-2" />
-                      View Team
+                      {t('view_team', 'View Team')}
                     </button>
                   </div>
                 ))}

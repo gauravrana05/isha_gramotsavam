@@ -32,11 +32,23 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Disable experimental features that might conflict with PWA
+  experimental: {
+    turbo: {
+      // Disable Turbopack for development if it causes issues
+      rules: {},
+    },
+  },
 };
 
-export default withPWA({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-})(nextConfig);
+// Only apply PWA in production to avoid Turbopack conflicts
+const config = process.env.NODE_ENV === 'production' 
+  ? withPWA({
+      dest: 'public',
+      register: true,
+      skipWaiting: true,
+      disable: false,
+    })(nextConfig)
+  : nextConfig;
+
+export default config;

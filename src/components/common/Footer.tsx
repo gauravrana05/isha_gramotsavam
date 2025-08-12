@@ -44,14 +44,6 @@ export default function Footer() {
               </li>
               <li>
                 <Link 
-                  href="/en/public/cultural" 
-                  className="text-gray-300 hover:text-[#F28C38] transition-colors"
-                >
-                  Cultural Events
-                </Link>
-              </li>
-              <li>
-                <Link 
                   href="/en/public/about" 
                   className="text-gray-300 hover:text-[#F28C38] transition-colors"
                 >

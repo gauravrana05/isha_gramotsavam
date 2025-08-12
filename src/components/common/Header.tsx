@@ -5,6 +5,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ChevronDown, Menu, X } from 'lucide-react'
+import LanguageSelector from './LanguageSelector'
 
 interface HeaderProps {
   lang: string
@@ -12,7 +13,6 @@ interface HeaderProps {
 
 export default function Header({ lang }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false)
   const [isSportsDropdownOpen, setIsSportsDropdownOpen] = useState(false)
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen)
@@ -28,7 +28,7 @@ export default function Header({ lang }: HeaderProps) {
             <div className="flex items-center">
               <Link href={`/${lang}/public`} className="flex items-center">
                 <Image
-                  src="/images/logos/isha_gramotsavam.png"
+                  src="/images/logos/light.png"
                   alt="Isha Gramotsavam"
                   width={80}
                   height={80}
@@ -92,39 +92,12 @@ export default function Header({ lang }: HeaderProps) {
                 Profile
               </Link>
 
-              {/* Language Dropdown */}
-              <div className="relative">
-                <button
-                  className="flex items-center space-x-1 text-white hover:text-[#F28C38] transition-colors duration-200"
-                  onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
-                >
-                  <span className="font-medium">English</span>
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-
-                {isLanguageDropdownOpen && (
-                  <div className="absolute top-full right-0 mt-1 w-32 bg-white shadow-lg rounded-md border border-gray-200 py-2 z-50">
-                    <Link
-                      href="/en/public"
-                      className="block px-4 py-2 text-gray-800 hover:bg-[#F3F0E5] hover:text-[#F28C38] transition-colors"
-                    >
-                      English
-                    </Link>
-                    <Link
-                      href="/ta/public"
-                      className="block px-4 py-2 text-gray-800 hover:bg-[#F3F0E5] hover:text-[#F28C38] transition-colors"
-                    >
-                      தமிழ்
-                    </Link>
-                    <Link
-                      href="/hi/public"
-                      className="block px-4 py-2 text-gray-800 hover:bg-[#F3F0E5] hover:text-[#F28C38] transition-colors"
-                    >
-                      हिंदी
-                    </Link>
-                  </div>
-                )}
-              </div>
+              {/* Language Selector */}
+              <LanguageSelector 
+                variant="medium" 
+                className="w-40 text-sm" 
+                showNativeNames={true}
+              />
             </nav>
           </div>
         </div>
@@ -136,7 +109,7 @@ export default function Header({ lang }: HeaderProps) {
           {/* Mobile Logo */}
           <Link href={`/${lang}/public`} className="flex items-center">
             <Image
-              src="/images/logos/isha_gramotsavam.png"
+              src="/images/logos/light.png"
               alt="Isha Gramotsavam"
               width={40}
               height={40}
@@ -146,41 +119,11 @@ export default function Header({ lang }: HeaderProps) {
 
           <div className="flex items-center space-x-4">
             {/* Mobile Language Selector */}
-            <div className="relative">
-              <button
-                className="flex items-center space-x-1 text-white"
-                onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
-              >
-                <span className="text-sm">English</span>
-                <ChevronDown className="w-3 h-3" />
-              </button>
-
-              {isLanguageDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1 w-24 bg-white shadow-lg rounded-md border border-gray-200 py-1 z-50">
-                  <Link
-                    href="/en/public"
-                    className="block px-3 py-2 text-xs text-gray-800 hover:bg-[#F3F0E5]"
-                    onClick={() => setIsLanguageDropdownOpen(false)}
-                  >
-                    English
-                  </Link>
-                  <Link
-                    href="/ta/public"
-                    className="block px-3 py-2 text-xs text-gray-800 hover:bg-[#F3F0E5]"
-                    onClick={() => setIsLanguageDropdownOpen(false)}
-                  >
-                    தமிழ்
-                  </Link>
-                  <Link
-                    href="/hi/public"
-                    className="block px-3 py-2 text-xs text-gray-800 hover:bg-[#F3F0E5]"
-                    onClick={() => setIsLanguageDropdownOpen(false)}
-                  >
-                    हिंदी
-                  </Link>
-                </div>
-              )}
-            </div>
+            <LanguageSelector 
+              variant="small" 
+              className="w-32 text-xs" 
+              showNativeNames={true}
+            />
 
             {/* Mobile Menu Button */}
             <button

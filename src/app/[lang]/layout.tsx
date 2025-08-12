@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
-
-type LanguageCode = "en" | "ta" | "hi" | "ml" | "te" | "kn" | "or";
+import { redirect } from "next/navigation";
+import { LanguageCode, DEFAULT_LANGUAGE, isValidLanguageCode } from "@/lib/utils/i18n-server";
 
 // Define SegmentParams to match your route's params
 interface SegmentParams {
@@ -17,7 +17,18 @@ interface LayoutProps {
 export default async function LangLayout({ children, params }: LayoutProps) {
   // Await the params Promise to get the actual object
   const { lang } = await params;
+  
+  // Validate language parameter
+  if (!isValidLanguageCode(lang)) {
+    console.warn(`Invalid language code: ${lang}, redirecting to default language`);
+    redirect(`/${DEFAULT_LANGUAGE}`);
+  }
+
   console.log("Rendering [lang]/layout.tsx for", lang);
+  
+  // Note: We don't set document.lang here as this runs server-side
+  // The lang attribute will be set in the root layout
+  
   return <>{children}</>;
 }
 

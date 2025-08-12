@@ -453,13 +453,13 @@ export default function ProfilePage() {
 
         <div className="text-center mb-8">
           <div className="mb-4">
-            <Image
-              src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg"
+            {/* <Image
+              src="/images/logos/dark.png"
               alt="Isha Logo"
-              width={63}
-              height={63}
-              className="mx-auto"
-            />
+              width={0}
+              height={80}
+              className="mx-auto pb-8"
+            /> */}
           </div>
           <h1 className="text-3xl font-semibold font-fira flex items-center justify-center space-x-2">
             <User className="w-8 h-8" />
@@ -921,7 +921,7 @@ export default function ProfilePage() {
                 label="Aadhar Card Front"
                 currentUrl={userProfile?.documents?.aadhaarFront?.url}
                 variant="card"
-                className="flex flex-col justify-center items-center"
+                className="flex flex-col justify-center items-center font-fira"
                 onSuccess={() => setError("")}
                 onError={(error) => setError(error)}
               />
@@ -932,7 +932,7 @@ export default function ProfilePage() {
                 label="Aadhar Card Back"
                 currentUrl={userProfile?.documents?.aadhaarBack?.url}
                 variant="card"
-                className="flex flex-col justify-center items-center"
+                className="flex flex-col justify-center items-center font-fira"
                 onSuccess={() => setError("")}
                 onError={(error) => setError(error)}
               />

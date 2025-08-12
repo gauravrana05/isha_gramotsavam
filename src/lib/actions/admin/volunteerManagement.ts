@@ -1,7 +1,8 @@
 'use server'
 
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, adminAuth } from '@/lib/firebase/admin';
 import { revalidatePath } from 'next/cache';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export async function addVolunteer(formData: FormData) {
   try {
@@ -30,35 +31,111 @@ export async function addVolunteer(formData: FormData) {
       };
     }
 
-    // Check if user with phone number already exists
-    const existingUserByPhone = await adminDb.collection('users')
-      .where('phoneNumber', '==', phoneNumber)
-      .get();
-
-    if (!existingUserByPhone.empty) {
+    // Validate and format phone number
+    const cleanPhone = phoneNumber.replace(/^\+91/, '').replace(/\D/g, '');
+    if (cleanPhone.length !== 10) {
       return {
         success: false,
-        error: 'A user with this phone number already exists'
+        error: 'Invalid phone number: Must be 10 digits'
       };
     }
+    const formattedPhone = `+91${cleanPhone}`;
 
-    // Check if user with email already exists
-    const existingUserByEmail = await adminDb.collection('users')
-      .where('email', '==', email)
-      .get();
+    let userId: string;
+    let existingUser = false;
 
-    if (!existingUserByEmail.empty) {
-      return {
-        success: false,
-        error: 'A user with this email already exists'
-      };
+    // Default documents structure for new users
+    const defaultDocuments = {
+      profilePhoto: {
+        storagePath: '',
+        url: null,
+        verified: false,
+        uploadedAt: null,
+        uploadedBy: null,
+      },
+      aadhaarFront: {
+        storagePath: '',
+        url: null,
+        verified: false,
+        uploadedAt: null,
+        uploadedBy: null,
+      },
+      aadhaarBack: {
+        storagePath: '',
+        url: null,
+        verified: false,
+        uploadedAt: null,
+        uploadedBy: null,
+      },
+    };
+
+    // Check if user exists in Firebase Authentication
+    try {
+      console.log("coming here):");
+      const existingAuthUser = await adminAuth.getUserByPhoneNumber(formattedPhone);
+      console.log("didnt reach here");
+      userId = existingAuthUser.uid;
+      existingUser = true;
+
+      // Check if user already has volunteer role
+      const userDoc = await adminDb.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        if (userData?.role === 'volunteer' || validRoles.includes(userData?.role)) {
+          return {
+            success: false,
+            error: 'A volunteer with this phone number already exists'
+          };
+        }
+      }
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        // Create new Firebase Auth user
+        const userRecord = await adminAuth.createUser({
+          phoneNumber: formattedPhone,
+          displayName: `${firstName} ${lastName}`,
+          email: email,
+          disabled: false,
+        });
+        userId = userRecord.uid;
+        existingUser = false;
+      } else {
+        console.error('Error checking existing user:', error);
+        return {
+          success: false,
+          error: 'Error checking existing user'
+        };
+      }
+    }
+
+    // Check if user with email already exists (but only for new users)
+    if (!existingUser) {
+      const existingUserByEmail = await adminDb.collection('users')
+        .where('email', '==', email)
+        .get();
+
+      if (!existingUserByEmail.empty) {
+        // If we created a new Firebase Auth user, clean it up
+        if (!existingUser) {
+          try {
+            await adminAuth.deleteUser(userId);
+          } catch (cleanupError) {
+            console.error('Error cleaning up created user:', cleanupError);
+          }
+        }
+        return {
+          success: false,
+          error: 'A user with this email already exists'
+        };
+      }
     }
 
     // Create volunteer user document
     const volunteerData = {
+      uid: userId,
       firstName,
       lastName,
-      phoneNumber,
+      phoneNumber: cleanPhone,
       whatsappNumber,
       email,
       role,
@@ -74,36 +151,41 @@ export async function addVolunteer(formData: FormData) {
         canVerifyDocuments: role === 'verification_volunteer',
         canAccessVenues: true,
       },
+      // Documents structure
+      documents: defaultDocuments,
       // Metadata
       addedBy: 'admin',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     };
 
-    // Add to users collection
-    const userRef = await adminDb.collection('users').add(volunteerData);
+    // Add/Update user document using the Firebase Auth user ID
+    await adminDb.collection('users').doc(userId).set(volunteerData, { merge: true });
 
     // Create audit log
     await adminDb.collection('auditLogs').add({
       action: 'volunteer_added',
       targetType: 'user',
-      targetId: userRef.id,
+      targetId: userId,
       performedBy: 'admin',
       details: {
         volunteerName: `${firstName} ${lastName}`,
         role,
         email,
-        phoneNumber
+        phoneNumber: cleanPhone
       },
-      timestamp: new Date()
+      timestamp: FieldValue.serverTimestamp()
     });
 
     revalidatePath('/admin/users/volunteers');
 
+    console.log(`Volunteer ${userId} ${existingUser ? 'updated' : 'created'} successfully`);
+
     return {
       success: true,
-      message: 'Volunteer added successfully',
-      volunteerId: userRef.id
+      message: existingUser ? 'Existing user updated with volunteer role' : 'Volunteer added successfully',
+      volunteerId: userId,
+      existed: existingUser
     };
   } catch (error) {
     console.error('Error adding volunteer:', error);

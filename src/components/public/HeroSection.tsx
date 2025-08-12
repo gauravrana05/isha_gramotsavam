@@ -5,12 +5,15 @@ import Link from 'next/link'
 import Image from 'next/image'
 import Button from '../ui/Button'
 import Container from '../ui/Container'
+import { useTranslation } from '@/lib/utils/i18n'
 
 interface HeroSectionProps {
   lang: string
 }
 
 export default function HeroSection({ lang }: HeroSectionProps) {
+  const { t } = useTranslation();
+  
   const scrollToSports = () => {
     const sportsSection = document.getElementById('sports-preview');
     if (sportsSection) {
@@ -71,15 +74,15 @@ export default function HeroSection({ lang }: HeroSectionProps) {
             {/* Actual Text Content */}
             <div className="relative z-10">
               <h1 className="font-fira text-4xl font-extrabold text-black md:text-5xl lg:text-4xl">
-                Isha Gramotsavam
+                {t('hero_title', 'Isha Gramotsavam')}
               </h1>
 
               <div className="font-fira mb-6 text-xl font-semibold text-black md:text-2xl">
-                Sporting Spirit of Bharat
+                {t('hero_subtitle', 'Sporting Spirit of Bharat')}
               </div>
 
               <p className="font-fira md:text-md mx-auto mb-8 max-w-3xl text-lg leading-relaxed text-[#4A2F1D] md:mx-36">
-                Aims to rejuvenate the spirit of rural India and foster a sense of community, tradition and healthy competition
+                {t('hero_description', 'Aims to rejuvenate the spirit of rural India and foster a sense of community, tradition and healthy competition')}
               </p>
 
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -89,7 +92,7 @@ export default function HeroSection({ lang }: HeroSectionProps) {
                   className="min-w-[200px]"
                   onClick={scrollToSports}
                 >
-                  Register Now
+                  {t('register_now', 'Register Now')}
                 </Button>
               </div>
             </div>

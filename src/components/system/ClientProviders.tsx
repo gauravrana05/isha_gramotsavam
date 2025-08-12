@@ -19,24 +19,24 @@ const OfflineIndicator = dynamic(() => import("@/components/system/OfflineIndica
 const ClientProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <ErrorBoundary>
-      <LanguageProvider>
-        <ClientOnly>
-          <LoadingProvider>
-            <ThemeProvider>
-              <OfflineProvider>
-                <AuthProvider>
+      <ClientOnly>
+        <LoadingProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <LanguageProvider>
+                <OfflineProvider>
                   <DocumentProvider>
                     <NotificationProvider>
                       <OfflineIndicator />
                       {children}
                     </NotificationProvider>
                   </DocumentProvider>
-                </AuthProvider>
-              </OfflineProvider>
-            </ThemeProvider>
-          </LoadingProvider>
-        </ClientOnly>
-      </LanguageProvider>
+                </OfflineProvider>
+              </LanguageProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </LoadingProvider>
+      </ClientOnly>
     </ErrorBoundary>
   );
 };

@@ -124,7 +124,10 @@ export default function CaptainDashboard() {
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-2" />
+          <p className="text-gray-600">{t('loading_captain_dashboard', 'Loading Captain Dashboard...')}</p>
+        </div>
       </div>
     );
   }
@@ -134,13 +137,13 @@ export default function CaptainDashboard() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('error', 'Error')}</h1>
           <p className="text-gray-600 mb-4">{error}</p>
           <button 
             onClick={() => window.location.reload()}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
-            Retry
+            {t('retry', 'Retry')}
           </button>
         </div>
       </div>
@@ -162,10 +165,10 @@ export default function CaptainDashboard() {
             />
           </div>
           <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">
-            Captain Dashboard
+            {t('captain_dashboard', 'Captain Dashboard')}
           </h1>
           <p className="text-gray-600">
-            Welcome back, {userProfile?.firstName || 'Captain'}! Manage your teams and players.
+            {t('welcome_back_captain', 'Welcome back, {name}! Manage your teams and players.').replace('{name}', userProfile?.firstName || 'Captain')}
           </p>
         </div>
 
@@ -180,7 +183,7 @@ export default function CaptainDashboard() {
                   <div className="flex flex-col sm:flex-row  sm:items-center gap-4 text-sm text-gray-600">
                   <span className="flex capitalize items-center gap-1">
                   {teams[0].gender === 'F' ? <UserRound className='w-4 h-4'/> : <User className='w-4 h-4'/>} 
-                    {teams[0].gender === 'F' ? 'Women' : 'Men'}</span>
+                    {teams[0].gender === 'F' ? t('women', 'Women') : t('men', 'Men')}</span>
                     
                     <span className="flex  items-center gap-1">
                       <Trophy className="w-4 h-4" />
@@ -207,27 +210,27 @@ export default function CaptainDashboard() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-lg border p-4 text-center">
                 <div className="text-2xl font-bold text-blue-600">{teams[0].currentPlayers || 0}</div>
-                <div className="text-sm text-gray-600">Players Registered</div>
+                <div className="text-sm text-gray-600">{t('players_registered', 'Players Registered')}</div>
               </div>
               <div className="bg-white rounded-lg border p-4 text-center">
                 <div className="text-2xl font-bold text-purple-600">{teams[0].maxPlayers}</div>
-                <div className="text-sm text-gray-600">Main Players</div>
+                <div className="text-sm text-gray-600">{t('main_players', 'Main Players')}</div>
               </div>
               <div className="bg-white rounded-lg border p-4 text-center">
                 <div className="text-2xl font-bold text-orange-600">🏟️</div>
-                <div className="text-sm text-gray-600">Venue TBD</div>
+                <div className="text-sm text-gray-600">{t('venue_tbd', 'Venue TBD')}</div>
               </div>
               <div className="bg-white rounded-lg border p-4 text-center">
                 <div className="text-2xl font-bold text-green-600">📅</div>
-                <div className="text-sm text-gray-600">Fixtures Soon</div>
+                <div className="text-sm text-gray-600">{t('fixtures_soon', 'Fixtures Soon')}</div>
               </div>
             </div>
           </div>
         ) : (
           <div className="bg-white rounded-lg border p-8 text-center">
             <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Team Found</h3>
-            <p className="text-gray-600">You don&apos;t have any team registered yet.</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('no_team_found', 'No Team Found')}</h3>
+            <p className="text-gray-600">{t('no_team_registered_message', "You don't have any team registered yet.")}</p>
           </div>
         )}
       </div>

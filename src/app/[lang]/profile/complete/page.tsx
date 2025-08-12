@@ -10,7 +10,7 @@ import { useTranslation } from "@/lib/utils/i18n";
 import { getDashboardRoute } from "@/lib/utils/navigation";
 import { checkAndUpdateProfileCompletion } from "@/lib/actions/profile/checkProfileCompletion";
 import Image from "next/image";
-import { Camera, Upload, Check, Loader2, MapPin } from "lucide-react";
+import { Camera, Upload, Check,ArrowLeft, Loader2, MapPin, LogOut } from "lucide-react";
 import { LoadingSpinner, PageLoader, SectionLoader } from "@/components/ui/loaders";
 import { DocumentUpload } from "@/components/documents";
 
@@ -56,7 +56,7 @@ export default function CompleteProfilePage() {
 
   const router = useRouter();
   const { lang } = useParams();
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const { user, userProfile, loading: authLoading, logout } = useAuth();
   const { t } = useTranslation();
 
 
@@ -261,7 +261,14 @@ export default function CompleteProfilePage() {
       setAddressLoading(false);
     }
   };
-
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push(`/${lang}/login`);
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
   const handleSubmit = async () => {
     if (!user) return;
 
@@ -350,15 +357,31 @@ export default function CompleteProfilePage() {
   return (
     <div className="min-h-screen bg-isha">
       <div className="max-w-4xl mx-auto p-4 py-8 bg-isha">
+      <div className="mb-6 flex justify-between">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center space-x-2 text-gray-600 hover:text-[#CE4520] transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-fira">Back</span>
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-2 text-gray-600 hover:text-red-600 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="font-fira">Logout</span>
+          </button>
+        </div>
         <div className="text-center mb-8">
           <div className="mb-4">
-            <Image 
-              src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" 
+            {/* <Image 
+              src="/images/logos/dark.png"
               alt="Isha Logo" 
-              width={80} 
+              width={180} 
               height={80} 
-              className="mx-auto"
-            />
+              className="mx-auto pb-10"
+            /> */}
           </div>
           <h1 className="text-3xl font-semibold font-fira mb-2">Complete Your Profile</h1>
           <p className="text-gray-600 font-fira">Please provide the following information to complete your profile</p>

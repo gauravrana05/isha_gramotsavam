@@ -19,7 +19,6 @@ export default function CaptainLayout({
         title="Loading Captain Dashboard..."
         variant="brand"
         size="lg"
-        className='bg-white'
       />
     );
   }

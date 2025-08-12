@@ -31,6 +31,51 @@ export {
   default as DataTableComponent
 } from './DataTable';
 
+// Advanced Table Components
+export { 
+  Table,
+  default as TableComponent,
+  type Column,
+  type ActionButton,
+  type SortConfig,
+  type PaginationConfig,
+  type FilterConfig,
+  type TableState,
+  type TableProps
+} from './Table';
+
+export { 
+  FilterSidebar,
+  default as FilterSidebarComponent,
+  type FilterField,
+  type FilterOption,
+  type ActiveFilter,
+  type FilterSidebarProps
+} from './FilterSidebar';
+
+export { 
+  TableControls,
+  default as TableControlsComponent,
+  type ExportConfig,
+  type BulkAction,
+  type ViewConfig,
+  type TableControlsProps
+} from './TableControls';
+
+export { 
+  Pagination,
+  default as PaginationComponent,
+  type PaginationProps
+} from './Pagination';
+
+export { 
+  AdvancedTable,
+  default as AdvancedTableComponent,
+  type AdvancedTableConfig,
+  type TableParams,
+  type AdvancedTableProps
+} from './AdvancedTable';
+
 export { 
   StatsCard,
   SingleStatCard,

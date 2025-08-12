@@ -40,7 +40,7 @@ export default function CaptainSidebar({ className = '' }: CaptainSidebarProps) 
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   
   const pathname = usePathname();
-  const { lang } = useParams();
+  const { lang,teamId } = useParams();
   const { user, userProfile } = useAuth();
 
   const navigation: NavItem[] = [
@@ -51,7 +51,7 @@ export default function CaptainSidebar({ className = '' }: CaptainSidebarProps) 
     },
     {
       name: 'My Team',
-      href: `/${lang}/captain/teams`,
+      href: `/${lang}/captain/teams/${teamId}`,
       icon: Users,
     },
     {

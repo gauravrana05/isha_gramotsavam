@@ -7,12 +7,15 @@ import { db } from '@/lib/firebase/config';
 import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { 
   Container,
-  DataTable,
+  AdvancedTable,
   StatsCard,
   StatusBadge,
-  EmptyState,
   ConfirmationModal,
-  Button
+  Button,
+  type Column,
+  type ActionButton,
+  type FilterField,
+  type ExportConfig
 } from '@/components/ui';
 import { 
   Plus, 
@@ -22,10 +25,10 @@ import {
   Edit,
   Eye,
   Trash2,
-  Loader2
+  Loader2,
+  Download
 } from 'lucide-react';
 import { getVenueStatus } from '@/components/ui/StatusBadge';
-import type { Column, ActionButton } from '@/components/ui/DataTable';
 
 interface SimplifiedVenue {
   venueId: string;
@@ -153,21 +156,30 @@ export default function VenuesManagement() {
     }
   };
 
-  // Define table columns for DataTable
+  // Define table columns for AdvancedTable (venue, type, location, actions)
   const columns: Column<SimplifiedVenue>[] = [
     {
       key: 'name',
       header: 'Venue',
+      accessor: 'name',
+      sortable: true,
+      priority: 'high',
+      width: '180px',
+      minWidth: '160px',
       render: (_, venue) => (
         <div>
           <div className="text-sm font-medium text-gray-900">{venue.name}</div>
-          <div className="text-sm text-gray-500">{venue.shortName}</div>
+          <div className="text-xs text-gray-500">{venue.shortName}</div>
         </div>
       ),
     },
     {
       key: 'type',
       header: 'Type',
+      accessor: 'type',
+      sortable: true,
+      priority: 'high',
+      width: '100px',
       render: (_, venue) => (
         <StatusBadge 
           status={venue.type === 'cluster' ? 'info' : venue.type === 'division' ? 'success' : 'warning'}
@@ -179,6 +191,9 @@ export default function VenuesManagement() {
     {
       key: 'location',
       header: 'Location',
+      accessor: 'district',
+      sortable: true,
+      priority: 'high',
       render: (_, venue) => (
         <div>
           <div className="text-sm text-gray-900">{venue.district}, {venue.state}</div>
@@ -186,31 +201,9 @@ export default function VenuesManagement() {
         </div>
       ),
     },
-    {
-      key: 'sports',
-      header: 'Sports',
-      render: (_, venue) => `${venue.supportedSports?.length || 0} sport${(venue.supportedSports?.length || 0) !== 1 ? 's' : ''}`,
-    },
-    {
-      key: 'contact',
-      header: 'Contact',
-      render: (_, venue) => (
-        <div>
-          <div className="text-sm text-gray-900">{venue.primaryContact?.name || 'N/A'}</div>
-          <div className="text-xs text-gray-500">{venue.primaryContact?.phone || 'N/A'}</div>
-        </div>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (_, venue) => (
-        <StatusBadge status={getVenueStatus(venue)} />
-      ),
-    },
   ];
 
-  // Define action buttons for DataTable
+  // Define action buttons for AdvancedTable
   const actions: ActionButton<SimplifiedVenue>[] = [
     {
       label: 'View',
@@ -229,7 +222,6 @@ export default function VenuesManagement() {
       icon: UserPlus,
       onClick: (venue) => router.push(`/${lang}/admin/venues/${venue.venueId}/volunteers`),
       variant: 'success',
-      hideOnMobile: true,
     },
     {
       label: 'Deactivate',
@@ -237,6 +229,59 @@ export default function VenuesManagement() {
       onClick: handleDeleteClick,
       variant: 'danger',
       loading: (venue) => deletingVenue === venue.venueId,
+    },
+  ];
+
+  // Define filters specific to venues (only district and venue type)
+  const venueFilters: FilterField[] = [
+    {
+      key: 'type',
+      label: 'Venue Type',
+      type: 'select',
+      options: [
+        { label: 'Cluster', value: 'cluster' },
+        { label: 'Division', value: 'division' },
+        { label: 'Final', value: 'final' },
+      ],
+    },
+    {
+      key: 'district',
+      label: 'District',
+      type: 'text',
+      placeholder: 'Enter district name',
+    },
+  ];
+
+  // Define export options specific to venues
+  const exportOptions: ExportConfig[] = [
+    {
+      label: 'Export CSV',
+      format: 'csv',
+      onExport: () => {
+        const csvContent = [
+          ['Venue Name', 'Short Name', 'Type', 'District', 'State', 'Pincode', 'Sports Count', 'Status', 'Contact Name', 'Contact Phone'].join(','),
+          ...venues.map(venue => [
+            venue.name,
+            venue.shortName,
+            venue.type,
+            venue.district,
+            venue.state,
+            venue.pincode,
+            venue.supportedSports?.length || 0,
+            venue.currentStatus,
+            venue.primaryContact?.name || '',
+            venue.primaryContact?.phone || ''
+          ].join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `venues_export_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      },
     },
   ];
 
@@ -277,38 +322,69 @@ export default function VenuesManagement() {
   }
 
   return (
-    <Container>
-      <div className="max-w-7xl mx-auto py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 font-fira">Venues Management</h1>
-            <p className="text-gray-600 text-sm font-roboto">Manage sports venues and facilities</p>
-          </div>
-          
-          <Button
-            onClick={() => router.push(`/${lang}/admin/venues/create`)}
-            leftIcon={Plus}
-            variant="primary"
-            size="base"
-          >
-            Add Venue
-          </Button>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 font-fira">Venues Management</h1>
+          <p className="text-gray-600 text-sm font-roboto">Manage sports venues and facilities</p>
         </div>
+        
+        <Button
+          onClick={() => router.push(`/${lang}/admin/venues/create`)}
+          leftIcon={Plus}
+          variant="primary"
+          size="base"
+        >
+          Add Venue
+        </Button>
+      </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-600 font-roboto">{error}</p>
-          </div>
-        )}
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-600 font-roboto">{error}</p>
+        </div>
+      )}
 
-        {/* Data Table with Mobile-First Design */}
-        <DataTable
+        {/* Advanced Table with all features */}
+        <AdvancedTable
           data={venues}
           columns={columns}
           actions={actions}
           loading={loading}
+          
+          // Search functionality
+          searchable={true}
+          searchPlaceholder="Search venues by name, location, or contact..."
+          
+          // Filter functionality
+          filterable={true}
+          filters={venueFilters}
+          
+          // Sort functionality
+          sortable={true}
+          multiSort={true}
+          defaultSort={[{ key: 'name', direction: 'asc' }]}
+          
+          // Pagination
+          pagination={{
+            enabled: true,
+            pageSize: 25,
+            pageSizeOptions: [10, 25, 50, 100]
+          }}
+          
+          // Export options
+          exportOptions={exportOptions}
+          
+          // Selection (for future bulk actions)
+          selectable={false}
+          
+          // State persistence in URL
+          persistState={true}
+          stateKey="venues"
+          
+          // Empty state
           emptyState={{
             icon: MapPin,
             title: 'No venues found',
@@ -318,33 +394,34 @@ export default function VenuesManagement() {
               onClick: () => router.push(`/${lang}/admin/venues/create`),
             },
           }}
+          
           keyExtractor={(venue) => venue.venueId}
+          stickyHeader={true}
         />
 
-        {/* Stats Cards */}
-        {statsData.length > 0 && (
-          <div className="mt-8">
-            <StatsCard 
-              stats={statsData}
-              columns={4}
-              size="base"
-              showBorder
-            />
-          </div>
-        )}
+      {/* Stats Cards */}
+      {statsData.length > 0 && (
+        <div className="mt-8">
+          <StatsCard 
+            stats={statsData}
+            columns={4}
+            size="base"
+            showBorder
+          />
+        </div>
+      )}
 
-        {/* Confirmation Modal */}
-        <ConfirmationModal
-          isOpen={confirmDelete.isOpen}
-          onClose={() => setConfirmDelete({ isOpen: false, venue: null })}
-          onConfirm={handleDeleteConfirm}
-          title="Deactivate Venue"
-          description={`Are you sure you want to deactivate "${confirmDelete.venue?.name}"? This action will make the venue unavailable for new bookings.`}
-          confirmLabel="Deactivate"
-          confirmVariant="danger"
-          loading={deletingVenue !== null}
-        />
-      </div>
-    </Container>
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmDelete.isOpen}
+        onClose={() => setConfirmDelete({ isOpen: false, venue: null })}
+        onConfirm={handleDeleteConfirm}
+        title="Deactivate Venue"
+        description={`Are you sure you want to deactivate "${confirmDelete.venue?.name}"? This action will make the venue unavailable for new bookings.`}
+        confirmLabel="Deactivate"
+        confirmVariant="danger"
+        loading={deletingVenue !== null}
+      />
+    </div>
   );
 }

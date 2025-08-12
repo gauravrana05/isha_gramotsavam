@@ -83,9 +83,17 @@ export async function addPlayerToTeam({ teamId, playerData, captainId }: AddPlay
     }
 
     // Validate phone number
-    const cleanPhone = playerData.phone.replace(/^\+91/, '').replace(/\D/g, '');
+    let cleanPhone = playerData.phone.replace(/\D/g, ''); // Remove all non-digits first
+    
+    // Handle different phone number formats
+    if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+      cleanPhone = cleanPhone.substring(2); // Remove country code
+    } else if (cleanPhone.length === 13 && cleanPhone.startsWith('911')) {
+      cleanPhone = cleanPhone.substring(3); // Remove 911 prefix
+    }
+    
     if (cleanPhone.length !== 10) {
-      return { success: false, error: { code: 'invalid-phone', message: 'Invalid phone number: Must be 10 digits' } };
+      return { success: false, error: { code: 'invalid-phone', message: `Invalid phone number: Expected 10 digits, got ${cleanPhone.length} (${cleanPhone})` } };
     }
     const formattedPhone = `+91${cleanPhone}`;
 

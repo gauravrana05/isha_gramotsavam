@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import Button from "@/components/ui/Button";
 import { AlertTriangle } from "lucide-react";
-import { useTranslation } from "@/lib/utils/i18n";
 
 export default function Error({
   error,
@@ -12,8 +11,6 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const { t } = useTranslation();
-
   useEffect(() => {
     console.error("Server-side error:", error);
   }, [error]);
@@ -25,17 +22,17 @@ export default function Error({
           <AlertTriangle className="w-8 h-8 text-white" />
         </div>
         <h2 className="text-2xl font-bold text-gray-900 font-roboto mb-4">
-          {t("error_generic")}
+          Something went wrong
         </h2>
-        <p className="text-gray-600 font-roboto mb-6">{error.message || t("error_generic")}</p>
+        <p className="text-gray-600 font-roboto mb-6">{error.message || "An unexpected error occurred"}</p>
         <Button
           onClick={reset}
           className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-medium ripple"
           variant="primary"
           size="lg"
-          aria-label={t("try_again")}
+          aria-label="Try again"
         >
-          {t("try_again")}
+          Try Again
         </Button>
       </div>
     </div>
