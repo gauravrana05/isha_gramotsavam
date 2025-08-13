@@ -72,7 +72,7 @@ const SectionLoader: React.FC<SectionLoaderProps> = ({
         <span className={`
           ${textSizes[size]} 
           text-gray-600 dark:text-gray-400 
-          font-roboto
+          font-fira
           ${variant === 'inline' ? '' : 'text-center'}
         `}>
           {message}

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { getAdminUsers } from '@/lib/actions/admin/optimizedUserQueries';
+import { addVolunteer } from '@/lib/actions/admin/volunteerManagement';
 import {
   Plus, 
   UserCheck,
@@ -50,6 +51,201 @@ interface AdminVolunteerRow {
   createdAt: string | null;
 }
 
+interface AddVolunteerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function AddVolunteerModal({ isOpen, onClose, onSuccess }: AddVolunteerModalProps) {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [sameAsWhatsapp, setSameAsWhatsapp] = useState(true);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const formData = new FormData(e.currentTarget);
+      formData.set('sameAsWhatsapp', sameAsWhatsapp.toString());
+      
+      // Set role based on verification checkbox
+      const isVerificationVolunteer = formData.get('isVerificationVolunteer') === 'on';
+      formData.set('role', isVerificationVolunteer ? 'verification_volunteer' : 'general_volunteer');
+      
+      const result = await addVolunteer(formData);
+      
+      if (result.success) {
+        onSuccess();
+        onClose();
+        e.currentTarget.reset();
+        setSameAsWhatsapp(true);
+      } else {
+        setError(result.error || 'Failed to add volunteer');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to add volunteer');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
+        <h3 className="text-lg font-semibold mb-4">Add New Volunteer</h3>
+        
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Personal Information */}
+          <div>
+            <h4 className="text-md font-medium text-gray-900 mb-3">Personal Information</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">First Name *</label>
+                <input 
+                  name="firstName" 
+                  required 
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                  placeholder="Enter first name"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Last Name *</label>
+                <input 
+                  name="lastName" 
+                  required 
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                  placeholder="Enter last name"
+                />
+              </div>
+            </div>
+            
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-2">Gender *</label>
+              <select 
+                name="gender" 
+                required 
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+              >
+                <option value="">Select Gender</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="O">Other</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Contact Information */}
+          <div>
+            <h4 className="text-md font-medium text-gray-900 mb-3">Contact Information</h4>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Phone Number *</label>
+                <input 
+                  name="phoneNumber" 
+                  type="tel"
+                  required 
+                  pattern="[+]?[0-9\s\-\(\)]*"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                  placeholder="+91 9876543210"
+                />
+              </div>
+              
+              <div>
+                <div className="flex items-center mb-2">
+                  <input
+                    type="checkbox"
+                    id="sameAsWhatsapp"
+                    checked={sameAsWhatsapp}
+                    onChange={(e) => setSameAsWhatsapp(e.target.checked)}
+                    className="h-4 w-4 text-[#F28C38] focus:ring-[#F28C38] border-gray-300 rounded"
+                  />
+                  <label htmlFor="sameAsWhatsapp" className="ml-2 block text-sm text-gray-700">
+                    WhatsApp number is same as phone number
+                  </label>
+                </div>
+                
+                {!sameAsWhatsapp && (
+                  <input
+                    name="whatsappNumber"
+                    type="tel"
+                    required={!sameAsWhatsapp}
+                    pattern="[+]?[0-9\s\-\(\)]*"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                    placeholder="+91 9876543210"
+                  />
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Email Address *</label>
+                <input 
+                  name="email" 
+                  type="email"
+                  required 
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                  placeholder="volunteer@example.com"
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Volunteer Type */}
+          <div>
+            <h4 className="text-md font-medium text-gray-900 mb-3">Volunteer Type</h4>
+            
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isVerificationVolunteer"
+                name="isVerificationVolunteer"
+                className="h-4 w-4 text-[#F28C38] focus:ring-[#F28C38] border-gray-300 rounded"
+              />
+              <label htmlFor="isVerificationVolunteer" className="ml-2 block text-sm text-gray-700">
+                Verification Volunteer
+              </label>
+            </div>
+            <p className="mt-2 text-sm text-gray-500">
+              If checked, volunteer will handle document verification and player eligibility. If not checked, volunteer will be assigned as General Volunteer (can be changed to Technical during venue assignment).
+            </p>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-2 text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F28C38] disabled:opacity-50"
+            >
+              {loading ? 'Adding...' : 'Add Volunteer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function VolunteersManagement() {
   const router = useRouter();
   const { lang } = useParams();
@@ -59,6 +255,7 @@ export default function VolunteersManagement() {
   const [error, setError] = useState<string>('');
   const [volunteers, setVolunteers] = useState<AdminVolunteerRow[]>([]);
   const [total, setTotal] = useState<number>(0);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Load volunteers data with volunteer role filter
   const loadVolunteers = useCallback(async () => {
@@ -319,12 +516,13 @@ export default function VolunteersManagement() {
               Assign Venues
             </button>
           </Link>
-          <Link href={`/${lang}/admin/users/volunteers/add`}>
-            <button className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F28C38]">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Volunteer
-            </button>
-          </Link>
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F28C38]"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Volunteer
+          </button>
         </div>
       </div>
 
@@ -373,6 +571,13 @@ export default function VolunteersManagement() {
           title: 'No volunteers found',
           description: 'Try adjusting your search or filters'
         }}
+      />
+      
+      {/* Add Volunteer Modal */}
+      <AddVolunteerModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSuccess={loadVolunteers}
       />
     </div>
   );

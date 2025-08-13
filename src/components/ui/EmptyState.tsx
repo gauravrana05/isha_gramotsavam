@@ -170,7 +170,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         
         {/* Description */}
         <p className={cn(
-          'text-gray-600 font-roboto',
+          'text-gray-600 font-fira',
           sizeConfig.description
         )}>
           {description}
@@ -333,7 +333,7 @@ export const LoadingEmptyState: React.FC<{
       </h3>
       
       <p className={cn(
-        'text-gray-600 font-roboto',
+        'text-gray-600 font-fira',
         sizeClasses[size].description
       )}>
         {description}

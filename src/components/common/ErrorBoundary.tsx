@@ -18,13 +18,13 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
         <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-8 h-8 text-white" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 font-roboto mb-4">
+        <h2 className="text-2xl font-bold text-gray-900 font-fira mb-4">
           {t("error_generic")}
         </h2>
-        <p className="text-gray-600 font-roboto mb-6">{error.message || t("error_generic")}</p>
+        <p className="text-gray-600 font-fira mb-6">{error.message || t("error_generic")}</p>
         <Button
           onClick={resetErrorBoundary}
-          className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-medium ripple"
+          className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 text-lg font-medium ripple"
           size="lg"
           aria-label={t("try_again")}
         >

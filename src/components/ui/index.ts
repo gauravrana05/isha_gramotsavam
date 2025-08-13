@@ -25,11 +25,7 @@ export {
   default as CardComponent
 } from './Card';
 
-// New mobile-first components
-export { 
-  DataTable,
-  default as DataTableComponent
-} from './DataTable';
+// (DataTable removed) Use AdvancedTable for all table needs
 
 // Advanced Table Components
 export { 

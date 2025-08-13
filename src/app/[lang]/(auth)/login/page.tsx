@@ -284,7 +284,7 @@ export default function LoginPage() {
             onClick={handleSendCode}
             disabled={phoneNumber.length < 10}
             loading={loading}
-            className="w-full bg-[#CE4520] disabled:hover:bg-[#CE4520] hover:bg-[#1565C0] py-3 text-lg font-firo"
+            className="w-full bg-primary-600 disabled:hover:bg-primary-600 hover:bg-primary-700 py-3 text-lg font-fira"
             size="lg"
             variant="primary"
             fullWidth
@@ -296,7 +296,7 @@ export default function LoginPage() {
           <div className="text-center">
             <button
               onClick={() => router.push(`/${lang}/public/`)}
-              className="text-[#1976D2] font-fira other-login-button text-sm"
+              className="text-info font-fira other-login-button text-sm"
               aria-label={t("continue_as_guest")}
             >
               Continue as Guest
@@ -307,11 +307,11 @@ export default function LoginPage() {
         <div className="mt-6 text-center">
           <p className="text-sm font-fira">
             By clicking on continue, you accept our{" "}
-            <a href="/terms" className="text-[#CE4520] hover:underline" target="_blank">
+            <a href="/terms" className="text-primary-600 hover:underline" target="_blank">
               Terms of Service
             </a>{" "}
             and{" "}
-            <a href="/privacy" className="text-[#CE4520] hover:underline" target="_blank">
+            <a href="/privacy" className="text-primary-600 hover:underline" target="_blank">
               Privacy Policy
             </a>
           </p>
@@ -365,7 +365,7 @@ export default function LoginPage() {
                 pattern="[0-9]*"
                 autoComplete="off"
                 aria-label={`Please enter OTP character ${index + 1}`}
-                className="w-12 h-12 text-center text-xl font-semibold border-2 border-gray-300 rounded-lg focus:border-[#CE4520] focus:outline-none focus:ring-2 focus:ring-[#CE4520] focus:ring-opacity-20 transition-colors caret-transparent selection:bg-[#CE4520] selection:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-12 h-12 text-center text-xl font-semibold border-2 border-gray-300 rounded-lg focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-opacity-20 transition-colors caret-transparent selection:bg-primary-600 selection:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 value={digit}
                 onChange={(e) => handleOtpChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
@@ -382,7 +382,7 @@ export default function LoginPage() {
             {canResend ? (
               <button
                 onClick={handleResendCode}
-                className="text-[#CE4520] font-fira text-sm hover:underline"
+                className="text-primary-600 font-fira text-sm hover:underline"
               >
                 Resend OTP
               </button>
@@ -405,7 +405,7 @@ export default function LoginPage() {
           disabled={otp.some(digit => !digit)}
           loading={loading}
           loadingText="Verifying..."
-          className="w-full bg-[#CE4520] hover:bg-[#1565C0] py-3 text-lg font-fira"
+          className="w-full bg-primary-600 hover:bg-primary-700 py-3 text-lg font-fira"
           size="lg"
           variant="primary"
           fullWidth
@@ -417,11 +417,11 @@ export default function LoginPage() {
       <div className="mt-6 text-center">
         <p className="text-sm font-fira text-gray-600">
           By clicking on verify, you accept our{" "}
-          <a href="/terms" className="text-[#CE4520] hover:underline" target="_blank">
+          <a href="/terms" className="text-primary-600 hover:underline" target="_blank">
             Terms of Service
           </a>{" "}
           and{" "}
-          <a href="/privacy" className="text-[#CE4520] hover:underline" target="_blank">
+          <a href="/privacy" className="text-primary-600 hover:underline" target="_blank">
             Privacy Policy
           </a>
         </p>

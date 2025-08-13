@@ -7,11 +7,14 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 export async function assignVolunteerToVenue(formData: FormData) {
   try {
+    const volunteerId = formData.get('volunteerId') as string;
+    const volunteerType = formData.get('volunteerType') as string;
+
     const assignmentData: any = {
       eventId: formData.get('eventId') as string,
-      volunteerId: formData.get('volunteerId') as string,
+      volunteerId: volunteerId,
       volunteerName: formData.get('volunteerName') as string,
-      volunteerType: formData.get('volunteerType') as 'general_volunteer' | 'technical_volunteer',
+      volunteerType: volunteerType,
       venueId: formData.get('venueId') as string,
       venueName: formData.get('venueName') as string,
       status: 'assigned',
@@ -25,12 +28,22 @@ export async function assignVolunteerToVenue(formData: FormData) {
       updatedAt: FieldValue.serverTimestamp()
     };
 
+    // Create the venue assignment
     const docRef = await adminDb.collection('volunteerVenueAssignment').add(assignmentWithTimestamps);
     
     // Update with document ID
     await docRef.update({ assignmentId: docRef.id });
 
+    // Update volunteer's role if assigned as technical
+    if (volunteerType === 'technical') {
+      await adminDb.collection('users').doc(volunteerId).update({
+        role: 'technical_volunteer',
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    }
+
     revalidatePath('/admin/users/volunteers/assign-venues');
+    revalidatePath('/admin/users/volunteers');
     
     return { 
       success: true, 
@@ -48,9 +61,26 @@ export async function assignVolunteerToVenue(formData: FormData) {
 
 export async function removeVolunteerAssignment(assignmentId: string) {
   try {
-    await adminDb.collection('volunteerVenueAssignment').doc(assignmentId).delete();
+    // Get the assignment first to check if we need to update volunteer role
+    const assignmentDoc = await adminDb.collection('volunteerVenueAssignment').doc(assignmentId).get();
+    
+    if (assignmentDoc.exists) {
+      const assignmentData = assignmentDoc.data();
+      
+      // Delete the assignment
+      await adminDb.collection('volunteerVenueAssignment').doc(assignmentId).delete();
+      
+      // If volunteer was technical, change them back to general
+      if (assignmentData?.volunteerType === 'technical' && assignmentData?.volunteerId) {
+        await adminDb.collection('users').doc(assignmentData.volunteerId).update({
+          role: 'general_volunteer',
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }
+    }
 
     revalidatePath('/admin/users/volunteers/assign-venues');
+    revalidatePath('/admin/users/volunteers');
     
     return { 
       success: true, 

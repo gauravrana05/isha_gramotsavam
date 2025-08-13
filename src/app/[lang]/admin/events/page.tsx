@@ -6,13 +6,13 @@ import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
 import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { 
-  Container,
-  DataTable,
+  AdvancedTable,
   StatsCard,
   StatusBadge,
   EmptyState,
   ConfirmationModal,
-  Button
+  Button,
+  PageLoader
 } from '@/components/ui';
 import { 
   Plus, 
@@ -23,7 +23,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { getEventStatus } from '@/components/ui/StatusBadge';
-import type { Column, ActionButton } from '@/components/ui/DataTable';
+import type { Column, ActionButton } from '@/components/ui';
 
 interface Event {
   eventId: string;
@@ -256,11 +256,7 @@ export default function EventsManagement() {
   ] : [];
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#3A7F3F]" />
-      </div>
-    );
+    return <PageLoader title="Loading events..." variant="minimal" />;
   }
 
   if (!user || userProfile?.role !== 'admin') {
@@ -268,24 +264,23 @@ export default function EventsManagement() {
   }
 
   return (
-    <Container>
-      <div className="max-w-7xl mx-auto py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 font-fira">Events Management</h1>
-            <p className="text-gray-600 text-sm font-roboto">Manage tournaments, exhibitions, and ceremonies</p>
-          </div>
-          
-          <Button
-            onClick={() => router.push(`/${lang}/admin/events/create`)}
-            leftIcon={Plus}
-            variant="primary"
-            size="base"
-          >
-            Add Event
-          </Button>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Events Management</h1>
+          <p className="text-gray-600 text-sm">Manage tournaments, exhibitions, and ceremonies</p>
         </div>
+        
+        <Button
+          onClick={() => router.push(`/${lang}/admin/events/create`)}
+          leftIcon={Plus}
+          variant="primary"
+          size="sm"
+        >
+          Add Event
+        </Button>
+      </div>
 
         {/* Error Message */}
         {error && (
@@ -294,12 +289,18 @@ export default function EventsManagement() {
           </div>
         )}
 
-        {/* Data Table with Mobile-First Design */}
-        <DataTable
+        {/* Advanced Table with full feature set */}
+        <AdvancedTable<Event>
           data={events}
           columns={columns}
           actions={actions}
           loading={loading}
+          searchable={true}
+          searchPlaceholder="Search events..."
+          filterable={false}
+          sortable={true}
+          defaultSort={[{ key: 'name', direction: 'asc' }]}
+          pagination={{ enabled: false }}
           emptyState={{
             icon: Calendar,
             title: 'No events found',
@@ -310,32 +311,32 @@ export default function EventsManagement() {
             },
           }}
           keyExtractor={(event) => event.eventId}
+          stickyHeader={true}
         />
 
-        {/* Stats Cards */}
-        {statsData.length > 0 && (
-          <div className="mt-8">
-            <StatsCard 
-              stats={statsData}
-              columns={3}
-              size="base"
-              showBorder
-            />
-          </div>
-        )}
+      {/* Stats Cards */}
+      {statsData.length > 0 && (
+        <div className="mt-8">
+          <StatsCard 
+            stats={statsData}
+            columns={3}
+            size="base"
+            showBorder
+          />
+        </div>
+      )}
 
-        {/* Confirmation Modal */}
-        <ConfirmationModal
-          isOpen={confirmDelete.isOpen}
-          onClose={() => setConfirmDelete({ isOpen: false, event: null })}
-          onConfirm={handleDeleteConfirm}
-          title="Deactivate Event"
-          description={`Are you sure you want to deactivate "${confirmDelete.event?.name}"? This action will make the event unavailable for new registrations.`}
-          confirmLabel="Deactivate"
-          confirmVariant="danger"
-          loading={deletingEvent !== null}
-        />
-      </div>
-    </Container>
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmDelete.isOpen}
+        onClose={() => setConfirmDelete({ isOpen: false, event: null })}
+        onConfirm={handleDeleteConfirm}
+        title="Deactivate Event"
+        description={`Are you sure you want to deactivate "${confirmDelete.event?.name}"? This action will make the event unavailable for new registrations.`}
+        confirmLabel="Deactivate"
+        confirmVariant="danger"
+        loading={deletingEvent !== null}
+      />
+    </div>
   );
 }

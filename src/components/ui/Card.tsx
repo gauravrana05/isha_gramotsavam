@@ -140,7 +140,7 @@ export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(({
           </h3>
         )}
         {subtitle && (
-          <p className="mt-1 text-sm text-gray-600 font-roboto">
+          <p className="mt-1 text-sm text-gray-600 font-fira">
             {subtitle}
           </p>
         )}
@@ -262,7 +262,7 @@ export const AdminCard = forwardRef<HTMLDivElement, AdminCardProps>(({
                 {title}
               </h3>
               {subtitle && (
-                <p className="text-sm text-gray-600 font-roboto mt-1">
+                <p className="text-sm text-gray-600 font-fira mt-1">
                   {subtitle}
                 </p>
               )}

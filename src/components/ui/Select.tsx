@@ -24,7 +24,7 @@ const Select: React.FC<SelectProps> = ({
     <div className="space-y-1 relative"> {/* Make parent relative */}
   {label && (
     <label
-      className="block text-sm font-medium text-gray-700 font-roboto"
+      className="block text-sm font-medium text-gray-700 font-fira"
       htmlFor={props.id}
     >
       {label}
@@ -33,7 +33,7 @@ const Select: React.FC<SelectProps> = ({
 
   <div className="relative">
     <select
-      className={`w-full px-4 border border-gray-300 appearance-none rounded-lg transition-colors duration-200 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent ${variantClasses[variant]} ${className || ""}`}
+      className={`w-full px-4 border border-gray-300 appearance-none rounded-lg transition-colors duration-200 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent ${variantClasses[variant]} ${className || ""}`}
       {...props}
     >
       {options.map((option) => (

@@ -22,14 +22,14 @@ const Input: React.FC<InputProps> = ({
     <div className="space-y-1">
       {label && (
         <label
-          className="block text-sm font-medium text-gray-700 font-roboto"
+          className="block text-sm font-medium text-gray-700 font-fira"
           htmlFor={props.id}
         >
           {label}
         </label>
       )}
       <input
-        className={`w-full px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent ${variantClasses[variant]} ${className || ""}`}
+        className={`w-full px-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent ${variantClasses[variant]} ${className || ""}`}
         {...props}
       />
     </div>

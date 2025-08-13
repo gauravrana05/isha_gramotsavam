@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import {
   AdvancedTable,
+  PageLoader,
   type Column,
   type ActionButton,
   type FilterField,
@@ -348,11 +349,7 @@ export default function AdminUsersPage() {
   ], [users]);
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
-      </div>
-    );
+    return <PageLoader title="Loading users..." variant="minimal" />;
   }
 
   if (error) {

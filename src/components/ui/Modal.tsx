@@ -160,7 +160,7 @@ const ModalHeader = ({
             </h3>
           )}
           {description && (
-            <p className="mt-1 text-sm text-gray-600 font-roboto">
+            <p className="mt-1 text-sm text-gray-600 font-fira">
               {description}
             </p>
           )}

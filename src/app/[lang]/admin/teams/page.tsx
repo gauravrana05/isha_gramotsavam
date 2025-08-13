@@ -26,6 +26,7 @@ import {
   AdvancedTable,
   StatsCard,
   StatusBadge,
+  PageLoader,
   type Column,
   type ActionButton,
   type FilterField,
@@ -393,11 +394,7 @@ export default function AdminTeamsPage() {
   ] : [];
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
-      </div>
-    );
+    return <PageLoader title="Loading teams..." variant="minimal" />;
   }
 
   if (error) {
@@ -409,7 +406,7 @@ export default function AdminTeamsPage() {
           <p className="text-gray-600 mb-4">{error}</p>
           <button 
             onClick={() => window.location.reload()}
-            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
+            className="bg-primary-500 text-white px-6 py-2 rounded-lg hover:bg-primary-600 transition-colors"
           >
             Retry
           </button>
@@ -498,7 +495,7 @@ export default function AdminTeamsPage() {
           <button
             onClick={() => setCurrentPage(prev => prev + 1)}
             disabled={loading}
-            className="px-6 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors disabled:opacity-50 flex items-center mx-auto"
+            className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 flex items-center mx-auto"
           >
             {loading ? (
               <>

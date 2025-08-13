@@ -78,12 +78,26 @@ function AssignmentModal({ isOpen, onClose, onSuccess }: AssignmentModalProps) {
         setVolunteers(volunteersResult.users || []);
       }
 
-      // For now, we'll use a placeholder for venues since we need to implement getAdminVenues
-      setVenues([
-        { id: 'venue1', name: 'Sports Complex A' },
-        { id: 'venue2', name: 'Sports Complex B' },
-        { id: 'venue3', name: 'Community Center' }
-      ]);
+      // Get venues
+      const venuesResult = await getAdminVenues({
+        limit: 50,
+        offset: 0,
+        level: 'all',
+        venueType: 'all',
+        genderCategory: 'all',
+        assignmentStatus: 'all',
+        district: undefined,
+        taluk: undefined,
+        state: undefined,
+        isActive: true,
+        searchQuery: undefined,
+        sortBy: 'name',
+        sortOrder: 'asc'
+      }, user.uid);
+
+      if (venuesResult.success) {
+        setVenues(venuesResult.venues || []);
+      }
     } catch (error) {
       console.error('Error loading modal data:', error);
     }
@@ -134,7 +148,7 @@ function AssignmentModal({ isOpen, onClose, onSuccess }: AssignmentModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-white bg-opacity-20 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
         <h3 className="text-lg font-semibold mb-4">Assign Volunteer to Venue</h3>
         
@@ -155,7 +169,7 @@ function AssignmentModal({ isOpen, onClose, onSuccess }: AssignmentModalProps) {
               <option value="">Select Volunteer</option>
               {volunteers.map(volunteer => (
                 <option key={volunteer.id} value={volunteer.id}>
-                  {volunteer.firstName} {volunteer.lastName} - {volunteer.role?.replace('_', ' ')}
+                  {volunteer.firstName} {volunteer.lastName}
                 </option>
               ))}
             </select>

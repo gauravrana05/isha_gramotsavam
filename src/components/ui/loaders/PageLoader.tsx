@@ -19,7 +19,7 @@ const PageLoader: React.FC<PageLoaderProps> = ({
   const containerClasses = {
     default: 'min-h-screen bg-gray-50 dark:bg-gray-900',
     minimal: 'min-h-[60vh]',
-    brand: 'min-h-screen bg-[#F2F0E5] from-orange-50 to-orange-100 dark:from-gray-900 dark:to-gray-800'
+    brand: 'min-h-screen bg-secondary-100'
   };
 
   const spinnerSizes = {
@@ -80,7 +80,7 @@ const PageLoader: React.FC<PageLoaderProps> = ({
           <p className={`
             ${textSizes[size].subtitle} 
             text-gray-600 dark:text-gray-400 
-            font-roboto
+            font-fira
             leading-relaxed
           `}>
             {subtitle}
