@@ -245,9 +245,7 @@ export default function LoginPage() {
   if (authLoading || user) {
     return (
       <PageLoader 
-        title="Loading..."
-        variant="brand"
-        size="lg"
+        title="Loadidjdjwng..."
       />
     );
   }
@@ -277,7 +275,7 @@ export default function LoginPage() {
           />
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-600 text-sm font-roboto">{error}</p>
+              <p className="text-red-600 text-sm font-fira">{error}</p>
             </div>
           )}
           <ButtonLoader

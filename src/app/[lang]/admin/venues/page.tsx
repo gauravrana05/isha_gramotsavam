@@ -12,6 +12,7 @@ import {
   StatusBadge,
   ConfirmationModal,
   Button,
+  PageLoader,
   type Column,
   type ActionButton,
   type FilterField,
@@ -310,11 +311,7 @@ export default function VenuesManagement() {
   ] : [];
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#3A7F3F]" />
-      </div>
-    );
+    return <PageLoader title="Loading venues..." variant="minimal" />;
   }
 
   if (!user || userProfile?.role !== 'admin') {
@@ -327,7 +324,7 @@ export default function VenuesManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-fira">Venues Management</h1>
-          <p className="text-gray-600 text-sm font-roboto">Manage sports venues and facilities</p>
+          <p className="text-gray-600 text-sm font-fira">Manage sports venues and facilities</p>
         </div>
         
         <Button
@@ -343,7 +340,7 @@ export default function VenuesManagement() {
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-600 font-roboto">{error}</p>
+          <p className="text-red-600 font-fira">{error}</p>
         </div>
       )}
 

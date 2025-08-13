@@ -19,7 +19,7 @@ export default function Header({ lang }: HeaderProps) {
   const closeMobileMenu = () => setIsMobileMenuOpen(false)
 
   return (
-    <header className="bg-[#28231e] text-white sticky top-0 z-50">
+    <header className="bg-secondary-900 text-white sticky top-0 z-50">
       {/* Desktop Header */}
       <div className="hidden lg:block">
         <div className="max-w-7xl mx-auto px-4">
@@ -42,13 +42,13 @@ export default function Header({ lang }: HeaderProps) {
               {/* Sports Dropdown */}
               <div className="relative">
                 <button
-                  className="flex items-center space-x-1 text-white hover:text-[#F28C38] transition-colors duration-200 py-2"
+                  className="flex items-center space-x-1 text-white hover:text-primary-500 transition-colors duration-200 py-2"
                   onMouseEnter={() => setIsSportsDropdownOpen(true)}
                   onMouseLeave={() => setIsSportsDropdownOpen(false)}
                 >
                   <Link
                     href={`/${lang}/public/sports`}
-                    className="text-white hover:text-[#F28C38] transition-colors duration-200 font-medium"
+                    className="text-white hover:text-primary-500 transition-colors duration-200 font-medium"
                   >
                     Sports
                   </Link>
@@ -64,13 +64,13 @@ export default function Header({ lang }: HeaderProps) {
                   >
                     <Link
                       href={`/${lang}/public/sports/volleyball`}
-                      className="block px-4 py-2 text-gray-800 hover:bg-[#F3F0E5] hover:text-[#F28C38] transition-colors"
+                    className="block px-4 py-2 text-gray-800 hover:bg-secondary-100 hover:text-primary-500 transition-colors"
                     >
                       Volleyball
                     </Link>
                     <Link
                       href={`/${lang}/public/sports/throwball`}
-                      className="block px-4 py-2 text-gray-800 hover:bg-[#F3F0E5] hover:text-[#F28C38] transition-colors"
+                    className="block px-4 py-2 text-gray-800 hover:bg-secondary-100 hover:text-primary-500 transition-colors"
                     >
                       Throwball
                     </Link>
@@ -80,14 +80,14 @@ export default function Header({ lang }: HeaderProps) {
 
               <Link
                 href={`/${lang}/public/about`}
-                className="text-white hover:text-[#F28C38] transition-colors duration-200 font-medium"
+                className="text-white hover:text-primary-500 transition-colors duration-200 font-medium"
               >
                 About Us
               </Link>
 
               <Link
                 href={`/${lang}/profile`}
-                className="text-white hover:text-[#F28C38] transition-colors duration-200 font-medium"
+                className="text-white hover:text-primary-500 transition-colors duration-200 font-medium"
               >
                 Profile
               </Link>
@@ -142,7 +142,7 @@ export default function Header({ lang }: HeaderProps) {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="bg-[#28231e] border-t border-gray-600">
+          <div className="bg-secondary-900 border-t border-gray-600">
             <div className="px-4 py-4 space-y-4">
               {/* Mobile Sports Section */}
               <div>
@@ -150,14 +150,14 @@ export default function Header({ lang }: HeaderProps) {
                 <div className="pl-4 space-y-2">
                   <Link
                     href={`/${lang}/public/sports/volleyball`}
-                    className="block text-gray-300 hover:text-[#F28C38] transition-colors"
+                    className="block text-gray-300 hover:text-primary-500 transition-colors"
                     onClick={closeMobileMenu}
                   >
                     Volleyball
                   </Link>
                   <Link
                     href={`/${lang}/public/sports/throwball`}
-                    className="block text-gray-300 hover:text-[#F28C38] transition-colors"
+                    className="block text-gray-300 hover:text-primary-500 transition-colors"
                     onClick={closeMobileMenu}
                   >
                     Throwball
@@ -167,7 +167,7 @@ export default function Header({ lang }: HeaderProps) {
 
               <Link
                 href={`/${lang}/public/about`}
-                className="block text-white hover:text-[#F28C38] transition-colors font-medium"
+                className="block text-white hover:text-primary-500 transition-colors font-medium"
                 onClick={closeMobileMenu}
               >
                 About Us
@@ -175,7 +175,7 @@ export default function Header({ lang }: HeaderProps) {
 
               <Link
                 href={`/${lang}/profile`}
-                className="block text-white hover:text-[#F28C38] transition-colors font-medium"
+                className="block text-white hover:text-primary-500 transition-colors font-medium"
                 onClick={closeMobileMenu}
               >
                 Profile

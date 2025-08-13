@@ -1,5 +1,18 @@
 import ClientProviders from "@/components/system/ClientProviders"; // New client component
 import "@/styles/globals.css";
+import localFont from "next/font/local";
+
+const fira = localFont({
+  src: [
+    { path: "../../public/fonts/FiraSans-Light.ttf", weight: "300", style: "normal" },
+    { path: "../../public/fonts/FiraSans-Regular.ttf", weight: "400", style: "normal" },
+    { path: "../../public/fonts/FiraSans-Medium.ttf", weight: "500", style: "normal" },
+    { path: "../../public/fonts/FiraSans-SemiBold.ttf", weight: "600", style: "normal" },
+    { path: "../../public/fonts/FiraSans-Bold.ttf", weight: "700", style: "normal" },
+  ],
+  variable: "--font-fira",
+  display: "swap",
+});
 
 export const metadata = {
   title: "Isha Gramotsavam",
@@ -36,7 +49,7 @@ export default function RootLayout({
         <link rel="icon" href="/icons/icon-192x192.png" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
-      <body suppressHydrationWarning className="font-fira">
+      <body suppressHydrationWarning className={`${fira.className} font-fira`}>
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>

@@ -285,7 +285,7 @@ export default function EventsManagement() {
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-600 font-roboto">{error}</p>
+            <p className="text-red-600 font-fira">{error}</p>
           </div>
         )}
 

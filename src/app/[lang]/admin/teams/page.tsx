@@ -421,16 +421,16 @@ export default function AdminTeamsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-fira">Teams Management</h1>
-          <p className="text-gray-600 text-sm font-roboto">View and manage team registrations</p>
+          <p className="text-gray-600 text-sm font-fira">View and manage team registrations</p>
         </div>
       </div>
 
       {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-600 font-roboto">{error}</p>
-        </div>
-      )}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-red-600 font-fira">{error}</p>
+          </div>
+        )}
 
       {/* Stats Cards */}
       {statsData.length > 0 && (
