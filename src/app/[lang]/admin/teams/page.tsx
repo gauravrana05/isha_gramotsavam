@@ -113,10 +113,10 @@ export default function AdminTeamsPage() {
         sportName: sportFilter !== 'all' ? sportFilter : undefined,
         district: districtFilter !== 'all' ? districtFilter : undefined,
         genderCategory: genderFilter === 'M'
-          ? 'M'
+          ? 'men'
           : genderFilter === 'F'
-          ? 'F'
-          : (genderFilter as "all" | "M" | "F"),
+          ? 'women'
+          : 'all',
         searchQuery: searchTerm || undefined,
         sortBy: 'createdAt',
         sortOrder: 'desc'
@@ -154,10 +154,10 @@ export default function AdminTeamsPage() {
         sportName: sportFilter !== 'all' ? sportFilter : undefined,
         genderCategory:
           genderFilter === 'M'
-            ? 'M'
+            ? 'men'
             : genderFilter === 'F'
-            ? 'F'
-            : (genderFilter as "all" | "M" | "F"),
+            ? 'women'
+            : 'all',
         currentTournamentLevel: "all", // or set based on a filter if you have one
       }, user.uid);
 
@@ -177,9 +177,9 @@ export default function AdminTeamsPage() {
       case 'verified': return 'success';
       case 'submitted': return 'info';
       case 'pending': return 'warning';
-      case 'draft': return 'secondary';
+      case 'draft': return 'inactive';
       case 'rejected': return 'error';
-      default: return 'secondary';
+      default: return 'inactive';
     }
   };
 
@@ -211,7 +211,7 @@ export default function AdminTeamsPage() {
     {
       key: 'captain',
       header: 'Captain',
-      accessor: 'captainProfile.name',
+      accessor: (team) => team.captainProfile?.name || '',
       sortable: true,
       priority: 'medium',
       width: '180px',

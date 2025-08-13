@@ -1,306 +1,351 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getAdminPlayers, getAdminPlayerStats } from '@/lib/actions/admin/optimizedPlayerQueries';
-import { 
+import { getAdminUsers } from '@/lib/actions/admin/optimizedUserQueries';
+import {
   Users,
-  Shield,
-  UserCheck,
-  Calendar,
-  Clock,
-  Edit,
   Eye,
-  Search,
-  ChevronDown,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
   Mail,
   Phone,
-  MapPin,
-  Download,
   Loader2
 } from 'lucide-react';
+import {
+  AdvancedTable,
+  type Column,
+  type ActionButton,
+  type FilterField,
+  type ExportConfig,
+  type TableParams
+} from '@/components/ui';
 
-interface PlayerData {
+type UserRole =
+  | 'admin'
+  | 'captain'
+  | 'player'
+  | 'general_volunteer'
+  | 'technical_volunteer'
+  | 'verification_volunteer';
+
+interface AdminUserRow {
   id: string;
-  name: string;
-  phone: string;
-  gender: 'M' | 'F';
-  age?: number;
-  position?: string;
-  verificationStatus: string;
-  addedAt: string | null;
-  verifiedAt: string | null;
-  team?: {
-    id: string;
-    name: string;
-    sportName: string;
-    status: string;
-    genderCategory: string;
-  } | null;
-  documents?: {
-    profilePhoto?: {
-      url?: string;
-      verified: boolean;
-    };
-    aadhaarFront?: {
-      url?: string;
-      verified: boolean;
-    };
-    aadhaarBack?: {
-      url?: string;
-      verified: boolean;
-    };
-  };
-  profileData?: {
-    panchayat?: string;
-    district?: string;
-    state?: string;
-  };
+  uid: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  email?: string;
+  role: UserRole;
+  gender: 'M' | 'F' | 'O';
+  panchayat?: string;
+  district?: string;
+  state?: string;
+  isVerified: boolean;
+  isProfileComplete: boolean;
+  createdAt: string | null;
 }
 
-export default function AdminPlayersPage() {
-  const [players, setPlayers] = useState<PlayerData[]>([]);
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [tableLoading, setTableLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeSearchTerm, setActiveSearchTerm] = useState(''); // This is what gets sent to the query
-  const [verificationFilter, setVerificationFilter] = useState<string>('all');
-  const [genderFilter, setGenderFilter] = useState<string>('all');
-  const [teamStatusFilter, setTeamStatusFilter] = useState<string>('all');
-  const [sportFilter, setSportFilter] = useState<string>('');
-  const [districtFilter, setDistrictFilter] = useState<string>('');
-  
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const pageSize = 25;
-
+export default function AdminUsersPage() {
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
 
-  // Initial auth check and data loading
-  useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
-    }
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
+  const [total, setTotal] = useState<number>(0);
 
-    if (userProfile?.role !== 'admin') {
-      router.push(`/${lang}/player/dashboard`);
-      return;
-    }
-
-    // Only load data on initial mount
-    loadPlayers();
-    loadStats();
-  }, [user, userProfile, authLoading, lang, router]);
-
-  // Separate effect for filter changes - only reload data, not redirect
-  useEffect(() => {
-    if (user && userProfile?.role === 'admin') {
-      loadPlayers();
-    }
-  }, [verificationFilter, genderFilter, teamStatusFilter, sportFilter, districtFilter, activeSearchTerm, currentPage]);
-
-  // Separate effect for stats when filters change (exclude currentPage as stats don't paginate)
-  useEffect(() => {
-    if (user && userProfile?.role === 'admin') {
-      loadStats();
-    }
-  }, [verificationFilter, genderFilter, teamStatusFilter, sportFilter, districtFilter]);
-
-  const handleSearch = useCallback(() => {
-    setActiveSearchTerm(searchTerm);
-    setCurrentPage(1); // Reset to first page when searching
-  }, [searchTerm]);
-
-  const handleFilterChange = useCallback((filterType: string, value: string) => {
-    setCurrentPage(1); // Reset to first page when filters change
-    
-    switch (filterType) {
-      case 'verification':
-        setVerificationFilter(value);
-        break;
-      case 'gender':
-        setGenderFilter(value);
-        break;
-      case 'teamStatus':
-        setTeamStatusFilter(value);
-        break;
-      case 'sport':
-        setSportFilter(value);
-        break;
-      case 'district':
-        setDistrictFilter(value);
-        break;
-    }
-  }, []);
-
-  const loadPlayers = async () => {
+  // Load users when table state changes (server-side via AdvancedTable.onDataLoad)
+  const handleDataLoad = useCallback(async (params: TableParams) => {
+    console.log('🔄 handleDataLoad called with params:', params, 'user:', user?.uid);
     try {
-      // Use tableLoading for filter changes, loading for initial load
-      if (players.length > 0) {
-        setTableLoading(true);
-      } else {
-        setLoading(true);
+      // Guard against running when not authenticated
+      if (!user?.uid) {
+        console.log('❌ No user UID, returning early');
+        return;
       }
+      console.log('✅ Starting data load...');
+      setLoading(true);
+
+      // Add a small delay to see if this is the issue
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Map filters from sidebar
+      const byKey = (key: string) => params.filters.find(f => f.key === key)?.value;
+
+      const role = (byKey('role') || 'all') as
+        | UserRole
+        | 'volunteer'
+        | 'all';
+      const gender = (byKey('gender') || 'all') as 'M' | 'F' | 'O' | 'all';
+      const district = (byKey('district') || undefined) as string | undefined;
+      const isVerifiedSel = (byKey('verification') || 'all') as 'all' | 'verified' | 'pending';
+
+      // Sorting (support first sort only for server)
+      const sort = params.sort?.[0];
+      const sortBy = sort?.key === 'name'
+        ? 'firstName'
+        : sort?.key === 'createdAt'
+          ? 'createdAt'
+          : sort?.key === 'role'
+            ? 'role'
+            : 'createdAt';
+      const sortOrder = sort?.direction || 'desc';
+
+      const result = await getAdminUsers(
+        {
+          limit: params.pageSize,
+          offset: (params.page - 1) * params.pageSize,
+          role: role,
+          gender: gender,
+          district: district,
+          isVerified: isVerifiedSel,
+          isProfileComplete: 'all',
+          searchQuery: params.search || undefined,
+          sortBy: sortBy as any,
+          sortOrder
+        },
+        user.uid
+      );
+
+      if (!result.success) {
+        console.log('❌ API call failed:', result.error);
+        setError(result.error || 'Failed to load users');
+        setUsers([]);
+        setTotal(0);
+        return;
+      }
+
+      console.log('✅ Data loaded successfully:', result.users?.length, 'users');
+      setError('');
+      setUsers(result.users || []);
+      setTotal(result.pagination?.total || (result.users?.length ?? 0));
+    } catch (e: any) {
+      console.log('❌ Exception during data load:', e);
+      console.error('Error loading users:', e);
+      setError(e?.message || 'Failed to load users');
+      setUsers([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.uid]);
+
+  // Load users with simple pattern like teams page
+  const loadUsers = useCallback(async () => {
+    try {
+      setLoading(true);
       
       if (!user?.uid) {
         throw new Error('User not authenticated');
       }
 
-      const result = await getAdminPlayers({
-        limit: pageSize,
-        offset: (currentPage - 1) * pageSize,
-        verificationStatus: verificationFilter as "pending" | "verified" | "rejected" | "all",
-        gender: genderFilter as "all" | "M" | "F",
-        teamStatus: teamStatusFilter as "verified" | "rejected" | "all" | "draft" | "submitted" | "active",
-        sportName: sportFilter || undefined,
-        district: districtFilter || undefined,
-        searchQuery: activeSearchTerm || undefined,
-        sortBy: 'addedAt',
-        sortOrder: 'desc',
-        position: "all",
-        genderCategory: "all"
-      }, user.uid);
+      const result = await getAdminUsers(
+        {
+          limit: 50,
+          offset: 0,
+          role: 'all',
+          gender: 'all',
+          district: undefined,
+          isVerified: 'all',
+          isProfileComplete: 'all',
+          searchQuery: undefined,
+          sortBy: 'createdAt' as any,
+          sortOrder: 'desc'
+        },
+        user.uid
+      );
 
       if (!result.success) {
-        console.error('Error loading players:', result.error);
-        // Don't throw error, just set empty state and show message
-        setPlayers([]);
-        setHasMore(false);
-        setError(result.error || 'Failed to load players. Please check that Firestore indexes are deployed.');
+        setError(result.error || 'Failed to load users');
+        setUsers([]);
+        setTotal(0);
         return;
       }
 
-      // Fix: Ensure all required PlayerData fields are present
-      setPlayers(
-        (result.players ?? []).map((p: any) => ({
-          ...p,
-          addedAt: p.addedAt ?? null,
-          verifiedAt: p.verifiedAt ?? null,
-        }))
-      );
-      setHasMore(result.pagination?.hasMore ?? false);
-      setError(''); // Clear any previous errors
-      
-      // Log performance information
-      if (result.meta?.usedFallback) {
-        console.warn('Player query used fallback:', result.meta.performanceNote);
-      }
-      
-    } catch (err: any) {
-      console.error('Error loading players:', err);
-      setPlayers([]);
-      setHasMore(false);
-      setError(err.message || 'Failed to load players. Please check your permissions and that Firestore indexes are deployed.');
+      setError('');
+      setUsers(result.users || []);
+      setTotal(result.pagination?.total || (result.users?.length ?? 0));
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load users');
+      setUsers([]);
+      setTotal(0);
     } finally {
       setLoading(false);
-      setTableLoading(false);
     }
-  };
+  }, [user?.uid]);
 
-  const loadStats = async () => {
-    try {
-      if (!user?.uid) return;
-
-      const result = await getAdminPlayerStats({
-        district: districtFilter || undefined,
-        sportName: sportFilter || undefined,
-        genderCategory: genderFilter as any,
-        teamStatus: teamStatusFilter as any
-      }, user.uid);
-
-      if (result.success) {
-        setStats(result.stats);
-        
-        // Log performance information for stats
-        if (result.meta?.usedFallback) {
-          console.warn('Stats query used fallback:', result.meta.performanceNote);
-        }
-      } else {
-        console.error('Error loading player stats:', result.error);
-        // Set stats to null on error so fallbacks are used
-        setStats(null);
-      }
-    } catch (err: any) {
-      console.error('Error loading player stats:', err);
-      // Set stats to null on error so fallbacks are used
-      setStats(null);
+  // Auth gate and data loading like teams page
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push(`/${lang}/login`);
+      return;
     }
-  };
-
-  // Remove client-side filtering since it's now handled by the server
-  const filteredPlayers = players;
-
-  const getVerificationStatusColor = (status: string) => {
-    switch (status) {
-      case 'verified': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+    if (userProfile?.role !== 'admin') {
+      router.push(`/${lang}/player/dashboard`);
+      return;
     }
-  };
-
-  const getVerificationStatusIcon = (status: string) => {
-    switch (status) {
-      case 'verified': return <CheckCircle className="w-4 h-4" />;
-      case 'rejected': return <XCircle className="w-4 h-4" />;
-      case 'pending': return <Clock className="w-4 h-4" />;
-      default: return <AlertCircle className="w-4 h-4" />;
-    }
-  };
-
-  const getDocumentStatus = (player: PlayerData) => {
-    const docs = player.documents || {};
-    const hasProfilePhoto = docs.profilePhoto?.url;
-    const hasAadhaarFront = docs.aadhaarFront?.url;
-    const hasAadhaarBack = docs.aadhaarBack?.url;
     
-    if (hasProfilePhoto && hasAadhaarFront && hasAadhaarBack) {
-      return { status: 'complete', color: 'text-green-600', icon: <CheckCircle className="w-4 h-4" /> };
-    } else if (hasProfilePhoto || hasAadhaarFront || hasAadhaarBack) {
-      return { status: 'partial', color: 'text-yellow-600', icon: <Clock className="w-4 h-4" /> };
-    } else {
-      return { status: 'none', color: 'text-red-600', icon: <XCircle className="w-4 h-4" /> };
+    loadUsers();
+  }, [user, userProfile, authLoading, lang, router, loadUsers]);
+
+  // Client-side filtering handled by AdvancedTable (like teams page)
+  const filteredUsers = users;
+
+  const columns: Column<AdminUserRow>[] = useMemo(() => [
+    {
+      key: 'name',
+      header: 'User',
+      accessor: (u) => `${u.firstName} ${u.lastName}`.trim(),
+      sortable: true,
+      sortKey: 'firstName',
+      minWidth: 200,
+      render: (_, u) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900">{u.firstName} {u.lastName}</div>
+          <div className="mt-1 inline-flex items-center gap-2">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-800 capitalize">
+              {u.role.replace('_', ' ')}
+            </span>
+            <span className="text-[11px] text-gray-500">{u.gender}</span>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'contact',
+      header: 'Contact',
+      accessor: 'phoneNumber',
+      minWidth: 180,
+      render: (phone, u) => (
+        <div className="text-sm text-gray-900">
+          <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" />{u.phoneNumber}</div>
+          {u.email && (
+            <div className="flex items-center gap-2 text-gray-600 mt-1"><Mail className="w-4 h-4 text-gray-400" />{u.email}</div>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      accessor: 'panchayat',
+      minWidth: 160,
+      render: (_, u) => (
+        <div className="text-sm text-gray-900">
+          <div>{u.panchayat || '—'}</div>
+          <div className="text-xs text-gray-500">{u.district || '—'}</div>
+        </div>
+      )
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      accessor: 'isVerified',
+      sortable: true,
+      minWidth: 150,
+      render: (isVerified, u) => (
+        <span className={`px-2 py-0.5 rounded-full text-xs ${u.isVerified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+          {u.isVerified ? 'Verified' : 'Pending'}
+        </span>
+      )
+    },
+    {
+      key: 'createdAt',
+      header: 'Created',
+      accessor: 'createdAt',
+      sortable: true,
+      minWidth: 130,
+      render: (val) => (
+        <span className="text-sm text-gray-700">{val ? new Date(val).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
+      )
     }
-  };
+  ], []);
 
-  const exportPlayers = () => {
-    const csvContent = [
-      ['Name', 'Phone', 'Gender', 'Age', 'Team', 'Sport', 'Position', 'Verification Status', 'Location', 'Documents Status', 'Added Date'].join(','),
-      ...filteredPlayers.map(player => [
-        player.name,
-        player.phone,
-        player.gender === 'M' ? 'Male' : 'Female',
-        player.age || '',
-        player.team?.name || 'No Team',
-        player.team?.sportName || '',
-        player.position || 'main',
-        player.verificationStatus,
-        `${player.profileData?.panchayat || ''}, ${player.profileData?.district || ''}`,
-        getDocumentStatus(player).status,
-        player.addedAt ? new Date(player.addedAt).toLocaleDateString() : 'Unknown'
-      ].join(','))
-    ].join('\n');
+  const actions: ActionButton<AdminUserRow>[] = useMemo(() => [
+    {
+      label: 'View',
+      icon: Eye,
+      variant: 'primary',
+      onClick: (u) => router.push(`/${lang}/admin/users/${u.id}`)
+    }
+  ], [router, lang]);
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `players_export_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
+  // Filters sidebar: reuse existing idea (verification, gender, district) + role
+  const filterFields: FilterField[] = useMemo(() => [
+    {
+      key: 'verification',
+      label: 'Verification',
+      type: 'select',
+      options: [
+        { label: 'Verified', value: 'verified' },
+        { label: 'Pending', value: 'pending' }
+      ]
+    },
+    {
+      key: 'gender',
+      label: 'Gender',
+      type: 'select',
+      options: [
+        { label: 'Male', value: 'M' },
+        { label: 'Female', value: 'F' },
+        { label: 'Other', value: 'O' }
+      ]
+    },
+    {
+      key: 'district',
+      label: 'District',
+      type: 'text',
+      placeholder: 'Type district',
+      caseSensitive: false
+    },
+    {
+      key: 'role',
+      label: 'Role',
+      type: 'select',
+      options: [
+        { label: 'Admin', value: 'admin' },
+        { label: 'Captain', value: 'captain' },
+        { label: 'Player', value: 'player' },
+        { label: 'General Volunteer', value: 'general_volunteer' },
+        { label: 'Technical Volunteer', value: 'technical_volunteer' },
+        { label: 'Verification Volunteer', value: 'verification_volunteer' }
+      ]
+    }
+  ], []);
+
+  const exportOptions: ExportConfig[] = useMemo(() => [
+    {
+      label: 'Export CSV',
+      format: 'csv',
+      onExport: () => {
+        const csv = [
+          ['Name', 'Phone', 'Email', 'Role', 'Gender', 'Panchayat', 'District', 'Verified', 'Profile Complete', 'Created'].join(','),
+          ...users.map(u => [
+            `${u.firstName} ${u.lastName}`.trim(),
+            u.phoneNumber,
+            u.email || '',
+            u.role,
+            u.gender,
+            u.panchayat || '',
+            u.district || '',
+            u.isVerified ? 'Yes' : 'No',
+            u.isProfileComplete ? 'Yes' : 'No',
+            u.createdAt ? new Date(u.createdAt).toISOString().slice(0, 10) : ''
+          ].join(','))
+        ].join('\n');
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+    }
+  ], [users]);
 
   if (authLoading || loading) {
     return (
@@ -310,410 +355,58 @@ export default function AdminPlayersPage() {
     );
   }
 
-  if (error && players.length === 0 && !loading) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Unable to Load Players</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          {error.includes('index') && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-left">
-              <p className="text-sm text-yellow-800">
-                <strong>Firestore Index Required:</strong> This error occurs when the required database indexes haven&apos;t been deployed yet. 
-                The indexes are defined in the codebase but need to be deployed to Firebase.
-              </p>
-            </div>
-          )}
-          <div className="flex gap-2 justify-center">
-            <button 
-              onClick={() => {
-                setError('');
-                loadPlayers();
-              }}
-              className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
-            >
-              Retry
-            </button>
-            <button 
-              onClick={() => router.push(`/${lang}/admin/dashboard`)}
-              className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              Back to Dashboard
-            </button>
-          </div>
+          <Users className="w-16 h-16 text-red-400 mx-auto mb-3" />
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Unable to load users</h1>
+          <p className="text-gray-600">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
-            Player Management
-          </h1>
-          <p className="text-sm sm:text-base text-gray-600 font-fira">
-            View and manage player registrations across all teams
-          </p>
-        </div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Users Management</h1>
+        <p className="text-gray-600 text-sm">View and manage all users (admins, volunteers, captains, players)</p>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Total Players</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{stats?.total || players.length}</p>
-              </div>
-              <Users className="w-8 h-8 text-gray-400" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Verified</p>
-                <p className="text-2xl font-bold text-green-600">{stats?.byVerificationStatus?.verified || players.filter(p => p.verificationStatus === 'verified').length}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-400" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats?.byVerificationStatus?.pending || players.filter(p => p.verificationStatus === 'pending').length}</p>
-              </div>
-              <Clock className="w-8 h-8 text-yellow-400" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">With Teams</p>
-                <p className="text-2xl font-bold text-blue-600">{stats?.teamAssociation?.withTeam || players.filter(p => p.team).length}</p>
-              </div>
-              <Shield className="w-8 h-8 text-blue-400" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Complete Docs</p>
-                <p className="text-2xl font-bold text-purple-600">{stats?.documentStats?.allDocumentsComplete || players.filter(p => getDocumentStatus(p).status === 'complete').length}</p>
-              </div>
-              <UserCheck className="w-8 h-8 text-purple-400" />
-            </div>
-          </div>
-        </div>
+      <AdvancedTable<AdminUserRow>
+        data={filteredUsers}
+        columns={columns}
+        actions={actions}
+        loading={loading}
 
-        {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4 mb-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Search players by name, phone, or team..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-2">
-              <select
-                value={verificationFilter}
-                onChange={(e) => handleFilterChange('verification', e.target.value)}
-                className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="verified">Verified</option>
-                <option value="rejected">Rejected</option>
-              </select>
+        searchable={true}
+        searchPlaceholder="Search by name, phone, email..."
 
-              <select
-                value={genderFilter}
-                onChange={(e) => handleFilterChange('gender', e.target.value)}
-                className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-              >
-                <option value="all">All Gender</option>
-                <option value="M">Male</option>
-                <option value="F">Female</option>
-              </select>
+        filterable={true}
+        filters={filterFields}
 
-              <select
-                value={teamStatusFilter}
-                onChange={(e) => handleFilterChange('teamStatus', e.target.value)}
-                className="appearance-none bg-white border border-gray-300 rounded-lg px-3 py-2 pr-8 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-              >
-                <option value="all">All Teams</option>
-                <option value="verified">Verified Teams</option>
-                <option value="submitted">Submitted Teams</option>
-                <option value="draft">Draft Teams</option>
-              </select>
+        sortable={true}
+        multiSort={true}
+        defaultSort={[{ key: 'createdAt', direction: 'desc' }]}
 
-              <input
-                type="text"
-                placeholder="Sport"
-                value={sportFilter}
-                onChange={(e) => handleFilterChange('sport', e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 w-24 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-              />
+        pagination={{ enabled: false }}
 
-              <input
-                type="text"
-                placeholder="District"
-                value={districtFilter}
-                onChange={(e) => handleFilterChange('district', e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 w-24 focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-              />
+        exportOptions={exportOptions}
 
-              <button
-                onClick={exportPlayers}
-                className="bg-[#F28C38] hover:bg-[#E67A26] text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </button>
-            </div>
-          </div>
+        selectable={false}
+        keyExtractor={(u) => u.id}
+        stickyHeader={true}
 
-          {/* Applied Filters */}
-          {(verificationFilter !== 'all' || genderFilter !== 'all' || teamStatusFilter !== 'all' || sportFilter || districtFilter || activeSearchTerm) && (
-            <div className="flex flex-wrap gap-2">
-              <span className="text-sm text-gray-600">Active filters:</span>
-              {verificationFilter !== 'all' && (
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                  Status: {verificationFilter}
-                </span>
-              )}
-              {genderFilter !== 'all' && (
-                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                  Gender: {genderFilter === 'M' ? 'Male' : 'Female'}
-                </span>
-              )}
-              {teamStatusFilter !== 'all' && (
-                <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">
-                  Team: {teamStatusFilter}
-                </span>
-              )}
-              {sportFilter && (
-                <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
-                  Sport: {sportFilter}
-                </span>
-              )}
-              {districtFilter && (
-                <span className="px-2 py-1 bg-pink-100 text-pink-800 rounded-full text-xs">
-                  District: {districtFilter}
-                </span>
-              )}
-              {activeSearchTerm && (
-                <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
-                  Search: &quot;{searchTerm}&quot;
-                </span>
-              )}
-              <button
-                onClick={() => {
-                  setVerificationFilter('all');
-                  setGenderFilter('all');
-                  setTeamStatusFilter('all');
-                  setSportFilter('');
-                  setDistrictFilter('');
-                  setSearchTerm('');
-                  setActiveSearchTerm('');
-                  setCurrentPage(1);
-                }}
-                className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs hover:bg-red-200 transition-colors"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
+        persistState={true}
+        stateKey="admin-users"
 
-        {/* Players List */}
-        {filteredPlayers.length === 0 ? (
-          <div className="text-center py-12">
-            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 font-fira mb-2">
-              No players found
-            </h3>
-            <p className="text-gray-600 font-fira">
-              {activeSearchTerm || verificationFilter !== 'all' || genderFilter !== 'all' || teamStatusFilter !== 'all' || sportFilter || districtFilter
-                ? 'Try adjusting your search or filters' 
-                : 'Players will appear here as they register'}
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Desktop Table View */}
-            <div className="hidden md:block bg-white rounded-lg shadow-sm border mb-6 overflow-hidden relative">
-              {tableLoading && (
-                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-                  <div className="flex items-center space-x-2">
-                    <Loader2 className="w-5 h-5 animate-spin text-[#F28C38]" />
-                    <span className="text-gray-600">Updating results...</span>
-                  </div>
-                </div>
-              )}
-              <div className="overflow-x-auto">
-                <table className="w-full divide-y divide-gray-200" style={{minWidth: '800px'}}>
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredPlayers.map((player) => {
-                    const docStatus = getDocumentStatus(player);
-                    return (
-                      <tr key={player.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="font-medium text-gray-900">{player.name}</div>
-                          <div className="text-xs text-gray-500">
-                            {player.gender === 'M' ? 'Male' : 'Female'} • Age: {player.age || 'N/A'} • {player.position || 'Main'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {player.team ? (
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">{player.team.name}</div>
-                              <div className="text-xs text-gray-500">{player.team.sportName} • {player.team.genderCategory}</div>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-400 italic">No Team</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{player.phone}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{player.profileData?.panchayat || 'Not provided'}</div>
-                          <div className="text-xs text-gray-500">{player.profileData?.district || 'N/A'}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getVerificationStatusColor(player.verificationStatus)}`}>
-                            {getVerificationStatusIcon(player.verificationStatus)}
-                            <span className="ml-1 capitalize">{player.verificationStatus}</span>
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className={`flex items-center ${docStatus.color}`}>
-                            {docStatus.icon}
-                            <span className="ml-1 text-xs capitalize">{docStatus.status}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {player.addedAt ? new Date(player.addedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unknown'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            onClick={() => router.push(`/${lang}/admin/teams/${player.team?.id}#player-${player.id}`)}
-                            className="text-[#F28C38] hover:text-[#E67A26] font-medium text-sm flex items-center"
-                            disabled={!player.team}
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-4 mb-6 relative">
-              {tableLoading && (
-                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-                  <div className="flex items-center space-x-2">
-                    <Loader2 className="w-5 h-5 animate-spin text-[#F28C38]" />
-                    <span className="text-gray-600">Updating results...</span>
-                  </div>
-                </div>
-              )}
-              {filteredPlayers.map((player) => {
-                const docStatus = getDocumentStatus(player);
-                return (
-                  <div key={player.id} className="bg-white rounded-lg shadow-sm border p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{player.name}</h3>
-                        <p className="text-sm text-gray-600">{player.phone}</p>
-                      </div>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getVerificationStatusColor(player.verificationStatus)}`}>
-                        {getVerificationStatusIcon(player.verificationStatus)}
-                        <span className="ml-1 capitalize">{player.verificationStatus}</span>
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 text-sm text-gray-600 mb-4">
-                      <div><strong>Team:</strong> {player.team ? `${player.team.name} (${player.team.sportName})` : 'No Team'}</div>
-                      <div><strong>Gender & Age:</strong> {player.gender === 'M' ? 'Male' : 'Female'}, {player.age || 'N/A'} years</div>
-                      <div><strong>Position:</strong> {player.position || 'Main'}</div>
-                      <div><strong>Location:</strong> {player.profileData?.panchayat || 'Not provided'}, {player.profileData?.district || 'N/A'}</div>
-                      <div className={`flex items-center ${docStatus.color}`}>
-                        <strong>Documents:</strong>
-                        {docStatus.icon}
-                        <span className="ml-1 text-xs capitalize">{docStatus.status}</span>
-                      </div>
-                      <div><strong>Added:</strong> {player.addedAt ? new Date(player.addedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unknown'}</div>
-                    </div>
-
-                    <button
-                      onClick={() => router.push(`/${lang}/admin/teams/${player.team?.id}#player-${player.id}`)}
-                      disabled={!player.team}
-                      className="w-full bg-[#F28C38] hover:bg-[#E67A26] text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Details
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {/* Pagination */}
-        {hasMore && (
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              disabled={loading}
-              className="px-6 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors disabled:opacity-50 flex items-center mx-auto"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Loading...
-                </>
-              ) : (
-                'Load More Players'
-              )}
-            </button>
-          </div>
-        )}
+        emptyState={{
+          icon: Users,
+          title: 'No users found',
+          description: 'Try adjusting your search or filters'
+        }}
+      />
     </div>
   );
 }

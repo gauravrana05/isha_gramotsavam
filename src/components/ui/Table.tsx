@@ -136,8 +136,12 @@ const sortData = <T,>(data: T[], sortConfig: SortConfig[], columns: Column<T>[])
       const column = columns.find(col => (col.sortKey || col.key) === sort.key);
       if (!column) continue;
       
-      let aValue = column.accessor ? getNestedValue(a, column.accessor) : getNestedValue(a, column.key);
-      let bValue = column.accessor ? getNestedValue(b, column.accessor) : getNestedValue(b, column.key);
+      let aValue = column.accessor 
+        ? (typeof column.accessor === 'function' ? column.accessor(a) : getNestedValue(a, String(column.accessor)))
+        : getNestedValue(a, String(column.key));
+      let bValue = column.accessor 
+        ? (typeof column.accessor === 'function' ? column.accessor(b) : getNestedValue(b, String(column.accessor)))
+        : getNestedValue(b, String(column.key));
       
       // Handle null/undefined values
       if (aValue == null && bValue == null) continue;
@@ -174,7 +178,9 @@ const filterData = <T,>(
     const searchLower = search.toLowerCase();
     filtered = filtered.filter(item => {
       return columns.some(column => {
-        const value = column.accessor ? getNestedValue(item, column.accessor) : getNestedValue(item, column.key);
+        const value = column.accessor 
+          ? (typeof column.accessor === 'function' ? column.accessor(item) : getNestedValue(item, String(column.accessor)))
+          : getNestedValue(item, String(column.key));
         return value != null && String(value).toLowerCase().includes(searchLower);
       });
     });
@@ -594,8 +600,8 @@ export const Table = <T,>({
                     {/* Data cells */}
                     {columns.map((column) => {
                       const value = column.accessor ? 
-                        getNestedValue(item, column.accessor) : 
-                        getNestedValue(item, column.key);
+                        (typeof column.accessor === 'function' ? column.accessor(item) : getNestedValue(item, String(column.accessor))) : 
+                        getNestedValue(item, String(column.key));
                       
                       return (
                         <td

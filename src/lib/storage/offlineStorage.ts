@@ -100,7 +100,11 @@ class OfflineStorage {
 
       // Store in IndexedDB
       if (!options.skipIndexedDB && this.db) {
-        await this.db.put(collection, document);
+        try {
+          await this.db.put(collection, document);
+        } catch (error) {
+          console.warn('Failed to store in IndexedDB:', error);
+        }
       }
 
       // Store in memory cache
@@ -185,10 +189,18 @@ class OfflineStorage {
       await this.ensureInitialized();
 
       if (!this.db) {
-        return { success: false, error: 'Database not available' };
+        // Return empty array instead of error for graceful degradation
+        console.warn(`Database not available for getAll(${collection}), returning empty array`);
+        return { success: true, data: [], fromCache: false };
       }
 
-      let documents = await this.db.getAll(collection);
+      let documents: OfflineDocument[] = [];
+      try {
+        documents = await this.db.getAll(collection);
+      } catch (error) {
+        console.warn('Failed to get documents from IndexedDB:', error);
+        return { success: true, data: [], fromCache: false };
+      }
 
       // Apply filters
       if (options.where) {

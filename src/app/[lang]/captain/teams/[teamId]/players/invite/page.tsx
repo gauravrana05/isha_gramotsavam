@@ -1668,7 +1668,7 @@ export default function CaptainPlayerManagement() {
                     <div>
                       <h4 className="font-medium text-yellow-800">Important Notice</h4>
                       <p className="text-sm text-yellow-700 mt-1">
-                        Once submitted, your team will be locked for verification. You won't be able to make changes until the review is complete.
+                        Once submitted, your team will be locked for verification. You won&apos;t be able to make changes until the review is complete.
                       </p>
                     </div>
                   </div>

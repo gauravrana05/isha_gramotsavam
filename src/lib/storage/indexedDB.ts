@@ -140,11 +140,16 @@ class IndexedDBManager {
    * Initialize the database connection
    */
   async initialize(): Promise<void> {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      throw new Error('IndexedDB is not available in this environment');
+    }
+
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.version);
 
       request.onerror = () => {
         console.error('Failed to open IndexedDB:', request.error);
+        this.db = null; // Ensure db is null on error
         reject(request.error);
       };
 
@@ -253,18 +258,33 @@ class IndexedDBManager {
    */
   async getAll(storeName: string): Promise<OfflineDocument[]> {
     if (!this.db) {
-      throw new Error('Database not initialized');
+      console.warn('Database not initialized, returning empty array');
+      return [];
     }
 
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([storeName], 'readonly');
-      const store = transaction.objectStore(storeName);
-      const request = store.getAll();
+      try {
+        const transaction = this.db!.transaction([storeName], 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.getAll();
 
-      request.onsuccess = () => {
-        resolve(request.result || []);
-      };
-      request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          resolve(request.result || []);
+        };
+
+        request.onerror = () => {
+          console.warn('IndexedDB getAll failed:', request.error);
+          resolve([]); // Return empty array instead of rejecting
+        };
+
+        transaction.onerror = () => {
+          console.warn('IndexedDB transaction failed:', transaction.error);
+          resolve([]); // Return empty array instead of rejecting
+        };
+      } catch (error) {
+        console.warn('IndexedDB getAll exception:', error);
+        resolve([]); // Return empty array instead of rejecting
+      }
     });
   }
 

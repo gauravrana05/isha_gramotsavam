@@ -195,3 +195,84 @@ export async function addVolunteer(formData: FormData) {
     };
   }
 }
+
+export async function getVolunteerVenueAssignments(adminUid: string) {
+  try {
+    // Verify admin permissions
+    const adminDoc = await adminDb.collection('users').doc(adminUid).get();
+    if (!adminDoc.exists || adminDoc.data()?.role !== 'admin') {
+      return {
+        success: false,
+        error: 'Unauthorized: Admin access required'
+      };
+    }
+
+    // Get all volunteer venue assignments
+    const assignmentsSnapshot = await adminDb.collection('volunteerVenueAssignment').get();
+    
+    const assignments: Record<string, string> = {};
+    assignmentsSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.volunteerId && data.venueName) {
+        assignments[data.volunteerId] = data.venueName;
+      }
+    });
+
+    return {
+      success: true,
+      assignments
+    };
+  } catch (error) {
+    console.error('Error fetching volunteer venue assignments:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch assignments'
+    };
+  }
+}
+
+export async function getVolunteerVenueAssignmentDetails(adminUid: string) {
+  try {
+    // Verify admin permissions
+    const adminDoc = await adminDb.collection('users').doc(adminUid).get();
+    if (!adminDoc.exists || adminDoc.data()?.role !== 'admin') {
+      return {
+        success: false,
+        error: 'Unauthorized: Admin access required'
+      };
+    }
+
+    // Get all volunteer venue assignments with full details
+    const assignmentsSnapshot = await adminDb.collection('volunteerVenueAssignment').get();
+    
+    const assignments = assignmentsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        assignmentId: data.assignmentId || doc.id,
+        volunteerId: data.volunteerId,
+        volunteerName: data.volunteerName,
+        volunteerType: data.volunteerType,
+        venueId: data.venueId,
+        venueName: data.venueName,
+        status: data.status,
+        eventId: data.eventId,
+        assignedBy: data.assignedBy,
+        createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
+        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || null,
+        assignedAt: data.createdAt?.toDate?.()?.toISOString() || null
+      };
+    });
+
+    return {
+      success: true,
+      assignments
+    };
+  } catch (error) {
+    console.error('Error fetching volunteer venue assignment details:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch assignment details'
+    };
+  }
+}
