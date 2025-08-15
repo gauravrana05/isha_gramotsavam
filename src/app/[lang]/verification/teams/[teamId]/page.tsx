@@ -414,22 +414,14 @@ export default function TeamVerificationPage() {
       if (teamData && user && userProfile) {
         for (const player of selectedPlayersList) {
           await auditLogService.logPlayerVerification(
-            { // actor
-              uid: user.uid,
-              name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-              role: userProfile.role
-            },
-            { // team
-              id: teamData.id,
-              name: teamData.name
-            },
-            { // player
-              id: player.playerId,
-              name: player.name
-            },
-            player.verificationStatus, // oldStatus
-            action, // newStatus
-            reason || null // reason
+            user.uid, // volunteerId
+            `${userProfile.firstName} ${userProfile.lastName}`.trim(), // volunteerName
+            player.playerId, // playerId
+            player.name, // playerName
+            teamData.id, // teamId
+            teamData.name, // teamName
+            action, // status
+            reason || undefined // comments
           );
         }
 

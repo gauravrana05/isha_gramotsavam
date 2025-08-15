@@ -60,11 +60,11 @@ function AssignmentModal({ isOpen, onClose, onSuccess }: AssignmentModalProps) {
     try {
       if (!user?.uid) return;
       
-      // Get volunteers
+      // Get volunteers (only general_volunteer users available for assignment)
       const volunteersResult = await getAdminUsers({
         limit: 100,
         offset: 0,
-        role: 'volunteer',
+        role: 'general_volunteer',
         gender: 'all',
         district: undefined,
         isVerified: 'all',

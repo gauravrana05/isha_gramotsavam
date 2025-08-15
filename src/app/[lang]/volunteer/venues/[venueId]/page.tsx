@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import { getVenueTeamsForMatchDay } from '@/lib/actions/volunteer/matchDayVerification';
-import { getVenueCheckedInTeams } from '@/lib/actions/tournament/fixtureManagement';
+import { getVenueCheckedInTeams, getVenueFixtures, getVenueDetails } from '@/lib/actions/tournament/fixtureManagement';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
@@ -15,6 +15,7 @@ interface PageProps {
     lang: string;
   }>;
 }
+
 
 export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) {
   const { venueId } = use(params);
@@ -44,23 +45,59 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
       setLoading(true);
       
       // Fetch teams for match day verification
-      const teamsResult = await getVenueTeamsForMatchDay(venueId, user!.uid);
-      
-      if (teamsResult.success) {
-        setTeams(teamsResult.teams ?? []);
-      } else {
-        setError(teamsResult.error || 'Failed to load teams');
+      try {
+        const teamsResult = await getVenueTeamsForMatchDay(venueId, user!.uid);
+        
+        if (teamsResult.success) {
+          setTeams(teamsResult.teams ?? []);
+        } else {
+          setError(teamsResult.error || 'Failed to load teams');
+        }
+      } catch (teamsError) {
+        console.error('Error fetching teams:', teamsError);
+        setTeams([]);
       }
-      // Fetch checked-in teams for sports overview
-      const checkedInResult = await getVenueCheckedInTeams(venueId, 'isha_gramotsavam_2025');
-      setCheckedInTeamsResult(checkedInResult);
       
-      // Set a mock venue for now - in production you'd create an API route
-      setVenue({
-        id: venueId,
-        name: `Venue ${venueId}`,
-        location: 'Match Day Verification Center'
-      });
+      // Fetch checked-in teams for sports overview
+      try {
+        const checkedInResult = await getVenueCheckedInTeams(venueId, 'isha_gramotsavam_2025');
+        setCheckedInTeamsResult(checkedInResult);
+      } catch (checkedInError) {
+        console.error('Error fetching checked-in teams:', checkedInError);
+        setCheckedInTeamsResult({ success: false, teams: [], teamsBySport: {}, totalTeams: 0 });
+      }
+      
+      // Fetch venue fixtures
+      try {
+        const fixturesData = await getVenueFixtures(venueId);
+        setFixtures(fixturesData);
+      } catch (fixturesError) {
+        console.error('Error fetching fixtures:', fixturesError);
+        setFixtures([]);
+      }
+      
+      // Fetch real venue details
+      try {
+        const venueResult = await getVenueDetails(venueId);
+        if (venueResult.success && venueResult.venue) {
+          setVenue(venueResult.venue);
+        } else {
+          // Fallback if venue not found
+          setVenue({
+            id: venueId,
+            name: `Venue ${venueId}`,
+            location: 'Match Day Verification Center'
+          });
+        }
+      } catch (venueError) {
+        console.error('Error fetching venue details:', venueError);
+        // Use fallback venue data
+        setVenue({
+          id: venueId,
+          name: `Venue ${venueId}`,
+          location: 'Match Day Verification Center'
+        });
+      }
       
     } catch (err) {
       console.error('Error loading venue data:', err);
@@ -113,7 +150,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
           {venue?.name || 'Match Day Venue'}
         </h1>
         <p className="text-sm sm:text-base text-gray-600 font-fira">
-          {venue?.location || 'Technical Volunteer Station'} - Match Day Operations
+          {venue?.address || venue?.location || 'Technical Volunteer Station'} - Match Day Operations
         </p>
       </div>
 
@@ -246,13 +283,29 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
                     {(sportTeams as any)?.length} teams checked in
                   </div>
                   
-                  {(sportTeams as any)?.length >= 2 && (
-                    <Link href={`/volunteer/venues/${venueId}/fixtures/create-draw?sport=${sportId}&gender=${genderCategory}`}>
-                      <button className="mt-3 bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors text-sm">
-                        Create Tournament
-                      </button>
-                    </Link>
-                  )}
+                  {(sportTeams as any)?.length >= 2 && (() => {
+                    const existingFixture = fixtures.find(f => 
+                      f.sportId === sportId && f.genderCategory === genderCategory
+                    );
+                    
+                    if (existingFixture) {
+                      return (
+                        <Link href={`/en/volunteer/venues/${venueId}/fixtures/${existingFixture.id}`}>
+                          <button className="mt-3 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm">
+                            View Tournament
+                          </button>
+                        </Link>
+                      );
+                    } else {
+                      return (
+                        <Link href={`/en/volunteer/venues/${venueId}/fixtures/create-draw?sport=${sportId}&gender=${genderCategory}`}>
+                          <button className="mt-3 bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors text-sm">
+                            Create Tournament
+                          </button>
+                        </Link>
+                      );
+                    }
+                  })()}
                 </div>
               );
             })}
@@ -274,13 +327,13 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
                   </p>
                 </div>
                 <div className="flex space-x-2">
-                  <Link href={`/volunteer/venues/${venueId}/fixtures/${fixture.id}`}>
+                  <Link href={`/en/volunteer/venues/${venueId}/fixtures/${fixture.id}`}>
                     <Button size="sm" variant="outline">
                       Manage
                     </Button>
                   </Link>
                   {fixture.status === 'in_progress' && (
-                    <Link href={`/volunteer/venues/${venueId}/matches?fixture=${fixture.id}`}>
+                    <Link href={`/en/volunteer/venues/${venueId}/matches?fixture=${fixture.id}`}>
                       <Button size="sm">
                         Live Matches
                       </Button>
@@ -319,7 +372,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
               </div>
             ))}
             {teams.length > 5 && (
-              <Link href={`/volunteer/venues/${venueId}/teams`}>
+              <Link href={`/en/volunteer/venues/${venueId}/teams`}>
                 <Button variant="outline" size="sm" className="w-full mt-2">
                   View All {teams.length} Teams
                 </Button>

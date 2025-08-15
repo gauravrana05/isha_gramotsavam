@@ -25,9 +25,7 @@ interface VenueLocationMappingFormProps {
 export default function VenueLocationMappingForm({ venues, districtsWithMultipleVenues }: VenueLocationMappingFormProps) {
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [availableTaluks, setAvailableTaluks] = useState<string[]>([]);
-  const [availablePanchayats, setAvailablePanchayats] = useState<string[]>([]);
   const [selectedTaluks, setSelectedTaluks] = useState<string[]>([]);
-  const [selectedPanchayats, setSelectedPanchayats] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [maxTeams, setMaxTeams] = useState(20);
@@ -42,9 +40,7 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
     if (!venueId) {
       setSelectedVenue(null);
       setAvailableTaluks([]);
-      setAvailablePanchayats([]);
       setSelectedTaluks([]);
-      setSelectedPanchayats([]);
       return;
     }
 
@@ -68,64 +64,21 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
       const data = await pincodeService.getTaluksByDistrict(state, district);
       console.log('Received data:', data);
       setAvailableTaluks(data.taluks || []);
-      setAvailablePanchayats(data.panchayats || []);
       setSelectedTaluks([]);
-      setSelectedPanchayats([]);
     } catch (err: any) {
       console.error('Error loading taluks:', err);
       setError(err.message || 'Failed to load taluks');
       setAvailableTaluks([]);
-      setAvailablePanchayats([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadPanchayats = async (state: string, district: string, taluk: string) => {
-    setLoading(true);
-    try {
-      const panchayats = await pincodeService.getPanchayatsByTaluk(state, district, taluk);
-      setAvailablePanchayats(prev => {
-        const combined = [...prev, ...panchayats];
-        return Array.from(new Set(combined)); // Remove duplicates
-      });
-    } catch (err: any) {
-      console.error('Failed to load panchayats for taluk:', taluk, err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTalukChange = async (taluk: string, checked: boolean) => {
+  const handleTalukChange = (taluk: string, checked: boolean) => {
     if (checked) {
       setSelectedTaluks(prev => [...prev, taluk]);
-      if (selectedVenue) {
-        await loadPanchayats(selectedVenue.address.state, selectedVenue.address.district, taluk);
-      }
     } else {
       setSelectedTaluks(prev => prev.filter(t => t !== taluk));
-      // Remove panchayats for this taluk
-      if (selectedVenue) {
-        try {
-          const talukPanchayats = await pincodeService.getPanchayatsByTaluk(
-            selectedVenue.address.state, 
-            selectedVenue.address.district, 
-            taluk
-          );
-          setAvailablePanchayats(prev => prev.filter(p => !talukPanchayats.includes(p)));
-          setSelectedPanchayats(prev => prev.filter(p => !talukPanchayats.includes(p)));
-        } catch (err) {
-          console.error('Error removing panchayats:', err);
-        }
-      }
-    }
-  };
-
-  const handlePanchayatChange = (panchayat: string, checked: boolean) => {
-    if (checked) {
-      setSelectedPanchayats(prev => [...prev, panchayat]);
-    } else {
-      setSelectedPanchayats(prev => prev.filter(p => p !== panchayat));
     }
   };
 
@@ -137,8 +90,8 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
       return;
     }
 
-    if (selectedTaluks.length === 0 && selectedPanchayats.length === 0) {
-      setError('Please select at least one taluk or panchayat');
+    if (selectedTaluks.length === 0) {
+      setError('Please select at least one taluk');
       return;
     }
 
@@ -150,7 +103,7 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
     formData.append('state', selectedVenue.address.state);
     formData.append('districts', selectedVenue.address.district);
     formData.append('taluks', selectedTaluks.join(','));
-    formData.append('panchayats', selectedPanchayats.join(','));
+    formData.append('panchayats', ''); // Empty since we're not using panchayats
     formData.append('maxTeams', maxTeams.toString());
 
     try {
@@ -158,9 +111,7 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
       // Reset form
       setSelectedVenue(null);
       setAvailableTaluks([]);
-      setAvailablePanchayats([]);
       setSelectedTaluks([]);
-      setSelectedPanchayats([]);
       setMaxTeams(20);
       setError('');
     } catch (err: any) {
@@ -188,7 +139,7 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
 
   return (
     <Card className="mb-8 p-6">
-      <h2 className="text-lg font-semibold mb-4">Create Venue Location Mapping</h2>
+      <h2 className="text-lg font-semibold mb-4">Create Venue-Taluk Mapping</h2>
       
       {districtsWithMultipleVenues.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
@@ -201,7 +152,7 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
             ).join(', ')}
           </div>
           <p className="text-xs text-yellow-600 mt-2">
-            Map venues to specific taluks/panchayats to avoid conflicts during team assignment.
+            Map venues to specific taluks to avoid conflicts during team assignment.
           </p>
         </div>
       )}
@@ -248,6 +199,9 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
                 Select Taluks to assign to this venue
                 {loading && <span className="text-blue-500 ml-2">(Loading...)</span>}
               </label>
+              <p className="text-sm text-gray-500 mb-3">
+                Teams from the selected taluks will be automatically assigned to this venue.
+              </p>
               
               {availableTaluks.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4">
@@ -268,27 +222,6 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
               ) : null}
             </div>
 
-            {/* Panchayat Selection */}
-            {availablePanchayats.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Select Panchayats (optional - for more specific mapping)
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-4">
-                  {availablePanchayats.map(panchayat => (
-                    <label key={panchayat} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm">
-                      <input
-                        type="checkbox"
-                        checked={selectedPanchayats.includes(panchayat)}
-                        onChange={(e) => handlePanchayatChange(panchayat, e.target.checked)}
-                        className="rounded border-gray-300 text-[#3A7F3F] focus:ring-[#3A7F3F]"
-                      />
-                      <span>{panchayat}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Max Teams */}
             <div>
@@ -305,22 +238,15 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
             </div>
 
             {/* Selection Summary */}
-            {(selectedTaluks.length > 0 || selectedPanchayats.length > 0) && (
+            {selectedTaluks.length > 0 && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-medium text-blue-900 mb-2">Mapping Summary</h4>
                 <div className="text-sm text-blue-800">
                   <div><strong>Venue:</strong> {selectedVenue.name}</div>
                   <div><strong>Will serve teams from:</strong></div>
-                  {selectedTaluks.length > 0 && (
-                    <div className="ml-4 mt-1">
-                      <strong>Taluks:</strong> {selectedTaluks.join(', ')}
-                    </div>
-                  )}
-                  {selectedPanchayats.length > 0 && (
-                    <div className="ml-4 mt-1">
-                      <strong>Panchayats:</strong> {selectedPanchayats.join(', ')}
-                    </div>
-                  )}
+                  <div className="ml-4 mt-1">
+                    <strong>Taluks:</strong> {selectedTaluks.join(', ')}
+                  </div>
                   <div className="mt-2"><strong>Max Teams:</strong> {maxTeams}</div>
                 </div>
               </div>
@@ -328,7 +254,7 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
 
             <Button 
               type="submit" 
-              disabled={loading || (selectedTaluks.length === 0 && selectedPanchayats.length === 0)}
+              disabled={loading || selectedTaluks.length === 0}
               className="w-full"
             >
               {loading ? 'Creating...' : 'Create Mapping'}

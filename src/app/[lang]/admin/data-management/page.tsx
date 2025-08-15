@@ -22,11 +22,11 @@ import {
 import { PageLoader } from '@/components/ui';
 
 // Import individual collection management components
-import UsersManagement from './components/UsersManagement';
-import TeamsManagement from './components/TeamsManagement';
+import UsersManagement from './components/UsersManagementFixed';
+import TeamsManagement from './components/TeamsManagementEnhanced';
 import EventsManagement from './components/EventsManagement';
 import SportsManagement from './components/SportsManagement';
-import VenuesManagement from './components/VenuesManagement';
+import VenuesManagement from './components/VenuesManagementEnhanced';
 import MatchesManagement from './components/MatchesManagement';
 import FixturesManagement from './components/FixturesManagement';
 import MediaManagement from './components/MediaManagement';
@@ -34,16 +34,9 @@ import NotificationsManagement from './components/NotificationsManagement';
 import SystemConfigManagement from './components/SystemConfigManagement';
 
 type TabId = 
-  | 'users' 
+  | 'users'
   | 'teams' 
-  | 'events' 
-  | 'sports' 
-  | 'venues' 
-  | 'matches' 
-  | 'fixtures' 
-  | 'media' 
-  | 'notifications' 
-  | 'systemConfig';
+  | 'venues';
 
 interface TabConfig {
   id: TabId;
@@ -57,61 +50,19 @@ const tabs: TabConfig[] = [
     id: 'users',
     label: 'Users',
     icon: Users,
-    description: 'Manage user profiles, roles, and authentication data'
+    description: 'Create captains, players, and volunteers for Isha Gramotsavam 2025'
   },
   {
     id: 'teams',
     label: 'Teams',
     icon: Trophy,
-    description: 'Create and manage teams with players and captains'
-  },
-  {
-    id: 'events',
-    label: 'Events',
-    icon: Calendar,
-    description: 'Configure tournament events and competitions'
-  },
-  {
-    id: 'sports',
-    label: 'Sports',
-    icon: Gamepad2,
-    description: 'Define sports with rules, eligibility, and team configs'
+    description: 'Bulk create teams with captains and players, set team status'
   },
   {
     id: 'venues',
     label: 'Venues',
     icon: MapPin,
-    description: 'Manage tournament venues and locations'
-  },
-  {
-    id: 'matches',
-    label: 'Matches',
-    icon: PlayCircle,
-    description: 'Create and schedule individual matches'
-  },
-  {
-    id: 'fixtures',
-    label: 'Fixtures',
-    icon: RefreshCw,
-    description: 'Generate tournament brackets and fixtures'
-  },
-  {
-    id: 'media',
-    label: 'Media',
-    icon: Images,
-    description: 'Upload and manage tournament media assets'
-  },
-  {
-    id: 'notifications',
-    label: 'Notifications',
-    icon: Bell,
-    description: 'Send notifications and manage templates'
-  },
-  {
-    id: 'systemConfig',
-    label: 'System Config',
-    icon: Settings,
-    description: 'Configure global system settings'
+    description: 'Create venues with proper district mapping and assign volunteers'
   }
 ];
 
@@ -143,22 +94,8 @@ export default function DataManagementPage() {
         return <UsersManagement />;
       case 'teams':
         return <TeamsManagement />;
-      case 'events':
-        return <EventsManagement />;
-      case 'sports':
-        return <SportsManagement />;
       case 'venues':
         return <VenuesManagement />;
-      case 'matches':
-        return <MatchesManagement />;
-      case 'fixtures':
-        return <FixturesManagement />;
-      case 'media':
-        return <MediaManagement />;
-      case 'notifications':
-        return <NotificationsManagement />;
-      case 'systemConfig':
-        return <SystemConfigManagement />;
       default:
         return <div>Select a collection to manage</div>;
     }
@@ -182,7 +119,7 @@ export default function DataManagementPage() {
             <h1 className="text-3xl font-bold text-gray-900">Data Management</h1>
           </div>
           <p className="text-gray-600">
-            Manage test data across all collections. Create, edit, and delete records for testing purposes.
+            Create and manage test data for Isha Gramotsavam 2025. Bulk create teams with captains/players, venues with volunteers.
           </p>
         </div>
 

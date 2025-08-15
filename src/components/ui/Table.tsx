@@ -112,6 +112,10 @@ export interface TableProps<T = any> extends BaseComponentProps {
   
   // Bulk actions
   bulkActions?: ActionButton<T[]>[];
+  // Virtualization
+  virtualize?: boolean;
+  rowHeight?: number;
+  viewportHeight?: number;
 }
 
 // Get nested value from object using dot notation or function
@@ -347,7 +351,7 @@ const LoadingState = ({ rows = 5 }: { rows?: number }) => (
 );
 
 // Main Table component
-export const Table = <T,>({
+export function Table<T>({
   data,
   columns,
   actions,
@@ -386,8 +390,12 @@ export const Table = <T,>({
   keyExtractor = (item, index) => index,
   bulkActions,
   className,
-  ...props
-}: TableProps<T>) => {
+  // virtualization props should not be spread to DOM
+  virtualize: virtualizeProp,
+  rowHeight: rowHeightProp,
+  viewportHeight: viewportHeightProp,
+  ...rest
+}: TableProps<T>) {
   // Local state for controlled/uncontrolled mode
   const [internalSearch, setInternalSearch] = useState(searchValue);
   const [internalSortConfig, setInternalSortConfig] = useState<SortConfig[]>(sortConfig);
@@ -461,6 +469,24 @@ export const Table = <T,>({
     }
   }, [onSearchChange]);
   
+  // Simple row virtualization (windowing) for large datasets - hooks must come before any returns
+  const shouldVirtualize = !!virtualizeProp && !pagination;
+  const rowHeight = rowHeightProp ?? 44;
+  const viewportHeight = viewportHeightProp ?? 480;
+  const totalRows = processedData.length;
+  const visibleCount = Math.max(1, Math.ceil(viewportHeight / rowHeight) + 6);
+
+  // Compute start/end for window based on scrollTop (tracked via ref handler)
+  const [scrollTop, setScrollTop] = useState(0);
+  const startIndex = shouldVirtualize ? Math.max(0, Math.floor(scrollTop / rowHeight) - 3) : 0;
+  const endIndex = shouldVirtualize ? Math.min(totalRows, startIndex + visibleCount) : totalRows;
+  const offsetY = shouldVirtualize ? startIndex * rowHeight : 0;
+
+  const onScroll = useCallback((e: React.UIEvent<HTMLElement>) => {
+    const target = e.target as HTMLElement;
+    setScrollTop(target.scrollTop || 0);
+  }, []);
+  
   // Loading state
   if (loading && processedData.length === 0) {
     return <LoadingState />;
@@ -470,17 +496,18 @@ export const Table = <T,>({
   if (processedData.length === 0 && emptyState && !loading) {
     return <EmptyState emptyState={emptyState} />;
   }
-  
+
   return (
-    <div className={cn('w-full', className)} {...props}>
+    <div className={cn('w-full', className)} {...rest}>
       {/* Table Container with horizontal scroll */}
       <div className="bg-white rounded-lg border overflow-hidden">
         <div 
-          className="overflow-x-auto" 
+          className="overflow-x-auto"
           style={{ 
             scrollbarWidth: 'thin',
             scrollbarColor: 'var(--isha-saffron) var(--isha-background)'
           }}
+          onScroll={shouldVirtualize ? onScroll : undefined}
         >
           <table 
             className={cn(
@@ -559,8 +586,15 @@ export const Table = <T,>({
             </thead>
             
             {/* Table Body */}
-            <tbody className="bg-white divide-y divide-gray-200">
-              {processedData.map((item, index) => {
+            <tbody 
+              className="bg-white divide-y divide-gray-200 transition-opacity duration-300 ease-in-out"
+              style={shouldVirtualize ? { display: 'block', height: viewportHeight } as any : undefined}
+            >
+              {shouldVirtualize && (
+                <tr style={{ height: offsetY, display: 'block' }} />
+              )}
+              {(shouldVirtualize ? processedData.slice(startIndex, endIndex) : processedData).map((item, i) => {
+                const index = shouldVirtualize ? startIndex + i : i;
                 const rowKey = keyExtractor(item, index);
                 const isSelected = selectedRows.has(rowKey);
                 
@@ -575,6 +609,7 @@ export const Table = <T,>({
                       compactMode && 'text-sm'
                     )}
                     onClick={() => onRowClick?.(item, index)}
+                    style={shouldVirtualize ? { display: 'block', height: rowHeight } as any : undefined}
                   >
                     {/* Selection cell */}
                     {selectable && (
@@ -642,6 +677,9 @@ export const Table = <T,>({
                   </tr>
                 );
               })}
+              {shouldVirtualize ? (
+                <tr style={{ height: Math.max(0, (totalRows - endIndex) * rowHeight), display: 'block' }} />
+              ) : null}
             </tbody>
           </table>
           
@@ -656,8 +694,11 @@ export const Table = <T,>({
           )}
         </div>
       </div>
+      {shouldVirtualize && (
+        <div className="mt-2 text-xs text-gray-500">Showing rows {startIndex + 1}-{Math.min(endIndex, totalRows)} of {totalRows}</div>
+      )}
     </div>
   );
-};
+}
 
 export default Table;

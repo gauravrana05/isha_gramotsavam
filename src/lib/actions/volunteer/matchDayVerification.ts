@@ -4,6 +4,8 @@ import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { revalidatePath } from 'next/cache';
 import { Timestamp } from 'firebase-admin/firestore';
+import { serializeFirestoreData } from '@/lib/utils/firestore';
+import { auditLogService } from '@/lib/services/auditLogService';
 interface MatchDayPlayerVerification {
   playerId: string;
   status: 'verified' | 'rejected';
@@ -53,25 +55,6 @@ interface MatchDayPlayerData {
   matchDayComments?: string;
 }
 
-function serializeFirestoreData(data: any): any {
-  if (data instanceof Timestamp) {
-    return data.toDate().toISOString();
-  }
-
-  if (Array.isArray(data)) {
-    return data.map(serializeFirestoreData);
-  }
-
-  if (data !== null && typeof data === 'object') {
-    const result: any = {};
-    for (const key in data) {
-      result[key] = serializeFirestoreData(data[key]);
-    }
-    return result;
-  }
-
-  return data;
-}
 
 
 export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: string) {
@@ -91,7 +74,7 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
 
     const teamVenueQuery = await adminDb
       .collection('teamVenueAssignment')
-      .where('venueId', '==', venueId)
+      .where('clusterVenueId', '==', venueId)
       .where('eventId', '==', 'isha_gramotsavam_2025')
       .get();
 
@@ -204,7 +187,7 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
       }
 
       // Get fresh document data from users collection if available
-      let userDocuments = playerData.documents;
+      let userDocuments = serializeFirestoreData(playerData.documents);
       if (playerData.userId && !playerData.userId.startsWith('user_')) {
         try {
           const userDocRef = adminDb.collection("users").doc(playerData.userId);
@@ -212,7 +195,7 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
           if (userDoc.exists) {
             const freshUserData = userDoc.data();
             if (freshUserData?.documents) {
-              userDocuments = freshUserData.documents;
+              userDocuments = serializeFirestoreData(freshUserData.documents);
             }
           }
         } catch (error) {
@@ -230,33 +213,15 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
         gender: playerData.gender || 'M',
         position: playerData.position || 'main',
         profileComplete: playerData.profileComplete || false,
-        documents: {
-          profilePhoto: {
-            url: userDocuments?.profilePhoto?.url || null,
-            verified: userDocuments?.profilePhoto?.verified || false,
-            storagePath: userDocuments?.profilePhoto?.storagePath || null,
-            uploadedBy: userDocuments?.profilePhoto?.uploadedBy || null,
-            uploadedAt: userDocuments?.profilePhoto?.uploadedAt?.toDate?.()?.toISOString() || null
-          },
-          aadhaarFront: {
-            url: userDocuments?.aadhaarFront?.url || null,
-            verified: userDocuments?.aadhaarFront?.verified || false,
-            storagePath: userDocuments?.aadhaarFront?.storagePath || null,
-            uploadedBy: userDocuments?.aadhaarFront?.uploadedBy || null,
-            uploadedAt: userDocuments?.aadhaarFront?.uploadedAt?.toDate?.()?.toISOString() || null
-          },
-          aadhaarBack: {
-            url: userDocuments?.aadhaarBack?.url || null,
-            verified: userDocuments?.aadhaarBack?.verified || false,
-            storagePath: userDocuments?.aadhaarBack?.storagePath || null,
-            uploadedBy: userDocuments?.aadhaarBack?.uploadedBy || null,
-            uploadedAt: userDocuments?.aadhaarBack?.uploadedAt?.toDate?.()?.toISOString() || null
-          }
-        },
+        documents: serializeFirestoreData({
+          profilePhoto: userDocuments?.profilePhoto || { url: null, verified: false, storagePath: null, uploadedBy: null, uploadedAt: null },
+          aadhaarFront: userDocuments?.aadhaarFront || { url: null, verified: false, storagePath: null, uploadedBy: null, uploadedAt: null },
+          aadhaarBack: userDocuments?.aadhaarBack || { url: null, verified: false, storagePath: null, uploadedBy: null, uploadedAt: null }
+        }),
         verificationStatus: playerData.verificationStatus || 'pending',
         matchDayVerificationStatus: playerData.matchDayVerificationStatus || 'pending',
         matchDayVerifiedBy: playerData.matchDayVerifiedBy,
-        matchDayVerifiedAt: playerData.matchDayVerifiedAt?.toDate?.()?.toISOString() || null,
+        matchDayVerifiedAt: serializeFirestoreData(playerData.matchDayVerifiedAt) || null,
         matchDayComments: playerData.matchDayComments || ''
       });
     }
@@ -277,10 +242,10 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
         teamImageUrl: teamData?.teamImageUrl,
         clusterVenue: teamData?.clusterVenue,
         // Convert Firestore timestamps to strings
-        createdAt: teamData?.createdAt?.toDate?.()?.toISOString() || null,
-        submittedAt: teamData?.submittedAt?.toDate?.()?.toISOString() || null,
-        verifiedAt: teamData?.verifiedAt?.toDate?.()?.toISOString() || null,
-        updatedAt: teamData?.updatedAt?.toDate?.()?.toISOString() || null
+        createdAt: serializeFirestoreData(teamData?.createdAt) || null,
+        submittedAt: serializeFirestoreData(teamData?.submittedAt) || null,
+        verifiedAt: serializeFirestoreData(teamData?.verifiedAt) || null,
+        updatedAt: serializeFirestoreData(teamData?.updatedAt) || null
       },
       players: players
     };
@@ -413,6 +378,31 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
       }
 
       console.log(`Team ${finalTeamId} auto-checked in at venue ${teamVenueId} after all players verified`);
+    }
+
+    // Log audit for on-ground verification
+    try {
+      const teamDoc = await adminDb.collection('teams').doc(finalTeamId).get();
+      const teamData = teamDoc.data();
+      const playerDoc = await playerDocRef.get();
+      const playerData = playerDoc.data();
+
+      if (teamData && playerData && userData) {
+        await auditLogService.logOnGroundVerification(
+          verifiedBy, // volunteerId
+          `${userData.firstName} ${userData.lastName}`.trim(), // volunteerName
+          playerId, // playerId
+          playerData.name || 'Unknown Player', // playerName
+          finalTeamId, // teamId
+          teamData.name || 'Unknown Team', // teamName
+          venueId || 'Unknown Venue', // venue
+          status, // status
+          comments || undefined // comments
+        );
+      }
+    } catch (auditError) {
+      console.error('Error logging audit for match day verification:', auditError);
+      // Don't fail the main operation if audit logging fails
     }
 
     console.log(`Player ${playerId} match day verification ${status} by ${verifiedBy}`);

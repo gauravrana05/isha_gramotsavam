@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Table, type TableProps, type Column, type ActionButton, type SortConfig } from './Table';
@@ -5,6 +7,7 @@ import { TableControls, type ExportConfig, type BulkAction } from './TableContro
 import { FilterSidebar, type FilterField, type ActiveFilter } from './FilterSidebar';
 import { Pagination } from './Pagination';
 import { cn, BaseComponentProps } from '@/lib/component-patterns';
+import { Modal } from './Modal';
 
 // Combined table configuration interface
 export interface AdvancedTableConfig<T = any> {
@@ -93,6 +96,11 @@ export interface AdvancedTableProps<T = any> extends BaseComponentProps, Advance
   title?: string;
   subtitle?: string;
   additionalActions?: React.ReactNode;
+  // Virtualization
+  virtualize?: boolean;
+  virtualizeThreshold?: number; // auto-enable when data length exceeds
+  rowHeight?: number;
+  viewportHeight?: number;
 }
 
 // URL state management utilities
@@ -197,9 +205,43 @@ export const AdvancedTable = <T,>({
   subtitle,
   additionalActions,
   
+  // Props that shouldn't go to DOM
+  itemsPerPageOptions,
+  defaultItemsPerPage,
+  emptyMessage,
+  virtualize,
+  virtualizeThreshold,
+  rowHeight,
+  viewportHeight,
+  
   className,
   ...props
 }: AdvancedTableProps<T>) => {
+  // Saved views state (localStorage)
+  const savedViewsKey = stateKey ? `table:views:${stateKey}` : undefined;
+  const [views, setViews] = useState<{ label: string; value: string; state: Partial<TableState> }[]>([]);
+  const [currentView, setCurrentView] = useState<string | undefined>(undefined);
+  const [isSaveViewOpen, setIsSaveViewOpen] = useState(false);
+  const [saveViewName, setSaveViewName] = useState('');
+
+  useEffect(() => {
+    if (!savedViewsKey) return;
+    try {
+      const raw = localStorage.getItem(savedViewsKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { label: string; value: string; state: Partial<TableState> }[];
+        setViews(parsed);
+      }
+    } catch {}
+  }, [savedViewsKey]);
+
+  const persistViews = useCallback((next: { label: string; value: string; state: Partial<TableState> }[]) => {
+    if (!savedViewsKey) return;
+    setViews(next);
+    try { localStorage.setItem(savedViewsKey, JSON.stringify(next)); } catch {}
+  }, [savedViewsKey]);
+
+  // Initialize state (moved above closures to avoid temporal dead zone)
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -217,6 +259,46 @@ export const AdvancedTable = <T,>({
       ...urlState
     };
   });
+
+  const handleConfirmSaveView = useCallback(() => {
+    if (!savedViewsKey) return;
+    const name = saveViewName.trim();
+    if (!name) return;
+    const value = name.toLowerCase().replace(/\s+/g, '-');
+    const viewState: Partial<TableState> = {
+      search: state.search,
+      sort: state.sort,
+      filters: state.filters,
+      pageSize: state.pageSize,
+    } as any;
+    const next = views.filter(v => v.value !== value).concat([{ label: name, value, state: viewState }]);
+    persistViews(next);
+    setCurrentView(value);
+    setIsSaveViewOpen(false);
+    setSaveViewName('');
+  }, [persistViews, savedViewsKey, saveViewName, state.filters, state.pageSize, state.search, state.sort, views]);
+
+  const handleApplyView = useCallback((viewValue: string) => {
+    const v = views.find(v => v.value === viewValue);
+    if (!v) return;
+    setCurrentView(viewValue);
+    setState(prev => ({
+      ...prev,
+      search: v.state.search ?? '',
+      sort: v.state.sort ?? [],
+      filters: v.state.filters ?? [],
+      page: 1,
+      pageSize: (v.state as any).pageSize ?? prev.pageSize,
+    }));
+  }, [views]);
+
+  const handleDeleteCurrentView = useCallback(() => {
+    if (!currentView) return;
+    const next = views.filter(v => v.value !== currentView);
+    persistViews(next);
+    setCurrentView(undefined);
+  }, [currentView, persistViews, views]);
+  
   
   // Update URL when state changes (if persistence is enabled)
   useEffect(() => {
@@ -382,7 +464,25 @@ export const AdvancedTable = <T,>({
   }, []);
   
   const handlePageChange = useCallback((page: number) => {
-    setState(prev => ({ ...prev, page }));
+    // Smooth scroll behavior - maintain current scroll position or smoothly scroll to table
+    const tableElement = document.querySelector('[data-table-container]');
+    if (tableElement) {
+      const rect = tableElement.getBoundingClientRect();
+      const isTableVisible = rect.top >= 0 && rect.top <= window.innerHeight;
+      
+      if (!isTableVisible) {
+        tableElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start',
+          inline: 'nearest'
+        });
+      }
+    }
+    
+    // Add a small delay for better user experience with transitions
+    requestAnimationFrame(() => {
+      setState(prev => ({ ...prev, page }));
+    });
   }, []);
   
   const handlePageSizeChange = useCallback((pageSize: number) => {
@@ -457,7 +557,7 @@ export const AdvancedTable = <T,>({
         </div>
       )}
       
-      <div className="w-full">
+      <div className="w-full" data-table-container>
         {/* Table controls */}
         <TableControls
           searchable={searchable}
@@ -488,7 +588,32 @@ export const AdvancedTable = <T,>({
           pageSize={state.pageSize}
           totalResults={totalItems}
           
+          // Saved views
+          views={views.map(v => ({ label: v.label, value: v.value }))}
+          currentView={currentView}
+          onViewChange={handleApplyView}
+
           compact={compact}
+          additionalActions={(
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSaveViewOpen(true)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                Save view
+              </button>
+              {currentView && (
+                <button
+                  type="button"
+                  onClick={handleDeleteCurrentView}
+                  className="px-3 py-2 text-sm text-red-600 border border-red-200 rounded-md bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Delete view
+                </button>
+              )}
+            </div>
+          )}
         />
         
         {/* Table */}
@@ -513,6 +638,10 @@ export const AdvancedTable = <T,>({
           keyExtractor={keyExtractor}
           
           emptyState={emptyState}
+          // Virtualization
+          virtualize={props.virtualize || totalItems > (props.virtualizeThreshold ?? 200)}
+          rowHeight={props.rowHeight}
+          viewportHeight={props.viewportHeight}
         />
         
         {/* Pagination */}
@@ -526,6 +655,7 @@ export const AdvancedTable = <T,>({
             
             pageSizeOptions={pagination.pageSizeOptions}
             showQuickJumper={totalPages > 10}
+            maxVisiblePages={3}
             
             loading={loading}
             size={compact ? 'sm' : 'base'}
@@ -533,6 +663,44 @@ export const AdvancedTable = <T,>({
         )}
       </div>
       
+      {/* Save View Modal */}
+      <Modal
+        isOpen={isSaveViewOpen}
+        onClose={() => { setIsSaveViewOpen(false); setSaveViewName(''); }}
+        title="Save current view"
+        description="Name and save your current filters, search, and sort settings"
+        size="sm"
+        footer={(
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setIsSaveViewOpen(false); setSaveViewName(''); }}
+              className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmSaveView}
+              disabled={!saveViewName.trim()}
+              className="px-4 py-2 text-sm text-white bg-primary-600 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 disabled:opacity-50"
+            >
+              Save
+            </button>
+          </div>
+        )}
+      >
+        <div className="px-6 py-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">View name</label>
+          <input
+            type="text"
+            autoFocus
+            value={saveViewName}
+            onChange={(e) => setSaveViewName(e.target.value)}
+            placeholder="e.g., Verified last 30d"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+          />
+        </div>
+      </Modal>
+
       {/* Filter sidebar */}
       {filterable && filters.length > 0 && (
         <FilterSidebar

@@ -102,9 +102,9 @@ export async function getAdminVenues(
     let venuesQuery: any = adminDb.collection('venues');
     const appliedFilters: string[] = [];
     
-    // Level filter (most selective)
+    // Level filter (most selective) - using 'type' field in venues collection
     if (validatedFilters.level !== 'all') {
-      venuesQuery = venuesQuery.where('level', '==', validatedFilters.level);
+      venuesQuery = venuesQuery.where('type', '==', validatedFilters.level);
       appliedFilters.push('level');
     }
     
@@ -125,11 +125,12 @@ export async function getAdminVenues(
       appliedFilters.push('isActive');
     }
     
-    // Venue type filter
-    if (validatedFilters.venueType !== 'all') {
-      venuesQuery = venuesQuery.where('type', '==', validatedFilters.venueType);
-      appliedFilters.push('venueType');
-    }
+    // Venue type filter (skipped - conflicts with level filter on 'type' field)
+    // Note: Our venues only have type: cluster|division|final, not venue categories
+    // if (validatedFilters.venueType !== 'all') {
+    //   venuesQuery = venuesQuery.where('venueCategory', '==', validatedFilters.venueType);
+    //   appliedFilters.push('venueType');
+    // }
     
     // Execute venue query
     const venuesSnapshot = await venuesQuery.get();

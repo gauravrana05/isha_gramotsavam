@@ -82,12 +82,11 @@ export const sampleData = {
     }
   },
 
-  // Sports list
-  sports: [
-    'Volleyball', 'Throwball', 'Kabbadi', 'Kho Kho', 'Football', 
-    'Cricket', 'Badminton', 'Carrom', 'Chess', 'Athletics',
-    'Basketball', 'Table Tennis', 'Wrestling', 'Boxing'
-  ],
+  // Sports list for Isha Gramotsavam 2025 (only 2 sports)
+  sports: ['Volleyball', 'Throwball'],
+  
+  // Team statuses
+  teamStatuses: ['draft', 'submitted', 'verified', 'checked-in'],
 
   // Phone number prefixes (Indian mobile)
   phonePrefix: ['9', '8', '7', '6'],
@@ -234,6 +233,50 @@ export const generators = {
       latitude: baseLat + latOffset,
       longitude: baseLng + lngOffset
     };
+  },
+
+  // Generate team status
+  generateTeamStatus(): 'draft' | 'submitted' | 'verified' | 'checked-in' {
+    return sampleData.teamStatuses[Math.floor(Math.random() * sampleData.teamStatuses.length)] as any;
+  },
+
+  // Generate complete team player
+  generateTeamPlayer(location: any, gender: 'M' | 'F', position: 'main' | 'substitute'): any {
+    const { firstName, lastName } = generators.generateName(gender);
+    const phoneNumber = generators.generatePhoneNumber();
+    
+    return {
+      playerId: `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      userId: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      teamId: '', // Will be set by team creation
+      name: `${firstName} ${lastName}`,
+      phone: phoneNumber,
+      dob: generators.generateDOB(),
+      age: Math.floor(Math.random() * 27) + 18, // 18-45
+      gender,
+      position,
+      profileData: {
+        firstName,
+        lastName,
+        whatsappNumber: Math.random() > 0.3 ? phoneNumber : generators.generatePhoneNumber(),
+        village: location.village,
+        panchayat: location.panchayat,
+        taluk: location.district,
+        district: location.district,
+        state: location.state,
+        pincode: location.pincode
+      },
+      documents: {
+        profilePhoto: { storagePath: '', url: null, verified: false, uploadedAt: null, uploadedBy: null },
+        aadhaarFront: { storagePath: '', url: null, verified: false, uploadedAt: null, uploadedBy: null },
+        aadhaarBack: { storagePath: '', url: null, verified: false, uploadedAt: null, uploadedBy: null }
+      },
+      profileComplete: Math.random() > 0.2,
+      verificationStatus: ['pending', 'approved', 'rejected'][Math.floor(Math.random() * 3)] as any,
+      verificationComments: [],
+      addedAt: new Date().toISOString(),
+      addedBy: 'admin_bulk_create'
+    };
   }
 };
 
@@ -279,5 +322,90 @@ export const batchGenerators = {
       });
     }
     return users;
+  },
+
+  // Generate complete teams with captains and players for Isha Gramotsavam 2025
+  generateTeamsWithRoster(count: number, customStatus?: string): any[] {
+    const teams = [];
+    const eventId = 'isha_gramotsavam_2025';
+    
+    for (let i = 0; i < count; i++) {
+      const sport = generators.generateSport();
+      const genderCategory = Math.random() > 0.5 ? 'men' : 'women';
+      const gender = genderCategory === 'men' ? 'M' : 'F';
+      const location = generators.generateLocation();
+      const teamName = generators.generateTeamName(location.panchayat, sport);
+      const teamId = `team_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Generate captain
+      const captainData = generators.generateName(gender);
+      const captainPhone = generators.generatePhoneNumber();
+      const captainId = `captain_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Team configuration based on sport
+      const teamConfig = sport === 'Volleyball' 
+        ? { maxPlayers: 6, maxSubstitutes: 6 }
+        : { maxPlayers: 7, maxSubstitutes: 5 }; // Throwball
+      
+      // Generate main players
+      const mainPlayers = [];
+      for (let j = 0; j < teamConfig.maxPlayers; j++) {
+        const player = generators.generateTeamPlayer(location, gender, 'main');
+        player.teamId = teamId;
+        mainPlayers.push(player);
+      }
+      
+      // Generate substitute players (random number between 2 and maxSubstitutes)
+      const numSubstitutes = Math.floor(Math.random() * (teamConfig.maxSubstitutes - 1)) + 2;
+      const substitutePlayers = [];
+      for (let j = 0; j < numSubstitutes; j++) {
+        const player = generators.generateTeamPlayer(location, gender, 'substitute');
+        player.teamId = teamId;
+        substitutePlayers.push(player);
+      }
+      
+      const allPlayers = [...mainPlayers, ...substitutePlayers];
+      
+      const team = {
+        teamId,
+        name: teamName,
+        description: `${genderCategory.charAt(0).toUpperCase() + genderCategory.slice(1)} ${sport} team from ${location.panchayat}`,
+        eventId,
+        sportId: sport.toLowerCase(),
+        sportName: sport,
+        genderCategory,
+        panchayat: location.panchayat,
+        taluk: location.district,
+        district: location.district,
+        state: location.state,
+        maxPlayers: teamConfig.maxPlayers,
+        maxSubstitutes: teamConfig.maxSubstitutes,
+        currentPlayers: mainPlayers.length,
+        currentSubstitutes: substitutePlayers.length,
+        captainId,
+        captainProfile: {
+          name: `${captainData.firstName} ${captainData.lastName}`,
+          phone: captainPhone,
+          panchayat: location.panchayat,
+          district: location.district,
+          state: location.state,
+          documents: {
+            profilePhoto: { storagePath: '', verified: false, uploadedAt: null, uploadedBy: null, url: null },
+            aadhaarFront: { storagePath: '', verified: false, uploadedAt: null, uploadedBy: null, url: null },
+            aadhaarBack: { storagePath: '', verified: false, uploadedAt: null, uploadedBy: null, url: null }
+          }
+        },
+        players: allPlayers,
+        status: customStatus || generators.generateTeamStatus(),
+        verifiedAt: null,
+        verifiedBy: null,
+        createdAt: generators.generateTimestamp(),
+        updatedAt: generators.generateTimestamp()
+      };
+      
+      teams.push(team);
+    }
+    
+    return teams;
   }
 };

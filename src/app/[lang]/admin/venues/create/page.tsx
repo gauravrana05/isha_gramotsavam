@@ -4,19 +4,27 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
-import { collection, addDoc, serverTimestamp, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import { pincodeService } from '@/lib/services/pincodeService';
 import Container from '@/components/ui/Container';
 import Button from '@/components/ui/Button';
-import { ArrowLeft, Save, Loader2, Plus, Trash2, MapPin } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, MapPin, Plus, Trash2 } from 'lucide-react';
+import VenueVolunteerAssignmentModal from './VenueVolunteerAssignmentModal';
 
-interface Event {
+interface Volunteer {
   id: string;
-  name: string;
-  description?: string;
-  startDate?: { toDate: () => Date };
-  endDate?: { toDate: () => Date };
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
   isActive: boolean;
+}
+
+interface VolunteerAssignment {
+  volunteerId: string;
+  volunteerName: string;
+  volunteerEmail: string;
+  volunteerType: 'general' | 'technical';
 }
 
 interface Sport {
@@ -40,29 +48,19 @@ interface VenueFormData {
     latitude: number;
     longitude: number;
   };
-  supportedSports: Array<{
-    sportId: string;
-    sportName: string;
-    courtCount: number;
-    courtSpecifications: string;
-  }>;
   primaryContact: {
     name: string;
     phone: string;
     email: string;
     role: string;
   };
-  assignedVolunteers: string[];
-  officials: {
-    coordinatorId: string;
-    referees: string[];
-    medicalOfficer: string;
-  };
-  isActive: boolean;
-  currentStatus: 'available' | 'in_use' | 'maintenance' | 'unavailable';
-  totalMatchesHosted: number;
-  upcomingMatches: number;
-  utilizationRate: number;
+  supportedSports: Array<{
+    sportId: string;
+    sportName: string;
+    courtCount: string;
+    courtSpecifications: string;
+  }>;
+  assignedVolunteers: VolunteerAssignment[];
 }
 
 export default function CreateVenuePage() {
@@ -84,38 +82,28 @@ export default function CreateVenuePage() {
       latitude: 0,
       longitude: 0
     },
-    supportedSports: [],
     primaryContact: {
       name: '',
       phone: '',
       email: '',
       role: ''
     },
-    assignedVolunteers: [],
-    officials: {
-      coordinatorId: '',
-      referees: [],
-      medicalOfficer: ''
-    },
-    isActive: true,
-    currentStatus: 'available',
-    totalMatchesHosted: 0,
-    upcomingMatches: 0,
-    utilizationRate: 0
+    supportedSports: [],
+    assignedVolunteers: []
   });
 
+  const [availableVolunteers, setAvailableVolunteers] = useState<Volunteer[]>([]);
   const [availableSports, setAvailableSports] = useState<Sport[]>([]);
-  const [availableEvents, setAvailableEvents] = useState<Event[]>([]);
-  const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
   const [taluks, setTaluks] = useState<string[]>([]);
   const [panchayats, setPanchayats] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingVolunteers, setLoadingVolunteers] = useState(true);
   const [loadingSports, setLoadingSports] = useState(true);
-  const [loadingEvents, setLoadingEvents] = useState(true);
   const [addressLoading, setAddressLoading] = useState(false);
   const [addressCaptured, setAddressCaptured] = useState(false);
   const [error, setError] = useState('');
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user || userProfile?.role !== 'admin') {
@@ -123,9 +111,33 @@ export default function CreateVenuePage() {
       return;
     }
 
+    loadVolunteers();
     loadSports();
-    loadEvents();
   }, [user, userProfile, lang, router]);
+
+  const loadVolunteers = async () => {
+    try {
+      setLoadingVolunteers(true);
+      const usersCollection = collection(db, 'users');
+      
+      // Only get general_volunteer users (available for assignment)
+      const volunteersQuery = query(usersCollection, where('role', '==', 'general_volunteer'));
+      const volunteersSnapshot = await getDocs(volunteersQuery);
+      const volunteersData = volunteersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Volunteer));
+      
+      const activeVolunteers = volunteersData.filter(volunteer => volunteer.isActive !== false);
+      setAvailableVolunteers(activeVolunteers);
+      console.log('Loaded general volunteers:', activeVolunteers); // Debug log
+    } catch (err: any) {
+      console.error('Error loading volunteers:', err);
+      setError('Failed to load volunteers. Please try again.');
+    } finally {
+      setLoadingVolunteers(false);
+    }
+  };
 
   const loadSports = async () => {
     try {
@@ -138,35 +150,11 @@ export default function CreateVenuePage() {
       } as Sport));
       const activeSports = sportsData.filter(sport => sport.isActive);
       setAvailableSports(activeSports);
-      if (activeSports.length === 0) {
-        console.warn('No active sports found.');
-      }
     } catch (err: any) {
       console.error('Error loading sports:', err);
       setError('Failed to load sports. Please try again.');
     } finally {
       setLoadingSports(false);
-    }
-  };
-
-  const loadEvents = async () => {
-    try {
-      setLoadingEvents(true);
-      const eventsCollection = collection(db, 'events');
-      const eventsSnapshot = await getDocs(eventsCollection);
-      const eventsData = eventsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          isActive: data.isActive || false,
-        } as Event;
-      });
-      setAvailableEvents(eventsData.filter(event => event.isActive));
-    } catch (err: any) {
-      console.error('Error loading events:', err);
-    } finally {
-      setLoadingEvents(false);
     }
   };
 
@@ -237,82 +225,71 @@ export default function CreateVenuePage() {
     }));
   };
 
-  const handleSupportedSportChange = (index: number, field: string, value: any) => {
-    const newSports = [...formData.supportedSports];
-    newSports[index] = { ...newSports[index], [field]: value };
-    setFormData(prev => ({ ...prev, supportedSports: newSports }));
-  };
-
-  const addSupportedSport = () => {
+  const handleVolunteerAssign = async (assignment: VolunteerAssignment) => {
     setFormData(prev => ({
       ...prev,
-      supportedSports: [...prev.supportedSports, {
-        sportId: '',
-        sportName: '',
-        courtCount: 1,
-        courtSpecifications: ''
-      }]
+      assignedVolunteers: [...prev.assignedVolunteers, assignment]
+    }));
+
+    // If technical role selected, update user's role in users collection
+    if (assignment.volunteerType === 'technical') {
+      try {
+        const userDoc = doc(db, 'users', assignment.volunteerId);
+        await updateDoc(userDoc, {
+          role: 'technical_volunteer',
+          updatedAt: new Date()
+        });
+      } catch (err: any) {
+        console.error('Error updating volunteer role:', err);
+        setError('Failed to update volunteer role. Please try again.');
+      }
+    }
+  };
+
+  const handleVolunteerRemove = async (volunteerId: string) => {
+    // Find the volunteer assignment being removed
+    const volunteerAssignment = formData.assignedVolunteers.find(assignment => assignment.volunteerId === volunteerId);
+    
+    // If the volunteer was assigned as technical, revert their role to general_volunteer
+    if (volunteerAssignment && volunteerAssignment.volunteerType === 'technical') {
+      try {
+        const userDoc = doc(db, 'users', volunteerId);
+        await updateDoc(userDoc, {
+          role: 'general_volunteer',
+          updatedAt: new Date()
+        });
+      } catch (err: any) {
+        console.error('Error reverting volunteer role:', err);
+        setError('Failed to revert volunteer role. Please try again.');
+      }
+    }
+    
+    // Remove volunteer from the array
+    setFormData(prev => ({
+      ...prev,
+      assignedVolunteers: prev.assignedVolunteers.filter(assignment => assignment.volunteerId !== volunteerId)
     }));
   };
 
-  const removeSupportedSport = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      supportedSports: prev.supportedSports.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleArrayChange = (field: 'assignedVolunteers' | 'referees', index: number, value: string) => {
-    if (field === 'referees') {
-      const newReferees = [...formData.officials.referees];
-      newReferees[index] = value;
-      setFormData(prev => ({
-        ...prev,
-        officials: { ...prev.officials, referees: newReferees }
-      }));
-    } else {
-      const newArray = [...formData[field]];
-      newArray[index] = value;
-      setFormData(prev => ({ ...prev, [field]: newArray }));
-    }
-  };
-
-  const addArrayItem = (field: 'assignedVolunteers' | 'referees') => {
-    if (field === 'referees') {
-      setFormData(prev => ({
-        ...prev,
-        officials: { ...prev.officials, referees: [...prev.officials.referees, ''] }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: [...prev[field], '']
-      }));
-    }
-  };
-
-  const removeArrayItem = (field: 'assignedVolunteers' | 'referees', index: number) => {
-    if (field === 'referees') {
-      setFormData(prev => ({
-        ...prev,
-        officials: {
-          ...prev.officials,
-          referees: prev.officials.referees.filter((_, i) => i !== index)
-        }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: prev[field].filter((_, i) => i !== index)
-      }));
-    }
-  };
-
-  const handleEventChange = (eventId: string, checked: boolean) => {
+  const handleSportChange = (sportId: string, checked: boolean) => {
     if (checked) {
-      setSelectedEvents(prev => [...prev, eventId]);
+      const selectedSport = availableSports.find(s => s.id === sportId);
+      const sportObject = {
+        sportId: sportId,
+        sportName: selectedSport?.displayName || selectedSport?.name || sportId,
+        courtCount: "",
+        courtSpecifications: ""
+      };
+      
+      setFormData(prev => ({
+        ...prev,
+        supportedSports: [...prev.supportedSports, sportObject]
+      }));
     } else {
-      setSelectedEvents(prev => prev.filter(e => e !== eventId));
+      setFormData(prev => ({
+        ...prev,
+        supportedSports: prev.supportedSports.filter(sport => sport.sportId !== sportId)
+      }));
     }
   };
 
@@ -405,43 +382,21 @@ export default function CreateVenuePage() {
       return;
     }
 
-    if (!formData.primaryContact.name.trim()) {
-      setError('Primary contact name is required');
-      return;
-    }
-
-    if (!formData.primaryContact.phone.trim()) {
-      setError('Primary contact phone is required');
-      return;
-    }
-
     setLoading(true);
     try {
       const venueData = {
         ...formData,
-        assignedVolunteers: formData.assignedVolunteers.filter(vol => vol.trim() !== ''),
-        officials: {
-          ...formData.officials,
-          referees: formData.officials.referees.filter(ref => ref.trim() !== '')
-        },
-        supportedSports: formData.supportedSports.filter(sport => sport.sportId && sport.sportName),
+        assignedVolunteers: formData.assignedVolunteers.map(assignment => assignment.volunteerId),
+        isActive: true,
+        currentStatus: 'available' as const,
+        totalMatchesHosted: 0,
+        upcomingMatches: 0,
+        utilizationRate: 0,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
-      const venueDoc = await addDoc(collection(db, 'venues'), venueData);
-
-      if (selectedEvents.length > 0) {
-        await Promise.all(
-          selectedEvents.map(eventId =>
-            updateDoc(doc(db, 'events', eventId), {
-              venues: arrayUnion(venueDoc.id),
-              updatedAt: serverTimestamp()
-            })
-          )
-        );
-      }
-
+      await addDoc(collection(db, 'venues'), venueData);
       router.push(`/${lang}/admin/venues`);
     } catch (err: any) {
       console.error('Error creating venue:', err);
@@ -523,32 +478,6 @@ export default function CreateVenuePage() {
                   <option value="division">Division</option>
                   <option value="final">Final</option>
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Current Status
-                </label>
-                <select
-                  value={formData.currentStatus}
-                  onChange={(e) => handleInputChange('currentStatus', e.target.value as 'available' | 'in_use' | 'maintenance' | 'unavailable')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                >
-                  <option value="available">Available</option>
-                  <option value="in_use">In Use</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="unavailable">Unavailable</option>
-                </select>
-              </div>
-              <div className="md:col-span-2">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.isActive}
-                    onChange={(e) => handleInputChange('isActive', e.target.checked)}
-                    className="rounded border-gray-300 text-[#3A7F3F] focus:ring-[#3A7F3F]"
-                  />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Active</span>
-                </label>
               </div>
             </div>
           </div>
@@ -680,100 +609,55 @@ export default function CreateVenuePage() {
           </div>
 
           <div className="bg-white rounded-lg border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Supported Sports</h3>
-              <Button
-                type="button"
-                onClick={addSupportedSport}
-                variant="outline"
-                className="text-sm"
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add Sport
-              </Button>
-            </div>
-            {formData.supportedSports.map((sport, index) => (
-              <div key={index} className="mb-4 p-4 border rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium">Sport {index + 1}</h4>
-                  <Button
-                    type="button"
-                    onClick={() => removeSupportedSport(index)}
-                    variant="outline"
-                    className="text-red-600 text-sm"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Sport</label>
-                    <select
-                      value={sport.sportId}
-                      onChange={(e) => {
-                        const selectedSport = availableSports.find(s => s.id === e.target.value);
-                        handleSupportedSportChange(index, 'sportId', e.target.value);
-                        handleSupportedSportChange(index, 'sportName', selectedSport?.displayName || selectedSport?.name || '');
-                      }}
-                      disabled={loadingSports || availableSports.length === 0}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F] disabled:bg-gray-100"
-                    >
-                      <option value="">
-                        {loadingSports ? 'Loading sports...' : availableSports.length === 0 ? 'No sports available' : 'Select a sport'}
-                      </option>
-                      {availableSports.map((availableSport) => (
-                        <option key={availableSport.id} value={availableSport.id}>
-                          {availableSport.displayName || availableSport.name || availableSport.id}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Court Count</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={sport.courtCount}
-                      onChange={(e) => handleSupportedSportChange(index, 'courtCount', parseInt(e.target.value) || 1)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Court Specifications</label>
-                    <textarea
-                      value={sport.courtSpecifications}
-                      onChange={(e) => handleSupportedSportChange(index, 'courtSpecifications', e.target.value)}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                      placeholder="Specifications and requirements for this sport"
-                    />
-                  </div>
-                </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Supported Sports</h3>
+            {loadingSports ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin text-[#3A7F3F]" />
+                <span className="ml-2">Loading sports...</span>
               </div>
-            ))}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {availableSports.map((sport) => (
+                  <label key={sport.id} className="flex items-start p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.supportedSports.some(s => s.sportId === sport.id)}
+                      onChange={(e) => handleSportChange(sport.id, e.target.checked)}
+                      className="rounded border-gray-300 text-[#3A7F3F] focus:ring-[#3A7F3F] mt-1"
+                    />
+                    <div className="ml-3 flex-1">
+                      <span className="text-sm font-medium text-gray-900">
+                        {sport.displayName || sport.name || sport.id}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+            {!loadingSports && availableSports.length === 0 && (
+              <p className="text-gray-500 text-center py-4">No sports available to select.</p>
+            )}
           </div>
 
           <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Primary Contact</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Primary Contact (Optional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
                 <input
                   type="text"
                   value={formData.primaryContact.name}
                   onChange={(e) => handleNestedInputChange('primaryContact', 'name', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                  required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
                 <input
                   type="tel"
                   value={formData.primaryContact.phone}
                   onChange={(e) => handleNestedInputChange('primaryContact', 'phone', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                  required
                 />
               </div>
               <div>
@@ -798,119 +682,61 @@ export default function CreateVenuePage() {
             </div>
           </div>
 
+
           <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Officials</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Coordinator ID</label>
-                <input
-                  type="text"
-                  value={formData.officials.coordinatorId}
-                  onChange={(e) => handleNestedInputChange('officials', 'coordinatorId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Medical Officer</label>
-                <input
-                  type="text"
-                  value={formData.officials.medicalOfficer}
-                  onChange={(e) => handleNestedInputChange('officials', 'medicalOfficer', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Referees</label>
-              {formData.officials.referees.map((referee, index) => (
-                <div key={index} className="flex mb-2">
-                  <input
-                    type="text"
-                    value={referee}
-                    onChange={(e) => handleArrayChange('referees', index, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                    placeholder="Enter referee name/ID"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeArrayItem('referees', index)}
-                    className="ml-2 px-3 py-2 text-red-600 hover:text-red-800"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <button
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Assign Volunteers</h3>
+              <Button
                 type="button"
-                onClick={() => addArrayItem('referees')}
-                className="text-[#3A7F3F] hover:text-green-700 text-sm"
+                onClick={() => setIsAssignModalOpen(true)}
+                leftIcon={Plus}
+                variant="primary"
+                size="sm"
               >
-                + Add Referee
-              </button>
+                Assign Volunteer
+              </Button>
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Assigned Volunteers</h3>
-            {formData.assignedVolunteers.map((volunteer, index) => (
-              <div key={index} className="flex mb-2">
-                <input
-                  type="text"
-                  value={volunteer}
-                  onChange={(e) => handleArrayChange('assignedVolunteers', index, e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                  placeholder="Enter volunteer name/ID"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeArrayItem('assignedVolunteers', index)}
-                  className="ml-2 px-3 py-2 text-red-600 hover:text-red-800"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => addArrayItem('assignedVolunteers')}
-              className="text-[#3A7F3F] hover:text-green-700 text-sm"
-            >
-              + Add Volunteer
-            </button>
-          </div>
-
-          <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Assign to Events</h3>
-            {loadingEvents ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin text-[#3A7F3F]" />
-                <span className="ml-2">Loading events...</span>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {availableEvents.map((event) => (
-                  <label key={event.id} className="flex items-start p-3 border rounded-lg hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={selectedEvents.includes(event.id)}
-                      onChange={(e) => handleEventChange(event.id, e.target.checked)}
-                      className="rounded border-gray-300 text-[#3A7F3F] focus:ring-[#3A7F3F] mt-1"
-                    />
-                    <div className="ml-3 flex-1">
-                      <span className="text-sm font-medium text-gray-900">{event.name}</span>
-                      <div className="text-xs text-gray-500 mt-1">
-                        <div>{event.description}</div>
-                        <div>{event.startDate?.toDate ? event.startDate.toDate().toLocaleDateString() : 'TBD'} - {event.endDate?.toDate ? event.endDate.toDate().toLocaleDateString() : 'TBD'}</div>
+            {/* Current Assignments */}
+            {formData.assignedVolunteers.length > 0 ? (
+              <div className="space-y-3">
+                {formData.assignedVolunteers.map((assignment) => (
+                  <div key={assignment.volunteerId} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <div>
+                          <p className="font-medium text-gray-900">{assignment.volunteerName}</p>
+                          <p className="text-sm text-gray-500">{assignment.volunteerEmail}</p>
+                        </div>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          assignment.volunteerType === 'technical' 
+                            ? 'bg-purple-100 text-purple-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {assignment.volunteerType === 'technical' ? 'Technical' : 'General'}
+                        </span>
                       </div>
                     </div>
-                  </label>
+                    <Button
+                      type="button"
+                      onClick={() => handleVolunteerRemove(assignment.volunteerId)}
+                      variant="danger"
+                      size="sm"
+                      leftIcon={Trash2}
+                    >
+                      Remove
+                    </Button>
+                  </div>
                 ))}
               </div>
-            )}
-            {!loadingEvents && availableEvents.length === 0 && (
-              <p className="text-gray-500 text-center py-4">No events available to assign.</p>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No volunteers assigned yet.</p>
+                <p className="text-sm">Click "Assign Volunteer" to add volunteers to this venue.</p>
+              </div>
             )}
           </div>
+
 
           <div className="flex justify-end space-x-4">
             <Button
@@ -939,6 +765,15 @@ export default function CreateVenuePage() {
             </Button>
           </div>
         </form>
+
+        {/* Volunteer Assignment Modal */}
+        <VenueVolunteerAssignmentModal
+          isOpen={isAssignModalOpen}
+          onClose={() => setIsAssignModalOpen(false)}
+          onAssign={handleVolunteerAssign}
+          currentAssignments={formData.assignedVolunteers}
+          venueName={formData.name}
+        />
       </div>
     </Container>
   );

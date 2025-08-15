@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
-import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, arrayUnion } from 'firebase/firestore';
 import { 
   Container,
   AdvancedTable,
@@ -47,9 +47,9 @@ interface SimplifiedVenue {
   supportedSports: Array<{
     sportId: string;
     sportName: string;
-    courtCount: number;
-    courtSpecifications: string;
-  }>;
+    courtCount?: number;
+    courtSpecifications?: string;
+  }> | string[]; // Array of sport objects or sport IDs
   primaryContact: {
     name: string;
     phone: string;
@@ -73,10 +73,15 @@ interface SimplifiedVenue {
 
 export default function VenuesManagement() {
   const [venues, setVenues] = useState<SimplifiedVenue[]>([]);
+  const [sportsData, setSportsData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deletingVenue, setDeletingVenue] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{
+    isOpen: boolean;
+    venue: SimplifiedVenue | null;
+  }>({ isOpen: false, venue: null });
+  const [volunteerModal, setVolunteerModal] = useState<{
     isOpen: boolean;
     venue: SimplifiedVenue | null;
   }>({ isOpen: false, venue: null });
@@ -104,9 +109,19 @@ export default function VenuesManagement() {
   const loadVenues = async () => {
     try {
       setLoading(true);
-      const venuesCollection = collection(db, 'venues');
-      const venuesQuery = query(venuesCollection, orderBy('createdAt', 'desc'));
-      const venuesSnapshot = await getDocs(venuesQuery);
+      
+      // Load venues and sports data in parallel
+      const [venuesSnapshot, sportsSnapshot] = await Promise.all([
+        getDocs(query(collection(db, 'venues'), orderBy('createdAt', 'desc'))),
+        getDocs(collection(db, 'sports'))
+      ]);
+      
+      // Process sports data
+      const sportsMap: Record<string, any> = {};
+      sportsSnapshot.docs.forEach(doc => {
+        sportsMap[doc.id] = doc.data();
+      });
+      setSportsData(sportsMap);
       
       const venuesData: SimplifiedVenue[] = venuesSnapshot.docs.map(doc => ({
         venueId: doc.id,
@@ -126,6 +141,46 @@ export default function VenuesManagement() {
     setConfirmDelete({ isOpen: true, venue });
   };
 
+  const handleVolunteerAssignClick = (venue: SimplifiedVenue) => {
+    setVolunteerModal({ isOpen: true, venue });
+  };
+
+  const handleVolunteerAssign = async (assignment: any) => {
+    if (!volunteerModal.venue) return;
+    
+    try {
+      // Update venue's assigned volunteers
+      const venueDoc = doc(db, 'venues', volunteerModal.venue.venueId);
+      await updateDoc(venueDoc, {
+        assignedVolunteers: arrayUnion(assignment.volunteerId),
+        updatedAt: new Date()
+      });
+
+      // If technical role selected, update volunteer's role in users collection
+      if (assignment.volunteerType === 'technical') {
+        const userDoc = doc(db, 'users', assignment.volunteerId);
+        await updateDoc(userDoc, {
+          role: 'technical_volunteer',
+          updatedAt: new Date()
+        });
+      }
+      
+      // Update local state
+      setVenues(prevVenues => 
+        prevVenues.map(venue => 
+          venue.venueId === volunteerModal.venue!.venueId 
+            ? { ...venue, assignedVolunteers: [...(venue.assignedVolunteers || []), assignment.volunteerId] }
+            : venue
+        )
+      );
+      
+      setVolunteerModal({ isOpen: false, venue: null });
+    } catch (err: any) {
+      console.error('Error assigning volunteer:', err);
+      setError('Failed to assign volunteer. Please try again.');
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!confirmDelete.venue) return;
 
@@ -134,23 +189,16 @@ export default function VenuesManagement() {
     
     try {
       const venueDoc = doc(db, 'venues', venueId);
-      await updateDoc(venueDoc, {
-        isActive: false,
-        updatedAt: new Date()
-      });
+      await deleteDoc(venueDoc);
       
-      // Update local state
+      // Update local state - remove venue from list
       setVenues(prevVenues => 
-        prevVenues.map(venue => 
-          venue.venueId === venueId 
-            ? { ...venue, isActive: false, updatedAt: new Date() }
-            : venue
-        )
+        prevVenues.filter(venue => venue.venueId !== venueId)
       );
       
     } catch (err: any) {
-      console.error('Error deactivating venue:', err);
-      setError('Failed to deactivate venue. Please try again.');
+      console.error('Error deleting venue:', err);
+      setError('Failed to delete venue. Please try again.');
     } finally {
       setDeletingVenue(null);
       setConfirmDelete({ isOpen: false, venue: null });
@@ -202,6 +250,49 @@ export default function VenuesManagement() {
         </div>
       ),
     },
+    {
+      key: 'supportedSports',
+      header: 'Sports',
+      accessor: 'supportedSports',
+      sortable: false,
+      priority: 'medium',
+      width: '180px',
+      render: (_, venue) => {
+        const sports = venue.supportedSports || [];
+        if (sports.length === 0) {
+          return <span className="text-xs text-gray-400">No sports</span>;
+        }
+        
+        // Handle both object format and string format
+        const displaySports = sports.slice(0, 2).map((sport: any) => {
+          if (typeof sport === 'string') {
+            // Sport ID format - look up in sportsData
+            return sportsData[sport]?.displayName || sportsData[sport]?.name || sport;
+          } else {
+            // Sport object format - use sportName or sportId
+            return sport.sportName || sportsData[sport.sportId]?.displayName || sportsData[sport.sportId]?.name || sport.sportId;
+          }
+        });
+        
+        return (
+          <div className="flex flex-wrap gap-1">
+            {displaySports.map((sportName: string, index: number) => (
+              <span 
+                key={index}
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+              >
+                {sportName}
+              </span>
+            ))}
+            {sports.length > 2 && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                +{sports.length - 2}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
   ];
 
   // Define action buttons for AdvancedTable
@@ -211,25 +302,29 @@ export default function VenuesManagement() {
       icon: Eye,
       onClick: (venue) => router.push(`/${lang}/admin/venues/${venue.venueId}`),
       variant: 'primary',
+      tooltip: 'View venue details'
     },
     {
       label: 'Edit',
       icon: Edit,
       onClick: (venue) => router.push(`/${lang}/admin/venues/${venue.venueId}/edit`),
       variant: 'secondary',
+      tooltip: 'Edit venue information'
     },
     {
-      label: 'Assign Volunteers',
+      label: 'Volunteers',
       icon: UserPlus,
-      onClick: (venue) => router.push(`/${lang}/admin/venues/${venue.venueId}/volunteers`),
+      onClick: handleVolunteerAssignClick,
       variant: 'success',
+      tooltip: 'Assign volunteers to this venue'
     },
     {
-      label: 'Deactivate',
+      label: 'Delete',
       icon: Trash2,
       onClick: handleDeleteClick,
       variant: 'danger',
       loading: (venue) => deletingVenue === venue.venueId,
+      tooltip: 'Permanently delete this venue'
     },
   ];
 
@@ -331,7 +426,7 @@ export default function VenuesManagement() {
           onClick={() => router.push(`/${lang}/admin/venues/create`)}
           leftIcon={Plus}
           variant="primary"
-          size="base"
+          size="sm"
         >
           Add Venue
         </Button>
@@ -413,12 +508,189 @@ export default function VenuesManagement() {
         isOpen={confirmDelete.isOpen}
         onClose={() => setConfirmDelete({ isOpen: false, venue: null })}
         onConfirm={handleDeleteConfirm}
-        title="Deactivate Venue"
-        description={`Are you sure you want to deactivate "${confirmDelete.venue?.name}"? This action will make the venue unavailable for new bookings.`}
-        confirmLabel="Deactivate"
+        title="Delete Venue"
+        description={`Are you sure you want to permanently delete "${confirmDelete.venue?.name}"? This action cannot be undone and will remove all venue data including assigned volunteers and bookings.`}
+        confirmLabel="Delete Venue"
         confirmVariant="danger"
         loading={deletingVenue !== null}
       />
+
+      {/* Volunteer Assignment Modal */}
+      {volunteerModal.isOpen && (
+        <VenueVolunteerAssignmentModal
+          isOpen={volunteerModal.isOpen}
+          onClose={() => setVolunteerModal({ isOpen: false, venue: null })}
+          onAssign={handleVolunteerAssign}
+          currentAssignments={[]}
+          venueName={volunteerModal.venue?.name || ''}
+        />
+      )}
     </div>
   );
 }
+
+// Inline Volunteer Assignment Modal Component
+const VenueVolunteerAssignmentModal = ({
+  isOpen,
+  onClose,
+  onAssign,
+  currentAssignments,
+  venueName
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onAssign: (assignment: any) => void;
+  currentAssignments: any[];
+  venueName: string;
+}) => {
+  const [volunteers, setVolunteers] = useState<any[]>([]);
+  const [selectedVolunteer, setSelectedVolunteer] = useState('');
+  const [volunteerType, setVolunteerType] = useState<'general' | 'technical'>('general');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingVolunteers, setLoadingVolunteers] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      loadVolunteers();
+    }
+  }, [isOpen]);
+
+  const loadVolunteers = async () => {
+    try {
+      setLoadingVolunteers(true);
+      const usersCollection = collection(db, 'users');
+      const volunteersSnapshot = await getDocs(usersCollection);
+      const volunteersData = volunteersSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(user => user.role === 'general_volunteer' && user.isActive !== false);
+      
+      setVolunteers(volunteersData);
+    } catch (err: any) {
+      setError('Failed to load volunteers.');
+    } finally {
+      setLoadingVolunteers(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVolunteer) {
+      setError('Please select a volunteer');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const volunteer = volunteers.find(v => v.id === selectedVolunteer);
+      if (!volunteer) {
+        setError('Selected volunteer not found');
+        return;
+      }
+
+      const assignment = {
+        volunteerId: selectedVolunteer,
+        volunteerName: `${volunteer.firstName} ${volunteer.lastName}`,
+        volunteerEmail: volunteer.email,
+        volunteerType: volunteerType
+      };
+
+      await onAssign(assignment);
+      setSelectedVolunteer('');
+      setVolunteerType('general');
+    } catch (err: any) {
+      setError('Failed to assign volunteer.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Assign Volunteer</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ×
+          </button>
+        </div>
+        
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Venue</label>
+            <input
+              type="text"
+              value={venueName}
+              disabled
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Volunteer</label>
+            {loadingVolunteers ? (
+              <div className="flex items-center justify-center py-3">
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Loading volunteers...
+              </div>
+            ) : (
+              <select 
+                value={selectedVolunteer}
+                onChange={(e) => setSelectedVolunteer(e.target.value)}
+                required 
+                className="w-full p-3 border border-gray-300 rounded-lg"
+              >
+                <option value="">Select Volunteer</option>
+                {volunteers.map(volunteer => (
+                  <option key={volunteer.id} value={volunteer.id}>
+                    {volunteer.firstName} {volunteer.lastName} - {volunteer.email}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-2">Volunteer Type</label>
+            <select 
+              value={volunteerType}
+              onChange={(e) => setVolunteerType(e.target.value as 'general' | 'technical')}
+              className="w-full p-3 border border-gray-300 rounded-lg"
+            >
+              <option value="general">General</option>
+              <option value="technical">Technical</option>
+            </select>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !selectedVolunteer}
+              className="flex-1 bg-[#3A7F3F] hover:bg-green-700"
+            >
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Assign
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};

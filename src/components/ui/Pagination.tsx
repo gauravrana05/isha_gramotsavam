@@ -4,7 +4,8 @@ import {
   ChevronRight, 
   ChevronsLeft, 
   ChevronsRight,
-  MoreHorizontal
+  MoreHorizontal,
+  ChevronDown
 } from 'lucide-react';
 import { cn, BaseComponentProps } from '@/lib/component-patterns';
 
@@ -59,7 +60,7 @@ export interface PaginationProps extends BaseComponentProps {
 const generatePageNumbers = (
   currentPage: number,
   totalPages: number,
-  maxVisiblePages: number = 7
+  maxVisiblePages: number = 3
 ): (number | 'ellipsis')[] => {
   if (totalPages <= maxVisiblePages) {
     return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -128,20 +129,23 @@ const PageSizeSelector = ({
       <span className={cn('text-gray-700 whitespace-nowrap', sizeClasses[size])}>
         Show
       </span>
-      <select
-        value={pageSize}
-        onChange={(e) => onPageSizeChange(Number(e.target.value))}
-        className={cn(
-          'border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white',
-          sizeClasses[size]
-        )}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <select
+          value={pageSize}
+          onChange={(e) => onPageSizeChange(Number(e.target.value))}
+          className={cn(
+            'border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white appearance-none pr-8',
+            sizeClasses[size]
+          )}
+        >
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+      </div>
       <span className={cn('text-gray-700 whitespace-nowrap', sizeClasses[size])}>
         per page
       </span>
@@ -229,8 +233,8 @@ const PageButton = ({
   
   const variantClasses = {
     default: cn(
-      'border border-gray-300 bg-white hover:bg-gray-50',
-      isActive && 'bg-primary-600 text-white border-primary-600 hover:bg-primary-700',
+      'border border-gray-300 bg-white hover:bg-gray-50 text-gray-700',
+      isActive && '!bg-primary-600 !text-white !border-primary-600 hover:!bg-primary-700 shadow-sm',
       isDisabled && 'opacity-50 cursor-not-allowed hover:bg-white'
     ),
     minimal: cn(
@@ -250,7 +254,7 @@ const PageButton = ({
       onClick={onClick}
       disabled={isDisabled}
       className={cn(
-        'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:pointer-events-none',
+        'inline-flex items-center justify-center rounded-md font-medium transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:pointer-events-none',
         sizeClasses[size],
         variantClasses[variant]
       )}
@@ -348,7 +352,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   pageSizeOptions = [10, 25, 50, 100],
   showFirstLastButtons = true,
   showPageNumbers = true,
-  maxVisiblePages = 7,
+  maxVisiblePages = 3,
   showTotalInfo = true,
   showQuickJumper = false,
   

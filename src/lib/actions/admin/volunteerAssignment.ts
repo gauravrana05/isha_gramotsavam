@@ -34,13 +34,14 @@ export async function assignVolunteerToVenue(formData: FormData) {
     // Update with document ID
     await docRef.update({ assignmentId: docRef.id });
 
-    // Update volunteer's role if assigned as technical
+    // Update volunteer's role only if assigned as technical
     if (volunteerType === 'technical') {
       await adminDb.collection('users').doc(volunteerId).update({
         role: 'technical_volunteer',
         updatedAt: FieldValue.serverTimestamp()
       });
     }
+    // If assigned as general, role stays as general_volunteer (no change needed)
 
     revalidatePath('/admin/users/volunteers/assign-venues');
     revalidatePath('/admin/users/volunteers');
@@ -70,8 +71,8 @@ export async function removeVolunteerAssignment(assignmentId: string) {
       // Delete the assignment
       await adminDb.collection('volunteerVenueAssignment').doc(assignmentId).delete();
       
-      // If volunteer was technical, change them back to general
-      if (assignmentData?.volunteerType === 'technical' && assignmentData?.volunteerId) {
+      // Always change volunteer back to general_volunteer when assignment is deleted
+      if (assignmentData?.volunteerId) {
         await adminDb.collection('users').doc(assignmentData.volunteerId).update({
           role: 'general_volunteer',
           updatedAt: FieldValue.serverTimestamp()
@@ -122,6 +123,98 @@ export async function updateVolunteerAssignmentStatus(
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+
+export async function getVolunteerAssignments(volunteerId: string) {
+  try {
+    // Get volunteer's venue assignments
+    const assignmentsQuery = adminDb.collection('volunteerVenueAssignment')
+      .where('volunteerId', '==', volunteerId);
+    
+    const assignmentsSnapshot = await assignmentsQuery.get();
+    
+    if (assignmentsSnapshot.empty) {
+      return {
+        success: true,
+        assignments: []
+      };
+    }
+
+    // Get venue details for each assignment
+    const venueIds = [...new Set(assignmentsSnapshot.docs.map(doc => doc.data().venueId).filter(Boolean))];
+    const venuesData: Record<string, any> = {};
+    
+    if (venueIds.length > 0) {
+      // Batch query venues
+      for (let i = 0; i < venueIds.length; i += 10) { // Firestore 'in' query limit
+        const batch = venueIds.slice(i, i + 10);
+        const venuesSnapshot = await adminDb.collection('venues')
+          .where('__name__', 'in', batch.map(id => adminDb.collection('venues').doc(id)))
+          .get();
+        
+        venuesSnapshot.docs.forEach(doc => {
+          venuesData[doc.id] = doc.data();
+        });
+      }
+    }
+
+    // Get sports data for display names
+    const sportsSnapshot = await adminDb.collection('sports').get();
+    const sportsData: Record<string, any> = {};
+    sportsSnapshot.docs.forEach(doc => {
+      sportsData[doc.id] = doc.data();
+    });
+
+    const assignments = assignmentsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      const venue = venuesData[data.venueId] || {};
+      
+      // Handle both array of strings and array of objects for supported sports
+      let supportedSports: string[] = [];
+      if (venue.supportedSports) {
+        supportedSports = venue.supportedSports.map((sport: any) => {
+          if (typeof sport === 'string') {
+            return sportsData[sport]?.displayName || sportsData[sport]?.name || sport;
+          } else if (sport && typeof sport === 'object') {
+            return sport.sportName || sportsData[sport.sportId]?.displayName || sportsData[sport.sportId]?.name || sport.sportId;
+          }
+          return 'Unknown Sport';
+        });
+      }
+
+      return {
+        id: doc.id,
+        assignmentId: data.assignmentId || doc.id,
+        volunteerId: data.volunteerId,
+        volunteerName: data.volunteerName,
+        volunteerType: data.volunteerType,
+        venueId: data.venueId,
+        venueName: data.venueName,
+        venueAddress: venue.address || '',
+        venueDistrict: venue.district || '',
+        venueType: venue.type || '',
+        supportedSports,
+        status: data.status,
+        eventId: data.eventId,
+        assignedBy: data.assignedBy,
+        createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
+        updatedAt: data.updatedAt?.toDate?.()?.toISOString() || null,
+        assignedAt: data.createdAt?.toDate?.()?.toISOString() || null
+      };
+    });
+
+    return {
+      success: true,
+      assignments
+    };
+  } catch (error) {
+    console.error('Error fetching volunteer assignments:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch assignments',
+      assignments: []
     };
   }
 }

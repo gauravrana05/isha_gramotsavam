@@ -26,12 +26,14 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50">
       <AdminSidebar 
         isDesktopCollapsed={isDesktopSidebarCollapsed}
         onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
       />
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <div className={`flex flex-col min-h-screen ${
+        isDesktopSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80'
+      } transition-[margin] duration-300 ease-in-out`}>
         <div className="lg:hidden h-16"></div>
         <main className="flex-1 overflow-auto">
           {children}

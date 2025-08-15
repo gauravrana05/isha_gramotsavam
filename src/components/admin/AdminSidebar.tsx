@@ -90,7 +90,7 @@ export default function AdminSidebar({
       children: [
         { name: 'All Venues', href: `/${lang}/admin/venues`, icon: MapPin },
         { name: 'Location Mapping', href: `/${lang}/admin/venues/location-mapping`, icon: MapPin },
-        { name: 'Cluster-Division Mapping', href: `/${lang}/admin/venues/cluster-division-mapping`, icon: MapPin },
+        { name: 'Division Mapping', href: `/${lang}/admin/venues/cluster-division-mapping`, icon: MapPin },
       ]
     },
     {
@@ -107,18 +107,15 @@ export default function AdminSidebar({
         { name: 'Assign Venues', href: `/${lang}/admin/users/volunteers/assign-venues`, icon: UserCheck },
       ]
     },
+    // {
+    //   name: 'Analytics',
+    //   href: `/${lang}/admin/analytics`,
+    //   icon: BarChart3,
+    // },
     {
-      name: 'Analytics',
-      href: `/${lang}/admin/analytics`,
-      icon: BarChart3,
-    },
-    {
-      name: 'System',
-      icon: Settings,
-      children: [
-        { name: 'Audit Logs', href: `/${lang}/admin/system/audit-logs`, icon: BarChart3 },
-        { name: 'Configuration', href: `/${lang}/admin/system/config`, icon: Settings },
-      ]
+      name: 'Audit Logs',
+      href: `/${lang}/admin/audit-logs`,
+      icon: Shield,
     }
   ];
 
@@ -233,7 +230,7 @@ export default function AdminSidebar({
       {/* Sidebar */}
       <div className={`
         fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
-        lg:translate-x-0 lg:static lg:h-screen lg:flex-shrink-0 lg:transition-[width] lg:duration-300 lg:ease-in-out
+        lg:translate-x-0 lg:fixed lg:top-0 lg:bottom-0 lg:flex-shrink-0 lg:transition-[width] lg:duration-300 lg:ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
         ${isDesktopCollapsed ? 'lg:w-20' : 'lg:w-80'} w-80
         ${className}

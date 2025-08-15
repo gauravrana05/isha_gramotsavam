@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
-import { doc, getDoc, updateDoc, serverTimestamp, getDocs, collection, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, getDocs, collection } from 'firebase/firestore';
 import { pincodeService } from '@/lib/services/pincodeService';
 import Container from '@/components/ui/Container';
 import Button from '@/components/ui/Button';
@@ -27,7 +27,7 @@ interface VenueFormData {
   supportedSports: Array<{
     sportId: string;
     sportName: string;
-    courtCount: number;
+    courtCount: string;
     courtSpecifications: string;
   }>;
   primaryContact: {
@@ -56,14 +56,6 @@ interface Sport {
   isActive: boolean;
 }
 
-interface Event {
-  id: string;
-  name: string;
-  description?: string;
-  startDate?: { toDate: () => Date };
-  endDate?: { toDate: () => Date };
-  isActive: boolean;
-}
 
 export default function EditVenuePage() {
   const router = useRouter();
@@ -84,7 +76,7 @@ export default function EditVenuePage() {
       latitude: 0,
       longitude: 0
     },
-    supportedSports: [],
+    supportedSports: [], // Array of sport objects
     primaryContact: {
       name: '',
       phone: '',
@@ -105,19 +97,17 @@ export default function EditVenuePage() {
   });
 
   const [availableSports, setAvailableSports] = useState<Sport[]>([]);
-  const [availableEvents, setAvailableEvents] = useState<Event[]>([]);
-  const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
-  const [originalEvents, setOriginalEvents] = useState<string[]>([]);
+  const [volunteersData, setVolunteersData] = useState<any[]>([]);
   const [districts, setDistricts] = useState<string[]>([]);
   const [taluks, setTaluks] = useState<string[]>([]);
   const [panchayats, setPanchayats] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingSports, setLoadingSports] = useState(true);
-  const [loadingEvents, setLoadingEvents] = useState(true);
   const [addressLoading, setAddressLoading] = useState(false);
   const [addressCaptured, setAddressCaptured] = useState(false);
   const [error, setError] = useState('');
+  const [volunteerModal, setVolunteerModal] = useState(false);
 
   useEffect(() => {
     if (!user || userProfile?.role !== 'admin') {
@@ -127,7 +117,7 @@ export default function EditVenuePage() {
 
     loadVenue();
     loadSports();
-    loadEvents();
+    loadVolunteersData();
   }, [user, userProfile, venueId, lang, router]);
 
   const loadVenue = async () => {
@@ -156,7 +146,11 @@ export default function EditVenuePage() {
             email: '',
             role: ''
           },
-          assignedVolunteers: venueData.assignedVolunteers || [],
+          assignedVolunteers: Array.isArray(venueData.assignedVolunteers) 
+            ? venueData.assignedVolunteers.map(vol => 
+                typeof vol === 'string' ? vol : vol.volunteerId || vol.id
+              ).filter(Boolean)
+            : [],
           officials: venueData.officials || {
             coordinatorId: '',
             referees: [],
@@ -169,7 +163,10 @@ export default function EditVenuePage() {
           utilizationRate: venueData.utilizationRate || 0
         });
 
-        console.log('Loaded venue supportedSports:', venueData.supportedSports); // Debug: Verify loaded sports
+        // Normalize supported sports data after venue is loaded
+        if (availableSports.length > 0) {
+          normalizeSupportedSports(availableSports);
+        }
 
         if (venueData.state) {
           await fetchDistricts(venueData.state);
@@ -184,7 +181,6 @@ export default function EditVenuePage() {
           }
         }
 
-        loadEventsForVenue(venueId as string);
       } else {
         setError('Venue not found');
       }
@@ -257,26 +253,6 @@ export default function EditVenuePage() {
     }
   };
 
-  const loadEventsForVenue = async (currentVenueId: string) => {
-    try {
-      const eventsCollection = collection(db, 'events');
-      const eventsSnapshot = await getDocs(eventsCollection);
-      const eventsWithThisVenue: string[] = [];
-      
-      eventsSnapshot.docs.forEach(doc => {
-        const eventData = doc.data();
-        if (eventData.venues && eventData.venues.includes(currentVenueId)) {
-          eventsWithThisVenue.push(doc.id);
-        }
-      });
-      
-      setSelectedEvents(eventsWithThisVenue);
-      setOriginalEvents(eventsWithThisVenue);
-    } catch (err: any) {
-      console.error('Error loading events for venue:', err);
-    }
-  };
-
   const loadSports = async () => {
     try {
       setLoadingSports(true);
@@ -287,10 +263,11 @@ export default function EditVenuePage() {
         ...doc.data(),
       } as Sport));
       const activeSports = sportsData.filter(sport => sport.isActive !== false);
-      console.log('Loaded sports:', activeSports); // Debug: Verify sports data
       setAvailableSports(activeSports);
-      if (activeSports.length === 0) {
-        console.warn('No active sports found.');
+      
+      // Normalize supported sports data after sports are loaded
+      if (formData.name) { // Only if venue is already loaded
+        normalizeSupportedSports(activeSports);
       }
     } catch (err: any) {
       console.error('Error loading sports:', err);
@@ -300,22 +277,57 @@ export default function EditVenuePage() {
     }
   };
 
-  const loadEvents = async () => {
+  const normalizeSupportedSports = (sportsData: Sport[]) => {
+    setFormData(prev => ({
+      ...prev,
+      supportedSports: Array.isArray(prev.supportedSports) 
+        ? prev.supportedSports.map(sport => {
+            if (typeof sport === 'string') {
+              // Convert old string format to new object format
+              const foundSport = sportsData.find(s => s.id === sport);
+              return {
+                sportId: sport,
+                sportName: foundSport?.displayName || foundSport?.name || sport,
+                courtCount: "",
+                courtSpecifications: ""
+              };
+            } else if (sport && typeof sport === 'object') {
+              // Already in object format, ensure all fields exist
+              return {
+                sportId: sport.sportId || sport.id,
+                sportName: sport.sportName || sport.name || sport.sportId || sport.id,
+                courtCount: sport.courtCount || "",
+                courtSpecifications: sport.courtSpecifications || ""
+              };
+            }
+            return null;
+          }).filter(Boolean)
+        : []
+    }));
+  };
+
+  const loadVolunteersData = async () => {
     try {
-      setLoadingEvents(true);
-      const eventsCollection = collection(db, 'events');
-      const eventsSnapshot = await getDocs(eventsCollection);
-      const eventsData = eventsSnapshot.docs.map(doc => ({
+      const usersCollection = collection(db, 'users');
+      const volunteersSnapshot = await getDocs(usersCollection);
+      const volunteersMap = volunteersSnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        isActive: doc.data().isActive || false
-      } as Event));
-      setAvailableEvents(eventsData.filter(event => event.isActive));
+        ...doc.data()
+      }));
+      setVolunteersData(volunteersMap);
     } catch (err: any) {
-      console.error('Error loading events:', err);
-    } finally {
-      setLoadingEvents(false);
+      console.error('Error loading volunteers:', err);
     }
+  };
+
+  const getVolunteerInfo = (volunteerId: string) => {
+    const volunteer = volunteersData.find(v => v.id === volunteerId);
+    if (!volunteer) return { name: volunteerId, email: 'Unknown' };
+    return {
+      name: `${volunteer.firstName || ''} ${volunteer.lastName || ''}`.trim() || volunteer.email || volunteerId,
+      email: volunteer.email || 'No email',
+      role: volunteer.role || 'general_volunteer'
+    };
   };
 
   const handleInputChange = (field: keyof VenueFormData, value: any) => {
@@ -383,24 +395,57 @@ export default function EditVenuePage() {
         [field]: value
       }
     }));
-
-  const addSupportedSport = () => {
-    setFormData(prev => ({
-      ...prev,
-      supportedSports: [...prev.supportedSports, {
-        sportId: '',
-        sportName: '',
-        courtCount: 1,
-        courtSpecifications: ''
-      }]
-    }));
   };
 
-  const removeSupportedSport = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      supportedSports: prev.supportedSports.filter((_, i) => i !== index)
-    }));
+  const handleSportChange = (sportId: string, checked: boolean) => {
+    if (checked) {
+      const selectedSport = availableSports.find(s => s.id === sportId);
+      const sportObject = {
+        sportId: sportId,
+        sportName: selectedSport?.displayName || selectedSport?.name || sportId,
+        courtCount: "",
+        courtSpecifications: ""
+      };
+      
+      setFormData(prev => ({
+        ...prev,
+        supportedSports: [...prev.supportedSports, sportObject]
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        supportedSports: prev.supportedSports.filter(sport => sport.sportId !== sportId)
+      }));
+    }
+  };
+
+  const handleVolunteerAssign = async (assignment: any) => {
+    try {
+      // Add volunteer ID to the assignedVolunteers array
+      setFormData(prev => ({
+        ...prev,
+        assignedVolunteers: [...prev.assignedVolunteers, assignment.volunteerId]
+      }));
+      
+      // If technical role selected, update user's role in users collection
+      if (assignment.volunteerRole === 'technical') {
+        const userDoc = doc(db, 'users', assignment.volunteerId);
+        await updateDoc(userDoc, {
+          role: 'technical_volunteer',
+          updatedAt: new Date()
+        });
+        
+        // Update local volunteersData state to reflect the change
+        setVolunteersData(prev => prev.map(v => 
+          v.id === assignment.volunteerId 
+            ? {...v, role: 'technical_volunteer'}
+            : v
+        ));
+      }
+    } catch (err: any) {
+      console.error('Error assigning volunteer:', err);
+      setError('Failed to assign volunteer. Please try again.');
+    }
   };
 
   const handleArrayChange = (field: 'assignedVolunteers' | 'referees', index: number, value: string) => {
@@ -432,7 +477,7 @@ export default function EditVenuePage() {
     }
   };
 
-  const removeArrayItem = (field: 'assignedVolunteers' | 'referees', index: number) => {
+  const removeArrayItem = async (field: 'assignedVolunteers' | 'referees', index: number) => {
     if (field === 'referees') {
       setFormData(prev => ({
         ...prev,
@@ -441,19 +486,36 @@ export default function EditVenuePage() {
           referees: prev.officials.referees.filter((_, i) => i !== index)
         }
       }));
-    } else {
+    } else if (field === 'assignedVolunteers') {
+      const volunteerToRemove = formData.assignedVolunteers[index];
+      
+      // Check if the volunteer is technical_volunteer and revert to general_volunteer
+      const volunteerInfo = getVolunteerInfo(volunteerToRemove);
+      if (volunteerInfo.role === 'technical_volunteer') {
+        try {
+          const userDoc = doc(db, 'users', volunteerToRemove);
+          await updateDoc(userDoc, {
+            role: 'general_volunteer',
+            updatedAt: new Date()
+          });
+          
+          // Update local volunteersData state to reflect the change
+          setVolunteersData(prev => prev.map(v => 
+            v.id === volunteerToRemove 
+              ? {...v, role: 'general_volunteer'}
+              : v
+          ));
+        } catch (err: any) {
+          console.error('Error reverting volunteer role:', err);
+          setError('Failed to revert volunteer role. Please try again.');
+        }
+      }
+      
+      // Remove volunteer from the array
       setFormData(prev => ({
         ...prev,
         [field]: prev[field].filter((_, i) => i !== index)
       }));
-    }
-  };
-
-  const handleEventChange = (eventId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedEvents(prev => [...prev, eventId]);
-    } else {
-      setSelectedEvents(prev => prev.filter(e => e !== eventId));
     }
   };
 
@@ -485,26 +547,24 @@ export default function EditVenuePage() {
       return;
     }
 
-    if (!formData.primaryContact.name.trim()) {
-      setError('Primary contact name is required');
-      return;
-    }
-
-    if (!formData.primaryContact.phone.trim()) {
-      setError('Primary contact phone is required');
-      return;
-    }
 
     setSaving(true);
     try {
+      // Ensure we completely replace supportedSports with clean format
       const venueData = {
-        ...formData,
-        assignedVolunteers: formData.assignedVolunteers.filter(vol => vol.trim() !== ''),
-        officials: {
-          ...formData.officials,
-          referees: formData.officials.referees.filter(ref => ref.trim() !== '')
-        },
-        supportedSports: formData.supportedSports.filter(sport => sport.sportId && sport.sportName),
+        name: formData.name,
+        shortName: formData.shortName,
+        type: formData.type,
+        address: formData.address,
+        pincode: formData.pincode,
+        state: formData.state,
+        district: formData.district,
+        taluk: formData.taluk,
+        panchayat: formData.panchayat,
+        coordinates: formData.coordinates,
+        supportedSports: formData.supportedSports, // Clean array of sport IDs
+        primaryContact: formData.primaryContact,
+        assignedVolunteers: formData.assignedVolunteers.filter(vol => vol && vol.trim() !== ''),
         updatedAt: serverTimestamp()
       };
       
@@ -512,27 +572,6 @@ export default function EditVenuePage() {
 
       const venueDoc = doc(db, 'venues', venueId as string);
       await updateDoc(venueDoc, venueData);
-      
-      const eventsToAdd = selectedEvents.filter(eventId => !originalEvents.includes(eventId));
-      const eventsToRemove = originalEvents.filter(eventId => !selectedEvents.includes(eventId));
-      
-      await Promise.all(
-        eventsToAdd.map(eventId => 
-          updateDoc(doc(db, 'events', eventId), {
-            venues: arrayUnion(venueId as string),
-            updatedAt: serverTimestamp()
-          })
-        )
-      );
-      
-      await Promise.all(
-        eventsToRemove.map(eventId => 
-          updateDoc(doc(db, 'events', eventId), {
-            venues: arrayRemove(venueId as string),
-            updatedAt: serverTimestamp()
-          })
-        )
-      );
       
       router.push(`/${lang}/admin/venues/${venueId}`);
     } catch (err: any) {
@@ -640,32 +679,6 @@ export default function EditVenuePage() {
                   <option value="division">Division</option>
                   <option value="final">Final</option>
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Current Status
-                </label>
-                <select
-                  value={formData.currentStatus}
-                  onChange={(e) => handleInputChange('currentStatus', e.target.value as 'available' | 'in_use' | 'maintenance' | 'unavailable')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                >
-                  <option value="available">Available</option>
-                  <option value="in_use">In Use</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="unavailable">Unavailable</option>
-                </select>
-              </div>
-              <div className="md:col-span-2">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.isActive}
-                    onChange={(e) => handleInputChange('isActive', e.target.checked)}
-                    className="rounded border-gray-300 text-[#3A7F3F] focus:ring-[#3A7F3F]"
-                  />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Active</span>
-                </label>
               </div>
             </div>
           </div>
@@ -796,123 +809,55 @@ export default function EditVenuePage() {
           </div>
 
           <div className="bg-white rounded-lg border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Supported Sports</h3>
-              <Button
-                type="button"
-                onClick={addSupportedSport}
-                variant="outline"
-                className="text-sm"
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add Sport
-              </Button>
-            </div>
-            {formData.supportedSports.map((sport, index) => (
-              <div key={index} className="mb-4 p-4 border rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium">Sport {index + 1}</h4>
-                  <Button
-                    type="button"
-                    onClick={() => removeSupportedSport(index)}
-                    variant="outline"
-                    className="text-red-600 text-sm"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Sport</label>
-                    <select
-                      value={sport.sportId}
-                      onChange={(e) => {
-                        const selectedSport = availableSports.find(s => s.id === e.target.value);
-                        console.log('Selected sport:', selectedSport); // Debug: Verify selected sport
-                        const newSports = [...formData.supportedSports];
-                        newSports[index] = {
-                          ...newSports[index],
-                          sportId: e.target.value,
-                          sportName: selectedSport?.displayName || selectedSport?.name || e.target.value || '',
-                        };
-                        setFormData(prev => {
-                          console.log('Updated supportedSports:', newSports); // Debug: Verify state update
-                          return { ...prev, supportedSports: newSports };
-                        });
-                      }}
-                      disabled={loadingSports || availableSports.length === 0}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F] disabled:bg-gray-100"
-                    >
-                      <option value="">
-                        {loadingSports ? 'Loading sports...' : availableSports.length === 0 ? 'No sports available' : 'Select a sport'}
-                      </option>
-                      {availableSports.map((availableSport) => (
-                        <option key={availableSport.id} value={availableSport.id}>
-                          {availableSport.displayName || availableSport.name || availableSport.id}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Court Count</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={sport.courtCount}
-                      onChange={(e) => {
-                        const newSports = [...formData.supportedSports];
-                        newSports[index] = {
-                          ...newSports[index],
-                          courtCount: parseInt(e.target.value) || 1
-                        };
-                        setFormData(prev => ({ ...prev, supportedSports: newSports }));
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Court Specifications</label>
-                    <textarea
-                      value={sport.courtSpecifications}
-                      onChange={(e) => {
-                        const newSports = [...formData.supportedSports];
-                        newSports[index] = {
-                          ...newSports[index],
-                          courtSpecifications: e.target.value
-                        };
-                        setFormData(prev => ({ ...prev, supportedSports: newSports }));
-                      }}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                      placeholder="Specifications and requirements for this sport"
-                    />
-                  </div>
-                </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Supported Sports</h3>
+            {loadingSports ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin text-[#3A7F3F]" />
+                <span className="ml-2">Loading sports...</span>
               </div>
-            ))}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {availableSports.map((sport) => (
+                  <label key={sport.id} className="flex items-start p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.supportedSports.some(s => s.sportId === sport.id)}
+                      onChange={(e) => handleSportChange(sport.id, e.target.checked)}
+                      className="rounded border-gray-300 text-[#3A7F3F] focus:ring-[#3A7F3F] mt-1"
+                    />
+                    <div className="ml-3 flex-1">
+                      <span className="text-sm font-medium text-gray-900">
+                        {sport.displayName || sport.name || sport.id}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+            {!loadingSports && availableSports.length === 0 && (
+              <p className="text-gray-500 text-center py-4">No sports available to select.</p>
+            )}
           </div>
 
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Primary Contact</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
                 <input
                   type="text"
                   value={formData.primaryContact.name}
                   onChange={(e) => handleNestedInputChange('primaryContact', 'name', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                  required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
                 <input
                   type="tel"
                   value={formData.primaryContact.phone}
                   onChange={(e) => handleNestedInputChange('primaryContact', 'phone', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                  required
                 />
               </div>
               <div>
@@ -937,119 +882,64 @@ export default function EditVenuePage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Officials</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Coordinator ID</label>
-                <input
-                  type="text"
-                  value={formData.officials.coordinatorId}
-                  onChange={(e) => handleNestedInputChange('officials', 'coordinatorId', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Medical Officer</label>
-                <input
-                  type="text"
-                  value={formData.officials.medicalOfficer}
-                  onChange={(e) => handleNestedInputChange('officials', 'medicalOfficer', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Referees</label>
-              {formData.officials.referees.map((referee, index) => (
-                <div key={index} className="flex mb-2">
-                  <input
-                    type="text"
-                    value={referee}
-                    onChange={(e) => handleArrayChange('referees', index, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                    placeholder="Enter referee name/ID"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeArrayItem('referees', index)}
-                    className="ml-2 px-3 py-2 text-red-600 hover:text-red-800"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => addArrayItem('referees')}
-                className="text-[#3A7F3F] hover:text-green-700 text-sm"
-              >
-                + Add Referee
-              </button>
-            </div>
-          </div>
 
           <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Assigned Volunteers</h3>
-            {formData.assignedVolunteers.map((volunteer, index) => (
-              <div key={index} className="flex mb-2">
-                <input
-                  type="text"
-                  value={volunteer}
-                  onChange={(e) => handleArrayChange('assignedVolunteers', index, e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                  placeholder="Enter volunteer name/ID"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeArrayItem('assignedVolunteers', index)}
-                  className="ml-2 px-3 py-2 text-red-600 hover:text-red-800"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <button
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Assign Volunteers</h3>
+              <Button
                 type="button"
-                onClick={() => addArrayItem('assignedVolunteers')}
-                className="text-[#3A7F3F] hover:text-green-700 text-sm"
+                onClick={() => setVolunteerModal(true)}
+                leftIcon={Plus}
+                variant="primary"
+                size="sm"
               >
-                + Add Volunteer
-              </button>
+                Assign Volunteer
+              </Button>
             </div>
-  
-            <div className="bg-white rounded-lg border p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Assign to Events</h3>
-              {loadingEvents ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#3A7F3F]" />
-                  <span className="ml-2">Loading events...</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {availableEvents.map((event) => (
-                    <label key={event.id} className="flex items-start p-3 border rounded-lg hover:bg-gray-50">
-                      <input
-                        type="checkbox"
-                        checked={selectedEvents.includes(event.id)}
-                        onChange={(e) => handleEventChange(event.id, e.target.checked)}
-                        className="rounded border-gray-300 text-[#3A7F3F] focus:ring-[#3A7F3F] mt-1"
-                      />
-                      <div className="ml-3 flex-1">
-                        <span className="text-sm font-medium text-gray-900">{event.name}</span>
-                        <div className="text-xs text-gray-500 mt-1">
-                          <div>{event.description}</div>
-                          <div>{event.startDate?.toDate ? event.startDate.toDate().toLocaleDateString() : 'TBD'} - {event.endDate?.toDate ? event.endDate.toDate().toLocaleDateString() : 'TBD'}</div>
+
+            {/* Current Assignments */}
+            {formData.assignedVolunteers.length > 0 ? (
+              <div className="space-y-3">
+                {formData.assignedVolunteers.map((volunteerId, index) => {
+                  const volunteerInfo = getVolunteerInfo(volunteerId);
+                  return (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <div>
+                            <p className="font-medium text-gray-900">{volunteerInfo.name}</p>
+                            <p className="text-sm text-gray-500">{volunteerInfo.email}</p>
+                          </div>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            volunteerInfo.role === 'technical_volunteer' 
+                              ? 'bg-purple-100 text-purple-800' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {volunteerInfo.role === 'technical_volunteer' ? 'Technical' : 'General'}
+                          </span>
                         </div>
                       </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-              {!loadingEvents && availableEvents.length === 0 && (
-                <p className="text-gray-500 text-center py-4">No events available to assign.</p>
-              )}
-            </div>
+                      <Button
+                        type="button"
+                        onClick={() => removeArrayItem('assignedVolunteers', index)}
+                        variant="danger"
+                        size="sm"
+                        leftIcon={Trash2}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No volunteers assigned yet.</p>
+                <p className="text-sm">Click "Assign Volunteer" to add volunteers to this venue.</p>
+              </div>
+            )}
+          </div>
+  
   
             <div className="flex justify-end space-x-4">
               <Button
@@ -1079,6 +969,171 @@ export default function EditVenuePage() {
             </div>
           </form>
         </div>
+
+        {/* Volunteer Assignment Modal */}
+        {volunteerModal && (
+          <VolunteerAssignmentModal
+            isOpen={volunteerModal}
+            onClose={() => setVolunteerModal(false)}
+            onAssign={handleVolunteerAssign}
+            venueName={formData.name}
+          />
+        )}
       </Container>
     );
-  }}
+  }
+
+  // Simplified Volunteer Assignment Modal Component
+  const VolunteerAssignmentModal = ({
+    isOpen,
+    onClose,
+    onAssign,
+    venueName
+  }: {
+    isOpen: boolean;
+    onClose: () => void;
+    onAssign: (assignment: any) => void;
+    venueName: string;
+  }) => {
+    const [volunteers, setVolunteers] = useState<any[]>([]);
+    const [selectedVolunteer, setSelectedVolunteer] = useState('');
+    const [volunteerRole, setVolunteerRole] = useState<'general' | 'technical'>('general');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loadingVolunteers, setLoadingVolunteers] = useState(false);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+      if (isOpen) {
+        loadVolunteers();
+      }
+    }, [isOpen]);
+
+    const loadVolunteers = async () => {
+      try {
+        setLoadingVolunteers(true);
+        const usersCollection = collection(db, 'users');
+        const volunteersSnapshot = await getDocs(usersCollection);
+        const volunteersData = volunteersSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(user => user.role === 'general_volunteer' && user.isActive !== false);
+        
+        setVolunteers(volunteersData);
+      } catch (err: any) {
+        setError('Failed to load volunteers.');
+      } finally {
+        setLoadingVolunteers(false);
+      }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedVolunteer) {
+        setError('Please select a volunteer');
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        const volunteer = volunteers.find(v => v.id === selectedVolunteer);
+        if (!volunteer) {
+          setError('Selected volunteer not found');
+          return;
+        }
+
+        const assignment = {
+          volunteerId: selectedVolunteer,
+          volunteerName: `${volunteer.firstName} ${volunteer.lastName}`,
+          volunteerEmail: volunteer.email,
+          volunteerRole: volunteerRole
+        };
+
+        await onAssign(assignment);
+        setSelectedVolunteer('');
+        setVolunteerRole('general');
+        onClose();
+      } catch (err: any) {
+        setError('Failed to assign volunteer.');
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Assign Volunteer</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">
+              ×
+            </button>
+          </div>
+          
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Volunteer</label>
+              {loadingVolunteers ? (
+                <div className="flex items-center justify-center py-3">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Loading volunteers...
+                </div>
+              ) : (
+                <select 
+                  value={selectedVolunteer}
+                  onChange={(e) => setSelectedVolunteer(e.target.value)}
+                  required 
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                >
+                  <option value="">Select Volunteer</option>
+                  {volunteers.map(volunteer => (
+                    <option key={volunteer.id} value={volunteer.id}>
+                      {volunteer.firstName} {volunteer.lastName} - {volunteer.email}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">Role</label>
+              <select 
+                value={volunteerRole}
+                onChange={(e) => setVolunteerRole(e.target.value as 'general' | 'technical')}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+              >
+                <option value="general">General</option>
+                <option value="technical">Technical</option>
+              </select>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting || !selectedVolunteer}
+                className="flex-1 bg-[#3A7F3F] hover:bg-green-700"
+              >
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Assign
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };

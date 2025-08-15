@@ -245,8 +245,32 @@ export async function getVolunteerVenueAssignmentDetails(adminUid: string) {
     // Get all volunteer venue assignments with full details
     const assignmentsSnapshot = await adminDb.collection('volunteerVenueAssignment').get();
     
+    // Get unique venue IDs to fetch venue details
+    const venueIds = [...new Set(assignmentsSnapshot.docs.map(doc => doc.data().venueId).filter(Boolean))];
+    
+    // Fetch venue details including supported sports
+    const venuesData: Record<string, any> = {};
+    if (venueIds.length > 0) {
+      const venuesSnapshot = await adminDb.collection('venues').where('__name__', 'in', venueIds).get();
+      venuesSnapshot.docs.forEach(doc => {
+        venuesData[doc.id] = doc.data();
+      });
+    }
+
+    // Get sports data for display names
+    const sportsSnapshot = await adminDb.collection('sports').get();
+    const sportsData: Record<string, any> = {};
+    sportsSnapshot.docs.forEach(doc => {
+      sportsData[doc.id] = doc.data();
+    });
+    
     const assignments = assignmentsSnapshot.docs.map(doc => {
       const data = doc.data();
+      const venue = venuesData[data.venueId] || {};
+      const supportedSports = (venue.supportedSports || []).map((sportId: string) => 
+        sportsData[sportId]?.displayName || sportsData[sportId]?.name || sportId
+      );
+
       return {
         id: doc.id,
         assignmentId: data.assignmentId || doc.id,
@@ -255,6 +279,7 @@ export async function getVolunteerVenueAssignmentDetails(adminUid: string) {
         volunteerType: data.volunteerType,
         venueId: data.venueId,
         venueName: data.venueName,
+        venueSupportedSports: supportedSports,
         status: data.status,
         eventId: data.eventId,
         assignedBy: data.assignedBy,

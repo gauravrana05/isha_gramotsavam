@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { revalidatePath } from 'next/cache';
 import { Fixture, FixtureMatch, Match } from '@/lib/types/fixtures';
 import { FieldValue } from 'firebase-admin/firestore';
+import { serializeFirestoreData } from '@/lib/utils/firestore';
 
 interface TeamNumberAssignment {
   teamId: string;
@@ -336,7 +337,7 @@ export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
     
     // Get team venue assignments
     const venueAssignmentsSnapshot = await adminDb.collection('teamVenueAssignment')
-      .where('venueId', '==', venueId)
+      .where('clusterVenueId', '==', venueId)
       .where('eventId', '==', eventId)
       .get();
     
@@ -429,15 +430,7 @@ export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
 function serializeTeamData(teamId: string, teamData: any) {
   return {
     id: teamId,
-    ...teamData,
-    // Only serialize timestamps that exist to avoid unnecessary work
-    createdAt: teamData?.createdAt?.toDate?.()?.toISOString() || null,
-    updatedAt: teamData?.updatedAt?.toDate?.()?.toISOString() || null,
-    submittedAt: teamData?.submittedAt?.toDate?.()?.toISOString() || null,
-    verifiedAt: teamData?.verifiedAt?.toDate?.()?.toISOString() || null,
-    checkedInAt: teamData?.checkedInAt?.toDate?.()?.toISOString() || null,
-    teamImageUploadedAt: teamData?.teamImageUploadedAt?.toDate?.()?.toISOString() || null,
-    numberAssignedAt: teamData?.numberAssignedAt?.toDate?.()?.toISOString() || null
+    ...serializeFirestoreData(teamData)
   };
 }
 
@@ -557,6 +550,118 @@ async function createMatchesFromBracket(
       error: error instanceof Error ? error.message : 'Unknown error occurred',
       matchesCreated: 0
     };
+  }
+}
+
+export async function getVenueDetails(venueId: string) {
+  try {
+    const venueDoc = await adminDb.collection('venues').doc(venueId).get();
+    
+    if (!venueDoc.exists) {
+      return {
+        success: false,
+        error: 'Venue not found'
+      };
+    }
+    
+    const venueData = venueDoc.data();
+    
+    // Recursively serialize all timestamp fields and other Firestore objects
+    const serializeFirestoreData = (obj: any): any => {
+      if (obj === null || obj === undefined) return obj;
+      
+      // Handle primitive types
+      if (typeof obj !== 'object') return obj;
+      
+      // Handle Firestore Timestamp objects
+      if (obj._seconds !== undefined && obj._nanoseconds !== undefined) {
+        return new Date(obj._seconds * 1000 + obj._nanoseconds / 1000000).toISOString();
+      }
+      
+      // Handle Firestore Timestamp objects with toDate method
+      if (typeof obj.toDate === 'function') {
+        return obj.toDate().toISOString();
+      }
+      
+      // Handle arrays
+      if (Array.isArray(obj)) {
+        return obj.map(serializeFirestoreData);
+      }
+      
+      // Handle regular objects
+      const serialized: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        serialized[key] = serializeFirestoreData(value);
+      }
+      return serialized;
+    };
+    
+    return {
+      success: true,
+      venue: {
+        id: venueDoc.id,
+        ...serializeFirestoreData(venueData)
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching venue details:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch venue details'
+    };
+  }
+}
+
+export async function getVenueFixtures(venueId: string) {
+  try {
+    const fixturesSnapshot = await adminDb.collection('fixtures')
+      .where('venueId', '==', venueId)
+      .get();
+    
+    // Sort in memory instead of using orderBy to avoid index requirement
+    const docs = fixturesSnapshot.docs.sort((a, b) => {
+      const aTime = a.data().createdAt?.toDate?.() || new Date(0);
+      const bTime = b.data().createdAt?.toDate?.() || new Date(0);
+      return bTime.getTime() - aTime.getTime();
+    });
+    
+    // Reuse the serialization function from getVenueDetails
+    const serializeFirestoreData = (obj: any): any => {
+      if (obj === null || obj === undefined) return obj;
+      
+      // Handle primitive types
+      if (typeof obj !== 'object') return obj;
+      
+      // Handle Firestore Timestamp objects
+      if (obj._seconds !== undefined && obj._nanoseconds !== undefined) {
+        return new Date(obj._seconds * 1000 + obj._nanoseconds / 1000000).toISOString();
+      }
+      
+      // Handle Firestore Timestamp objects with toDate method
+      if (typeof obj.toDate === 'function') {
+        return obj.toDate().toISOString();
+      }
+      
+      // Handle arrays
+      if (Array.isArray(obj)) {
+        return obj.map(serializeFirestoreData);
+      }
+      
+      // Handle regular objects
+      const serialized: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        serialized[key] = serializeFirestoreData(value);
+      }
+      return serialized;
+    };
+    
+    return docs.map(doc => ({
+      id: doc.id,
+      ...serializeFirestoreData(doc.data())
+    }));
+  } catch (error) {
+    console.error('Error fetching fixtures:', error);
+    return [];
   }
 }
 

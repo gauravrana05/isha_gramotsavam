@@ -1,46 +1,63 @@
 import { db } from "@/lib/firebase/config";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-// Define the object shapes for clarity
-interface Actor {
-  uid: string;
-  name: string;
-  role: string;
-}
-
-interface TeamInfo {
-  id: string;
-  name: string;
-}
-
-interface PlayerInfo {
-  id: string;
-  name: string;
+// Simple audit log interface
+interface AuditLog {
+  action: 'player_verification' | 'document_upload' | 'onground_verification';
+  volunteer: {
+    id: string;
+    name: string;
+    role: 'verification_volunteer' | 'technical_volunteer';
+  };
+  player?: { 
+    id: string; 
+    name: string; 
+  };
+  team?: { 
+    id: string; 
+    name: string; 
+  };
+  venue?: string;
+  documentType?: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack';
+  status: 'approved' | 'rejected' | 'uploaded' | 'verified';
+  comments?: string;
+  success: boolean;
+  timestamp: any;
 }
 
 export const auditLogService = {
   /**
-   * Logs the verification status change for a single player.
+   * Logs player verification by verification_volunteer (document verification)
    */
   logPlayerVerification: async (
-    actor: Actor,
-    team: TeamInfo,
-    player: PlayerInfo,
-    oldStatus: string,
-    newStatus: string,
-    reason: string | null
+    volunteerId: string,
+    volunteerName: string,
+    playerId: string,
+    playerName: string,
+    teamId: string,
+    teamName: string,
+    status: 'approved' | 'rejected',
+    comments?: string
   ) => {
     try {
-      await addDoc(collection(db, "auditLog"), {
-        action: "PLAYER_VERIFICATION",
-        actor,
-        team,
-        player,
-        oldValue: oldStatus,
-        newValue: newStatus,
-        details: {
-          reason: reason,
+      await addDoc(collection(db, "auditLogs"), {
+        action: "player_verification",
+        volunteer: {
+          id: volunteerId,
+          name: volunteerName,
+          role: "verification_volunteer"
         },
+        player: {
+          id: playerId,
+          name: playerName
+        },
+        team: {
+          id: teamId,
+          name: teamName
+        },
+        status: status,
+        comments: comments || '',
+        success: true,
         timestamp: serverTimestamp(),
       });
     } catch (error) {
@@ -49,25 +66,114 @@ export const auditLogService = {
   },
 
   /**
-   * Logs a bulk verification action for multiple players.
+   * Logs document upload by technical_volunteer during match day
+   */
+  logDocumentUpload: async (
+    volunteerId: string,
+    volunteerName: string,
+    playerId: string,
+    playerName: string,
+    teamId: string,
+    teamName: string,
+    venue: string,
+    documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack',
+    success: boolean = true,
+    comments?: string
+  ) => {
+    try {
+      await addDoc(collection(db, "auditLogs"), {
+        action: "document_upload",
+        volunteer: {
+          id: volunteerId,
+          name: volunteerName,
+          role: "technical_volunteer"
+        },
+        player: {
+          id: playerId,
+          name: playerName
+        },
+        team: {
+          id: teamId,
+          name: teamName
+        },
+        venue: venue,
+        documentType: documentType,
+        status: "uploaded",
+        comments: comments || '',
+        success: success,
+        timestamp: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error creating document upload audit log:", error);
+    }
+  },
+
+  /**
+   * Logs on-ground verification by technical_volunteer
+   */
+  logOnGroundVerification: async (
+    volunteerId: string,
+    volunteerName: string,
+    playerId: string,
+    playerName: string,
+    teamId: string,
+    teamName: string,
+    venue: string,
+    status: 'verified' | 'rejected',
+    comments?: string
+  ) => {
+    try {
+      await addDoc(collection(db, "auditLogs"), {
+        action: "onground_verification",
+        volunteer: {
+          id: volunteerId,
+          name: volunteerName,
+          role: "technical_volunteer"
+        },
+        player: {
+          id: playerId,
+          name: playerName
+        },
+        team: {
+          id: teamId,
+          name: teamName
+        },
+        venue: venue,
+        status: status,
+        comments: comments || '',
+        success: true,
+        timestamp: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Error creating on-ground verification audit log:", error);
+    }
+  },
+
+  /**
+   * Legacy function for backward compatibility - maps to new player verification
    */
   logBulkPlayerVerification: async (
-    actor: Actor,
-    team: TeamInfo,
+    actor: any,
+    team: any,
     playerCount: number,
     status: 'approved' | 'rejected',
     reason: string
   ) => {
     try {
-      await addDoc(collection(db, "auditLog"), {
-        action: "BULK_PLAYER_VERIFICATION",
-        actor,
-        team,
-        newValue: status,
-        details: {
-          playerCount: playerCount,
-          reason: reason,
+      await addDoc(collection(db, "auditLogs"), {
+        action: "player_verification",
+        volunteer: {
+          id: actor.uid,
+          name: actor.name,
+          role: actor.role
         },
+        team: {
+          id: team.id,
+          name: team.name
+        },
+        status: status,
+        comments: `Bulk verification of ${playerCount} players: ${reason}`,
+        success: true,
         timestamp: serverTimestamp(),
       });
     } catch (error) {
@@ -76,25 +182,30 @@ export const auditLogService = {
   },
 
   /**
-   * Logs a change in the overall team status.
+   * Legacy function for backward compatibility - maps to new player verification
    */
   logTeamStatusChange: async (
-    actor: Actor,
-    team: TeamInfo,
+    actor: any,
+    team: any,
     oldStatus: string,
     newStatus: string,
     reason: string
   ) => {
     try {
-      await addDoc(collection(db, "auditLog"), {
-        action: "TEAM_STATUS_CHANGE",
-        actor,
-        team,
-        oldValue: oldStatus,
-        newValue: newStatus,
-        details: {
-          reason: reason,
+      await addDoc(collection(db, "auditLogs"), {
+        action: "player_verification",
+        volunteer: {
+          id: actor.uid,
+          name: actor.name,
+          role: actor.role
         },
+        team: {
+          id: team.id,
+          name: team.name
+        },
+        status: newStatus as any,
+        comments: `Team status changed from ${oldStatus} to ${newStatus}: ${reason}`,
+        success: true,
         timestamp: serverTimestamp(),
       });
     } catch (error) {

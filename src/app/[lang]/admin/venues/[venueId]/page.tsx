@@ -52,6 +52,7 @@ interface SimplifiedVenue {
 export default function VenueDetailPage() {
   const [venue, setVenue] = useState<SimplifiedVenue | null>(null);
   const [sportsData, setSportsData] = useState<any[]>([]);
+  const [volunteersData, setVolunteersData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -83,14 +84,23 @@ export default function VenueDetailPage() {
         } as SimplifiedVenue;
         setVenue(venueData);
 
-        // Load sports data for sport names
-        const sportsCollection = collection(db, 'sports');
-        const sportsSnapshot = await getDocs(sportsCollection);
+        // Load sports data and volunteers data in parallel
+        const [sportsSnapshot, volunteersSnapshot] = await Promise.all([
+          getDocs(collection(db, 'sports')),
+          getDocs(collection(db, 'users'))
+        ]);
+        
         const sportsMap = sportsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
         setSportsData(sportsMap);
+
+        const volunteersMap = volunteersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setVolunteersData(volunteersMap);
       } else {
         setError('Venue not found');
       }
@@ -146,7 +156,28 @@ export default function VenueDetailPage() {
 
   const getSportName = (sportId: string) => {
     const sport = sportsData.find(s => s.id === sportId);
-    return sport?.displayName || sportId;
+    return sport?.displayName || sport?.name || sportId;
+  };
+
+  const getSportDisplayName = (sport: any) => {
+    if (typeof sport === 'string') {
+      // Legacy format - just sport ID
+      return getSportName(sport);
+    } else if (sport && typeof sport === 'object') {
+      // New object format - use sportName if available, otherwise lookup by sportId
+      return sport.sportName || getSportName(sport.sportId || sport.id);
+    }
+    return 'Unknown Sport';
+  };
+
+  const getVolunteerInfo = (volunteerId: string) => {
+    const volunteer = volunteersData.find(v => v.id === volunteerId);
+    if (!volunteer) return { name: volunteerId, email: 'Unknown' };
+    return {
+      name: `${volunteer.firstName || ''} ${volunteer.lastName || ''}`.trim() || volunteer.email || volunteerId,
+      email: volunteer.email || 'No email',
+      role: volunteer.role || 'general_volunteer'
+    };
   };
 
   if (loading) {
@@ -284,22 +315,18 @@ export default function VenueDetailPage() {
           </div>
 
           {/* Supported Sports */}
-          {venue.supportedSports.length > 0 && (
+          {venue.supportedSports && venue.supportedSports.length > 0 && (
             <div className="bg-white rounded-lg border p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Supported Sports</h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {venue.supportedSports.map((sport, index) => (
                   <div key={index} className="p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center mb-2">
+                    <div className="flex items-center">
                       <Trophy className="w-4 h-4 text-[#3A7F3F] mr-2" />
-                      <span className="font-medium text-gray-900">{sport.sportName || getSportName(sport.sportId)}</span>
-                    </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>Courts: {sport.courtCount}</div>
-                      {sport.courtSpecifications && (
-                        <div>Specifications: {sport.courtSpecifications}</div>
-                      )}
+                      <span className="font-medium text-gray-900">
+                        {getSportDisplayName(sport)}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -340,73 +367,38 @@ export default function VenueDetailPage() {
             </div>
           </div>
 
-          {/* Officials */}
-          <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Officials</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="text-sm font-medium text-gray-500">Coordinator ID</label>
-                <p className="text-gray-900 mt-1">{venue.officials.coordinatorId || 'Not assigned'}</p>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-gray-500">Medical Officer</label>
-                <p className="text-gray-900 mt-1">{venue.officials.medicalOfficer || 'Not assigned'}</p>
-              </div>
-              
-              <div className="md:col-span-2">
-                <label className="text-sm font-medium text-gray-500">Referees</label>
-                {venue.officials.referees.length > 0 ? (
-                  <div className="mt-2 space-y-1">
-                    {venue.officials.referees.map((referee, index) => (
-                      <div key={index} className="text-gray-900 text-sm">• {referee}</div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-900 mt-1">No referees assigned</p>
-                )}
-              </div>
-            </div>
-          </div>
 
           {/* Assigned Volunteers */}
-          {venue.assignedVolunteers.length > 0 && (
+          {venue.assignedVolunteers && venue.assignedVolunteers.length > 0 && (
             <div className="bg-white rounded-lg border p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Assigned Volunteers</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {venue.assignedVolunteers.map((volunteer, index) => (
-                  <div key={index} className="flex items-center p-2 bg-gray-50 rounded">
-                    <Users className="w-4 h-4 text-[#3A7F3F] mr-2" />
-                    <span className="text-sm text-gray-900">{volunteer}</span>
-                  </div>
-                ))}
+              <div className="space-y-3">
+                {venue.assignedVolunteers.map((volunteerId, index) => {
+                  const volunteerInfo = getVolunteerInfo(volunteerId);
+                  return (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <div>
+                            <p className="font-medium text-gray-900">{volunteerInfo.name}</p>
+                            <p className="text-sm text-gray-500">{volunteerInfo.email}</p>
+                          </div>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            volunteerInfo.role === 'technical_volunteer' 
+                              ? 'bg-purple-100 text-purple-800' 
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {volunteerInfo.role === 'technical_volunteer' ? 'Technical' : 'General'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Statistics */}
-          <div className="bg-white rounded-lg border p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Statistics</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="text-sm font-medium text-gray-500">Total Matches Hosted</label>
-                <p className="text-2xl font-bold text-[#3A7F3F] mt-1">{venue.totalMatchesHosted}</p>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-gray-500">Upcoming Matches</label>
-                <p className="text-2xl font-bold text-blue-600 mt-1">{venue.upcomingMatches}</p>
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium text-gray-500">Utilization Rate</label>
-                <p className="text-2xl font-bold text-orange-600 mt-1">{venue.utilizationRate}%</p>
-              </div>
-            </div>
-          </div>
 
           {/* Additional Information */}
           <div className="bg-white rounded-lg border p-6">

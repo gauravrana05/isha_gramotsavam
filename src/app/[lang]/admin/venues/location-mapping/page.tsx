@@ -1,14 +1,8 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import VenueLocationMappingForm from './VenueLocationMappingForm';
-import { deleteVenueLocationMapping } from '@/lib/actions/admin/venueMapping';
+import LocationMappingContainer from './LocationMappingContainer';
 import { serializeFirestoreDocs } from '@/lib/utils/firestore';
 
-async function deleteMappingAction(mappingId: string) {
-  'use server';
-  await deleteVenueLocationMapping(mappingId);
-}
 
 async function getVenues() {
   const venuesSnapshot = await adminDb.collection('venues').where('isActive', '==', true).get();
@@ -69,64 +63,48 @@ export default async function VenueLocationMappingPage() {
   const districtsWithMultipleVenues = analyzeVenueDistribution(venues);
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Venue Location Mapping</h1>
-        <p className="text-gray-600">Map venues to locations for automatic team assignment</p>
-        
-        <div className="mt-4 text-sm text-gray-600">
-          <div><strong>Total Venues:</strong> {venues.length}</div>
-          <div><strong>Districts with single venues:</strong> {venues.filter(v => v.type === 'cluster').length - districtsWithMultipleVenues.reduce((sum, d) => sum + d.count, 0)} (auto-assigned)</div>
-          <div><strong>Districts requiring mapping:</strong> {districtsWithMultipleVenues.length}</div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Venue Location Mapping</h1>
+          <p className="mt-1 text-sm text-gray-500">Map venues to locations for automatic team assignment</p>
+        </div>
+        <div>
+          <LocationMappingContainer
+            venues={venues}
+            mappings={mappings}
+            districtsWithMultipleVenues={districtsWithMultipleVenues}
+            headerButtonOnly={true}
+          />
         </div>
       </div>
 
-      {/* Create New Mapping Form */}
-      <VenueLocationMappingForm 
-        venues={venues} 
-        districtsWithMultipleVenues={districtsWithMultipleVenues}
-      />
-
-      {/* Existing Mappings */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Existing Mappings</h2>
-        
-        {mappings.length === 0 ? (
-          <Card className="p-4">
-            <p className="text-gray-500">No venue location mappings found.</p>
-          </Card>
-        ) : (
-          mappings.map(mapping => (
-            <Card key={mapping.id} className="p-4">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <h3 className="font-semibold">{mapping.venueName}</h3>
-                  <p className="text-sm text-gray-600 capitalize">Type: {mapping.venueType}</p>
-                  <p className="text-sm">Max Teams: {mapping.maxTeams}</p>
-                  
-                  <div className="mt-2 space-y-1">
-                    {mapping.assignedLocations.state && (
-                      <p className="text-sm"><strong>State:</strong> {mapping.assignedLocations.state}</p>
-                    )}
-                    {mapping.assignedLocations.districts?.length > 0 && (
-                      <p className="text-sm"><strong>Districts:</strong> {mapping.assignedLocations.districts.join(', ')}</p>
-                    )}
-                    {mapping.assignedLocations.taluks?.length > 0 && (
-                      <p className="text-sm"><strong>Taluks:</strong> {mapping.assignedLocations.taluks.join(', ')}</p>
-                    )}
-                  </div>
-                </div>
-                
-                <form action={deleteMappingAction.bind(null, mapping.id)}>
-                  <Button type="submit" variant="danger" size="sm">
-                    Deactivate
-                  </Button>
-                </form>
-              </div>
-            </Card>
-          ))
-        )}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="p-4">
+          <div className="text-2xl font-bold text-gray-900">{venues.length}</div>
+          <p className="text-sm text-gray-500">Total Venues</p>
+        </Card>
+        <Card className="p-4">
+          <div className="text-2xl font-bold text-green-600">
+            {venues.filter(v => v.type === 'cluster').length - districtsWithMultipleVenues.reduce((sum, d) => sum + d.count, 0)}
+          </div>
+          <p className="text-sm text-gray-500">Auto-assigned Districts</p>
+        </Card>
+        <Card className="p-4">
+          <div className="text-2xl font-bold text-orange-600">{districtsWithMultipleVenues.length}</div>
+          <p className="text-sm text-gray-500">Districts Requiring Mapping</p>
+        </Card>
       </div>
+
+      {/* Mappings Table */}
+      {mappings.length > 0 && (
+        <LocationMappingContainer
+          venues={venues}
+          mappings={mappings}
+          districtsWithMultipleVenues={districtsWithMultipleVenues}
+          headerButtonOnly={false}
+        />
+      )}
     </div>
   );
 }

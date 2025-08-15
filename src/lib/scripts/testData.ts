@@ -69,6 +69,7 @@ export async function createTestTeams(venueId: string, count: number = 25) {
       const assignmentData = {
         teamId,
         eventId: 'isha_gramotsavam_2025',
+        venueId: venueId,
         teamLocation: {
           panchayat: `Test Panchayat ${i}`,
           taluk: taluk,

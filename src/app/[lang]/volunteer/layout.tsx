@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import { useRedirect } from '@/lib/utils/navigation';
 import VolunteerSidebar from '@/components/volunteer/VolunteerSidebar';
 import { useAuth } from '@/context/AuthContext';
@@ -12,6 +13,11 @@ export default function VolunteerLayout({
 }) {
   useRedirect(['general_volunteer', 'technical_volunteer', 'verification_volunteer']);
   const { user, loading } = useAuth();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+  };
 
   if (loading || !user) {
     return (
@@ -25,8 +31,13 @@ export default function VolunteerLayout({
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <VolunteerSidebar />
-      <div className="flex-1 lg:ml-0 min-w-0 overflow-hidden">
+      <VolunteerSidebar 
+        isDesktopCollapsed={isSidebarCollapsed}
+        onDesktopToggle={toggleSidebar}
+      />
+      <div className={`flex-1 min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${
+        isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80'
+      }`}>
         <div className="lg:hidden h-16"></div>
         <main className="flex-1 relative">
           {children}

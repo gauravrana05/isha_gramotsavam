@@ -222,11 +222,26 @@ export const CardFooter = forwardRef<HTMLDivElement, CardFooterProps>(({
 
 CardFooter.displayName = 'CardFooter';
 
+// CardTitle component for consistency with shadcn
+const CardTitle = forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>((
+  { className, children, ...props }, ref
+) => (
+  <h3
+    ref={ref}
+    className={cn("text-2xl font-semibold leading-none tracking-tight", className)}
+    {...props}
+  >
+    {children}
+  </h3>
+));
+CardTitle.displayName = "CardTitle";
+
 // Add compound components to Card
 const CardWithCompounds = Card as unknown as CompoundComponentType<CardProps>;
 CardWithCompounds.Header = CardHeader;
 CardWithCompounds.Content = CardContent;
 CardWithCompounds.Footer = CardFooter;
+CardWithCompounds.Title = CardTitle;
 
 // Specialized card variants for common use cases
 
@@ -360,5 +375,5 @@ export const SimpleStatsCard = forwardRef<HTMLDivElement, SimpleStatsCardProps>(
 
 SimpleStatsCard.displayName = 'SimpleStatsCard';
 
-export { CardWithCompounds as Card };
+export { CardWithCompounds as Card, CardTitle };
 export default CardWithCompounds;
