@@ -1,4 +1,13 @@
-import { adminDb } from '@/lib/firebase/admin';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { db } from '@/lib/firebase/config';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { AdvancedTable, type AdvancedTableConfig } from '@/components/ui/AdvancedTable';
+import type { Column } from '@/components/ui/Table';
+import type { FilterField } from '@/components/ui/FilterSidebar';
 import Link from 'next/link';
 import { 
   Trophy,
@@ -10,90 +19,258 @@ import {
   Clock,
   AlertCircle,
   Eye,
-  Filter
+  Edit,
+  Trash2,
+  Filter,
+  Loader2,
+  Target
 } from 'lucide-react';
 
-interface PageProps {
-  params: Promise<{
-    lang: string;
-  }>;
+interface Fixture {
+  id: string;
+  name?: string;
+  sportName?: string;
+  genderCategory?: string;
+  venueName?: string;
+  level?: string;
+  status?: string;
+  assignedTeams?: any[];
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  completedAt?: string | null;
+  [key: string]: any;
 }
 
-async function getAllFixtures() {
-  try {
-    const fixturesSnapshot = await adminDb.collection('fixtures')
-      .get();
+export default function AdminFixturesPage() {
+  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [venues, setVenues] = useState<{id: string, name: string}[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
+  const router = useRouter();
+  const { lang } = useParams();
+  const { user, userProfile, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (authLoading) return;
     
-    const fixtures = [];
-    
-    for (const doc of fixturesSnapshot.docs) {
-      const fixtureData = doc.data();
-      
-      // Serialize timestamps
-      fixtures.push({
-        id: doc.id,
-        ...fixtureData,
-        createdAt: fixtureData?.createdAt?.toDate?.()?.toISOString() || null,
-        updatedAt: fixtureData?.updatedAt?.toDate?.()?.toISOString() || null,
-        completedAt: fixtureData?.completedAt?.toDate?.()?.toISOString() || null
-      });
+    if (!user) {
+      router.push(`/${lang}/login`);
+      return;
     }
-    
-    // Sort by createdAt in memory to avoid index requirement
-    fixtures.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-    
-    return { success: true, fixtures };
-  } catch (error) {
-    console.error('Error fetching fixtures:', error);
-    return { success: false, fixtures: [] };
-  }
-}
 
-async function getFixtureStats() {
-  try {
-    const fixturesSnapshot = await adminDb.collection('fixtures').get();
-    const matchesSnapshot = await adminDb.collection('matches').get();
-    
-    const stats = {
-      totalFixtures: fixturesSnapshot.size,
-      totalMatches: matchesSnapshot.size,
-      byStatus: { draft: 0, teams_assigned: 0, in_progress: 0, completed: 0 },
-      byLevel: { cluster: 0, division: 0, final: 0 }
-    };
-    
-    fixturesSnapshot.docs.forEach(doc => {
-      const data = doc.data();
-      if (typeof data.status === 'string' && data.status in stats.byStatus) {
-        stats.byStatus[data.status as keyof typeof stats.byStatus]++;
+    if (userProfile?.role !== 'admin') {
+      router.push(`/${lang}/player/dashboard`);
+      return;
+    }
+
+    loadFixtures();
+    loadVenues();
+  }, [user, userProfile, authLoading, lang, router]);
+
+  const loadFixtures = async () => {
+    try {
+      setLoading(true);
+      const fixturesQuery = query(
+        collection(db, 'fixtures'),
+        orderBy('createdAt', 'desc'),
+        limit(100)
+      );
+
+      const fixturesSnapshot = await getDocs(fixturesQuery);
+      
+      const fixturesData: Fixture[] = fixturesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
+        updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || null,
+        completedAt: doc.data().completedAt?.toDate?.()?.toISOString() || null
+      }));
+        
+      setFixtures(fixturesData);
+      
+    } catch (err: any) {
+      console.error('Error loading fixtures:', err);
+      setError('Failed to load fixtures. Please check your permissions.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadVenues = async () => {
+    try {
+      const venuesSnapshot = await getDocs(collection(db, 'venues'));
+      const venuesData = venuesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name
+      }));
+      setVenues(venuesData);
+    } catch (error) {
+      console.error('Error loading venues:', error);
+    }
+  };
+
+  // Calculate statistics
+  const stats = {
+    totalFixtures: fixtures.length,
+    byStatus: { draft: 0, teams_assigned: 0, in_progress: 0, completed: 0 },
+    byLevel: { cluster: 0, division: 0, final: 0 }
+  };
+  
+  fixtures.forEach(fixture => {
+    if (typeof fixture.status === 'string' && fixture.status in stats.byStatus) {
+      stats.byStatus[fixture.status as keyof typeof stats.byStatus]++;
+    }
+    if (typeof fixture.level === 'string' && fixture.level in stats.byLevel) {
+      stats.byLevel[fixture.level as keyof typeof stats.byLevel]++;
+    }
+  });
+
+  // AdvancedTable configuration
+  const columns: Column<Fixture>[] = [
+    {
+      key: 'name',
+      header: 'Tournament',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div>
+            <div className="text-sm font-medium text-gray-900">{item.name}</div>
+            <div className="text-sm text-gray-500">{item.sportName} • {item.genderCategory}</div>
+          </div>
+        );
+      },
+      sortable: true
+    },
+    {
+      key: 'venueName',
+      header: 'Venue',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex items-center text-sm text-gray-900">
+            <MapPin className="w-4 h-4 text-gray-400 mr-1" />
+            {item.venueName}
+          </div>
+        );
+      },
+      sortable: true
+    },
+    {
+      key: 'level',
+      header: 'Level',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getLevelColor(item.level)}`}>
+            {item.level}
+          </span>
+        );
+      },
+      sortable: true
+    },
+    {
+      key: 'assignedTeams',
+      header: 'Teams',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex items-center">
+            <Users className="w-4 h-4 text-gray-400 mr-1" />
+            {item.assignedTeams?.length || 0}
+          </div>
+        );
       }
-      if (typeof data.level === 'string' && data.level in stats.byLevel) {
-        stats.byLevel[data.level as keyof typeof stats.byLevel]++;
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(item.status)}`}>
+            {getStatusIcon(item.status)}
+            <span className="ml-1 capitalize">{item.status?.replace('_', ' ')}</span>
+          </span>
+        );
+      },
+      sortable: true
+    },
+    {
+      key: 'createdAt',
+      header: 'Created',
+      render: (value, item, index) => {
+        if (!item || !item.createdAt) return null;
+        return (
+          <div className="text-sm text-gray-500">
+            {new Date(item.createdAt).toLocaleDateString()}
+          </div>
+        );
+      },
+      sortable: true
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex space-x-2">
+            <Link 
+              href={`/${lang}/admin/fixtures/${item.id}`}
+              className="text-[#F28C38] hover:text-[#E67A26] flex items-center"
+            >
+              <Eye className="w-4 h-4 mr-1" />
+              View
+            </Link>
+            <Link 
+              href={`/${lang}/admin/fixtures/${item.id}/edit`}
+              className="text-blue-600 hover:text-blue-800 flex items-center"
+            >
+              <Edit className="w-4 h-4 mr-1" />
+              Edit
+            </Link>
+          </div>
+        );
       }
-    });
+    }
+  ];
 
-    return stats;
-  } catch (error) {
-    console.error('Error fetching stats:', error);
-    return {
-      totalFixtures: 0,
-      totalMatches: 0,
-      byStatus: { draft: 0, teams_assigned: 0, in_progress: 0, completed: 0 },
-      byLevel: { cluster: 0, division: 0, final: 0 }
-    };
-  }
-}
-
-export default async function AdminFixturesPage({ params }: PageProps) {
-  const { lang } = await params;
-  
-  const [fixturesResult, stats] = await Promise.all([
-    getAllFixtures(),
-    getFixtureStats()
-  ]);
-  
-  const { fixtures } = fixturesResult;
-  
-  const getStatusColor = (status: string) => {
+  const filters: FilterField[] = [
+    {
+      key: 'venueName',
+      label: 'Venue',
+      type: 'select',
+      options: venues.map(venue => ({ label: venue.name, value: venue.name }))
+    },
+    {
+      key: 'level',
+      label: 'Level',
+      type: 'select',
+      options: [
+        { label: 'Cluster', value: 'cluster' },
+        { label: 'Division', value: 'division' },
+        { label: 'Final', value: 'final' }
+      ]
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { label: 'Draft', value: 'draft' },
+        { label: 'Teams Assigned', value: 'teams_assigned' },
+        { label: 'In Progress', value: 'in_progress' },
+        { label: 'Completed', value: 'completed' }
+      ]
+    },
+    {
+      key: 'sportName',
+      label: 'Sport',
+      type: 'text'
+    }
+  ];
+  const getStatusColor = (status?: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
       case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -102,8 +279,7 @@ export default async function AdminFixturesPage({ params }: PageProps) {
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
-  
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status?: string) => {
     switch (status) {
       case 'completed': return <CheckCircle className="w-4 h-4" />;
       case 'in_progress': return <Play className="w-4 h-4" />;
@@ -112,8 +288,7 @@ export default async function AdminFixturesPage({ params }: PageProps) {
       default: return <AlertCircle className="w-4 h-4" />;
     }
   };
-  
-  const getLevelColor = (level: string) => {
+  const getLevelColor = (level?: string) => {
     switch (level) {
       case 'final': return 'bg-purple-100 text-purple-800';
       case 'division': return 'bg-blue-100 text-blue-800';
@@ -122,173 +297,106 @@ export default async function AdminFixturesPage({ params }: PageProps) {
     }
   };
 
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={loadFixtures}
+            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Tournament Fixtures</h1>
-        <p className="text-gray-600 mt-2">Monitor all tournament fixtures across venues</p>
-      </div>
-
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center">
-            <Trophy className="w-8 h-8 text-[#F28C38]" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Fixtures</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalFixtures}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center">
-            <Play className="w-8 h-8 text-blue-600" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Matches</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalMatches}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center">
-            <CheckCircle className="w-8 h-8 text-green-600" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Completed</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.byStatus.completed}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex items-center">
-            <Clock className="w-8 h-8 text-yellow-600" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">In Progress</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.byStatus.in_progress}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Level Breakdown */}
-      <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Tournament Levels</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{stats.byLevel.cluster}</div>
-            <div className="text-sm text-gray-600">Cluster</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{stats.byLevel.division}</div>
-            <div className="text-sm text-gray-600">Division</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">{stats.byLevel.final}</div>
-            <div className="text-sm text-gray-600">Final</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Fixtures List */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="px-6 py-4 border-b border-gray-200">
+    <div className="p-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-lg p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">All Fixtures</h3>
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-500">{fixtures.length} fixtures</span>
+            <div>
+              <p className="text-gray-600 text-sm">Total Fixtures</p>
+              <p className="text-2xl font-bold text-[#4A2F1D]">{stats.totalFixtures}</p>
             </div>
+            <Trophy className="w-8 h-8 text-[#F28C38]" />
           </div>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tournament
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Venue
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Level
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Teams
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Created
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {fixtures.map((fixture) => (
-                <tr key={fixture.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{(fixture as any)?.name}</div>
-                      <div className="text-sm text-gray-500">{(fixture as any)?.sportName} • {(fixture as any)?.genderCategory}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm text-gray-900">
-                      <MapPin className="w-4 h-4 text-gray-400 mr-1" />
-                      {(fixture as any)?.venueName}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getLevelColor((fixture as any)?.level)}`}>
-                      {(fixture as any)?.level}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <Users className="w-4 h-4 text-gray-400 mr-1" />
-                      {(fixture as any)?.assignedTeams?.length || 0}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor((fixture as any)?.status)}`}>
-                      {getStatusIcon((fixture as any)?.status)}
-                      <span className="ml-1 capitalize">{(fixture as any)?.status?.replace('_', ' ')}</span>
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {fixture.createdAt ? new Date(fixture.createdAt).toLocaleDateString() : 'N/A'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <Link 
-                      href={`/${lang}/admin/fixtures/${fixture.id}`}
-                      className="text-[#F28C38] hover:text-[#E67A26] flex items-center"
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {fixtures.length === 0 && (
-            <div className="text-center py-12">
-              <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No fixtures found</h3>
-              <p className="text-gray-600">Tournament fixtures will appear here once created by volunteers.</p>
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Completed</p>
+              <p className="text-2xl font-bold text-green-600">{stats.byStatus.completed}</p>
             </div>
-          )}
+            <CheckCircle className="w-8 h-8 text-green-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">In Progress</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.byStatus.in_progress}</p>
+            </div>
+            <Play className="w-8 h-8 text-blue-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Draft</p>
+              <p className="text-2xl font-bold text-gray-600">{stats.byStatus.draft}</p>
+            </div>
+            <Clock className="w-8 h-8 text-gray-400" />
+          </div>
         </div>
       </div>
+
+      {/* AdvancedTable */}
+      <AdvancedTable
+        title="Tournament Fixtures"
+        subtitle="Monitor all tournament fixtures across venues"
+        data={fixtures}
+        columns={columns}
+        loading={loading}
+        
+        searchable={true}
+        searchPlaceholder="Search fixtures, sports, venues..."
+        searchFields={['name', 'sportName', 'venueName']}
+        
+        filterable={true}
+        filters={filters}
+        
+        sortable={true}
+        defaultSort={[{ key: 'createdAt', direction: 'desc' }]}
+        
+        pagination={{ enabled: true, pageSize: 25 }}
+        
+        persistState={true}
+        stateKey="admin-fixtures"
+        
+        emptyState={{
+          icon: Target,
+          title: 'No fixtures found',
+          description: 'Tournament fixtures will appear here once created by volunteers'
+        }}
+      />
     </div>
   );
 }

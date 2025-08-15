@@ -69,6 +69,7 @@ export interface AdvancedTableConfig<T = any> {
   // Styling
   compact?: boolean;
   stickyHeader?: boolean;
+  emptyMessage?: string;
 }
 
 // Table parameters for server-side operations
@@ -97,6 +98,7 @@ export interface AdvancedTableProps<T = any> extends BaseComponentProps, Advance
   subtitle?: string;
   additionalActions?: React.ReactNode;
   // Virtualization
+  emptyMessage?:string;
   virtualize?: boolean;
   virtualizeThreshold?: number; // auto-enable when data length exceeds
   rowHeight?: number;
@@ -206,8 +208,8 @@ export const AdvancedTable = <T,>({
   additionalActions,
   
   // Props that shouldn't go to DOM
-  itemsPerPageOptions,
-  defaultItemsPerPage,
+  // itemsPerPageOptions,
+  // defaultItemsPerPage,
   emptyMessage,
   virtualize,
   virtualizeThreshold,
@@ -639,9 +641,9 @@ export const AdvancedTable = <T,>({
           
           emptyState={emptyState}
           // Virtualization
-          virtualize={props.virtualize || totalItems > (props.virtualizeThreshold ?? 200)}
-          rowHeight={props.rowHeight}
-          viewportHeight={props.viewportHeight}
+          // virtualize={props.virtualize || totalItems > (props.virtualizeThreshold ?? 200)}
+          // rowHeight={props.rowHeight}
+          // viewportHeight={props.viewportHeight}
         />
         
         {/* Pagination */}

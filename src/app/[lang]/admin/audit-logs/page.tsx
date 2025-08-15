@@ -90,7 +90,7 @@ export default function AuditLogsPage() {
         const allLogs = auditSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        }));
+        } as AuditLog));
         
         // Strict filtering for valid audit logs
         const auditData: AuditLog[] = allLogs.filter(log => {
@@ -98,6 +98,8 @@ export default function AuditLogsPage() {
           const hasValidStructure = (
             log.volunteer && 
             typeof log.volunteer === 'object' &&
+            'name' in log.volunteer &&
+            'role' in log.volunteer &&
             log.volunteer.name && 
             log.volunteer.role &&
             log.action &&
@@ -343,15 +345,15 @@ export default function AuditLogsPage() {
   const exportOptions = [
     {
       label: 'Export CSV',
-      icon: Download,
-      onClick: () => {
+      format: 'csv' as const,
+      onExport: () => {
         const csvContent = [
           ['Timestamp', 'Action', 'Volunteer', 'Role', 'Player', 'Team', 'Venue', 'Status', 'Comments'].join(','),
           ...logs.map(log => [
             log.timestamp?.toDate?.() ? log.timestamp.toDate().toLocaleString() : new Date(log.timestamp).toLocaleString(),
-            getActionLabel(log.action),
-            log.volunteer.name,
-            log.volunteer.role,
+            getActionLabel(log.action || ''),
+            log.volunteer?.name || '',
+            log.volunteer?.role || '',
             log.player?.name || '',
             log.team?.name || '',
             log.venue || '',

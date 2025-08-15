@@ -21,7 +21,11 @@ import {
   Home,
   User,
   ChevronLeft,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  Target,
+  Play,
+  Camera,
+  CheckCircle
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -46,7 +50,7 @@ export default function AdminSidebar({
   onDesktopToggle 
 }: AdminSidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<string[]>(['Venues', 'Users']);
+  const [expandedItems, setExpandedItems] = useState<string[]>(['Venues', 'Teams', 'Users']);
   const [showContent, setShowContent] = useState(!isDesktopCollapsed);
   
   const pathname = usePathname();
@@ -95,8 +99,26 @@ export default function AdminSidebar({
     },
     {
       name: 'Teams',
-      href: `/${lang}/admin/teams`,
       icon: Users,
+      children: [
+        { name: 'All Teams', href: `/${lang}/admin/teams`, icon: Users },
+        { name: 'Venue Assignment', href: `/${lang}/admin/teams/venue-assignment`, icon: MapPin },
+      ]
+    },
+    {
+      name: 'Fixtures',
+      href: `/${lang}/admin/fixtures`,
+      icon: Target,
+    },
+    {
+      name: 'Matches',
+      href: `/${lang}/admin/matches`,
+      icon: Play,
+    },
+    {
+      name: 'Media',
+      href: `/${lang}/admin/media`,
+      icon: Camera,
     },
     {
       name: 'Users',

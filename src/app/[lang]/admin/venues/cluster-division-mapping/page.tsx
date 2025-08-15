@@ -39,20 +39,34 @@ function analyzeVenueStateDistribution(venues: any[]) {
 
   // Return states categorized by mapping needs
   const singleDivisionStates = Object.entries(venuesByState)
-    .filter(([_state, data]) => data.divisions.length === 1 && data.clusters.length > 0)
-    .map(([state, data]) => ({
-      state,
-      clustersCount: data.clusters.length,
-      divisionName: data.divisions[0]?.name
-    }));
+    .filter(([_state, data]) => {
+      const d = data as { clusters: any[]; divisions: any[] };
+      return d.divisions.length === 1 && d.clusters.length > 0;
+    })
+    .map(([state, data]) => {
+      const d = data as { clusters: any[]; divisions: any[] };
+      return {
+        state,
+        clustersCount: d.clusters.length,
+        divisionName: d.divisions[0]?.name
+      };
+    });
+
 
   const multiDivisionStates = Object.entries(venuesByState)
-    .filter(([_state, data]) => data.divisions.length > 1 && data.clusters.length > 0)
-    .map(([state, data]) => ({
-      state,
-      clustersCount: data.clusters.length,
-      divisionsCount: data.divisions.length
-    }));
+    .filter(([_state, data]) => {
+      const d = data as { clusters: any[]; divisions: any[] };
+      return d.divisions.length > 1 && d.clusters.length > 0;
+    })
+    .map(([state, data]) => {
+      const d = data as { clusters: any[]; divisions: any[] };
+      return {
+        state,
+        clustersCount: d.clusters.length,
+        divisionsCount: d.divisions.length
+      };
+    });
+
 
   return { singleDivisionStates, multiDivisionStates };
 }

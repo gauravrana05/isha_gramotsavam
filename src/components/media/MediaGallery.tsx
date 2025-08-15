@@ -5,7 +5,7 @@ import { Filter, Search, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/AdvancedDialog';
+import { MediaFullPreview } from './MediaFullPreview';
 import { MediaItem } from '@/lib/types/media';
 import { MediaDisplay } from './MediaDisplay';
 import { MediaFilterSidebar, MediaFilterState } from './MediaFilterSidebar';
@@ -17,6 +17,8 @@ interface MediaGalleryProps {
   onDownload?: (mediaItem: MediaItem) => void;
   showActions?: boolean;
   showFilters?: boolean;
+  availableFixtures?: Array<{ id: string; name: string; }>;
+  availableMatches?: Array<{ id: string; name: string; }>;
 }
 
 export const MediaGallery: React.FC<MediaGalleryProps> = ({
@@ -25,7 +27,9 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
   onDelete,
   onDownload,
   showActions = true,
-  showFilters = true
+  showFilters = true,
+  availableFixtures = [],
+  availableMatches = []
 }) => {
   const [selectedMediaItem, setSelectedMediaItem] = useState<MediaItem | null>(null);
   const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(false);
@@ -34,17 +38,11 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
     search: '',
     type: 'all',
     capturedDuring: 'all',
-    uploadedBy: 'all',
-    tags: [],
-    dateRange: {}
+    context: 'all',
+    tags: []
   });
 
   // Get available filter options from data
-  const availableUploaders = useMemo(() => {
-    const uploaders = new Set(mediaItems.map(item => item.uploadedByName));
-    return Array.from(uploaders).sort();
-  }, [mediaItems]);
-
   const availableTags = useMemo(() => {
     const tags = new Set<string>();
     mediaItems.forEach(item => {
@@ -76,9 +74,17 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
         return false;
       }
 
-      // Uploaded by filter
-      if (filters.uploadedBy !== 'all' && item.uploadedByName !== filters.uploadedBy) {
-        return false;
+      // Context filter
+      if (filters.context !== 'all') {
+        if (filters.context === 'tournament') {
+          if (!item.fixtureId) return false;
+          if (filters.fixtureId && filters.fixtureId !== 'all-tournaments' && item.fixtureId !== filters.fixtureId) return false;
+        } else if (filters.context === 'match') {
+          if (!item.matchId) return false;
+          if (filters.matchId && filters.matchId !== 'all-matches' && item.matchId !== filters.matchId) return false;
+        } else if (filters.context === 'venue') {
+          if (item.fixtureId || item.matchId) return false;
+        }
       }
 
       // Tags filter
@@ -87,25 +93,6 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
           item.tags?.some(itemTag => itemTag.toLowerCase().includes(filterTag.toLowerCase()))
         );
         if (!hasMatchingTag) return false;
-      }
-
-      // Date range filter
-      if (filters.dateRange.from || filters.dateRange.to) {
-        let itemDate: Date;
-        if (item.uploadedAt && typeof item.uploadedAt.toDate === 'function') {
-          itemDate = item.uploadedAt.toDate();
-        } else if (item.uploadedAt && typeof item.uploadedAt.seconds === 'number') {
-          itemDate = new Date(item.uploadedAt.seconds * 1000);
-        } else {
-          itemDate = new Date(item.uploadedAt);
-        }
-
-        if (filters.dateRange.from && itemDate < filters.dateRange.from) {
-          return false;
-        }
-        if (filters.dateRange.to && itemDate > filters.dateRange.to) {
-          return false;
-        }
       }
 
       return true;
@@ -140,9 +127,8 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
       search: '',
       type: 'all',
       capturedDuring: 'all',
-      uploadedBy: 'all',
-      tags: [],
-      dateRange: {}
+      context: 'all',
+      tags: []
     });
   };
 
@@ -151,9 +137,10 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
     if (filters.search) count++;
     if (filters.type !== 'all') count++;
     if (filters.capturedDuring !== 'all') count++;
-    if (filters.uploadedBy !== 'all') count++;
+    if (filters.context !== 'all') count++;
+    if (filters.fixtureId && filters.fixtureId !== 'all-tournaments') count++;
+    if (filters.matchId && filters.matchId !== 'all-matches') count++;
     if (filters.tags.length > 0) count++;
-    if (filters.dateRange.from || filters.dateRange.to) count++;
     return count;
   };
 
@@ -177,7 +164,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
           
           {/* Filter Button */}
           <Button
-            variant="outline"
+            variant="primary"
             onClick={() => setIsFilterSidebarOpen(true)}
             className="flex items-center gap-2"
           >
@@ -203,12 +190,22 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
           )}
           {filters.capturedDuring !== 'all' && (
             <Badge variant="secondary" className="text-xs">
-              Context: {filters.capturedDuring}
+              Captured: {filters.capturedDuring}
             </Badge>
           )}
-          {filters.uploadedBy !== 'all' && (
+          {filters.context !== 'all' && (
             <Badge variant="secondary" className="text-xs">
-              By: {filters.uploadedBy}
+              Context: {filters.context}
+            </Badge>
+          )}
+          {filters.fixtureId && filters.fixtureId !== 'all-tournaments' && (
+            <Badge variant="secondary" className="text-xs">
+              Tournament: {availableFixtures.find(f => f.id === filters.fixtureId)?.name || filters.fixtureId}
+            </Badge>
+          )}
+          {filters.matchId && filters.matchId !== 'all-matches' && (
+            <Badge variant="secondary" className="text-xs">
+              Match: {availableMatches.find(m => m.id === filters.matchId)?.name || filters.matchId}
             </Badge>
           )}
           {filters.tags.map(tag => (
@@ -264,7 +261,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
           {filteredMediaItems.map((item) => (
             <MediaDisplay
               key={item.mediaId}
@@ -274,6 +271,7 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
               onDelete={onDelete}
               onDownload={onDownload}
               showActions={showActions}
+              showTitle={true}
               size="medium"
               aspectRatio="square"
             />
@@ -288,135 +286,21 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
         filters={filters}
         onFiltersChange={setFilters}
         onClearAll={clearAllFilters}
-        availableUploaders={availableUploaders}
         availableTags={availableTags}
+        availableFixtures={availableFixtures}
+        availableMatches={availableMatches}
       />
 
-      {/* Media Detail Modal */}
-      <Dialog open={!!selectedMediaItem} onOpenChange={() => setSelectedMediaItem(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto mx-4 bg-white">
-          {selectedMediaItem && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
-                  <span className="truncate">{selectedMediaItem.title}</span>
-                </DialogTitle>
-              </DialogHeader>
-              
-              <div className="space-y-6">
-                {/* Large Media Display */}
-                <div className="flex justify-center">
-                  <div className="w-full max-w-4xl">
-                    <MediaDisplay
-                      item={selectedMediaItem}
-                      showActions={false}
-                      size="large"
-                      aspectRatio="auto"
-                    />
-                  </div>
-                </div>
-                
-                {/* Media Details in Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-gray-900">Details</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Type:</span>
-                        <span>{selectedMediaItem.type.toUpperCase()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Size:</span>
-                        <span>{formatFileSize(selectedMediaItem.fileSize)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Format:</span>
-                        <span>{selectedMediaItem.mimeType}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <h4 className="font-medium text-gray-900">Context</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Uploaded by:</span>
-                        <span>{selectedMediaItem.uploadedByName}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Upload date:</span>
-                        <span>{formatDate(selectedMediaItem.uploadedAt)}</span>
-                      </div>
-                      {selectedMediaItem.capturedDuring && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Captured:</span>
-                          <span className="capitalize">{selectedMediaItem.capturedDuring.replace('-', ' ')}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                {selectedMediaItem.description && (
-                  <div>
-                    <h4 className="font-medium mb-2 text-gray-900">Description</h4>
-                    <p className="text-sm text-gray-600">{selectedMediaItem.description}</p>
-                  </div>
-                )}
-                
-                {selectedMediaItem.tags && selectedMediaItem.tags.length > 0 && (
-                  <div>
-                    <h4 className="font-medium mb-2 text-gray-900">Tags</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedMediaItem.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Actions */}
-                {showActions && (
-                  <div className="flex gap-3 pt-4 border-t">
-                    {onDownload && (
-                      <Button
-                        variant="outline"
-                        onClick={() => onDownload(selectedMediaItem)}
-                      >
-                        Download
-                      </Button>
-                    )}
-                    {onEdit && (
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          onEdit(selectedMediaItem.mediaId);
-                          setSelectedMediaItem(null);
-                        }}
-                      >
-                        Edit
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button
-                        variant="destructive"
-                        onClick={() => {
-                          onDelete(selectedMediaItem.mediaId);
-                          setSelectedMediaItem(null);
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Full Screen Media Preview */}
+      <MediaFullPreview
+        mediaItem={selectedMediaItem}
+        isOpen={!!selectedMediaItem}
+        onClose={() => setSelectedMediaItem(null)}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onDownload={onDownload}
+        showActions={showActions}
+      />
     </div>
   );
 };

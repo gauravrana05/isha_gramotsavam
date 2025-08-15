@@ -321,13 +321,13 @@ export default function VenuesManagementEnhanced() {
       return {
         volleyball: {
           sportId: volleyballSport.id,
-          sportName: volleyballSport.displayName || volleyballSport.name,
+          sportName: (volleyballSport as any).name || 'Volleyball',
           courtCount: '2',
           courtSpecifications: 'Standard volleyball court 18x9m with 2.43m net height'
         },
         throwball: {
           sportId: throwballSport.id,
-          sportName: throwballSport.displayName || throwballSport.name,
+          sportName: (throwballSport as any).displayName || (throwballSport as any).name || 'Throwball',
           courtCount: '1',
           courtSpecifications: 'Throwball court 12.2x18.3m with 2.2m net height'
         }
@@ -629,7 +629,7 @@ export default function VenuesManagementEnhanced() {
               <li>• Each venue supports Volleyball and Throwball</li>
               <li>• {includeVolunteers ? '2-5 volunteers assigned per venue' : 'No volunteers assigned'}</li>
               <li>• Realistic contact details and capacity</li>
-              <li>• Set to "{typeOptions.find(t => t.value === venueType)?.label}" tournament level</li>
+              <li>• Set to &quot;{typeOptions.find(t => t.value === venueType)?.label}&quot; tournament level</li>
             </ul>
           </div>
 

@@ -15,6 +15,7 @@ interface MediaDisplayProps {
   showActions?: boolean;
   size?: 'small' | 'medium' | 'large';
   aspectRatio?: 'square' | 'video' | 'auto';
+  showTitle: boolean;
 }
 
 export const MediaDisplay: React.FC<MediaDisplayProps> = ({
@@ -25,7 +26,8 @@ export const MediaDisplay: React.FC<MediaDisplayProps> = ({
   onDownload,
   showActions = true,
   size = 'medium',
-  aspectRatio = 'auto'
+  aspectRatio = 'auto',
+  showTitle = true
 }) => {
   const formatDuration = (seconds?: number): string => {
     if (!seconds) return '';
@@ -49,7 +51,8 @@ export const MediaDisplay: React.FC<MediaDisplayProps> = ({
           videoIcon: 'h-6 w-6',
           eyeIcon: 'h-4 w-4',
           eyeContainer: 'p-2',
-          duration: 'bottom-1 right-1 text-xs px-1 py-0.5'
+          duration: 'bottom-1 right-1 text-xs px-1 py-0.5',
+          title: 'bottom-0 left-0 right-0 p-1 text-xs'
         };
       case 'large':
         return {
@@ -64,7 +67,8 @@ export const MediaDisplay: React.FC<MediaDisplayProps> = ({
           videoIcon: 'h-16 w-16',
           eyeIcon: 'h-8 w-8',
           eyeContainer: 'p-4',
-          duration: 'bottom-3 right-3 text-sm px-3 py-1'
+          duration: 'bottom-3 right-3 text-sm px-3 py-1',
+          title: 'bottom-0 left-0 right-0 p-3 text-sm'
         };
       default: // medium
         return {
@@ -134,15 +138,15 @@ export const MediaDisplay: React.FC<MediaDisplayProps> = ({
       {/* Type badge */}
       <div className={`absolute ${classes.badge} z-10`}>
         <Badge 
-          variant={item.type === 'image' ? 'default' : 'secondary'} 
-          className={`${classes.badgeSize} bg-white/90 backdrop-blur-sm border-0 shadow-sm`}
+          variant="default"
+          className={`${classes.badgeSize} border-0 shadow-sm`}
         >
           {item.type === 'image' ? (
             <Image className={`${classes.iconSize} mr-1`} />
           ) : (
             <Video className={`${classes.iconSize} mr-1`} />
           )}
-          <span className="hidden md:inline">
+          <span className="hidden sm:inline">
             {item.type.toUpperCase()}
           </span>
         </Badge>
@@ -151,12 +155,12 @@ export const MediaDisplay: React.FC<MediaDisplayProps> = ({
       {/* Action buttons */}
       {showActions && (
         <div className={`absolute ${classes.actions} z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200`}>
-          <div className="flex gap-1 bg-white/10 backdrop-blur-sm rounded-lg p-1">
+          <div className="flex gap-1">
             {onDownload && (
               <Button
                 size="sm"
                 variant="secondary"
-                className={`${classes.actionButton} bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm border-0`}
+                className={`${classes.actionButton} bg-white hover:bg-gray-50 text-gray-700 hover:text-blue-600 shadow-md border border-gray-200`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onDownload(item);
@@ -169,7 +173,7 @@ export const MediaDisplay: React.FC<MediaDisplayProps> = ({
               <Button
                 size="sm"
                 variant="secondary"
-                className={`${classes.actionButton} bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 shadow-sm border-0`}
+                className={`${classes.actionButton} bg-white hover:bg-gray-50 text-gray-700 hover:text-green-600 shadow-md border border-gray-200`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onEdit(item.mediaId);
@@ -181,8 +185,8 @@ export const MediaDisplay: React.FC<MediaDisplayProps> = ({
             {onDelete && (
               <Button
                 size="sm"
-                variant="destructive"
-                className={`${classes.actionButton} bg-red-500/90 hover:bg-red-600 text-white shadow-sm border-0`}
+                variant="danger"
+                className={`${classes.actionButton} bg-white hover:bg-red-50 text-gray-700 hover:text-red-600 shadow-md border border-gray-200`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onDelete(item.mediaId);
@@ -192,6 +196,15 @@ export const MediaDisplay: React.FC<MediaDisplayProps> = ({
               </Button>
             )}
           </div>
+        </div>
+      )}
+      
+      {/* Title overlay */}
+      {showTitle && (
+        <div className={`absolute ${classes.title} bg-gradient-to-t from-black/70 to-transparent text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200`}>
+          <p className={`font-medium truncate ${classes.badgeSize}`} title={item.title}>
+            {item.title}
+          </p>
         </div>
       )}
     </div>

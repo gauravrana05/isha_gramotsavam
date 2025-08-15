@@ -245,14 +245,14 @@ export default function LoginPage() {
   if (authLoading || user) {
     return (
       <PageLoader 
-        title="Loadidjdjwng..."
+        title="Loading..."
       />
     );
   }
 
   if (step === "phone") {
     return (
-      <div className="bg-isha p-6 w-full max-w-md">
+      <div className="bg-gray-50 p-6 w-full max-w-md">
         <div className="flex justify-center items-center mb-4">
           <div className="logo-container">
             <Image src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" alt="Logo" width={80} height={80} />
@@ -321,7 +321,7 @@ export default function LoginPage() {
   const isVerifyDisabled = otp.some(digit => !digit) || loading;
 
   return (
-    <div className="bg-isha p-6 w-full max-w-md">
+    <div className="bg-gray-50 p-6 w-full max-w-md">
       <div className="flex justify-center items-center mb-4">
         <div className="logo-container">
           <Image

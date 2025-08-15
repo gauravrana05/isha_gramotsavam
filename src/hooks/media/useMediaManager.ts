@@ -43,7 +43,7 @@ export const useMediaManager = (): UseMediaManagerReturn => {
   }, []);
 
   const buildQuery = useCallback((filters?: MediaFilter, startAfterDoc?: DocumentSnapshot, limitCount = 20) => {
-    let baseQuery = collection(db, 'media');
+    const baseQuery = collection(db, 'media');
     const constraints: any[] = [];
 
     // Add filters

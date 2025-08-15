@@ -732,7 +732,7 @@ export default function CreateVenuePage() {
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <p>No volunteers assigned yet.</p>
-                <p className="text-sm">Click "Assign Volunteer" to add volunteers to this venue.</p>
+                <p className="text-sm">Click &quot;Assign Volunteer&quot; to add volunteers to this venue.</p>
               </div>
             )}
           </div>

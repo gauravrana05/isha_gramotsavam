@@ -294,14 +294,14 @@ export default function EditVenuePage() {
             } else if (sport && typeof sport === 'object') {
               // Already in object format, ensure all fields exist
               return {
-                sportId: sport.sportId || sport.id,
-                sportName: sport.sportName || sport.name || sport.sportId || sport.id,
+                sportId: sport.sportId,
+                sportName: sport.sportName,
                 courtCount: sport.courtCount || "",
                 courtSpecifications: sport.courtSpecifications || ""
               };
             }
             return null;
-          }).filter(Boolean)
+          }).filter((sport): sport is { sportId: string; sportName: string; courtCount: string; courtSpecifications: string; } => sport !== null)
         : []
     }));
   };
@@ -935,7 +935,7 @@ export default function EditVenuePage() {
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <p>No volunteers assigned yet.</p>
-                <p className="text-sm">Click "Assign Volunteer" to add volunteers to this venue.</p>
+                <p className="text-sm">Click &quot;Assign Volunteer&quot; to add volunteers to this venue.</p>
               </div>
             )}
           </div>
@@ -1014,9 +1014,12 @@ export default function EditVenuePage() {
         const usersCollection = collection(db, 'users');
         const volunteersSnapshot = await getDocs(usersCollection);
         const volunteersData = volunteersSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .map(doc => {
+            const data = doc.data() as { role?: string; isActive?: boolean; [key: string]: any };
+            return { id: doc.id, ...data };
+          })
           .filter(user => user.role === 'general_volunteer' && user.isActive !== false);
-        
+
         setVolunteers(volunteersData);
       } catch (err: any) {
         setError('Failed to load volunteers.');

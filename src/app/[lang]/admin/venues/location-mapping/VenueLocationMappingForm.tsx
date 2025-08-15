@@ -9,6 +9,7 @@ import { pincodeService } from '@/lib/services/pincodeService';
 interface Venue {
   id: string;
   name: string;
+  type: string;
   address: {
     state: string;
     district: string;
@@ -20,9 +21,10 @@ interface Venue {
 interface VenueLocationMappingFormProps {
   venues: Venue[];
   districtsWithMultipleVenues: { district: string; count: number; state: string }[];
+  venueType?: 'cluster' | 'division';
 }
 
-export default function VenueLocationMappingForm({ venues, districtsWithMultipleVenues }: VenueLocationMappingFormProps) {
+export default function VenueLocationMappingForm({ venues, districtsWithMultipleVenues, venueType = 'cluster' }: VenueLocationMappingFormProps) {
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [availableTaluks, setAvailableTaluks] = useState<string[]>([]);
   const [selectedTaluks, setSelectedTaluks] = useState<string[]>([]);
@@ -30,8 +32,9 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
   const [error, setError] = useState('');
   const [maxTeams, setMaxTeams] = useState(20);
 
-  // Filter venues to only show those in districts with multiple venues
+  // Filter venues to only show those in districts with multiple venues and matching venue type
   const eligibleVenues = venues.filter(venue => 
+    venue.type === venueType && 
     districtsWithMultipleVenues.some(d => d.district === venue.address.district)
   );
 
@@ -99,7 +102,7 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
     formData.append('eventId', 'isha_gramotsavam_2025');
     formData.append('venueId', selectedVenue.id);
     formData.append('venueName', selectedVenue.name);
-    formData.append('venueType', 'cluster');
+    formData.append('venueType', venueType);
     formData.append('state', selectedVenue.address.state);
     formData.append('districts', selectedVenue.address.district);
     formData.append('taluks', selectedTaluks.join(','));
@@ -126,11 +129,11 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-center">
             <div className="text-green-600 text-sm">
-              ✓ All districts have single cluster venues. No manual mapping required.
+              ✓ All districts have single {venueType} venues. No manual mapping required.
             </div>
           </div>
           <p className="text-sm text-gray-600 mt-2">
-            Teams will be automatically assigned to their district&apos;s cluster venue.
+            Teams will be automatically assigned to their district&apos;s {venueType} venue.
           </p>
         </div>
       </Card>

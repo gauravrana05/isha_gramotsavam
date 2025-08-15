@@ -52,7 +52,7 @@ export class MediaUploadService {
     }
     
     const allowedTypes = MEDIA_CONFIG.ALLOWED_TYPES[mediaType.toUpperCase() as keyof typeof MEDIA_CONFIG.ALLOWED_TYPES];
-    if (!allowedTypes.includes(file.type)) {
+    if (!(allowedTypes as readonly string[]).includes(file.type as any)) {
       return { isValid: false, error: `File type ${file.type} not supported` };
     }
     

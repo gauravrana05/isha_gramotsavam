@@ -11,6 +11,9 @@ export interface MediaFilterState {
   search: string;
   type: 'all' | 'image' | 'video';
   capturedDuring: string;
+  context: 'all' | 'tournament' | 'match' | 'venue';
+  fixtureId?: string;
+  matchId?: string;
   tags: string[];
 }
 
@@ -21,6 +24,8 @@ interface MediaFilterSidebarProps {
   onFiltersChange: (filters: MediaFilterState) => void;
   onClearAll: () => void;
   availableTags?: string[];
+  availableFixtures?: Array<{ id: string; name: string; }>;
+  availableMatches?: Array<{ id: string; name: string; }>;
 }
 
 export const MediaFilterSidebar: React.FC<MediaFilterSidebarProps> = ({
@@ -29,15 +34,29 @@ export const MediaFilterSidebar: React.FC<MediaFilterSidebarProps> = ({
   filters,
   onFiltersChange,
   onClearAll,
-  availableTags = []
+  availableTags = [],
+  availableFixtures = [],
+  availableMatches = []
 }) => {
   const [tagInput, setTagInput] = useState('');
 
   const updateFilter = (key: keyof MediaFilterState, value: any) => {
-    onFiltersChange({
+    const newFilters = {
       ...filters,
       [key]: value
-    });
+    };
+    
+    // Clear specific tournament/match when context changes
+    if (key === 'context') {
+      if (value !== 'tournament') {
+        newFilters.fixtureId = undefined;
+      }
+      if (value !== 'match') {
+        newFilters.matchId = undefined;
+      }
+    }
+    
+    onFiltersChange(newFilters);
   };
 
   const addTag = (tag: string) => {
@@ -62,6 +81,9 @@ export const MediaFilterSidebar: React.FC<MediaFilterSidebarProps> = ({
     let count = 0;
     if (filters.type !== 'all') count++;
     if (filters.capturedDuring !== 'all') count++;
+    if (filters.context !== 'all') count++;
+    if (filters.fixtureId && filters.fixtureId !== 'all-tournaments') count++;
+    if (filters.matchId && filters.matchId !== 'all-matches') count++;
     if (filters.tags.length > 0) count++;
     return count;
   };
@@ -70,9 +92,9 @@ export const MediaFilterSidebar: React.FC<MediaFilterSidebarProps> = ({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop - only on mobile */}
       <div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-40"
+        className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
         onClick={onClose}
       />
       
@@ -80,6 +102,7 @@ export const MediaFilterSidebar: React.FC<MediaFilterSidebarProps> = ({
       <div className={`
         fixed top-0 right-0 h-full w-80 bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : 'translate-x-full'}
+        lg:shadow-xl lg:border-l lg:border-gray-200
       `}>
         <div className="flex flex-col h-full">
           {/* Header */}
@@ -152,6 +175,67 @@ export const MediaFilterSidebar: React.FC<MediaFilterSidebarProps> = ({
               </Select>
             </div>
 
+            {/* Context Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <MapPin className="h-4 w-4 inline mr-1" />
+                Context
+              </label>
+              <Select value={filters.context} onValueChange={(value) => updateFilter('context', value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Media</SelectItem>
+                  <SelectItem value="tournament">Tournament Media</SelectItem>
+                  <SelectItem value="match">Match Media</SelectItem>
+                  <SelectItem value="venue">General Venue</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Specific Tournament/Match */}
+            {filters.context === 'tournament' && availableFixtures.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tournament
+                </label>
+                <Select value={filters.fixtureId || 'all-tournaments'} onValueChange={(value) => updateFilter('fixtureId', value === 'all-tournaments' ? undefined : value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select tournament" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all-tournaments">All Tournaments</SelectItem>
+                    {availableFixtures.map((fixture) => (
+                      <SelectItem key={fixture.id} value={fixture.id}>
+                        {fixture.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {filters.context === 'match' && availableMatches.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Match
+                </label>
+                <Select value={filters.matchId || 'all-matches'} onValueChange={(value) => updateFilter('matchId', value === 'all-matches' ? undefined : value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select match" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all-matches">All Matches</SelectItem>
+                    {availableMatches.map((match) => (
+                      <SelectItem key={match.id} value={match.id}>
+                        {match.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Tags */}
             <div>

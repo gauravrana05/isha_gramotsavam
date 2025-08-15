@@ -272,34 +272,50 @@ export default async function AdminFixtureDetailPage({ params }: PageProps) {
                       </div>
                       
                       <div className="space-y-2">
-                        <div className={`p-2 rounded text-sm ${match.result?.winnerId === match.team1?.teamId ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
+                        <div className={`p-2 rounded text-sm ${
+                          match.result?.winnerId === match.team1?.teamId && 
+                          match.team1?.teamName && 
+                          match.team1.teamName.toLowerCase() !== 'tbd' ? 
+                          'bg-green-50 border border-green-200' : 'bg-gray-50'
+                        }`}>
                           <div className="font-medium">
                             {match.team1?.teamName || 'TBD'}
                             {match.team1?.tournamentNumber && (
                               <span className="text-gray-500 ml-1">(#{match.team1.tournamentNumber})</span>
                             )}
                           </div>
-                          {match.result?.winnerId === match.team1?.teamId && (
+                          {match.result?.winnerId === match.team1?.teamId && 
+                           match.team1?.teamName && 
+                           match.team1.teamName.toLowerCase() !== 'tbd' && (
                             <div className="text-green-600 text-xs font-medium">Winner</div>
                           )}
                         </div>
                         
                         <div className="text-center text-xs text-gray-400">vs</div>
                         
-                        <div className={`p-2 rounded text-sm ${match.result?.winnerId === match.team2?.teamId ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
+                        <div className={`p-2 rounded text-sm ${
+                          match.result?.winnerId === match.team2?.teamId && 
+                          match.team2?.teamName && 
+                          match.team2.teamName.toLowerCase() !== 'tbd' ? 
+                          'bg-green-50 border border-green-200' : 'bg-gray-50'
+                        }`}>
                           <div className="font-medium">
                             {match.team2?.teamName || 'TBD'}
                             {match.team2?.tournamentNumber && (
                               <span className="text-gray-500 ml-1">(#{match.team2.tournamentNumber})</span>
                             )}
                           </div>
-                          {match.result?.winnerId === match.team2?.teamId && (
+                          {match.result?.winnerId === match.team2?.teamId && 
+                           match.team2?.teamName && 
+                           match.team2.teamName.toLowerCase() !== 'tbd' && (
                             <div className="text-green-600 text-xs font-medium">Winner</div>
                           )}
                         </div>
                       </div>
                       
-                      {match.result && (
+                      {match.result && 
+                       match.result.winnerName && 
+                       match.result.winnerName.toLowerCase() !== 'tbd' && (
                         <div className="mt-3 text-xs text-gray-600 border-t pt-2">
                           <div>Winner: {match.result.winnerName}</div>
                           {match.result.resultEnteredAt && (

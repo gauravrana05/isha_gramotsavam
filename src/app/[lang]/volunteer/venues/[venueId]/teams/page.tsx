@@ -5,6 +5,8 @@ import { getVenueTeamsForMatchDay } from '@/lib/actions/volunteer/matchDayVerifi
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useParams } from 'next/navigation';
+import { AdvancedTable } from '@/components/ui/AdvancedTable';
+import type { Column } from '@/components/ui/Table';
 import { 
   Loader2, 
   Users, 
@@ -111,6 +113,117 @@ export default function MatchDayTeamsPage() {
     }
   };
 
+  const getTeamColumns = (): Column<any>[] => [
+    {
+      key: 'name',
+      header: 'Team',
+      sortable: true,
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div>
+            <div className="text-sm font-medium text-gray-900">{item.name || 'N/A'}</div>
+            <div className="text-sm text-gray-500">{item.captainProfile?.name || 'N/A'}</div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'sportName',
+      header: 'Sport',
+      sortable: true,
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex items-center">
+            <Trophy className="w-4 h-4 text-gray-400 mr-2" />
+            <span className="text-sm text-gray-900">{item.sportName || 'N/A'}</span>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'players',
+      header: 'Players',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <span className="text-sm text-gray-900">
+            {item.verifiedPlayersCount || 0}/{item.currentPlayers || 0}
+          </span>
+        );
+      }
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex items-center">
+            <MapPin className="w-4 h-4 text-gray-400 mr-2" />
+            <div>
+              <div className="text-sm text-gray-900">{item.panchayat || 'N/A'}</div>
+              <div className="text-sm text-gray-500">{item.district || 'N/A'}</div>
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'matchDayStatus',
+      header: 'Status',
+      sortable: true,
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.matchDayStatus)}`}>
+            {getStatusIcon(item.matchDayStatus)}
+            <span className="ml-1 capitalize">{item.matchDayStatus || 'pending'}</span>
+          </span>
+        );
+      }
+    }
+  ];
+
+  const getTeamFilters = () => [
+    {
+      key: 'matchDayStatus',
+      label: 'Status',
+      type: 'select' as const,
+      options: [
+        { label: 'All', value: '' },
+        { label: 'Checked In', value: 'checked_in' },
+        { label: 'Verified', value: 'verified' },
+        { label: 'Pending', value: 'pending' }
+      ]
+    },
+    {
+      key: 'sportName',
+      label: 'Sport',
+      type: 'select' as const,
+      options: [
+        { label: 'All Sports', value: '' },
+        ...Array.from(new Set(teams.map(t => t?.sportName).filter(Boolean))).map(sport => ({
+          label: sport,
+          value: sport
+        }))
+      ]
+    },
+    {
+      key: 'district',
+      label: 'District',
+      type: 'select' as const,
+      options: [
+        { label: 'All Districts', value: '' },
+        ...Array.from(new Set(teams.map(t => t?.district).filter(Boolean))).map(district => ({
+          label: district,
+          value: district
+        }))
+      ]
+    }
+  ];
+
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       {/* Header */}
@@ -168,139 +281,41 @@ export default function MatchDayTeamsPage() {
         </div>
       </div>
 
-      {/* Teams Table - Desktop */}
-      {teams.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg border">
-          <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No teams found</h3>
-          <p className="text-gray-600">No teams have been assigned to this venue yet.</p>
-        </div>
-      ) : (
-        <>
-          {/* Desktop Table */}
-          <div className="hidden md:block bg-white rounded-lg border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Team</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sport</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Players</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {teams.map((team) => (
-                    <tr key={team.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{team.name}</div>
-                          <div className="text-sm text-gray-500">{team.captainName}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <Trophy className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="text-sm text-gray-900">{team.sportName}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {team.verifiedPlayersCount || 0}/{team.currentPlayers || 0}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 text-gray-400 mr-2" />
-                          <div>
-                            <div className="text-sm text-gray-900">{team.panchayat}</div>
-                            <div className="text-sm text-gray-500">{team.district}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(team.matchDayStatus)}`}>
-                          {getStatusIcon(team.matchDayStatus)}
-                          <span className="ml-1 capitalize">{team.matchDayStatus || 'pending'}</span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <Link href={`/en/volunteer/venues/${venueId}/teams/${team.id}`}>
-                            <button className="text-indigo-600 hover:text-indigo-900">
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          </Link>
-                          {team.teamImageUrl && (
-                            <button className="text-purple-600 hover:text-purple-900">
-                              <Camera className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Mobile Cards */}
-          <div className="md:hidden space-y-4">
-            {teams.map((team) => (
-              <div key={team.id} className="bg-white rounded-lg border p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-medium text-gray-900">{team.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{team.captainName}</p>
-                  </div>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(team.matchDayStatus)} ml-2`}>
-                    {getStatusIcon(team.matchDayStatus)}
-                    <span className="ml-1 capitalize">{team.matchDayStatus || 'pending'}</span>
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <span className="text-xs text-gray-500">Sport</span>
-                    <div className="mt-1 flex items-center">
-                      <Trophy className="w-4 h-4 text-gray-400 mr-1" />
-                      <span className="text-sm font-medium text-gray-900">{team.sportName}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-500">Players</span>
-                    <p className="text-sm font-medium text-gray-900 mt-1">
-                      {team.verifiedPlayersCount || 0}/{team.currentPlayers || 0}
-                    </p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-xs text-gray-500">Location</span>
-                    <div className="mt-1 flex items-center">
-                      <MapPin className="w-4 h-4 text-gray-400 mr-1" />
-                      <span className="text-sm font-medium text-gray-900">{team.panchayat}, {team.district}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex space-x-2 pt-3 border-t">
-                  <Link href={`/en/volunteer/venues/${venueId}/teams/${team.id}`} className="flex-1">
-                    <button className="w-full flex items-center justify-center px-3 py-2 text-sm text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-md">
-                      <Eye className="w-4 h-4 mr-1" />
-                      {team.matchDayStatus === 'checked_in' ? 'View' : 'Verify'}
-                    </button>
-                  </Link>
-                  {team.teamImageUrl && (
-                    <button className="flex items-center justify-center px-3 py-2 text-sm text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded-md">
-                      <Camera className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+      {/* Teams Table */}
+      <AdvancedTable
+        data={teams}
+        columns={getTeamColumns()}
+        searchable
+        searchPlaceholder="Search teams..."
+        filterable
+        filters={getTeamFilters()}
+        sortable
+        pagination={{ enabled: true, pageSize: 25 }}
+        keyExtractor={(team) => team?.id || Math.random().toString()}
+        emptyState={{
+          icon: Users,
+          title: 'No teams found',
+          description: 'No teams have been assigned to this venue yet.'
+        }}
+        actions={[
+          {
+            label: 'View',
+            icon: Eye,
+            onClick: (team) => window.location.href = `/en/volunteer/venues/${venueId}/teams/${team?.id}`,
+            variant: 'primary'
+          },
+          {
+            label: 'Photo',
+            icon: Camera,
+            onClick: (team) => console.log('View photo:', team),
+            variant: 'secondary',
+             // @ts-expect-error: 'show' is not a valid property on ActionButton, but used for conditional rendering
+            show: (team : any) => !!team?.teamImageUrl
+          }
+        ]}
+        persistState
+        stateKey="venue-teams"
+      />
     </div>
   );
 }

@@ -22,10 +22,10 @@ async function getVenues() {
   });
 }
 
-function analyzeVenueDistribution(venues: any[]) {
-  // Group venues by district and count cluster venues only
+function analyzeVenueDistribution(venues: any[], venueType: 'cluster' | 'division' = 'cluster') {
+  // Group venues by district and count venues of specified type only
   const districtCounts = venues
-    .filter(venue => venue.type === 'cluster')
+    .filter(venue => venue.type === venueType)
     .reduce((acc, venue) => {
       const district = venue.address.district;
       const state = venue.address.state;
@@ -38,7 +38,7 @@ function analyzeVenueDistribution(venues: any[]) {
       return acc;
     }, {} as Record<string, { count: number; state: string }>);
 
-  // Return districts with multiple cluster venues
+  // Return districts with multiple venues of the specified type
   return Object.entries(districtCounts)
     .filter(([_district, data]) => (data as { count: number; state: string }).count > 1)
     .map(([district, data]) => {

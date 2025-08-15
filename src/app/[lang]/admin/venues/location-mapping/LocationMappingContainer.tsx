@@ -97,7 +97,7 @@ export default function LocationMappingContainer({
       {/* Mappings Table */}
       <LocationMappingTable 
         mappings={mappings} 
-        onEdit={handleEditMapping}
+        onEdit={(mapping) => handleEditMapping(mapping as ExistingMapping)}
       />
 
       {/* Modal */}

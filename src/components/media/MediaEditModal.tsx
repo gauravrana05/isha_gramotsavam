@@ -37,8 +37,7 @@ export const MediaEditModal: React.FC<MediaEditModalProps> = ({
         description: mediaItem.description || '',
         tags: mediaItem.tags || [],
         capturedDuring: mediaItem.capturedDuring,
-        location: mediaItem.location || '',
-        status: mediaItem.status
+        location: mediaItem.location || ''
       });
     } else {
       setFormData({});
@@ -79,11 +78,6 @@ export const MediaEditModal: React.FC<MediaEditModalProps> = ({
         capturedDuring: formData.capturedDuring,
         location: formData.location?.trim() || ''
       };
-
-      // Only admins can change status
-      if (isAdmin && formData.status) {
-        updates.status = formData.status;
-      }
 
       const success = await onSave(mediaItem.mediaId, updates);
       
@@ -195,27 +189,6 @@ export const MediaEditModal: React.FC<MediaEditModalProps> = ({
                 disabled={saving}
               />
             </div>
-
-            {isAdmin && (
-              <div>
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status || 'active'}
-                  onValueChange={(value) => handleInputChange('status', value)}
-                  disabled={saving}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="pending">Pending Review</SelectItem>
-                    <SelectItem value="hidden">Hidden</SelectItem>
-                    <SelectItem value="deleted">Deleted</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             <div className="md:col-span-2">
               <Label htmlFor="description">Description</Label>

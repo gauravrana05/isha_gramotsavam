@@ -143,7 +143,8 @@ export async function getVolunteerAssignments(volunteerId: string) {
     }
 
     // Get venue details for each assignment
-    const venueIds = [...new Set(assignmentsSnapshot.docs.map(doc => doc.data().venueId).filter(Boolean))];
+    const venueIdArr = assignmentsSnapshot.docs.map(doc => doc.data().venueId).filter(Boolean);
+    const venueIds = Array.from(new Set(venueIdArr));
     const venuesData: Record<string, any> = {};
     
     if (venueIds.length > 0) {

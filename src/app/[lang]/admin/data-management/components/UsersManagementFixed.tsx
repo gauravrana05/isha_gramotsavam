@@ -219,8 +219,7 @@ export default function UsersManagementFixed() {
         setSelectedUser(user);
         setShowDeleteConfirm(true);
       },
-      variant: 'danger',
-      className: 'text-red-600 hover:text-red-700'
+      variant: 'danger'
     }
   ];
 

@@ -317,7 +317,7 @@ export default function TeamsManagementEnhanced() {
               <li>• Complete player rosters (6-13 players per team)</li>
               <li>• Players from same panchayat as team</li>
               <li>• Random but realistic Indian names and locations</li>
-              <li>• All teams set to "{statusOptions.find(s => s.value === teamStatus)?.label}" status</li>
+              <li>• All teams set to &quot;{statusOptions.find(s => s.value === teamStatus)?.label}&quot; status</li>
             </ul>
           </div>
 

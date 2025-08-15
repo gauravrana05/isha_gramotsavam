@@ -562,9 +562,12 @@ const VenueVolunteerAssignmentModal = ({
       const usersCollection = collection(db, 'users');
       const volunteersSnapshot = await getDocs(usersCollection);
       const volunteersData = volunteersSnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .map(doc => {
+          const data = doc.data() as { role?: string; isActive?: boolean };
+          return { id: doc.id, ...data };
+        })
         .filter(user => user.role === 'general_volunteer' && user.isActive !== false);
-      
+
       setVolunteers(volunteersData);
     } catch (err: any) {
       setError('Failed to load volunteers.');

@@ -50,12 +50,11 @@ export class ClientMediaUploadService {
       const sizeMB = Math.round(maxSize / (1024 * 1024));
       return { isValid: false, error: `File size must be less than ${sizeMB}MB` };
     }
-    
     const allowedTypes = MEDIA_CONFIG.ALLOWED_TYPES[mediaType.toUpperCase() as keyof typeof MEDIA_CONFIG.ALLOWED_TYPES];
-    if (!allowedTypes.includes(file.type)) {
+    if (!(allowedTypes as readonly string[]).includes(file.type as any)) {
       return { isValid: false, error: `File type ${file.type} not supported` };
     }
-    
+
     return { isValid: true };
   }
 

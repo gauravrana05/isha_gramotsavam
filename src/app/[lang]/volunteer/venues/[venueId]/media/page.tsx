@@ -23,6 +23,8 @@ export default function VenueMediaPage() {
   const [editingMedia, setEditingMedia] = useState<MediaItem | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [availableFixtures, setAvailableFixtures] = useState<Array<{ id: string; name: string; }>>([]);
+  const [availableMatches, setAvailableMatches] = useState<Array<{ id: string; name: string; }>>([]);
   
   const {
     state: mediaState,
@@ -42,6 +44,34 @@ export default function VenueMediaPage() {
       loadMedia(filters);
     }
   }, [venueId, loadMedia]);
+
+  // Load fixtures and matches for filtering
+  useEffect(() => {
+    const loadContextData = async () => {
+      try {
+        // For now, use placeholder data
+        // In a real app, you would fetch this from your fixtures/matches API
+        const fixtures = [
+          { id: 'fixture1', name: 'Tournament A' },
+          { id: 'fixture2', name: 'Tournament B' }
+        ];
+        const matches = [
+          { id: 'match1', name: 'Match 1: Team A vs Team B' },
+          { id: 'match2', name: 'Match 2: Team C vs Team D' }
+        ];
+        
+        
+        setAvailableFixtures(fixtures);
+        setAvailableMatches(matches);
+      } catch (error) {
+        console.error('Error loading context data:', error);
+      }
+    };
+
+    if (venueId) {
+      loadContextData();
+    }
+  }, [venueId]);
 
   // Clear messages after 5 seconds
   useEffect(() => {
@@ -150,7 +180,7 @@ export default function VenueMediaPage() {
               className={`
                 flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 text-sm font-medium
                 ${activeTab === 'upload' 
-                  ? 'bg-white text-blue-600 shadow-sm' 
+                  ? 'bg-primary-500 text-white hover:bg-primary-600' 
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }
               `}
@@ -164,7 +194,7 @@ export default function VenueMediaPage() {
               className={`
                 flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 text-sm font-medium
                 ${activeTab === 'gallery' 
-                  ? 'bg-white text-blue-600 shadow-sm' 
+                  ? 'bg-primary-500 text-white hover:bg-primary-600' 
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }
               `}
@@ -204,7 +234,7 @@ export default function VenueMediaPage() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  You don't have permission to upload media. Only technical volunteers and admins can upload media.
+                  You don&apos;t have permission to upload media. Only technical volunteers and admins can upload media.
                 </AlertDescription>
               </Alert>
             ) : (
@@ -240,6 +270,8 @@ export default function VenueMediaPage() {
                 onDownload={handleDownloadMedia}
                 showActions={true}
                 showFilters={true}
+                availableFixtures={availableFixtures}
+                availableMatches={availableMatches}
               />
             )}
             

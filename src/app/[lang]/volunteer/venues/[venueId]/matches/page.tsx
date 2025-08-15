@@ -10,7 +10,9 @@ import {
   CheckCircle,
   AlertCircle,
   Calendar,
-  Target
+  Target,
+  Camera,
+  Edit
 } from 'lucide-react';
 
 interface PageProps {
@@ -272,20 +274,36 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
                       </div>
                     )}
                     
-                    {(match.status === 'ready' || match.status === 'in_progress') && (
-                      <Link href={`/en/volunteer/venues/${venueId}/matches/${match.matchId}`} className="block">
-                        <button className="w-full bg-[#F28C38] text-white px-4 py-2 rounded-md hover:bg-[#E67A26] transition-colors">
-                          {match.status === 'ready' ? 'Start Match' : 'Update Result'}
+                    <div className="space-y-2">
+                      {(match.status === 'ready' || match.status === 'in_progress') && (
+                        <Link href={`/en/volunteer/venues/${venueId}/matches/${match.matchId}`} className="block">
+                          <button className="w-full bg-[#F28C38] text-white px-4 py-2 rounded-md hover:bg-[#E67A26] transition-colors">
+                            {match.status === 'ready' ? 'Start Match' : 'Update Result'}
+                          </button>
+                        </Link>
+                      )}
+                      {match.status === 'completed' && (
+                        <Link href={`/en/volunteer/venues/${venueId}/matches/${match.matchId}`} className="block">
+                          <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors">
+                            View Result
+                          </button>
+                        </Link>
+                      )}
+                      {match.status !== 'completed' && (
+                        <Link href={`/en/volunteer/venues/${venueId}/matches/${match.matchId}/edit`} className="block">
+                          <button className="w-full flex items-center justify-center px-4 py-2 text-sm text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-md border border-blue-200">
+                            <Edit className="w-4 h-4 mr-1" />
+                            Edit Match
+                          </button>
+                        </Link>
+                      )}
+                      <Link href={`/en/volunteer/venues/${venueId}/media/upload?matchId=${match.matchId}`} className="block">
+                        <button className="w-full flex items-center justify-center px-4 py-2 text-sm text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded-md border border-purple-200">
+                          <Camera className="w-4 h-4 mr-1" />
+                          Upload Media
                         </button>
                       </Link>
-                    )}
-                    {match.status === 'completed' && (
-                      <Link href={`/en/volunteer/venues/${venueId}/matches/${match.matchId}`} className="block">
-                        <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors">
-                          View Result
-                        </button>
-                      </Link>
-                    )}
+                    </div>
                   </div>
                 ))}
               </div>

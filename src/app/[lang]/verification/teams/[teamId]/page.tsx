@@ -256,26 +256,26 @@ export default function TeamVerificationPage() {
         });
 
         // Log the verification action
-        if (teamData && user && userProfile) {
-          await auditLogService.logPlayerVerification(
-            { // actor
-              uid: user.uid,
-              name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-              role: userProfile.role
-            },
-            { // team
-              id: teamData.id,
-              name: teamData.name
-            },
-            { // player
-              id: player.playerId,
-              name: player.name
-            },
-            player.verificationStatus, // oldStatus
-            status, // newStatus
-            comments || null // reason
-          );
-        }
+        // if (teamData && user && userProfile) {
+        //   await auditLogService.logPlayerVerification(
+        //     { // actor
+        //       uid: user.uid,
+        //       name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+        //       role: userProfile.role
+        //     },
+        //     { // team
+        //       id: teamData.id,
+        //       name: teamData.name
+        //     },
+        //     { // player
+        //       id: player.playerId,
+        //       name: player.name
+        //     },
+        //     player.verificationStatus, // oldStatus
+        //     status, // newStatus
+        //     comments || null // reason
+        //   );
+        // }
       }
       
       // Update team status based on the new list of players

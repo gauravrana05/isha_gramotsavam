@@ -244,10 +244,17 @@ export async function getVolunteerVenueAssignmentDetails(adminUid: string) {
 
     // Get all volunteer venue assignments with full details
     const assignmentsSnapshot = await adminDb.collection('volunteerVenueAssignment').get();
-    
+
     // Get unique venue IDs to fetch venue details
-    const venueIds = [...new Set(assignmentsSnapshot.docs.map(doc => doc.data().venueId).filter(Boolean))];
-    
+    const venueIdSet: Record<string, true> = {};
+    assignmentsSnapshot.docs.forEach(doc => {
+      const venueId = doc.data().venueId;
+      if (venueId) {
+        venueIdSet[venueId] = true;
+      }
+    });
+    const venueIds = Object.keys(venueIdSet);
+
     // Fetch venue details including supported sports
     const venuesData: Record<string, any> = {};
     if (venueIds.length > 0) {

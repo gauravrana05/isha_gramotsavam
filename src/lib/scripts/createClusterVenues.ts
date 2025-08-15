@@ -136,12 +136,16 @@ async function getSportsData() {
       ...doc.data()
     }));
 
-    const volleyballSport = sports.find(sport => 
-      sport.name?.toLowerCase() === 'volleyball' || sport.displayName?.toLowerCase() === 'volleyball'
+    type SportDoc = { id: string; name?: string; displayName?: string };
+
+    const volleyballSport = (sports as SportDoc[]).find(sport => 
+      (typeof sport.name === 'string' && sport.name.toLowerCase() === 'volleyball') ||
+      (typeof sport.displayName === 'string' && sport.displayName.toLowerCase() === 'volleyball')
     );
     
-    const throwballSport = sports.find(sport => 
-      sport.name?.toLowerCase() === 'throwball' || sport.displayName?.toLowerCase() === 'throwball'
+    const throwballSport = (sports as SportDoc[]).find(sport => 
+      (typeof sport.name === 'string' && sport.name.toLowerCase() === 'throwball') ||
+      (typeof sport.displayName === 'string' && sport.displayName.toLowerCase() === 'throwball')
     );
 
     if (!volleyballSport || !throwballSport) {

@@ -16,6 +16,8 @@ import { MediaMetadata, MEDIA_CONFIG } from '@/lib/types/media';
 
 interface MediaUploadProps {
   venueId: string;
+  contextType?: 'fixture' | 'match' | null;
+  contextId?: string | null;
   fixtureId?: string;
   matchId?: string;
   onUploadComplete?: (results: any[]) => void;
@@ -33,6 +35,8 @@ interface FileWithMetadata {
 
 export const MediaUpload: React.FC<MediaUploadProps> = ({
   venueId,
+  contextType,
+  contextId,
   fixtureId,
   matchId,
   onUploadComplete,
@@ -40,6 +44,9 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
   multiple = true,
   acceptedTypes = 'all'
 }) => {
+  // Support both new context props and legacy props
+  const effectiveContextType = contextType || (fixtureId ? 'fixture' : matchId ? 'match' : null);
+  const effectiveContextId = contextId || fixtureId || matchId;
   const [files, setFiles] = useState<FileWithMetadata[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -77,11 +84,13 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
       const sizeMB = Math.round(maxSize / (1024 * 1024));
       return `File size must be less than ${sizeMB}MB`;
     }
-    
-    if (!allowedTypes.includes(file.type)) {
+
+    // Fix: allowedTypes may be string[] but TS error expects never[] if not typed properly.
+    // To resolve, ensure allowedTypes is string[] and file.type is string.
+    if (Array.isArray(allowedTypes) && !allowedTypes.includes(file.type)) {
       return `File type ${file.type} not supported`;
     }
-    
+
     return null;
   }, []);
 
@@ -175,10 +184,10 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
         };
         
         let result;
-        if (fixtureId) {
-          result = await uploadFixtureMedia(fixtureId, venueId, fileData.file, fileData.metadata);
-        } else if (matchId) {
-          result = await uploadMatchMedia(matchId, venueId, fileData.file, fileData.metadata);
+        if (effectiveContextType === 'fixture' && effectiveContextId) {
+          result = await uploadFixtureMedia(effectiveContextId, venueId, fileData.file, fileData.metadata);
+        } else if (effectiveContextType === 'match' && effectiveContextId) {
+          result = await uploadMatchMedia(effectiveContextId, venueId, fileData.file, fileData.metadata);
         } else {
           result = await uploadVenueMedia(venueId, fileData.file, fileData.metadata);
         }
@@ -196,10 +205,10 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
         const uploads = files.map(fileData => ({
           file: fileData.file,
           metadata: fileData.metadata,
-          context: fixtureId 
-            ? { type: 'fixture' as const, fixtureId, venueId }
-            : matchId 
-            ? { type: 'match' as const, matchId, venueId }
+          context: effectiveContextType === 'fixture' && effectiveContextId
+            ? { type: 'fixture' as const, fixtureId: effectiveContextId, venueId }
+            : effectiveContextType === 'match' && effectiveContextId
+            ? { type: 'match' as const, matchId: effectiveContextId, venueId }
             : { type: 'venue' as const, venueId }
         }));
         
@@ -280,7 +289,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
             {isDragActive ? (
               <div className="text-white">
                 <h3 className="text-xl md:text-2xl font-bold mb-2">Drop your files here!</h3>
-                <p className="text-base md:text-lg opacity-90">We'll handle the rest</p>
+                <p className="text-base md:text-lg opacity-90">We&apos;ll handle the rest</p>
               </div>
             ) : (
               <div>
@@ -334,7 +343,6 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
               <Button 
                 onClick={handleUpload} 
                 className="w-full md:w-auto px-4 md:px-8 py-3 md:py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-sm md:text-base"
-                size="default"
               >
                 <Upload className="h-4 w-4 mr-2 flex-shrink-0" />
                 <span className="truncate">Upload {files.length} {files.length === 1 ? 'File' : 'Files'}</span>
@@ -412,7 +420,16 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                       <span className="text-sm font-medium text-blue-600">Uploading...</span>
                       <span className="text-sm text-blue-600">{Math.round(uploadProgress[fileData.id])}%</span>
                     </div>
-                    <Progress value={uploadProgress[fileData.id]} className="h-2" />
+                    {/* Progress is a custom component, but it does na prop. */}
+                    <div className="relative w-full h-2 bg-blue-200 rot accept 'value' as ounded">
+                      <div
+                        className="absolute left-0 top-0 h-2 bg-blue-600 rounded"
+                        style={{
+                          width: `${uploadProgress[fileData.id]}%`,
+                          transition: 'width 0.3s ease',
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
 

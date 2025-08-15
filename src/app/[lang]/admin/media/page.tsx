@@ -1,96 +1,138 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useRouter, useParams } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { db } from '@/lib/firebase/config';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { AdvancedTable, type AdvancedTableConfig } from '@/components/ui/AdvancedTable';
+import type { Column } from '@/components/ui/Table';
+import type { FilterField } from '@/components/ui/FilterSidebar';
 import { 
-  Shield, 
   Camera, 
   Video, 
   Eye, 
-  EyeOff, 
+  Download, 
+  Edit,
   Trash2, 
   AlertTriangle, 
   CheckCircle, 
-  Clock,
-  Filter,
-  Download,
-  BarChart3
+  Loader2,
+  MapPin,
+  User,
+  Target,
+  Trophy,
+  Hash
 } from 'lucide-react';
-import { MediaGallery } from '@/components/media/MediaGallery';
+import { MediaFullPreview } from '@/components/media/MediaFullPreview';
 import { MediaEditModal } from '@/components/media/MediaEditModal';
 import { useMediaManager } from '@/hooks/media/useMediaManager';
-import { useAuth } from '@/context/AuthContext';
 import { MediaItem, MediaFilter } from '@/lib/types/media';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+
+interface Venue {
+  id: string;
+  name: string;
+}
+
+interface Tournament {
+  id: string;
+  name: string;
+}
+
+interface Match {
+  id: string;
+  matchNumber?: number;
+  fixtureName?: string;
+  roundName?: string;
+}
 
 export default function AdminMediaPage() {
-  const { user, userProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState('all');
+  const { user, userProfile, loading: authLoading } = useAuth();
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [previewMedia, setPreviewMedia] = useState<MediaItem | null>(null);
   const [editingMedia, setEditingMedia] = useState<MediaItem | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [uploaderFilter, setUploaderFilter] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  const router = useRouter();
+  const { lang } = useParams();
   
   const {
     state: mediaState,
     loadMedia,
     updateMediaItem,
-    deleteMediaItem,
-    clearError
+    deleteMediaItem
   } = useMediaManager();
 
-  // Filter media items based on current filters
-  const filteredMediaItems = React.useMemo(() => {
-    let items = mediaState.mediaItems;
-
-    // Filter by tab (status)
-    if (activeTab !== 'all') {
-      items = items.filter(item => item.status === activeTab);
-    }
-
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      items = items.filter(item => 
-        item.title.toLowerCase().includes(query) ||
-        item.description?.toLowerCase().includes(query) ||
-        item.uploadedByName.toLowerCase().includes(query) ||
-        item.tags?.some(tag => tag.toLowerCase().includes(query))
-      );
-    }
-
-    // Filter by type
-    if (typeFilter !== 'all') {
-      items = items.filter(item => item.type === typeFilter);
-    }
-
-    // Filter by uploader
-    if (uploaderFilter) {
-      const uploader = uploaderFilter.toLowerCase();
-      items = items.filter(item => 
-        item.uploadedByName.toLowerCase().includes(uploader)
-      );
-    }
-
-    return items;
-  }, [mediaState.mediaItems, activeTab, searchQuery, typeFilter, uploaderFilter]);
-
-  // Load all media (including all statuses) for admin oversight
   useEffect(() => {
-    const filters: MediaFilter = {
-      type: 'all'
-      // Don't filter by status - load all media for admin review
-    };
-    loadMedia(filters, 50); // Load more items for admin view
-  }, [loadMedia]);
+    if (authLoading) return;
+    
+    if (!user) {
+      router.push(`/${lang}/login`);
+      return;
+    }
+
+    if (userProfile?.role !== 'admin') {
+      router.push(`/${lang}/player/dashboard`);
+      return;
+    }
+
+    loadData();
+  }, [user, userProfile, authLoading, lang, router]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load all data in parallel
+      const [venuesSnap, tournamentsSnap, matchesSnap] = await Promise.all([
+        getDocs(collection(db, 'venues')),
+        getDocs(collection(db, 'fixtures')),
+        getDocs(collection(db, 'matches'))
+      ]);
+
+      // Process venues
+      const venuesData: Venue[] = venuesSnap.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name
+      }));
+      setVenues(venuesData);
+
+      // Process tournaments/fixtures
+      const tournamentsData: Tournament[] = tournamentsSnap.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name
+      }));
+      setTournaments(tournamentsData);
+
+      // Process matches
+      const matchesData: Match[] = matchesSnap.docs.map(doc => ({
+        id: doc.id,
+        matchNumber: doc.data().matchNumber,
+        fixtureName: doc.data().fixtureName,
+        roundName: doc.data().roundName
+      }));
+      setMatches(matchesData);
+
+      // Load media
+      const filters: MediaFilter = {
+        type: 'all'
+      };
+      await loadMedia(filters, 100);
+      
+    } catch (err: any) {
+      console.error('Error loading data:', err);
+      setError('Failed to load data. Please check your permissions.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Clear messages after 5 seconds
   useEffect(() => {
@@ -107,18 +149,18 @@ export default function AdminMediaPage() {
     }
   }, [errorMessage]);
 
-  // Calculate statistics
-  const statistics = React.useMemo(() => {
-    const total = mediaState.mediaItems.length;
-    const active = mediaState.mediaItems.filter(item => item.status === 'active').length;
-    const pending = mediaState.mediaItems.filter(item => item.status === 'pending').length;
-    const hidden = mediaState.mediaItems.filter(item => item.status === 'hidden').length;
-    const deleted = mediaState.mediaItems.filter(item => item.status === 'deleted').length;
-    const images = mediaState.mediaItems.filter(item => item.type === 'image').length;
-    const videos = mediaState.mediaItems.filter(item => item.type === 'video').length;
+  // Calculate simple statistics
+  const stats = {
+    totalImages: mediaState.mediaItems.filter(item => item.type === 'image').length,
+    totalVideos: mediaState.mediaItems.filter(item => item.type === 'video').length
+  };
 
-    return { total, active, pending, hidden, deleted, images, videos };
-  }, [mediaState.mediaItems]);
+  const handleMediaPreview = (mediaId: string) => {
+    const mediaItem = mediaState.mediaItems.find(item => item.mediaId === mediaId);
+    if (mediaItem) {
+      setPreviewMedia(mediaItem);
+    }
+  };
 
   const handleEditMedia = (mediaId: string) => {
     const mediaItem = mediaState.mediaItems.find(item => item.mediaId === mediaId);
@@ -156,19 +198,332 @@ export default function AdminMediaPage() {
     document.body.removeChild(link);
   };
 
-  const handleBulkAction = async (action: 'approve' | 'hide' | 'delete', mediaIds: string[]) => {
-    // This would be implemented for bulk operations
-    console.log(`Bulk ${action} for:`, mediaIds);
+  const getContextInfo = (item: MediaItem) => {
+    let tournament = null;
+    let match = null;
+    let round = null;
+
+    // Look up tournament/fixture by fixtureId
+    if (item.fixtureId) {
+      const fixture = tournaments.find(t => t.id === item.fixtureId);
+      tournament = fixture?.name || null;
+    }
+
+    // Look up match by matchId
+    if (item.matchId) {
+      const matchData = matches.find(m => m.id === item.matchId);
+      if (matchData) {
+        match = `Match #${matchData.matchNumber || item.matchId}`;
+        round = matchData.roundName || null;
+        // If we didn't find tournament from fixture, try from match
+        if (!tournament) {
+          tournament = matchData.fixtureName || null;
+        }
+      }
+    }
+
+    return tournament || match || round ? { tournament, match, round } : null;
   };
+
+  const getVenueName = (item: MediaItem) => {
+    const venue = venues.find(v => v.id === item.venueId);
+    return venue?.name || null;
+  };
+
+  // AdvancedTable configuration
+  const columns: Column<MediaItem>[] = [
+    {
+      key: 'preview',
+      header: 'Media',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div 
+            className="cursor-pointer hover:opacity-75 transition-opacity"
+            onClick={() => handleMediaPreview(item.mediaId)}
+          >
+            {item.type === 'image' ? (
+              <img 
+                src={item.url} 
+                alt={item.title}
+                className="w-16 h-16 object-cover rounded-lg"
+                onError={(e) => {
+                  // Fallback to placeholder if image fails to load
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.nextElementSibling?.setAttribute('style', 'display: flex');
+                }}
+              />
+            ) : (
+              item.thumbnailUrl ? (
+                <img 
+                  src={item.thumbnailUrl} 
+                  alt={item.title}
+                  className="w-16 h-16 object-cover rounded-lg"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.setAttribute('style', 'display: flex');
+                  }}
+                />
+              ) : (
+                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <Video className="w-6 h-6 text-gray-400" />
+                </div>
+              )
+            )}
+            {/* Fallback placeholder (hidden by default) */}
+            <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center" style={{display: 'none'}}>
+              {item.type === 'image' ? (
+                <Camera className="w-6 h-6 text-gray-400" />
+              ) : (
+                <Video className="w-6 h-6 text-gray-400" />
+              )}
+            </div>
+          </div>
+        );
+      },
+      width: '80px'
+    },
+    {
+      key: 'title',
+      header: 'Title',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="font-medium text-gray-900">
+            {item.title}
+          </div>
+        );
+      },
+      sortable: true
+    },
+    {
+      key: 'description',
+      header: 'Description',
+      render: (value, item, index) => {
+        if (!item || !item.description) return <span className="text-gray-400">-</span>;
+        const truncated = item.description.length > 80 
+          ? item.description.substring(0, 80) + '...' 
+          : item.description;
+        return (
+          <div 
+            className="text-sm text-gray-600 max-w-xs"
+            title={item.description}
+          >
+            {truncated}
+          </div>
+        );
+      },
+      width: '200px'
+    },
+    {
+      key: 'context',
+      header: 'Context',
+      render: (value, item, index) => {
+        if (!item) return null;
+        const context = getContextInfo(item);
+        if (!context) return <span className="text-gray-400">-</span>;
+        
+        return (
+          <div className="text-sm">
+            {context.tournament && (
+              <div className="flex items-center text-gray-900">
+                <Trophy className="w-3 h-3 mr-1" />
+                {context.tournament}
+              </div>
+            )}
+            {context.match && (
+              <div className="flex items-center text-gray-600 mt-1">
+                <Hash className="w-3 h-3 mr-1" />
+                {context.match}
+              </div>
+            )}
+            {context.round && (
+              <div className="flex items-center text-gray-600 mt-1">
+                <Target className="w-3 h-3 mr-1" />
+                {context.round}
+              </div>
+            )}
+          </div>
+        );
+      },
+      width: '150px'
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <Badge variant={item.type === 'image' ? 'default' : 'secondary'}>
+            {item.type === 'image' ? 'Image' : 'Video'}
+          </Badge>
+        );
+      },
+      sortable: true,
+      width: '80px'
+    },
+    {
+      key: 'uploader',
+      header: 'Uploader',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex items-center text-sm text-gray-900">
+            <User className="w-4 h-4 text-gray-400 mr-1" />
+            {item.uploadedByName}
+          </div>
+        );
+      },
+      sortable: true,
+      width: '120px'
+    },
+    {
+      key: 'venue',
+      header: 'Venue',
+      render: (value, item, index) => {
+        if (!item) return null;
+        const venueName = getVenueName(item);
+        if (!venueName) return <span className="text-gray-400">-</span>;
+        return (
+          <div className="flex items-center text-sm text-gray-900">
+            <MapPin className="w-4 h-4 text-gray-400 mr-1" />
+            {venueName}
+          </div>
+        );
+      },
+      sortable: true,
+      width: '120px'
+    },
+    {
+      key: 'uploadedAt',
+      header: 'Upload Date',
+      render: (value, item, index) => {
+        if (!item || !item.uploadedAt) return null;
+        const date = item.uploadedAt?.seconds 
+          ? new Date(item.uploadedAt.seconds * 1000)
+          : new Date(item.uploadedAt);
+        return (
+          <div className="text-sm text-gray-600">
+            {date.toLocaleDateString()}
+          </div>
+        );
+      },
+      sortable: true,
+      width: '100px'
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleMediaPreview(item.mediaId)}
+              className="text-blue-600 hover:text-blue-800 p-1"
+              title="Preview"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleEditMedia(item.mediaId)}
+              className="text-green-600 hover:text-green-800 p-1"
+              title="Edit"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleDownloadMedia(item)}
+              className="text-gray-600 hover:text-gray-800 p-1"
+              title="Download"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleDeleteMedia(item.mediaId)}
+              className="text-red-600 hover:text-red-800 p-1"
+              title="Delete"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        );
+      },
+      width: '120px'
+    }
+  ];
+
+  const filters: FilterField[] = [
+    {
+      key: 'type',
+      label: 'Media Type',
+      type: 'select',
+      options: [
+        { label: 'All Types', value: 'all' },
+        { label: 'Images', value: 'image' },
+        { label: 'Videos', value: 'video' }
+      ]
+    },
+    {
+      key: 'venueId',
+      label: 'Venue',
+      type: 'select',
+      options: [
+        { label: 'All Venues', value: 'all' },
+        ...venues.map(venue => ({ label: venue.name, value: venue.id }))
+      ]
+    },
+    {
+      key: 'fixtureId',
+      label: 'Tournament',
+      type: 'select',
+      options: [
+        { label: 'All Tournaments', value: 'all' },
+        ...tournaments.map(tournament => ({ label: tournament.name, value: tournament.id }))
+      ]
+    },
+    {
+      key: 'uploadedByName',
+      label: 'Uploader',
+      type: 'text',
+      placeholder: 'Search by uploader name...'
+    }
+  ];
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={loadData}
+            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Check if user is admin
   if (!user || !userProfile || userProfile.role !== 'admin') {
     return (
       <div className="container mx-auto px-4 py-8">
         <Alert>
-          <Shield className="h-4 w-4" />
+          <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Access denied. Only administrators can access media oversight.
+            Access denied. Only administrators can access media management.
           </AlertDescription>
         </Alert>
       </div>
@@ -176,11 +531,12 @@ export default function AdminMediaPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Media Oversight</h1>
+    <div className="p-6">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2">Media Management</h1>
         <p className="text-gray-600">
-          Monitor and moderate media uploads across all venues
+          Browse and manage uploaded media from all venues
         </p>
       </div>
 
@@ -203,228 +559,69 @@ export default function AdminMediaPage() {
         </Alert>
       )}
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{statistics.total}</div>
-            <div className="text-sm text-gray-500">Total</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{statistics.active}</div>
-            <div className="text-sm text-gray-500">Active</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-yellow-600">{statistics.pending}</div>
-            <div className="text-sm text-gray-500">Pending</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-gray-600">{statistics.hidden}</div>
-            <div className="text-sm text-gray-500">Hidden</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-red-600">{statistics.deleted}</div>
-            <div className="text-sm text-gray-500">Deleted</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-purple-600">{statistics.images}</div>
-            <div className="text-sm text-gray-500">Images</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-indigo-600">{statistics.videos}</div>
-            <div className="text-sm text-gray-500">Videos</div>
-          </CardContent>
-        </Card>
+      {/* Simple Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Total Images</p>
+              <p className="text-2xl font-bold text-blue-600">{stats.totalImages}</p>
+            </div>
+            <Camera className="w-8 h-8 text-blue-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Total Videos</p>
+              <p className="text-2xl font-bold text-purple-600">{stats.totalVideos}</p>
+            </div>
+            <Video className="w-8 h-8 text-purple-400" />
+          </div>
+        </div>
       </div>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <Input
-                placeholder="Search media..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="image">Images</SelectItem>
-                  <SelectItem value="video">Videos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Input
-                placeholder="Filter by uploader..."
-                value={uploaderFilter}
-                onChange={(e) => setUploaderFilter(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setSearchQuery('');
-                  setTypeFilter('all');
-                  setUploaderFilter('');
-                }}
-              >
-                Clear Filters
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* AdvancedTable */}
+      <AdvancedTable
+        data={mediaState.mediaItems}
+        columns={columns}
+        loading={mediaState.loading}
+        
+        searchable={true}
+        searchPlaceholder="Search media titles, descriptions..."
+        searchFields={['title', 'description', 'uploadedByName']}
+        
+        filterable={true}
+        filters={filters}
+        
+        sortable={true}
+        defaultSort={[{ key: 'uploadedAt', direction: 'desc' }]}
+        
+        pagination={{ enabled: true, pageSize: 20 }}
+        
+        persistState={true}
+        stateKey="admin-media"
+        
+        emptyState={{
+          icon: Camera,
+          title: 'No media found',
+          description: 'Media uploads will appear here once volunteers start uploading'
+        }}
+      />
 
-      {/* Tabs by Status */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="all" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            All ({statistics.total})
-          </TabsTrigger>
-          <TabsTrigger value="active" className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4" />
-            Active ({statistics.active})
-          </TabsTrigger>
-          <TabsTrigger value="pending" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Pending ({statistics.pending})
-          </TabsTrigger>
-          <TabsTrigger value="hidden" className="flex items-center gap-2">
-            <EyeOff className="h-4 w-4" />
-            Hidden ({statistics.hidden})
-          </TabsTrigger>
-          <TabsTrigger value="deleted" className="flex items-center gap-2">
-            <Trash2 className="h-4 w-4" />
-            Deleted ({statistics.deleted})
-          </TabsTrigger>
-        </TabsList>
+      {/* Media Full Preview Modal */}
+      <MediaFullPreview
+        mediaItem={previewMedia}
+        isOpen={!!previewMedia}
+        onClose={() => setPreviewMedia(null)}
+        onEdit={handleEditMedia}
+        onDelete={handleDeleteMedia}
+        onDownload={handleDownloadMedia}
+        showActions={true}
+      />
 
-        <TabsContent value={activeTab} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Camera className="h-5 w-5" />
-                  Media Items
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <span>Showing {filteredMediaItems.length} of {mediaState.totalCount} items</span>
-                  {mediaState.loading && <span>Loading...</span>}
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {mediaState.loading && mediaState.mediaItems.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-500">Loading media...</p>
-                </div>
-              ) : filteredMediaItems.length === 0 ? (
-                <div className="text-center py-12">
-                  <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No media items found matching your filters</p>
-                </div>
-              ) : (
-                <>
-                  <MediaGallery
-                    mediaItems={filteredMediaItems}
-                    onEdit={handleEditMedia}
-                    onDelete={handleDeleteMedia}
-                    onDownload={handleDownloadMedia}
-                    showActions={true}
-                    showFilters={false} // We have our own filters above
-                  />
-                  
-                  {/* Enhanced media list for admin with additional details */}
-                  <div className="mt-8">
-                    <h3 className="text-lg font-medium mb-4">Detailed View</h3>
-                    <div className="space-y-3">
-                      {filteredMediaItems.slice(0, 10).map((item) => (
-                        <div key={item.mediaId} className="border rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {item.type === 'image' ? (
-                                <Camera className="h-5 w-5 text-blue-500" />
-                              ) : (
-                                <Video className="h-5 w-5 text-green-500" />
-                              )}
-                              <div>
-                                <h4 className="font-medium">{item.title}</h4>
-                                <p className="text-sm text-gray-500">
-                                  by {item.uploadedByName} • {new Date(item.uploadedAt?.seconds * 1000 || item.uploadedAt).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge 
-                                variant={
-                                  item.status === 'active' ? 'default' :
-                                  item.status === 'pending' ? 'secondary' :
-                                  item.status === 'hidden' ? 'outline' : 'destructive'
-                                }
-                              >
-                                {item.status}
-                              </Badge>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEditMedia(item.mediaId)}
-                              >
-                                Review
-                              </Button>
-                            </div>
-                          </div>
-                          {item.description && (
-                            <p className="text-sm text-gray-600 mt-2">{item.description}</p>
-                          )}
-                          {item.tags && item.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {item.tags.map((tag) => (
-                                <Badge key={tag} variant="secondary" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Edit Media Modal with Admin Features */}
+      {/* Edit Media Modal */}
       <MediaEditModal
         mediaItem={editingMedia}
         isOpen={!!editingMedia}
