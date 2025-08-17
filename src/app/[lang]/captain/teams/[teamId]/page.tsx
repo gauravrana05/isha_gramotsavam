@@ -29,6 +29,8 @@ import Image from "next/image";
 import { PlayerDocumentUpload } from "@/components/players";
 import { checkAndUpdateProfileCompletion } from "@/lib/actions/profile/checkProfileCompletion";
 import DocumentPreview from "@/components/documents/DocumentPreview";
+import { useAlert } from '@/hooks/useAlert';
+import { AlertModal } from '@/components/ui/Modal';
 
 interface TeamPlayer {
   playerId: string;

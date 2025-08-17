@@ -863,7 +863,7 @@ export default function MyTeamPage() {
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Team Found</h3>
-            <p className="text-gray-600 mb-6">You don't have any team registered yet.</p>
+            <p className="text-gray-600 mb-6">You don&apos;t have any team registered yet.</p>
             <button 
               onClick={() => router.push(`/${lang}/captain/dashboard`)}
               className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
