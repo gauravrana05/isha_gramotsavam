@@ -17,6 +17,7 @@ import {
   Clock,
   Loader2
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { useAuth } from "@/context/AuthContext";
 import { AlertModal } from '@/components/ui/Modal';
 import { useAlert } from '@/hooks/useAlert';
@@ -157,7 +158,7 @@ export default function MyTeamPage() {
     try {
       setLoading(true);
       
-      // Find captain's team
+      // Find captain's team - using dashboard's working logic
       const teamsQuery = query(
         collection(db, "teams"),
         where("captainId", "==", user.uid)
@@ -165,8 +166,12 @@ export default function MyTeamPage() {
       
       const querySnapshot = await getDocs(teamsQuery);
       
+      // Check if teams exist, but don't error out immediately like dashboard
       if (querySnapshot.empty) {
-        setError("No team found for this captain");
+        console.log("No teams found for captain:", user.uid);
+        setTeamData(null);
+        setPlayers([]);
+        setLoading(false);
         return;
       }
 
@@ -815,19 +820,57 @@ export default function MyTeamPage() {
     );
   }
 
-  if (error || !teamData) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
-          <p className="text-gray-600 mb-4">{error || "Failed to load team data"}</p>
+          <p className="text-gray-600 mb-4">{error}</p>
           <button 
             onClick={() => router.push(`/${lang}/captain/dashboard`)}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
             Back to Dashboard
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!teamData) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center mb-8">
+            <div className="mb-4">
+              <Image 
+                src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" 
+                alt="Isha Logo" 
+                width={80} 
+                height={80} 
+                className="mx-auto"
+              />
+            </div>
+            <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">
+              My Team
+            </h1>
+            <p className="text-gray-600">
+              Manage your team and players
+            </p>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Team Found</h3>
+            <p className="text-gray-600 mb-6">You don't have any team registered yet.</p>
+            <button 
+              onClick={() => router.push(`/${lang}/captain/dashboard`)}
+              className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1258,14 +1301,18 @@ export default function MyTeamPage() {
                     <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
                       Position <span className="text-red-500">*</span>
                     </label>
-                    <select
+                    <Select
                       value={playerFormData.position}
-                      onChange={(e) => setPlayerFormData(prev => ({ ...prev, position: e.target.value as 'main' | 'substitute' }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+                      onValueChange={(value) => setPlayerFormData(prev => ({ ...prev, position: value as 'main' | 'substitute' }))}
                     >
-                      {canAddMain && <option value="main">Main Player</option>}
-                      {canAddSubstitute && <option value="substitute">Substitute</option>}
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {canAddMain && <SelectItem value="main">Main Player</SelectItem>}
+                        {canAddSubstitute && <SelectItem value="substitute">Substitute</SelectItem>}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               )}

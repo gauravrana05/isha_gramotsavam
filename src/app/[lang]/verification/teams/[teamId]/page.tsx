@@ -7,6 +7,7 @@ import { db } from "@/lib/firebase/config";
 import { doc, getDoc, collection, getDocs, updateDoc, writeBatch } from "firebase/firestore";
 import { auditLogService } from "@/lib/services/auditLogService";
 import { assignTeamToVenue } from "@/lib/actions/admin/teamVenueAssignment";
+import { updateTeamVerificationRecord } from "@/lib/actions/verification/verifyTeam";
 import Image from "next/image";
 import { ArrowLeft, Users, Phone, Calendar, MapPin, Loader2, AlertCircle, CheckCircle, X, Eye, Check, UserCheck } from "lucide-react";
 import { AlertModal } from '@/components/ui/Modal';
@@ -273,29 +274,13 @@ export default function TeamVerificationPage() {
         }
       }
       
-      // Update team status based on the new list of players
-      // (Fix: define updateTeamStatus inline here)
+      // Update team verification record using the proper server action
       try {
-        // Determine new team status based on updatedPlayers
-        // Example: if all players are approved, set team as 'verified'
-        const allApproved = updatedPlayers.every(p => p.verificationStatus === 'approved');
-        const anyRejected = updatedPlayers.some(p => p.verificationStatus === 'rejected');
-        let newTeamStatus = 'pending';
-        if (allApproved) {
-          newTeamStatus = 'verified';
-        } else if (anyRejected) {
-          newTeamStatus = 'rejected';
+        if (teamIdStr) {
+          await updateTeamVerificationRecord(teamIdStr);
         }
-
-        // Update the team document in Firestore
-        const teamRef = doc(db, "teams", teamIdStr);
-        await updateDoc(teamRef, {
-          verificationStatus: newTeamStatus,
-          verifiedAt: newTeamStatus === 'verified' ? new Date().toISOString() : null,
-          verifiedBy: newTeamStatus === 'verified' ? user?.uid || null : null,
-        });
       } catch (err) {
-        console.error('Error updating team status:', err);
+        console.error('Error updating team verification record:', err);
         // Optionally, show a user-facing error or handle as needed
       }
       
@@ -375,32 +360,7 @@ export default function TeamVerificationPage() {
         }
       }
     }
-      // Calculate new team status based on updated players
-      const approvedCount = updatedPlayers.filter(p => p.verificationStatus === 'approved').length;
-      const rejectedCount = updatedPlayers.filter(p => p.verificationStatus === 'rejected').length;
-      const totalPlayers = updatedPlayers.length;
-      
-      let newTeamStatus = teamData?.status || 'pending';
-      if (rejectedCount > 0) {
-        newTeamStatus = 'rejected';
-      } else if (approvedCount === totalPlayers) {
-        newTeamStatus = 'verified';
-      } else if (approvedCount > 0) {
-        newTeamStatus = 'partial_verification';
-      } else {
-        newTeamStatus = 'pending';
-      }
-
-      // Add team status update to batch if it changed
-      if (typeof teamIdStr === "string" && newTeamStatus !== teamData?.status) {
-        const teamRef = doc(db, "teams", teamIdStr);
-        batch.update(teamRef, {
-          status: newTeamStatus,
-          verifiedAt: timestamp,
-          verifiedBy: user?.uid,
-          updatedAt: timestamp,
-        });
-      }
+      // Note: Team status will be updated by updateTeamVerificationRecord() server action
 
       // Commit the batch
       await batch.commit();
@@ -436,44 +396,19 @@ export default function TeamVerificationPage() {
           reason // reason
         );
 
-        // Log team status change if it occurred
-        if (newTeamStatus !== teamData.status) {
-          await auditLogService.logTeamStatusChange(
-            {
-              uid: user.uid,
-              name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-              role: userProfile.role
-            },
-            {
-              id: teamData.id,
-              name: teamData.name
-            },
-            teamData.status,
-            newTeamStatus,
-            `Team status changed based on bulk player verification`
-          );
-        }
       }
 
-      // Update local team status
-      setTeamData(prev => prev ? { ...prev, status: newTeamStatus } : null);
-
-      // Trigger venue assignment when team becomes verified
-      if (newTeamStatus === 'verified' && teamData?.status !== 'verified') {
-        try {
-          const result = await assignTeamToVenue({
-            id: (teamData as any)?.id,
-            name: (teamData as any)?.name,
-            state: (teamData as any)?.state,
-            district: (teamData as any)?.district,
-            panchayat: (teamData as any)?.panchayat
-          });
-          console.log('Venue assignment result:', result.message);
-        } catch (error) {
-          console.error('Error assigning team to venue:', error);
-          // Don't fail the verification process if venue assignment fails
+      // Update team verification record using the proper server action
+      try {
+        if (teamIdStr) {
+          await updateTeamVerificationRecord(teamIdStr);
         }
+      } catch (err) {
+        console.error('Error updating team verification record:', err);
       }
+
+      // Reload team data to get updated status from server
+      await loadTeamData();
 
       showSuccess(`Successfully ${action} ${selectedPlayersList.length} players!`);
       setSelectedPlayers(new Set()); // Clear selection

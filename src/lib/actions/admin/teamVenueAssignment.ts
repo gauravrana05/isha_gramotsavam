@@ -13,13 +13,12 @@ interface TeamData {
 
 export async function assignTeamToVenue(teamData: TeamData) {
   try {
-    const eventId = 'isha_gramotsavam_2025';
+    console.log(`Starting venue assignment for team: ${teamData.name} from ${teamData.district}, ${teamData.state}`);
 
     // Check if team is already assigned
     const existingAssignment = await adminDb
       .collection('teamVenueAssignment')
       .where('teamId', '==', teamData.id)
-      .where('eventId', '==', eventId)
       .limit(1)
       .get();
 
@@ -29,12 +28,12 @@ export async function assignTeamToVenue(teamData: TeamData) {
     }
 
     // Find matching venue
-    const venue = await findMatchingVenue(teamData, eventId);
+    const venue = await findMatchingVenue(teamData, '');
 
     if (!venue) {
       // Queue for manual assignment
-      await queueForManualAssignment(teamData, eventId, 'No matching venue found');
-      console.log('Team queued for manual assignment');
+      await queueForManualAssignment(teamData, '', 'No matching venue found');
+      console.log('Team queued for manual assignment - no matching venue');
       return { success: true, message: 'Queued for manual assignment', requiresManualAssignment: true };
     }
 
@@ -42,12 +41,11 @@ export async function assignTeamToVenue(teamData: TeamData) {
     const currentAssignments = await adminDb
       .collection('teamVenueAssignment')
       .where('venueId', '==', venue.venueId)
-      .where('eventId', '==', eventId)
       .where('status', 'in', ['assigned', 'confirmed'])
       .get();
 
     if (currentAssignments.size >= venue.maxTeams) {
-      await queueForManualAssignment(teamData, eventId, 'Venue at capacity');
+      await queueForManualAssignment(teamData, '', 'Venue at capacity');
       console.log('Team queued for manual assignment - venue at capacity');
       return { success: true, message: 'Venue at capacity, queued for manual assignment', requiresManualAssignment: true };
     }
@@ -58,7 +56,7 @@ export async function assignTeamToVenue(teamData: TeamData) {
       teamName: teamData.name,
       venueId: venue.venueId,
       venueName: venue.venueName,
-      eventId,
+      assignmentLevel: 'cluster',
       status: 'assigned',
       assignedAt: FieldValue.serverTimestamp(),
       assignedBy: 'system_auto',
@@ -72,16 +70,19 @@ export async function assignTeamToVenue(teamData: TeamData) {
     // Also update team document with venue name
     await adminDb.collection('teams').doc(teamData.id).update({
       clusterVenue: venue.venueName,
+      clusterVenueId: venue.venueId,
+      currentLevel: 'cluster',
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    console.log('Team successfully assigned to venue:', venue.venueName);
+    console.log(`Team successfully assigned to venue: ${venue.venueName} (${currentAssignments.size + 1}/${venue.maxTeams} capacity)`);
     return { 
       success: true, 
       message: 'Team successfully assigned to venue',
       assignment: {
         venueId: venue.venueId,
-        venueName: venue.venueName
+        venueName: venue.venueName,
+        assignmentLevel: 'cluster'
       }
     };
 
@@ -93,57 +94,73 @@ export async function assignTeamToVenue(teamData: TeamData) {
 
 async function findMatchingVenue(teamData: TeamData, eventId: string) {
   try {
-    // Get venue-location mappings
-    const mappingsSnapshot = await adminDb
-      .collection('venueLocationMapping')
-      .where('eventId', '==', eventId)
-      .where('isActive', '==', true)
-      .get();
-
-    // Check each mapping for team location match
-    for (const mappingDoc of mappingsSnapshot.docs) {
-      const mapping = mappingDoc.data();
-      
-      if (mapping.assignedLocations) {
-        const locations = mapping.assignedLocations;
-        
-        // Check state match
-        if (locations.state && locations.state !== teamData.state) continue;
-        
-        // Check district match
-        if (locations.districts?.length > 0 && !locations.districts.includes(teamData.district)) continue;
-        
-        // Check panchayat match (if specified)
-        if (locations.panchayats?.length > 0 && !locations.panchayats.includes(teamData.panchayat)) continue;
-        
-        // Found matching venue
-        return {
-          venueId: mapping.venueId,
-          venueName: mapping.venueName,
-          maxTeams: mapping.maxTeams
-        };
-      }
-    }
-
-    // If no mapping found, try single venue in district
+    // Step 1: Get all active cluster venues in team's district
     const venuesSnapshot = await adminDb
       .collection('venues')
       .where('isActive', '==', true)
       .where('type', '==', 'cluster')
       .get();
 
+      console.log("This is team data", teamData);
+
     const districtVenues = venuesSnapshot.docs.filter(doc => {
       const venue = doc.data();
       return venue.address?.district === teamData.district || venue.district === teamData.district;
     });
 
+    // Step 2: If exactly one venue in district, assign directly
     if (districtVenues.length === 1) {
       const venue = districtVenues[0].data();
+      console.log(`Direct assignment: Found single cluster venue ${venue.name} for district ${teamData.district}`);
       return {
         venueId: districtVenues[0].id,
         venueName: venue.name,
         maxTeams: venue.capacity || 50
       };
+    }
+
+    // Step 3: If multiple venues in district, use location mapping
+    if (districtVenues.length > 1) {
+      console.log(`Multiple venues found in ${teamData.district}, checking location mappings...`);
+      
+      // Get venue-location mappings (without event ID constraint)
+      const mappingsSnapshot = await adminDb
+        .collection('venueLocationMapping')
+        .where('isActive', '==', true)
+        .get();
+
+      // Check each mapping for team location match
+      for (const mappingDoc of mappingsSnapshot.docs) {
+        const mapping = mappingDoc.data();
+        
+        if (mapping.assignedLocations) {
+          const locations = mapping.assignedLocations;
+          
+          // Check state match
+          if (locations.state && locations.state !== teamData.state) continue;
+          
+          // Check district match
+          if (locations.districts?.length > 0 && !locations.districts.includes(teamData.district)) continue;
+          
+          // Check panchayat match (if specified)
+          if (locations.panchayats?.length > 0 && !locations.panchayats.includes(teamData.panchayat)) continue;
+          
+          // Found matching venue mapping
+          console.log(`Mapping assignment: Found venue ${mapping.venueName} via location mapping`);
+          return {
+            venueId: mapping.venueId,
+            venueName: mapping.venueName,
+            maxTeams: mapping.maxTeams
+          };
+        }
+      }
+      
+      console.log(`No location mapping found for team in ${teamData.district} with multiple venues`);
+    }
+
+    // Step 4: No venues in district
+    if (districtVenues.length === 0) {
+      console.log(`No cluster venues found in district ${teamData.district}`);
     }
 
     return null;
@@ -163,7 +180,6 @@ async function queueForManualAssignment(teamData: TeamData, eventId: string, rea
         district: teamData.district,
         panchayat: teamData.panchayat
       },
-      eventId,
       reason,
       status: 'pending_manual_assignment',
       queuedAt: FieldValue.serverTimestamp(),
@@ -173,6 +189,8 @@ async function queueForManualAssignment(teamData: TeamData, eventId: string, rea
 
     const queueRef = await adminDb.collection('manualVenueAssignmentQueue').add(queueData);
     await queueRef.update({ queueId: queueRef.id });
+    
+    console.log(`Team ${teamData.name} queued for manual assignment: ${reason}`);
   } catch (error) {
     console.error('Error queuing team for manual assignment:', error);
   }

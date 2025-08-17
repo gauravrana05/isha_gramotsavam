@@ -8,6 +8,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import Container from '@/components/ui/Container';
 import Button from '@/components/ui/Button';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 
 interface SportFormData {
   name: string;
@@ -235,14 +236,18 @@ export default function CreateSportPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Category
                 </label>
-                <select
+                <Select
                   value={formData.category}
-                  onChange={(e) => handleInputChange('category', e.target.value as 'individual' | 'team')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520]"
+                  onValueChange={(value) => handleInputChange('category', value as 'individual' | 'team')}
                 >
-                  <option value="team">Team Sport</option>
-                  <option value="individual">Individual Sport</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="team">Team Sport</SelectItem>
+                    <SelectItem value="individual">Individual Sport</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>

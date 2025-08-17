@@ -12,7 +12,7 @@ interface VerifyTeamRequest {
   volunteerId: string; // The volunteer performing the verification
 }
 
-async function updateTeamVerificationRecord(teamId: string): Promise<void> {
+export async function updateTeamVerificationRecord(teamId: string): Promise<void> {
   const playersSnapshot = await adminDb
     .collection("teams").doc(teamId)
     .collection("players")
@@ -21,7 +21,7 @@ async function updateTeamVerificationRecord(teamId: string): Promise<void> {
 
   const totalPlayers = playersSnapshot.size;
   const verifiedPlayers = playersSnapshot.docs.filter(doc => 
-    doc.data().verificationStatus === "verified"
+    doc.data().verificationStatus === "approved"
   ).length;
   const rejectedPlayers = playersSnapshot.docs.filter(doc => 
     doc.data().verificationStatus === "rejected"
@@ -42,13 +42,45 @@ async function updateTeamVerificationRecord(teamId: string): Promise<void> {
       updatedAt: FieldValue.serverTimestamp()
     });
 
-  // If all players are verified, update team status
+  // If all players are approved, update team status to verified
   if (allChecksComplete && verifiedPlayers === totalPlayers) {
     await adminDb.collection("teams").doc(teamId).update({
       status: "verified",
       verificationStatus: "verified",
       updatedAt: FieldValue.serverTimestamp()
     });
+
+    // Trigger automatic venue assignment for newly verified team
+    try {
+      console.log('Starting venue assignment for verified team:', teamId);
+      const teamDoc = await adminDb.collection("teams").doc(teamId).get();
+      const teamData = teamDoc.data();
+      
+      if (teamData) {
+        const teamForVenueAssignment = {
+          id: teamId,
+          name: teamData.name || '',
+          state: teamData.state || '',
+          district: teamData.district || '',
+          panchayat: teamData.panchayat || ''
+        };
+
+        console.log('Team data for venue assignment:', teamForVenueAssignment);
+        const venueAssignmentResult = await assignTeamToVenue(teamForVenueAssignment);
+        console.log('Venue assignment result:', venueAssignmentResult);
+        
+        if (!venueAssignmentResult.success) {
+          console.error('Venue assignment failed:', venueAssignmentResult.error);
+        } else {
+          console.log('Venue assignment successful:', venueAssignmentResult.message);
+        }
+      } else {
+        console.error('Team data not found for venue assignment');
+      }
+    } catch (venueError) {
+      console.error('Error assigning venue to auto-verified team:', venueError);
+      // Don't fail the verification if venue assignment fails
+    }
   }
 }
 

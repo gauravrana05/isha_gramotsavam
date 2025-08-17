@@ -38,7 +38,7 @@ const getCaptainNavItems = (lang: string): NavItem[] => [
     id: 'team',
     label: 'My Team',
     icon: Users,
-    href: `/${lang}/captain/team`,
+    href: `/${lang}/captain/teams`,
   },
   {
     id: 'fixtures',
