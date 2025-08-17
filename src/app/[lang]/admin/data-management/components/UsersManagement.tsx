@@ -4,7 +4,7 @@ import { Plus, Trash2, RefreshCw, Users, Eye, Edit, Download, Upload, AlertTrian
 import { Button, Modal, StatusBadge, AdvancedTable, type Column, type ActionButton, type FilterField
 } from '@/components/ui';
 import Input from '@/components/ui/Input';
-import Select from '@/components/ui/Select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { collectionManagers, firebaseUtils } from '../lib/firebaseOperations';
 import { generators, batchGenerators } from '../lib/dataGenerators';
 import type { User, UserRole, Gender } from '@/lib/types/user'; interface UsersStats { total: number; byRole: Record<string, number>; verified: number; unverified: number; testDataCount: number;

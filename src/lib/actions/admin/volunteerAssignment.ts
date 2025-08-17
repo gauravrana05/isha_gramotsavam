@@ -45,6 +45,7 @@ export async function assignVolunteerToVenue(formData: FormData) {
 
     revalidatePath('/admin/users/volunteers/assign-venues');
     revalidatePath('/admin/users/volunteers');
+    revalidatePath('/admin/venues');
     
     return { 
       success: true, 
@@ -82,6 +83,7 @@ export async function removeVolunteerAssignment(assignmentId: string) {
 
     revalidatePath('/admin/users/volunteers/assign-venues');
     revalidatePath('/admin/users/volunteers');
+    revalidatePath('/admin/venues');
     
     return { 
       success: true, 

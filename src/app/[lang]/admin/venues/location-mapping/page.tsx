@@ -81,8 +81,8 @@ export default async function VenueLocationMappingPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card className="p-4">
-          <div className="text-2xl font-bold text-gray-900">{venues.length}</div>
-          <p className="text-sm text-gray-500">Total Venues</p>
+          <div className="text-2xl font-bold text-gray-900">{venues.filter(v => v.type === 'cluster').length}</div>
+          <p className="text-sm text-gray-500">Cluster Venues</p>
         </Card>
         <Card className="p-4">
           <div className="text-2xl font-bold text-green-600">

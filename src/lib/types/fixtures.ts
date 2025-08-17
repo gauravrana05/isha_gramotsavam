@@ -144,21 +144,26 @@ export interface VenueLocationMapping {
   updatedAt: Timestamp;
 }
 
-// Cluster to Division Venue Mapping
+// Cluster to Division Venue Mapping (Grouped format like VenueLocationMapping)
 export interface ClusterDivisionMapping {
   mappingId: string;
   eventId: string;
   
-  // Cluster Venue
-  clusterVenueId: string;
-  clusterVenueName: string;
-  
-  // Division Venue (where winners advance)
+  // Division Venue Information
   divisionVenueId: string;
   divisionVenueName: string;
+  venueType: 'division';
   
-  // Status
+  // Assigned Clusters (similar to assignedLocations in venue location mapping)
+  assignedClusters: {
+    state: string;
+    clusterVenueIds: string[];
+    clusterVenueNames: string[];
+  };
+  
+  // Status & Metadata
   isActive: boolean;
+  autoMapped: boolean; // true if all clusters in state have single division
   
   // Audit Fields
   createdAt: Timestamp;

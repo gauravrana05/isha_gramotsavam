@@ -9,6 +9,8 @@ import DocumentPreview from '@/components/documents/DocumentPreview';
 import PlayerDocumentUpload from '@/components/players/PlayerDocumentUpload';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { AlertModal } from '@/components/ui/Modal';
+import { useAlert } from '@/hooks/useAlert';
 import { 
   Loader2, 
   CheckCircle, 
@@ -77,6 +79,7 @@ export default function TeamMatchDayVerificationPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
+  const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
 
   useEffect(() => {
     if (authLoading) return;
@@ -128,16 +131,16 @@ export default function TeamMatchDayVerificationPage() {
         await loadTeamData();
         
         if (result.teamAutoCheckedIn) {
-          alert(`Player ${status} successfully! Team has been automatically checked in as all players are now verified.`);
+          showSuccess(`Player ${status} successfully! Team has been automatically checked in as all players are now verified.`);
         } else {
-          alert(`Player ${status} successfully!`);
+          showSuccess(`Player ${status} successfully!`);
         }
       } else {
-        alert(`Error: ${result.error}`);
+        showError(`Error: ${result.error}`);
       }
     } catch (error) {
       console.error('Error verifying player:', error);
-      alert('Failed to verify player. Please try again.');
+      showError('Failed to verify player. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -145,7 +148,7 @@ export default function TeamMatchDayVerificationPage() {
 
   const handleBulkAction = async (action: 'verified' | 'rejected') => {
     if (selectedPlayers.size === 0) {
-      alert('Please select players to perform bulk action.');
+      showInfo('Please select players to perform bulk action.');
       return;
     }
     
@@ -155,7 +158,7 @@ export default function TeamMatchDayVerificationPage() {
     );
     
     if (eligiblePlayers.length === 0) {
-      alert('No eligible players selected. Only unverified players can be bulk processed.');
+      showInfo('No eligible players selected. Only unverified players can be bulk processed.');
       return;
     }
     
@@ -207,15 +210,15 @@ export default function TeamMatchDayVerificationPage() {
       await loadTeamData();
       
       if (errorCount === 0) {
-        alert(`Successfully ${action} ${successCount} players!`);
+        showSuccess(`Successfully ${action} ${successCount} players!`);
       } else {
-        alert(`Completed bulk ${actionText}: ${successCount} successful, ${errorCount} failed. Please check and retry failed players individually.`);
+        showInfo(`Completed bulk ${actionText}: ${successCount} successful, ${errorCount} failed. Please check and retry failed players individually.`);
       }
       
       setSelectedPlayers(new Set()); // Clear selection
     } catch (error) {
       console.error('Bulk action error:', error);
-      alert(`Bulk ${actionText} failed. Please try again.`);
+      showError(`Bulk ${actionText} failed. Please try again.`);
     } finally {
       setSubmitting(false);
     }
@@ -736,7 +739,7 @@ export default function TeamMatchDayVerificationPage() {
                       loadTeamData();
                     }}
                     onError={(error) => {
-                      alert(`Upload failed: ${error}`);
+                      showError(`Upload failed: ${error}`);
                     }}
                     variant="card"
                   />
@@ -751,7 +754,7 @@ export default function TeamMatchDayVerificationPage() {
                       loadTeamData();
                     }}
                     onError={(error) => {
-                      alert(`Upload failed: ${error}`);
+                      showError(`Upload failed: ${error}`);
                     }}
                     variant="card"
                   />
@@ -766,7 +769,7 @@ export default function TeamMatchDayVerificationPage() {
                       loadTeamData();
                     }}
                     onError={(error) => {
-                      alert(`Upload failed: ${error}`);
+                      showError(`Upload failed: ${error}`);
                     }}
                     variant="card"
                   />
@@ -839,7 +842,7 @@ export default function TeamMatchDayVerificationPage() {
                   setShowImageUpload(false);
                 }}
                 onError={(error) => {
-                  alert(`Upload failed: ${error}`);
+                  showError(`Upload failed: ${error}`);
                 }}
                 variant="card"
               />
@@ -857,6 +860,14 @@ export default function TeamMatchDayVerificationPage() {
           </div>
         </div>
       )}
+      
+      <AlertModal
+        isOpen={alertState.isOpen}
+        onClose={hideAlert}
+        message={alertState.message}
+        type={alertState.type}
+        title={alertState.title}
+      />
     </div>
   );
 }

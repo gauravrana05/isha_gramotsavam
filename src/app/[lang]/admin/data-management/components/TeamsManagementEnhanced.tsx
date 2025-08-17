@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Trophy, Plus, Trash2, RefreshCw, Users, Upload, Eye } from 'lucide-react';
 import { Button, StatusBadge, AdvancedTable, Modal, type Column, type ActionButton } from '@/components/ui';
 import Input from '@/components/ui/Input';
-import Select from '@/components/ui/Select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { collectionManagers } from '../lib/firebaseOperations';
 import { batchGenerators } from '../lib/dataGenerators';
 
@@ -301,11 +301,18 @@ export default function TeamsManagementEnhanced() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Team Status
               </label>
-              <Select
-                value={teamStatus}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTeamStatus(e.target.value)}
-                options={statusOptions}
-              />
+              <Select value={teamStatus} onValueChange={setTeamStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select team status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

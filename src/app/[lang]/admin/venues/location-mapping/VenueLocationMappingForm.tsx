@@ -5,6 +5,7 @@ import { createVenueLocationMapping } from '@/lib/actions/admin/venueMapping';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { pincodeService } from '@/lib/services/pincodeService';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 
 interface Venue {
   id: string;
@@ -38,8 +39,7 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
     districtsWithMultipleVenues.some(d => d.district === venue.address.district)
   );
 
-  const handleVenueChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const venueId = e.target.value;
+  const handleVenueChange = async (venueId: string) => {
     if (!venueId) {
       setSelectedVenue(null);
       setAvailableTaluks([]);
@@ -170,19 +170,22 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
         {/* Venue Selection */}
         <div>
           <label className="block text-sm font-medium mb-2">Select Venue (Districts with multiple venues only)</label>
-          <select 
+          <Select 
             value={selectedVenue?.id || ''}
-            onChange={handleVenueChange}
-            required 
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+            onValueChange={handleVenueChange}
+            required
           >
-            <option value="">Choose a venue to map...</option>
-            {eligibleVenues.map(venue => (
-              <option key={venue.id} value={venue.id}>
-                {venue.name} ({venue.address.district})
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Choose a venue to map..." />
+            </SelectTrigger>
+            <SelectContent>
+              {eligibleVenues.map(venue => (
+                <SelectItem key={venue.id} value={venue.id}>
+                  {venue.name} ({venue.address.district})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {selectedVenue && (

@@ -77,27 +77,31 @@ export default async function ClusterDivisionMappingPage() {
   
   const { singleDivisionStates, multiDivisionStates } = analyzeVenueStateDistribution(venues);
   
-  // Add venue details to mappings for display
+  // Process mappings - now they come naturally grouped from the database
   const enrichedMappings = mappings.map(mapping => {
-    const clusterVenue = venues.find(v => v.venueId === mapping.clusterVenueId);
-    const divisionVenue = venues.find(v => v.venueId === mapping.divisionVenueId);
+    const divisionVenue = venues.find(v => v.id === mapping.divisionVenueId);
     
     return {
       id: mapping.id,
       mappingId: mapping.mappingId,
-      clusterVenueName: mapping.clusterVenueName,
+      divisionVenueId: mapping.divisionVenueId, // Add this for editing
       divisionVenueName: mapping.divisionVenueName,
-      clusterState: clusterVenue?.state || 'Unknown',
-      clusterDistrict: clusterVenue?.district || 'Unknown',
+      divisionState: divisionVenue?.state || 'Unknown',
       divisionDistrict: divisionVenue?.district || 'Unknown',
-      autoMapped: mapping.autoMapped || false,
+      assignedClusters: mapping.assignedClusters?.clusterVenueNames || [],
+      assignedClusterIds: mapping.assignedClusters?.clusterVenueIds || [],
+      state: mapping.assignedClusters?.state || 'Unknown',
+      autoMapped: mapping.autoMapped === true,
       isActive: mapping.isActive,
       createdDate: mapping.createdAt ? new Date(mapping.createdAt).toLocaleDateString() : 'N/A'
     };
   });
 
-  const totalMappings = mappings.length;
-  const autoMappedCount = mappings.filter(m => m.autoMapped).length;
+  // Calculate auto-mappable clusters (clusters in states with single division)
+  const autoMappableClustersCount = singleDivisionStates.reduce((total, state) => total + state.clustersCount, 0);
+  
+  const totalMappings = mappings.length + autoMappableClustersCount;
+  const autoMappedCount = mappings.filter(m => m.autoMapped === true).length + autoMappableClustersCount;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-full">
@@ -113,6 +117,7 @@ export default async function ClusterDivisionMappingPage() {
             mappings={enrichedMappings}
             onDelete={deleteMappingAction}
             headerButtonOnly={true}
+            statesRequiringMapping={multiDivisionStates}
           />
         </div>
       </div>
@@ -140,6 +145,7 @@ export default async function ClusterDivisionMappingPage() {
           mappings={enrichedMappings}
           onDelete={deleteMappingAction}
           headerButtonOnly={false}
+          statesRequiringMapping={multiDivisionStates}
         />
       )}
 

@@ -8,6 +8,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { cn, BaseComponentProps } from '@/lib/component-patterns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 
 // Pagination configuration interface
 export interface PaginationConfig {
@@ -129,23 +130,18 @@ const PageSizeSelector = ({
       <span className={cn('text-gray-700 whitespace-nowrap', sizeClasses[size])}>
         Show
       </span>
-      <div className="relative">
-        <select
-          value={pageSize}
-          onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className={cn(
-            'border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white appearance-none pr-8',
-            sizeClasses[size]
-          )}
-        >
+      <Select value={pageSize.toString()} onValueChange={(value) => onPageSizeChange(Number(value))}>
+        <SelectTrigger className={cn('w-auto min-w-[80px]', sizeClasses[size])}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
           {options.map((option) => (
-            <option key={option} value={option}>
+            <SelectItem key={option} value={option.toString()}>
               {option}
-            </option>
+            </SelectItem>
           ))}
-        </select>
-        <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-      </div>
+        </SelectContent>
+      </Select>
       <span className={cn('text-gray-700 whitespace-nowrap', sizeClasses[size])}>
         per page
       </span>

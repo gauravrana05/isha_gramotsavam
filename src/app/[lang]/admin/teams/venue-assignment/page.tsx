@@ -5,7 +5,6 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
 import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
-import { advanceClusterWinnersToDivision } from '@/lib/actions/admin/teamVenueAssignment';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -21,7 +20,6 @@ import {
   Loader2,
   Settings,
   Target,
-  ArrowUp,
   RefreshCw
 } from 'lucide-react';
 
@@ -54,7 +52,6 @@ export default function VenueAssignmentPage() {
   const [success, setSuccess] = useState('');
   const [selectedAssignment, setSelectedAssignment] = useState<TeamAssignment | null>(null);
   const [showReassignModal, setShowReassignModal] = useState(false);
-  const [progressingTeams, setProgressingTeams] = useState(false);
   
   const router = useRouter();
   const { lang } = useParams();
@@ -160,27 +157,6 @@ export default function VenueAssignmentPage() {
     }
   };
 
-  const handleProgressTeams = async () => {
-    try {
-      setProgressingTeams(true);
-      setError('');
-      
-      const result = await advanceClusterWinnersToDivision();
-      
-      if (result.success) {
-        setSuccess(`Successfully processed ${result.processedVenues} venues. ${result.successfulProgressions} progressions completed.`);
-        // Reload assignments to show new division assignments
-        await loadAssignments();
-      } else {
-        setError(result.error || 'Failed to progress teams');
-      }
-    } catch (err) {
-      console.error('Error progressing teams:', err);
-      setError('An error occurred while progressing teams');
-    } finally {
-      setProgressingTeams(false);
-    }
-  };
 
   // Calculate statistics
   const stats = {
@@ -398,15 +374,6 @@ export default function VenueAssignmentPage() {
         </div>
         <div className="flex space-x-3">
           <Button
-            onClick={handleProgressTeams}
-            disabled={progressingTeams}
-            loading={progressingTeams}
-            className="bg-[#F28C38] hover:bg-[#E67A26]"
-          >
-            <ArrowUp className="w-4 h-4 mr-2" />
-            Advance Winners to Division
-          </Button>
-          <Button
             onClick={() => window.location.reload()}
             variant="secondary"
           >
@@ -472,8 +439,6 @@ export default function VenueAssignmentPage() {
       {/* Team Assignments Table */}
       <Card className="p-6">
         <AdvancedTable
-          title="Team Venue Assignments"
-          subtitle="View and manage all team venue assignments across cluster and division levels"
           data={assignments}
           columns={columns}
           loading={loading}

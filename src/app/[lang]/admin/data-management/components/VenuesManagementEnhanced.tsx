@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { MapPin, Plus, Trash2, RefreshCw, Users, Upload, Eye, Download, FileSpreadsheet } from 'lucide-react';
 import { Button, StatusBadge, AdvancedTable, Modal, type Column, type ActionButton } from '@/components/ui';
 import Input from '@/components/ui/Input';
-import Select from '@/components/ui/Select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { collectionManagers } from '../lib/firebaseOperations';
 import { generators, batchGenerators, sampleData } from '../lib/dataGenerators';
 import { 
@@ -590,22 +590,36 @@ export default function VenuesManagementEnhanced() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 District Focus
               </label>
-              <Select
-                value={selectedDistrict}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedDistrict(e.target.value)}
-                options={districtOptions}
-              />
+              <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select district" />
+                </SelectTrigger>
+                <SelectContent>
+                  {districtOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Tournament Level
               </label>
-              <Select
-                value={venueType}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setVenueType(e.target.value)}
-                options={typeOptions}
-              />
+              <Select value={venueType} onValueChange={setVenueType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select tournament level" />
+                </SelectTrigger>
+                <SelectContent>
+                  {typeOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

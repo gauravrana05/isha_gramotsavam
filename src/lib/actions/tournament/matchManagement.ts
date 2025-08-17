@@ -646,16 +646,35 @@ async function triggerLevelAdvancement(fixtureData: any, winners: string[]) {
       
       if (!mappingSnapshot.empty) {
         const mapping = mappingSnapshot.docs[0].data();
+        
+        // Get team details first (outside batch)
+        const teamDataMap = {};
+        for (const teamId of winners.slice(0, 2)) {
+          const teamDoc = await adminDb.collection('teams').doc(teamId).get();
+          (teamDataMap as any)[teamId] = teamDoc.data();
+        }
+        
         const batch = adminDb.batch();
         
         for (const teamId of winners.slice(0, 2)) {
-          const teamAssignmentRef = adminDb.collection('teamVenueAssignment').doc(teamId);
-          batch.update(teamAssignmentRef, {
-            currentLevel: 'division',
+          const teamData = (teamDataMap as any)[teamId];
+          
+          // Create new division venue assignment
+          const assignmentRef = adminDb.collection('teamVenueAssignment').doc();
+          batch.set(assignmentRef, {
+            assignmentId: assignmentRef.id,
+            teamId: teamId,
+            teamName: teamData?.name || '',
+            eventId: fixtureData.eventId,
             divisionVenueId: mapping.divisionVenueId,
             divisionVenueName: mapping.divisionVenueName,
-            clusterQualified: true,
-            qualifiedAt: FieldValue.serverTimestamp(),
+            assignmentLevel: 'division',
+            status: 'assigned',
+            assignedBy: 'system_auto',
+            assignedAt: FieldValue.serverTimestamp(),
+            advancedFrom: 'cluster',
+            sourceClusterVenueId: fixtureData.venueId,
+            createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp()
           });
 
@@ -676,16 +695,34 @@ async function triggerLevelAdvancement(fixtureData: any, winners: string[]) {
         console.log(`Teams ${winners.slice(0, 2).join(', ')} advanced to division level at ${mapping.divisionVenueName}`);
       }
     } else if (fixtureData.level === 'division' && winners.length >= 2) {
+      // Get team details first (outside batch)
+      const teamDataMap = {};
+      for (const teamId of winners.slice(0, 2)) {
+        const teamDoc = await adminDb.collection('teams').doc(teamId).get();
+        (teamDataMap as any)[teamId] = teamDoc.data();
+      }
+      
       const batch = adminDb.batch();
       
       for (const teamId of winners.slice(0, 2)) {
-        const teamAssignmentRef = adminDb.collection('teamVenueAssignment').doc(teamId);
-        batch.update(teamAssignmentRef, {
-          currentLevel: 'final',
+        const teamData = (teamDataMap as any)[teamId];
+        
+        // Create new finals venue assignment
+        const assignmentRef = adminDb.collection('teamVenueAssignment').doc();
+        batch.set(assignmentRef, {
+          assignmentId: assignmentRef.id,
+          teamId: teamId,
+          teamName: teamData?.name || '',
+          eventId: fixtureData.eventId,
           finalVenueId: 'isha_yoga_center',
           finalVenueName: 'Isha Yoga Center',
-          divisionQualified: true,
-          qualifiedAt: FieldValue.serverTimestamp(),
+          assignmentLevel: 'final',
+          status: 'assigned',
+          assignedBy: 'system_auto',
+          assignedAt: FieldValue.serverTimestamp(),
+          advancedFrom: 'division',
+          sourceDivisionVenueId: fixtureData.venueId,
+          createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp()
         });
 

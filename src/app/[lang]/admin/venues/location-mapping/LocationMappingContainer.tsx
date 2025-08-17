@@ -64,20 +64,32 @@ export default function LocationMappingContainer({
     setEditingMapping(null);
   };
 
+  // Check if there are eligible venues for mapping
+  const getEligibleVenues = () => {
+    return venues.filter(venue => {
+      const isInMultiVenueDistrict = districtsWithMultipleVenues.some(d => d.district === venue.address.district);
+      const isAlreadyAssigned = mappings.some(mapping => 
+        mapping.venueId === venue.id && mapping.isActive
+      );
+      return isInMultiVenueDistrict && !isAlreadyAssigned;
+    });
+  };
+
+  const hasEligibleVenues = getEligibleVenues().length > 0;
+
   if (headerButtonOnly) {
     return (
       <>
         {/* Header Button Only */}
-        {districtsWithMultipleVenues.length > 0 && (
-          <Button 
-            onClick={handleAddMapping}
-            className="flex items-center gap-2"
-            size="sm"
-          >
-            <Plus className="h-4 w-4" />
-            Add Venue Mapping
-          </Button>
-        )}
+        <Button 
+          onClick={handleAddMapping}
+          disabled={!hasEligibleVenues}
+          className="flex items-center gap-2"
+          size="sm"
+        >
+          <Plus className="h-4 w-4" />
+          Add Venue Mapping
+        </Button>
 
         {/* Modal */}
         <VenueTalukMappingModal

@@ -35,6 +35,7 @@ import {
   Calendar,
   UserCheck
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 
 interface EditState {
   basicProfile: boolean;
@@ -678,31 +679,38 @@ export default function ProfilePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
                     Gender <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                  <Select
                     value={formData.gender}
-                    onChange={(e) => handleInputChange('gender', e.target.value)}
+                    onValueChange={(value) => handleInputChange('gender', value)}
                   >
-                    <option value="" disabled>Select Gender</option>
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
-                    <option value="O">Others</option>
-                  </select>
+                    <SelectTrigger className="w-full font-fira">
+                      <SelectValue placeholder="Select Gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="M">Male</SelectItem>
+                      <SelectItem value="F">Female</SelectItem>
+                      <SelectItem value="O">Others</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
                     Preferred Language
                   </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                  <Select
                     value={formData.preferredLanguage}
-                    onChange={(e) => handleInputChange('preferredLanguage', e.target.value)}
+                    onValueChange={(value) => handleInputChange('preferredLanguage', value)}
                   >
-                    {languages.map(lang => (
-                      <option key={lang.code} value={lang.code}>{lang.name}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full font-fira">
+                      <SelectValue placeholder="Select Language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {languages.map(lang => (
+                        <SelectItem key={lang.code} value={lang.code}>{lang.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -820,56 +828,56 @@ export default function ProfilePage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">District</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                  <Select
                     value={formData.district}
-                    onChange={(e) => {
-                      e.preventDefault();
-                      handleInputChange('district', e.target.value);
-                    }}
+                    onValueChange={(value) => handleInputChange('district', value)}
                     disabled={!formData.state || !districts.length}
                   >
-                    <option value="" disabled>Select District</option>
-                    {districts.map(district => (
-                      <option key={district} value={district}>{district}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full font-fira">
+                      <SelectValue placeholder="Select District" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {districts.map(district => (
+                        <SelectItem key={district} value={district}>{district}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">Taluk</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                  <Select
                     value={formData.taluk}
-                    onChange={(e) => {
-                      e.preventDefault();
-                      handleInputChange('taluk', e.target.value);
-                    }}
+                    onValueChange={(value) => handleInputChange('taluk', value)}
                     disabled={!formData.district || !taluks.length}
                   >
-                    <option value="" disabled>Select Taluk</option>
-                    {taluks.map(taluk => (
-                      <option key={taluk} value={taluk}>{taluk}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full font-fira">
+                      <SelectValue placeholder="Select Taluk" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {taluks.map(taluk => (
+                        <SelectItem key={taluk} value={taluk}>{taluk}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">Panchayat</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#CE4520] focus:border-[#CE4520] font-fira"
+                  <Select
                     value={formData.panchayat}
-                    onChange={(e) => {
-                      e.preventDefault();
-                      handleInputChange('panchayat', e.target.value);
-                    }}
+                    onValueChange={(value) => handleInputChange('panchayat', value)}
                     disabled={!formData.taluk || !panchayats.length}
                   >
-                    <option value="" disabled>Select Panchayat</option>
-                    {panchayats.map(panchayat => (
-                      <option key={panchayat} value={panchayat}>{panchayat}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full font-fira">
+                      <SelectValue placeholder="Select Panchayat" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {panchayats.map(panchayat => (
+                        <SelectItem key={panchayat} value={panchayat}>{panchayat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

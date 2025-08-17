@@ -16,6 +16,8 @@ import {
   Medal
 } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { AlertModal } from '@/components/ui/Modal';
+import { useAlert } from '@/hooks/useAlert';
 
 interface PageProps {
   params: Promise<{
@@ -43,6 +45,7 @@ export default function CreateDrawPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState(1); // 1: assign numbers, 2: create draw, 3: success
   const [creating, setCreating] = useState(false);
+  const { alertState, showError, hideAlert } = useAlert();
 
   useEffect(() => {
     loadTeams();
@@ -97,7 +100,7 @@ export default function CreateDrawPage({ params }: PageProps) {
     if (result.success) {
       setStep(2);
     } else {
-      alert('Error assigning numbers: ' + result.error);
+      showError('Error assigning numbers: ' + result.error);
     }
     
     setCreating(false);
@@ -119,7 +122,7 @@ export default function CreateDrawPage({ params }: PageProps) {
         router.push(`/${lang}/volunteer/venues/${venueId}/fixtures`);
       }, 2000);
     } else {
-      alert('Error creating tournament: ' + result.error);
+      showError('Error creating tournament: ' + result.error);
     }
     
     setCreating(false);
@@ -456,6 +459,14 @@ export default function CreateDrawPage({ params }: PageProps) {
           </div>
         </div>
       )}
+      
+      <AlertModal
+        isOpen={alertState.isOpen}
+        onClose={hideAlert}
+        message={alertState.message}
+        type={alertState.type}
+        title={alertState.title}
+      />
     </div>
   );
 }

@@ -9,11 +9,10 @@ import { ArrowRight, Trash2, Edit, X, AlertTriangle } from 'lucide-react';
 interface ClusterDivisionMapping {
   id: string;
   mappingId: string;
-  clusterVenueName: string;
   divisionVenueName: string;
-  clusterState: string;
-  clusterDistrict: string;
+  divisionState: string;
   divisionDistrict: string;
+  assignedClusters: string[]; // For display purposes - array of cluster names
   autoMapped: boolean;
   isActive: boolean;
   createdDate: string;
@@ -22,6 +21,7 @@ interface ClusterDivisionMapping {
 interface ClusterDivisionMappingTableProps {
   mappings: ClusterDivisionMapping[];
   onDelete: (mappingId: string) => Promise<void>;
+  onEdit: (mapping: ClusterDivisionMapping) => void;
 }
 
 // Delete Confirmation Modal Component
@@ -60,20 +60,29 @@ function DeleteConfirmationModal({ isOpen, onClose, onConfirm, mapping, isDeleti
             Are you sure you want to remove the mapping between:
           </p>
           <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-blue-600">{mapping.clusterVenueName}</div>
-                <div className="text-sm text-gray-500">{mapping.clusterDistrict}, {mapping.clusterState}</div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-gray-400 mx-4" />
-              <div>
-                <div className="font-medium text-green-600">{mapping.divisionVenueName}</div>
-                <div className="text-sm text-gray-500">{mapping.divisionDistrict}</div>
-              </div>
+            <div className="text-center">
+              <div className="font-medium text-green-600 text-lg">{mapping.divisionVenueName}</div>
+              <div className="text-sm text-gray-500 mb-3">{mapping.divisionDistrict}, {mapping.divisionState}</div>
+              
+              {mapping.assignedClusters && mapping.assignedClusters.length > 0 && (
+                <div>
+                  <div className="text-sm text-gray-600 mb-2">Assigned Clusters ({mapping.assignedClusters.length}):</div>
+                  <div className="flex flex-wrap gap-1 justify-center">
+                    {mapping.assignedClusters.map((cluster: string, index: number) => (
+                      <span
+                        key={index}
+                        className="inline-block bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs"
+                      >
+                        {cluster}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <p className="text-sm text-gray-600">
-            This action cannot be undone. Teams from {mapping.clusterVenueName} will no longer be able to advance to {mapping.divisionVenueName}.
+            This action cannot be undone. All cluster mappings for {mapping.divisionVenueName} will be removed.
           </p>
         </div>
 
@@ -100,7 +109,7 @@ function DeleteConfirmationModal({ isOpen, onClose, onConfirm, mapping, isDeleti
   );
 }
 
-export default function ClusterDivisionMappingTable({ mappings, onDelete }: ClusterDivisionMappingTableProps) {
+export default function ClusterDivisionMappingTable({ mappings, onDelete, onEdit }: ClusterDivisionMappingTableProps) {
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     mapping: ClusterDivisionMapping | null;
@@ -111,7 +120,7 @@ export default function ClusterDivisionMappingTable({ mappings, onDelete }: Clus
     isDeleting: false
   });
 
-  const handleDeleteMapping = (mapping: ClusterDivisionMapping) => {
+  const handleDeleteMapping = (mapping: any) => {
     setDeleteModal({
       isOpen: true,
       mapping,
@@ -125,7 +134,9 @@ export default function ClusterDivisionMappingTable({ mappings, onDelete }: Clus
     setDeleteModal(prev => ({ ...prev, isDeleting: true }));
     
     try {
+      // Delete the grouped mapping (single document)
       await onDelete(deleteModal.mapping.id);
+      
       setDeleteModal({
         isOpen: false,
         mapping: null,
@@ -151,31 +162,15 @@ export default function ClusterDivisionMappingTable({ mappings, onDelete }: Clus
       <Card className="p-6">
         <h2 className="text-lg font-semibold mb-4">Current Cluster-Division Mappings</h2>
         <AdvancedTable
-          data={mappings}
+          data={mappings.map(mapping => ({
+            ...mapping,
+            clusters: mapping.assignedClusters?.join(', ') || 'No clusters assigned',
+            statusBadge: mapping.isActive ? 'Active' : 'Inactive'
+          }))}
           searchable={true}
-          searchPlaceholder="Search by cluster name, division name, or state..."
-          searchFields={['clusterVenueName', 'divisionVenueName', 'clusterState']}
+          searchPlaceholder="Search by division name, cluster name, or state..."
+          searchFields={['divisionVenueName', 'clusters', 'divisionState']}
           columns={[
-            {
-              key: 'clusterVenueName',
-              header: 'Cluster Venue',
-              sortable: true,
-              render: (_, row) => (
-                <div>
-                  <div className="font-medium text-blue-600">{row.clusterVenueName}</div>
-                  <div className="text-sm text-gray-500">{row.clusterDistrict}, {row.clusterState}</div>
-                </div>
-              )
-            },
-            {
-              key: 'mapping',
-              header: 'Mapping',
-              sortable: false,
-              className: 'text-center',
-              render: () => (
-                <ArrowRight className="w-4 h-4 text-gray-400 mx-auto" />
-              )
-            },
             {
               key: 'divisionVenueName',
               header: 'Division Venue',
@@ -183,12 +178,37 @@ export default function ClusterDivisionMappingTable({ mappings, onDelete }: Clus
               render: (_, row) => (
                 <div>
                   <div className="font-medium text-green-600">{row.divisionVenueName}</div>
-                  <div className="text-sm text-gray-500">{row.divisionDistrict}</div>
+                  <div className="text-sm text-gray-500">{row.divisionDistrict}, {row.divisionState}</div>
                 </div>
               )
             },
             {
-              key: 'clusterState',
+              key: 'clusters',
+              header: 'Assigned Clusters',
+              sortable: false,
+              width: '600px',
+              className: 'max-w-[600px]',
+              render: (value) => (
+                <div className="text-sm">
+                  {value === 'No clusters assigned' ? (
+                    <span className="text-gray-500 italic">{value}</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {value.split(', ').map((cluster: string, index: number) => (
+                        <span
+                          key={index}
+                          className="inline-flex bg-blue-50 text-blue-700 px-2 py-1 rounded-full text-xs whitespace-nowrap"
+                        >
+                          {cluster.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            },
+            {
+              key: 'state',
               header: 'State',
               sortable: true
             },
@@ -205,6 +225,18 @@ export default function ClusterDivisionMappingTable({ mappings, onDelete }: Clus
               )
             },
             {
+              key: 'statusBadge',
+              header: 'Status',
+              sortable: true,
+              render: (value, row) => (
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  row.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {value}
+                </span>
+              )
+            },
+            {
               key: 'createdDate',
               header: 'Created',
               sortable: true
@@ -212,7 +244,13 @@ export default function ClusterDivisionMappingTable({ mappings, onDelete }: Clus
           ]}
           actions={[
             {
-              label: 'Remove',
+              label: 'Edit',
+              icon: Edit,
+              onClick: (row) => onEdit(row),
+              variant: 'secondary' as const
+            },
+            {
+              label: 'Remove All',
               icon: Trash2,
               onClick: (row) => handleDeleteMapping(row),
               variant: 'danger' as const

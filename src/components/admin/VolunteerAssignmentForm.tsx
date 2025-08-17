@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { assignVolunteerToVenue } from '@/lib/actions/admin/volunteerAssignment';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 
 interface Volunteer {
   id: string;
@@ -61,15 +62,32 @@ export default function VolunteerAssignmentForm({
         }
       }
 
-      await assignVolunteerToVenue(formData);
+      // Debug: Log form data
+      console.log('Form data being sent:', {
+        eventId: formData.get('eventId'),
+        volunteerId: formData.get('volunteerId'),
+        volunteerName: formData.get('volunteerName'),
+        volunteerType: formData.get('volunteerType'),
+        venueId: formData.get('venueId'),
+        venueName: formData.get('venueName'),
+        assignedBy: formData.get('assignedBy')
+      });
+
+      const result = await assignVolunteerToVenue(formData);
+      console.log('Assignment result:', result);
       
-      setSuccess('Volunteer assigned successfully!');
-      e.currentTarget.reset();
-      
-      if (onAssignmentSuccess) {
-        onAssignmentSuccess();
+      if (result.success) {
+        setSuccess(result.message || 'Volunteer assigned successfully!');
+        e.currentTarget.reset();
+        
+        if (onAssignmentSuccess) {
+          onAssignmentSuccess();
+        }
+      } else {
+        setError(result.error || 'Failed to assign volunteer');
       }
     } catch (err: any) {
+      console.error('Volunteer assignment error:', err);
       setError(err.message || 'Failed to assign volunteer');
     } finally {
       setLoading(false);
@@ -108,48 +126,49 @@ export default function VolunteerAssignmentForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-2">Volunteer</label>
-            <select 
-              name="volunteerId" 
-              required 
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-            >
-              <option value="">Select Volunteer</option>
-              {volunteers.map(volunteer => (
-                <option key={volunteer.id} value={volunteer.id}>
-                  {volunteer.displayName || volunteer.name} - {volunteer.role?.replace('_', ' ')}
-                </option>
-              ))}
-            </select>
+<Select name="volunteerId" required>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select Volunteer" />
+              </SelectTrigger>
+              <SelectContent>
+                {volunteers.map(volunteer => (
+                  <SelectItem key={volunteer.id} value={volunteer.id}>
+                    {volunteer.displayName || volunteer.name} - {volunteer.role?.replace('_', ' ')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
           {!preSelectedVenueId && venues && (
             <div>
               <label className="block text-sm font-medium mb-2">Venue</label>
-              <select 
-                name="venueId" 
-                required 
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-              >
-                <option value="">Select Venue</option>
-                {venues.map(venue => (
-                  <option key={venue.id} value={venue.id}>
-                    {venue.name}
-                  </option>
-                ))}
-              </select>
+<Select name="venueId" required>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Venue" />
+                </SelectTrigger>
+                <SelectContent>
+                  {venues.map(venue => (
+                    <SelectItem key={venue.id} value={venue.id}>
+                      {venue.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
           
           <div>
             <label className="block text-sm font-medium mb-2">Volunteer Type</label>
-            <select 
-              name="volunteerType" 
-              required 
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-            >
-              <option value="general">General</option>
-              <option value="technical">Technical</option>
-            </select>
+<Select name="volunteerType" required>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general">General</SelectItem>
+                <SelectItem value="technical">Technical</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

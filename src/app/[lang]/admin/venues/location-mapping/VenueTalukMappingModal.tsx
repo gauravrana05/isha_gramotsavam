@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { createVenueLocationMapping, updateVenueLocationMapping } from '@/lib/actions/admin/venueMapping';
 import { pincodeService } from '@/lib/services/pincodeService';
 
@@ -99,7 +100,16 @@ export default function VenueTalukMappingModal({
     setLoading(true);
     try {
       const data = await pincodeService.getTaluksByDistrict(state, district);
-      setAvailableTaluks(data.taluks || []);
+      const allTaluks = data.taluks || [];
+      
+      // Filter out taluks that are already mapped to other venues
+      const mappedTaluks = existingMappings
+        .filter(mapping => mapping.isActive && (!editingMapping || mapping.id !== editingMapping.id))
+        .flatMap(mapping => mapping.assignedLocations?.taluks || []);
+      
+      const availableTaluks = allTaluks.filter(taluk => !mappedTaluks.includes(taluk));
+      
+      setAvailableTaluks(availableTaluks);
       if (!editingMapping) {
         setSelectedTaluks([]);
       }
@@ -195,20 +205,6 @@ export default function VenueTalukMappingModal({
       size="lg"
     >
       <div className="p-6">
-        {/* Info Alert */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <div className="text-yellow-800 text-sm font-medium mb-2">
-            ⚠️ Districts requiring mapping:
-          </div>
-          <div className="text-sm text-yellow-700">
-            {districtsWithMultipleVenues.map(d => 
-              `${d.district} (${d.count} venues)`
-            ).join(', ')}
-          </div>
-          <p className="text-xs text-yellow-600 mt-2">
-            Map venues to specific taluks to avoid conflicts during team assignment.
-          </p>
-        </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
@@ -222,30 +218,41 @@ export default function VenueTalukMappingModal({
             <label className="block text-sm font-medium mb-2">
               Select Venue (Districts with multiple venues only)
             </label>
-            <select 
-              value={selectedVenue?.id || ''}
-              onChange={handleVenueChange}
-              required 
-              disabled={loading}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F] disabled:bg-gray-100"
-            >
-              <option value="">Choose a venue to map...</option>
-              {eligibleVenues.map(venue => (
-                <option key={venue.id} value={venue.id}>
-                  {venue.name} ({venue.address.district})
-                </option>
-              ))}
-            </select>
+            {editingMapping ? (
+              /* Read-only display when editing */
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
+                {selectedVenue?.name} ({selectedVenue?.address.district})
+                <span className="text-xs text-gray-500 ml-2">(Cannot be changed when editing)</span>
+              </div>
+            ) : (
+              /* Dropdown when creating new */
+              <Select 
+                value={selectedVenue?.id || ''}
+                onValueChange={(value) => handleVenueChange({ target: { value } } as React.ChangeEvent<HTMLSelectElement>)}
+                disabled={loading}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a venue to map..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {eligibleVenues.map(venue => (
+                    <SelectItem key={venue.id} value={venue.id}>
+                      {venue.name} ({venue.address.district})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
-          {selectedVenue && (
+          {(selectedVenue || editingMapping) && (
             <>
               {/* Venue Info */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="font-medium text-gray-900 mb-2">Selected Venue</h3>
                 <div className="text-sm text-gray-600">
-                  <div><strong>Name:</strong> {selectedVenue.name}</div>
-                  <div><strong>Location:</strong> {selectedVenue.address.district}, {selectedVenue.address.state}</div>
+                  <div><strong>Name:</strong> {selectedVenue?.name || editingMapping?.venueName}</div>
+                  <div><strong>Location:</strong> {selectedVenue?.address.district || editingMapping?.assignedLocations.districts?.[0]}, {selectedVenue?.address.state || editingMapping?.assignedLocations.state}</div>
                 </div>
               </div>
 
@@ -299,7 +306,7 @@ export default function VenueTalukMappingModal({
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <h4 className="font-medium text-blue-900 mb-2">Mapping Summary</h4>
                   <div className="text-sm text-blue-800">
-                    <div><strong>Venue:</strong> {selectedVenue.name}</div>
+                    <div><strong>Venue:</strong> {selectedVenue?.name || editingMapping?.venueName}</div>
                     <div><strong>Will serve teams from:</strong></div>
                     <div className="ml-4 mt-1">
                       <strong>Taluks:</strong> {selectedTaluks.join(', ')}

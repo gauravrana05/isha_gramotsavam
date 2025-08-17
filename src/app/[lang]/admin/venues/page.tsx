@@ -18,6 +18,7 @@ import {
   type FilterField,
   type ExportConfig
 } from '@/components/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { 
   Plus, 
   MapPin,
@@ -645,32 +646,39 @@ const VenueVolunteerAssignmentModal = ({
                 Loading volunteers...
               </div>
             ) : (
-              <select 
+              <Select 
                 value={selectedVolunteer}
-                onChange={(e) => setSelectedVolunteer(e.target.value)}
-                required 
-                className="w-full p-3 border border-gray-300 rounded-lg"
+                onValueChange={(value) => setSelectedVolunteer(value)}
+                required
               >
-                <option value="">Select Volunteer</option>
-                {volunteers.map(volunteer => (
-                  <option key={volunteer.id} value={volunteer.id}>
-                    {volunteer.firstName} {volunteer.lastName} - {volunteer.email}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Volunteer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {volunteers.map(volunteer => (
+                    <SelectItem key={volunteer.id} value={volunteer.id}>
+                      {volunteer.firstName} {volunteer.lastName} - {volunteer.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
           
           <div>
             <label className="block text-sm font-medium mb-2">Volunteer Type</label>
-            <select 
+            <Select 
               value={volunteerType}
-              onChange={(e) => setVolunteerType(e.target.value as 'general' | 'technical')}
-              className="w-full p-3 border border-gray-300 rounded-lg"
+              onValueChange={(value) => setVolunteerType(value as 'general' | 'technical')}
             >
-              <option value="general">General</option>
-              <option value="technical">Technical</option>
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select Volunteer Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general">General</SelectItem>
+                <SelectItem value="technical">Technical</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex gap-3 pt-4">

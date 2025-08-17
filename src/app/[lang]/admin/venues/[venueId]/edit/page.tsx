@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase/config';
-import { doc, getDoc, updateDoc, serverTimestamp, getDocs, collection } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, getDocs, collection, addDoc, query, where, deleteDoc } from 'firebase/firestore';
 import { pincodeService } from '@/lib/services/pincodeService';
 import Container from '@/components/ui/Container';
 import Button from '@/components/ui/Button';
 import { ArrowLeft, Save, Loader2, Plus, Trash2, MapPin } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 
 interface VenueFormData {
   name: string;
@@ -427,6 +428,28 @@ export default function EditVenuePage() {
         assignedVolunteers: [...prev.assignedVolunteers, assignment.volunteerId]
       }));
       
+      // Create proper volunteer venue assignment record
+      const assignmentData = {
+        eventId: 'isha_gramotsavam_2025',
+        volunteerId: assignment.volunteerId,
+        volunteerName: assignment.volunteerName,
+        volunteerType: assignment.volunteerRole === 'technical' ? 'technical' : 'general',
+        venueId: venueId as string,
+        venueName: formData.name,
+        status: 'assigned',
+        assignedBy: user?.uid || 'admin',
+        assignedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      // Add to volunteerVenueAssignment collection
+      const assignmentCollection = collection(db, 'volunteerVenueAssignment');
+      const assignmentDocRef = await addDoc(assignmentCollection, assignmentData);
+      
+      // Update with document ID
+      await updateDoc(assignmentDocRef, { assignmentId: assignmentDocRef.id });
+      
       // If technical role selected, update user's role in users collection
       if (assignment.volunteerRole === 'technical') {
         const userDoc = doc(db, 'users', assignment.volunteerId);
@@ -442,6 +465,8 @@ export default function EditVenuePage() {
             : v
         ));
       }
+      
+      console.log('Volunteer assigned successfully with assignment record:', assignmentDocRef.id);
     } catch (err: any) {
       console.error('Error assigning volunteer:', err);
       setError('Failed to assign volunteer. Please try again.');
@@ -489,10 +514,24 @@ export default function EditVenuePage() {
     } else if (field === 'assignedVolunteers') {
       const volunteerToRemove = formData.assignedVolunteers[index];
       
-      // Check if the volunteer is technical_volunteer and revert to general_volunteer
-      const volunteerInfo = getVolunteerInfo(volunteerToRemove);
-      if (volunteerInfo.role === 'technical_volunteer') {
-        try {
+      try {
+        // Delete assignment record from volunteerVenueAssignment collection
+        const assignmentQuery = query(
+          collection(db, 'volunteerVenueAssignment'),
+          where('volunteerId', '==', volunteerToRemove),
+          where('venueId', '==', venueId as string)
+        );
+        const assignmentSnapshot = await getDocs(assignmentQuery);
+        
+        // Delete all matching assignment records
+        for (const assignmentDoc of assignmentSnapshot.docs) {
+          await deleteDoc(assignmentDoc.ref);
+          console.log('Deleted assignment record:', assignmentDoc.id);
+        }
+        
+        // Check if the volunteer is technical_volunteer and revert to general_volunteer
+        const volunteerInfo = getVolunteerInfo(volunteerToRemove);
+        if (volunteerInfo.role === 'technical_volunteer') {
           const userDoc = doc(db, 'users', volunteerToRemove);
           await updateDoc(userDoc, {
             role: 'general_volunteer',
@@ -505,17 +544,18 @@ export default function EditVenuePage() {
               ? {...v, role: 'general_volunteer'}
               : v
           ));
-        } catch (err: any) {
-          console.error('Error reverting volunteer role:', err);
-          setError('Failed to revert volunteer role. Please try again.');
         }
+        
+        // Remove volunteer from the array
+        setFormData(prev => ({
+          ...prev,
+          [field]: prev[field].filter((_, i) => i !== index)
+        }));
+        
+      } catch (err: any) {
+        console.error('Error removing volunteer assignment:', err);
+        setError('Failed to remove volunteer assignment. Please try again.');
       }
-      
-      // Remove volunteer from the array
-      setFormData(prev => ({
-        ...prev,
-        [field]: prev[field].filter((_, i) => i !== index)
-      }));
     }
   };
 
@@ -669,16 +709,20 @@ export default function EditVenuePage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Type *
                 </label>
-                <select
+                <Select
                   value={formData.type}
-                  onChange={(e) => handleInputChange('type', e.target.value as 'cluster' | 'division' | 'final')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                  onValueChange={(value) => handleInputChange('type', value as 'cluster' | 'division' | 'final')}
                   required
                 >
-                  <option value="cluster">Cluster</option>
-                  <option value="division">Division</option>
-                  <option value="final">Final</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cluster">Cluster</SelectItem>
+                    <SelectItem value="division">Division</SelectItem>
+                    <SelectItem value="final">Final</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
@@ -733,45 +777,54 @@ export default function EditVenuePage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">District</label>
-                <select
+                <Select
                   value={formData.district}
-                  onChange={(e) => handleInputChange('district', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                  onValueChange={(value) => handleInputChange('district', value)}
                   disabled={!formData.state || !districts.length}
                 >
-                  <option value="" disabled>Select District</option>
-                  {districts.map(district => (
-                    <option key={district} value={district}>{district}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select District" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {districts.map(district => (
+                      <SelectItem key={district} value={district}>{district}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Taluk</label>
-                <select
+                <Select
                   value={formData.taluk}
-                  onChange={(e) => handleInputChange('taluk', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                  onValueChange={(value) => handleInputChange('taluk', value)}
                   disabled={!formData.district || !taluks.length}
                 >
-                  <option value="" disabled>Select Taluk</option>
-                  {taluks.map(taluk => (
-                    <option key={taluk} value={taluk}>{taluk}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Taluk" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {taluks.map(taluk => (
+                      <SelectItem key={taluk} value={taluk}>{taluk}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Panchayat</label>
-                <select
+                <Select
                   value={formData.panchayat}
-                  onChange={(e) => handleInputChange('panchayat', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                  onValueChange={(value) => handleInputChange('panchayat', value)}
                   disabled={!formData.taluk || !panchayats.length}
                 >
-                  <option value="" disabled>Select Panchayat</option>
-                  {panchayats.map(panchayat => (
-                    <option key={panchayat} value={panchayat}>{panchayat}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Panchayat" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {panchayats.map(panchayat => (
+                      <SelectItem key={panchayat} value={panchayat}>{panchayat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1088,32 +1141,39 @@ export default function EditVenuePage() {
                   Loading volunteers...
                 </div>
               ) : (
-                <select 
+                <Select 
                   value={selectedVolunteer}
-                  onChange={(e) => setSelectedVolunteer(e.target.value)}
-                  required 
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                  onValueChange={(value) => setSelectedVolunteer(value)}
+                  required
                 >
-                  <option value="">Select Volunteer</option>
-                  {volunteers.map(volunteer => (
-                    <option key={volunteer.id} value={volunteer.id}>
-                      {volunteer.firstName} {volunteer.lastName} - {volunteer.email}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Volunteer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {volunteers.map(volunteer => (
+                      <SelectItem key={volunteer.id} value={volunteer.id}>
+                        {volunteer.firstName} {volunteer.lastName} - {volunteer.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
             
             <div>
               <label className="block text-sm font-medium mb-2">Role</label>
-              <select 
+              <Select 
                 value={volunteerRole}
-                onChange={(e) => setVolunteerRole(e.target.value as 'general' | 'technical')}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                onValueChange={(value) => setVolunteerRole(value as 'general' | 'technical')}
               >
-                <option value="general">General</option>
-                <option value="technical">Technical</option>
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="technical">Technical</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex gap-3 pt-4">

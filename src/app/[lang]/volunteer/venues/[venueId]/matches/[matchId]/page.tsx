@@ -15,6 +15,8 @@ import {
   Target,
   Hash
 } from 'lucide-react';
+import { AlertModal } from '@/components/ui/Modal';
+import { useAlert } from '@/hooks/useAlert';
 
 export default function MatchPage() {
   const params = useParams();
@@ -27,6 +29,7 @@ export default function MatchPage() {
   const [updating, setUpdating] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
+  const { alertState, showError, hideAlert } = useAlert();
   const [scoreInput, setScoreInput] = useState({
     team1Score: '',
     team2Score: '',
@@ -63,7 +66,7 @@ export default function MatchPage() {
     if (result.success) {
       await loadMatch(); // Reload to get updated status
     } else {
-      alert('Error starting match: ' + result.error);
+      showError('Error starting match: ' + result.error);
     }
     
     setStarting(false);
@@ -99,7 +102,7 @@ export default function MatchPage() {
         router.push(`/${lang}/volunteer/venues/${venueId}/matches${match?.fixtureId ? `?fixture=${match.fixtureId}` : ''}`);
       }, 2000);
     } else {
-      alert('Error updating match result: ' + result.error);
+      showError('Error updating match result: ' + result.error);
     }
     
     setUpdating(false);
@@ -432,6 +435,14 @@ export default function MatchPage() {
           </div>
         </div>
       )}
+      
+      <AlertModal
+        isOpen={alertState.isOpen}
+        onClose={hideAlert}
+        message={alertState.message}
+        type={alertState.type}
+        title={alertState.title}
+      />
     </div>
   );
 }

@@ -360,6 +360,88 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   );
 };
 
+// Alert modal component (replacement for alert())
+export interface AlertModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  message: string;
+  type?: 'info' | 'success' | 'warning' | 'error';
+  okLabel?: string;
+}
+
+export const AlertModal: React.FC<AlertModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  message,
+  type = 'info',
+  okLabel = 'OK',
+}) => {
+  const getTypeStyles = () => {
+    switch (type) {
+      case 'success':
+        return {
+          iconColor: 'text-green-600',
+          bgColor: 'bg-green-50',
+          borderColor: 'border-green-200',
+        };
+      case 'warning':
+        return {
+          iconColor: 'text-yellow-600',
+          bgColor: 'bg-yellow-50',
+          borderColor: 'border-yellow-200',
+        };
+      case 'error':
+        return {
+          iconColor: 'text-red-600',
+          bgColor: 'bg-red-50',
+          borderColor: 'border-red-200',
+        };
+      default:
+        return {
+          iconColor: 'text-blue-600',
+          bgColor: 'bg-blue-50',
+          borderColor: 'border-blue-200',
+        };
+    }
+  };
+
+  const typeStyles = getTypeStyles();
+
+  const footer = (
+    <div className="flex justify-end">
+      <button
+        onClick={onClose}
+        className={cn(
+          'px-4 py-2 text-sm font-medium text-white',
+          'bg-primary-500 hover:bg-primary-600 rounded-lg',
+          'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500',
+          'transition-colors'
+        )}
+      >
+        {okLabel}
+      </button>
+    </div>
+  );
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title || (type === 'error' ? 'Error' : type === 'success' ? 'Success' : type === 'warning' ? 'Warning' : 'Information')}
+      size="sm"
+      footer={footer}
+    >
+      <div className={cn('p-4 rounded-lg border', typeStyles.bgColor, typeStyles.borderColor)}>
+        <p className="text-sm text-gray-700 whitespace-pre-line">
+          {message}
+        </p>
+      </div>
+    </Modal>
+  );
+};
+
 // Export compound components with proper typing
 import type { FC } from 'react';
 

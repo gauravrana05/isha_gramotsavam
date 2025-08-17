@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, X, Image, Video, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import Progress from '@/components/ui/progress/ProgressBar';
+import { Progress } from '@/components/ui/Progress';
 import Input from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Label } from '@/components/ui/Label';
@@ -52,7 +52,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [uploadResults, setUploadResults] = useState<Record<string, { success: boolean; error?: string }>>({});
   
-  const { uploadFixtureMedia, uploadMatchMedia, uploadVenueMedia, uploadMultipleMedia } = useMediaUpload();
+  const { uploadFixtureMedia, uploadMatchMedia, uploadVenueMedia, uploadMultipleMedia, uploadState } = useMediaUpload();
 
   const getAcceptedMimeTypes = useCallback(() => {
     const imageTypes = MEDIA_CONFIG.ALLOWED_TYPES.IMAGE;
@@ -134,7 +134,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
     onDrop,
     accept: getAcceptedMimeTypes(),
     multiple,
-    disabled: uploading
+    disabled: uploading || uploadState.uploading
   });
 
   const removeFile = useCallback((fileId: string) => {
@@ -171,7 +171,9 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
   const handleUpload = async () => {
     if (files.length === 0) return;
     
-    setUploading(true);
+    if (files.length > 1) {
+      setUploading(true);
+    }
     setUploadProgress({});
     setUploadResults({});
     
@@ -179,9 +181,6 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
       if (files.length === 1) {
         // Single file upload
         const fileData = files[0];
-        const progressCallback = (progress: any) => {
-          setUploadProgress({ [fileData.id]: progress.progress });
-        };
         
         let result;
         if (effectiveContextType === 'fixture' && effectiveContextId) {
@@ -233,7 +232,9 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
       onUploadError?.(errorMessage);
     } finally {
-      setUploading(false);
+      if (files.length > 1) {
+        setUploading(false);
+      }
     }
   };
 
@@ -257,7 +258,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
               ? 'bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 scale-[1.02] shadow-xl' 
               : 'bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 hover:from-blue-100 hover:via-indigo-100 hover:to-purple-100 border-2 border-dashed border-blue-200 hover:border-blue-300'
             }
-            ${uploading ? 'opacity-75 cursor-not-allowed' : 'hover:shadow-lg'}
+            ${(uploading || uploadState.uploading) ? 'opacity-75 cursor-not-allowed' : 'hover:shadow-lg'}
             min-h-[250px] md:min-h-[300px] flex flex-col items-center justify-center
           `}
         >
@@ -339,7 +340,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
               </h3>
               <p className="text-sm md:text-base text-gray-600">Review and add details to your media</p>
             </div>
-            {!uploading && Object.keys(uploadResults).length === 0 && (
+            {!uploading && !uploadState.uploading && Object.keys(uploadResults).length === 0 && (
               <Button 
                 onClick={handleUpload} 
                 className="w-full md:w-auto px-4 md:px-8 py-3 md:py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-sm md:text-base"
@@ -391,7 +392,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                   {/* Remove Button */}
                   <button
                     onClick={() => removeFile(fileData.id)}
-                    disabled={uploading}
+                    disabled={uploading || uploadState.uploading}
                     className="absolute top-3 right-3 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors disabled:opacity-50"
                   >
                     <X className="h-4 w-4" />
@@ -414,22 +415,19 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                 </div>
 
                 {/* Progress Bar */}
-                {uploadProgress[fileData.id] !== undefined && (
+                {((files.length === 1 && uploadState.uploading) || uploadProgress[fileData.id] !== undefined) && (
                   <div className="px-4 py-2 bg-blue-50">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-blue-600">Uploading...</span>
-                      <span className="text-sm text-blue-600">{Math.round(uploadProgress[fileData.id])}%</span>
+                      <span className="text-sm text-blue-600">
+                        {Math.round(files.length === 1 ? uploadState.progress : uploadProgress[fileData.id] || 0)}%
+                      </span>
                     </div>
-                    {/* Progress is a custom component, but it does na prop. */}
-                    <div className="relative w-full h-2 bg-blue-200 rot accept 'value' as ounded">
-                      <div
-                        className="absolute left-0 top-0 h-2 bg-blue-600 rounded"
-                        style={{
-                          width: `${uploadProgress[fileData.id]}%`,
-                          transition: 'width 0.3s ease',
-                        }}
-                      />
-                    </div>
+                    <Progress 
+                      value={files.length === 1 ? uploadState.progress : uploadProgress[fileData.id] || 0} 
+                      size="md"
+                      variant="default"
+                    />
                   </div>
                 )}
 
@@ -454,7 +452,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                   </div>
 
                   {/* Metadata Form - Only show if not uploading and no results */}
-                  {!uploading && !uploadResults[fileData.id] && (
+                  {!uploading && !uploadState.uploading && !uploadResults[fileData.id] && (
                     <div className="space-y-3">
                       <div>
                         <Label htmlFor={`title-${fileData.id}`} className="text-sm font-medium">Title</Label>

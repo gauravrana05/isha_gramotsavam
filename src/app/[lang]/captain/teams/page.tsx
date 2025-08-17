@@ -18,6 +18,8 @@ import {
   Loader2
 } from 'lucide-react';
 import { useAuth } from "@/context/AuthContext";
+import { AlertModal } from '@/components/ui/Modal';
+import { useAlert } from '@/hooks/useAlert';
 import { db } from "@/lib/firebase/config";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, orderBy } from "firebase/firestore";
 import { addPlayerToTeam } from "@/lib/actions/captain/addPlayerToTeam";
@@ -144,6 +146,7 @@ export default function MyTeamPage() {
   // Document upload states
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [documentPlayer, setDocumentPlayer] = useState<TeamPlayer | null>(null);
+  const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
 
   const loadTeamData = useCallback(async () => {
     if (!user) {
@@ -541,7 +544,7 @@ export default function MyTeamPage() {
   const handleAddPlayer = async () => {
     if (!teamData) {
       console.error('handleAddPlayer: teamData is not available');
-      alert('Team data is not loaded yet. Please wait a moment and try again.');
+      showInfo('Team data is not loaded yet. Please wait a moment and try again.');
       return;
     }
     
@@ -552,7 +555,7 @@ export default function MyTeamPage() {
       // Check for duplicate player by phone number
       const existingPlayerInTeam = players.find(p => p.phone === playerFormData.phone);
       if (existingPlayerInTeam) {
-        alert(`A player with phone number ${playerFormData.phone} is already in this team.`);
+        showInfo(`A player with phone number ${playerFormData.phone} is already in this team.`);
         setIsSubmitting(false);
         return;
       }
@@ -576,7 +579,7 @@ export default function MyTeamPage() {
         });
         
         if (playerInOtherTeam) {
-          alert(`This player is already registered in another team for this event.`);
+          showInfo(`This player is already registered in another team for this event.`);
           setIsSubmitting(false);
           return;
         }
@@ -589,7 +592,7 @@ export default function MyTeamPage() {
           playerPosition = 'substitute';
           console.log('Main slots full, automatically assigned as substitute');
         } else {
-          alert('No available positions. Team is full.');
+          showInfo('No available positions. Team is full.');
           setIsSubmitting(false);
           return;
         }
@@ -598,7 +601,7 @@ export default function MyTeamPage() {
           playerPosition = 'main';
           console.log('Substitute slots full, automatically assigned as main');
         } else {
-          alert('No available positions. Team is full.');
+          showInfo('No available positions. Team is full.');
           setIsSubmitting(false);
           return;
         }
@@ -647,13 +650,13 @@ export default function MyTeamPage() {
         resetPlayerForm();
       } catch (error) {
         console.error('Error adding player:', error);
-        alert(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showError(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setIsSubmitting(false);
       }
     } catch (error) {
       console.error('Error adding player:', error);
-      alert(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showError(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -681,11 +684,11 @@ export default function MyTeamPage() {
         await loadTeamData();
         console.log('Player removed successfully');
       } else {
-        alert(result.error || 'Failed to remove player');
+        showError(result.error || 'Failed to remove player');
       }
     } catch (error) {
       console.error('Error removing player:', error);
-      alert('Failed to remove player. Please try again.');
+      showError('Failed to remove player. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -719,12 +722,12 @@ export default function MyTeamPage() {
 
   const handleSubmitTeam = async () => {
     if (!teamData || !sportData) {
-      alert('Team data is not loaded. Please refresh and try again.');
+      showError('Team data is not loaded. Please refresh and try again.');
       return;
     }
 
     if (!user || !userProfile) {
-      alert('User authentication required. Please log in again.');
+      showError('User authentication required. Please log in again.');
       return;
     }
 
@@ -764,7 +767,7 @@ export default function MyTeamPage() {
     }
 
     if (validationErrors.length > 0) {
-      alert(`Cannot submit team:\n\n${validationErrors.map((error, index) => `${index + 1}. ${error}`).join('\n')}`);
+      showError(`Cannot submit team:\n\n${validationErrors.map((error, index) => `${index + 1}. ${error}`).join('\n')}`);
       return;
     }
 
@@ -793,14 +796,14 @@ export default function MyTeamPage() {
       });
       
       if (result.success) {
-        alert(`Team "${teamData.name}" submitted for verification successfully!\n\nYou will be notified once the review is complete.`);
+        showSuccess(`Team "${teamData.name}" submitted for verification successfully!\n\nYou will be notified once the review is complete.`);
         router.push(`/${lang}/captain/dashboard`);
       } else {
         throw new Error(result.error || 'Failed to submit team');
       }
     } catch (error) {
       console.error('Error submitting team:', error);
-      alert(`Failed to submit team: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again or contact support.`);
+      showError(`Failed to submit team: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again or contact support.`);
     }
   };
 
@@ -1480,6 +1483,14 @@ export default function MyTeamPage() {
           </div>
         </div>
       )}
+      
+      <AlertModal
+        isOpen={alertState.isOpen}
+        onClose={hideAlert}
+        message={alertState.message}
+        type={alertState.type}
+        title={alertState.title}
+      />
     </div>
   );
 }

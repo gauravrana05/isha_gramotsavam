@@ -10,6 +10,7 @@ import Container from '@/components/ui/Container';
 import Button from '@/components/ui/Button';
 import { ArrowLeft, Save, Loader2, MapPin, Plus, Trash2 } from 'lucide-react';
 import VenueVolunteerAssignmentModal from './VenueVolunteerAssignmentModal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 
 interface Volunteer {
   id: string;
@@ -468,16 +469,19 @@ export default function CreateVenuePage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Type *
                 </label>
-                <select
+                <Select
                   value={formData.type}
-                  onChange={(e) => handleInputChange('type', e.target.value as 'cluster' | 'division' | 'final')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
-                  required
+                  onValueChange={(value) => handleInputChange('type', value as 'cluster' | 'division' | 'final')}
                 >
-                  <option value="cluster">Cluster</option>
-                  <option value="division">Division</option>
-                  <option value="final">Final</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cluster">Cluster</SelectItem>
+                    <SelectItem value="division">Division</SelectItem>
+                    <SelectItem value="final">Final</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
@@ -533,45 +537,54 @@ export default function CreateVenuePage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">District</label>
-                <select
+                <Select
                   value={formData.district}
-                  onChange={(e) => handleInputChange('district', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                  onValueChange={(value) => handleInputChange('district', value)}
                   disabled={!formData.state || !districts.length}
                 >
-                  <option value="" disabled>Select District</option>
-                  {districts.map(district => (
-                    <option key={district} value={district}>{district}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select District" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {districts.map(district => (
+                      <SelectItem key={district} value={district}>{district}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Taluk</label>
-                <select
+                <Select
                   value={formData.taluk}
-                  onChange={(e) => handleInputChange('taluk', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                  onValueChange={(value) => handleInputChange('taluk', value)}
                   disabled={!formData.district || !taluks.length}
                 >
-                  <option value="" disabled>Select Taluk</option>
-                  {taluks.map(taluk => (
-                    <option key={taluk} value={taluk}>{taluk}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Taluk" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {taluks.map(taluk => (
+                      <SelectItem key={taluk} value={taluk}>{taluk}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Panchayat</label>
-                <select
+                <Select
                   value={formData.panchayat}
-                  onChange={(e) => handleInputChange('panchayat', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3A7F3F] focus:border-[#3A7F3F]"
+                  onValueChange={(value) => handleInputChange('panchayat', value)}
                   disabled={!formData.taluk || !panchayats.length}
                 >
-                  <option value="" disabled>Select Panchayat</option>
-                  {panchayats.map(panchayat => (
-                    <option key={panchayat} value={panchayat}>{panchayat}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Panchayat" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {panchayats.map(panchayat => (
+                      <SelectItem key={panchayat} value={panchayat}>{panchayat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

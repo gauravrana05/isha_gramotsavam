@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { getTeamPlayersForVerification, verifyTeamPlayers, checkInTeam } from '@/lib/actions/volunteer/teamCheckin';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { AlertModal } from '@/components/ui/Modal';
+import { useAlert } from '@/hooks/useAlert';
 
 interface PageProps {
   params: Promise<{
@@ -29,6 +31,7 @@ export default async function TeamCheckInPage({ params }: PageProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const { alertState, showError, showInfo, hideAlert } = useAlert();
 
   useEffect(() => {
     loadPlayers();
@@ -87,13 +90,13 @@ export default async function TeamCheckInPage({ params }: PageProps) {
         if (checkInResult.success) {
           router.push(`/volunteer/venues/${venueId}/teams`);
         } else {
-          alert('Error checking in team: ' + checkInResult.error);
+          showError('Error checking in team: ' + checkInResult.error);
         }
       } else {
-        alert('Please verify all players before checking in');
+        showInfo('Please verify all players before checking in');
       }
     } else {
-      alert('Error verifying players: ' + result.error);
+      showError('Error verifying players: ' + result.error);
     }
     
     setSubmitting(false);
@@ -214,6 +217,14 @@ export default async function TeamCheckInPage({ params }: PageProps) {
           </Button>
         </div>
       )}
+      
+      <AlertModal
+        isOpen={alertState.isOpen}
+        onClose={hideAlert}
+        message={alertState.message}
+        type={alertState.type}
+        title={alertState.title}
+      />
     </div>
   );
 }

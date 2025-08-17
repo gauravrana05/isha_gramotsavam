@@ -9,6 +9,8 @@ import { auditLogService } from "@/lib/services/auditLogService";
 import { assignTeamToVenue } from "@/lib/actions/admin/teamVenueAssignment";
 import Image from "next/image";
 import { ArrowLeft, Users, Phone, Calendar, MapPin, Loader2, AlertCircle, CheckCircle, X, Eye, Check, UserCheck } from "lucide-react";
+import { AlertModal } from '@/components/ui/Modal';
+import { useAlert } from '@/hooks/useAlert';
 
 interface TeamPlayer {
   playerId: string;
@@ -75,6 +77,7 @@ export default function TeamVerificationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
 
   const router = useRouter();
   const { lang, teamId } = useParams();
@@ -256,26 +259,18 @@ export default function TeamVerificationPage() {
         });
 
         // Log the verification action
-        // if (teamData && user && userProfile) {
-        //   await auditLogService.logPlayerVerification(
-        //     { // actor
-        //       uid: user.uid,
-        //       name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-        //       role: userProfile.role
-        //     },
-        //     { // team
-        //       id: teamData.id,
-        //       name: teamData.name
-        //     },
-        //     { // player
-        //       id: player.playerId,
-        //       name: player.name
-        //     },
-        //     player.verificationStatus, // oldStatus
-        //     status, // newStatus
-        //     comments || null // reason
-        //   );
-        // }
+        if (teamData && user && userProfile) {
+          await auditLogService.logPlayerVerification(
+            user.uid, // volunteerId
+            `${userProfile.firstName} ${userProfile.lastName}`.trim(), // volunteerName
+            player.playerId, // playerId
+            player.name, // playerName
+            teamData.id, // teamId
+            teamData.name, // teamName
+            status, // status
+            comments || undefined // comments
+          );
+        }
       }
       
       // Update team status based on the new list of players
@@ -306,7 +301,7 @@ export default function TeamVerificationPage() {
       
     } catch (error) {
       console.error('Error updating player status:', error);
-      alert('Failed to save verification. Please try again.');
+      showError('Failed to save verification. Please try again.');
       loadTeamData(); // Reload data on error
     } finally {
       setSaving(false);
@@ -315,7 +310,7 @@ export default function TeamVerificationPage() {
 
   const handleBulkAction = async (action: 'approved' | 'rejected') => {
     if (selectedPlayers.size === 0) {
-      alert('Please select players to perform bulk action.');
+      showInfo('Please select players to perform bulk action.');
       return;
     }
     
@@ -480,12 +475,12 @@ export default function TeamVerificationPage() {
         }
       }
 
-      alert(`Successfully ${action} ${selectedPlayersList.length} players!`);
+      showSuccess(`Successfully ${action} ${selectedPlayersList.length} players!`);
       setSelectedPlayers(new Set()); // Clear selection
 
     } catch(error) {
       console.error('Bulk action error:', error);
-      alert(`Some ${actionText}s may have failed. Please check and try again.`);
+      showError(`Some ${actionText}s may have failed. Please check and try again.`);
       // Reload data on error to ensure UI consistency
       loadTeamData();
     } finally {
@@ -1120,7 +1115,7 @@ export default function TeamVerificationPage() {
                       onClick={async () => {
                         await handlePlayerStatusChange(selectedPlayer.playerId, 'approved', 'Approved by verification volunteer');
                         setShowPlayerModal(false);
-                        alert('Player approved successfully!');
+                        showSuccess('Player approved successfully!');
                       }}
                       disabled={saving}
                       className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
@@ -1135,7 +1130,7 @@ export default function TeamVerificationPage() {
                         if (reason) {
                           await handlePlayerStatusChange(selectedPlayer.playerId, 'rejected', reason);
                           setShowPlayerModal(false);
-                          alert('Player rejected successfully!');
+                          showSuccess('Player rejected successfully!');
                         }
                       }}
                       disabled={saving}
@@ -1200,6 +1195,14 @@ export default function TeamVerificationPage() {
           </div>
         </div>
       )}
+      
+      <AlertModal
+        isOpen={alertState.isOpen}
+        onClose={hideAlert}
+        message={alertState.message}
+        type={alertState.type}
+        title={alertState.title}
+      />
     </div>
   );
   }

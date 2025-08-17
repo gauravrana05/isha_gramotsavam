@@ -3,7 +3,7 @@
 ## Collection: `clusterDivisionMapping/{mappingId}`
 
 ### Overview
-Maps cluster venues to division venues, defining the progression path for teams advancing from cluster level to division level competitions.
+Maps cluster venues to division venues, defining the progression path for teams advancing from cluster level to division level competitions. Similar to venue location mapping, this stores grouped mappings with one document per division venue containing arrays of assigned cluster venues.
 
 ### Document Structure
 
@@ -12,16 +12,21 @@ interface ClusterDivisionMapping {
   mappingId: string;
   eventId: string;
   
-  // Cluster Venue
-  clusterVenueId: string;
-  clusterVenueName: string;
-  
-  // Division Venue (where winners advance)
+  // Division Venue Information
   divisionVenueId: string;
   divisionVenueName: string;
+  venueType: 'division';
   
-  // Status
+  // Assigned Clusters (similar to assignedLocations in venue location mapping)
+  assignedClusters: {
+    state: string;
+    clusterVenueIds: string[];
+    clusterVenueNames: string[];
+  };
+  
+  // Status & Metadata
   isActive: boolean;
+  autoMapped: boolean; // true if all clusters in state have single division
   
   // Audit Fields
   createdAt: Timestamp;
@@ -33,16 +38,29 @@ interface ClusterDivisionMapping {
 
 ```javascript
 {
-  mappingId: 'cluster_div_coimbatore_chennai',
+  mappingId: 'division_mapping_chennai_tn',
   eventId: 'isha_gramotsavam_2025',
-  
-  clusterVenueId: 'coimbatore_sports_complex',
-  clusterVenueName: 'Coimbatore Sports Complex',
   
   divisionVenueId: 'chennai_division_venue',
   divisionVenueName: 'Chennai Division Sports Complex',
+  venueType: 'division',
+  
+  assignedClusters: {
+    state: 'Tamil Nadu',
+    clusterVenueIds: [
+      'coimbatore_sports_complex',
+      'tirupur_grounds',
+      'salem_stadium'
+    ],
+    clusterVenueNames: [
+      'Coimbatore Sports Complex',
+      'Tirupur Sports Ground', 
+      'Salem Stadium'
+    ]
+  },
   
   isActive: true,
+  autoMapped: false,
   
   createdAt: Timestamp.now(),
   updatedAt: Timestamp.now()
@@ -50,10 +68,11 @@ interface ClusterDivisionMapping {
 ```
 
 ### Usage
-- Admin defines which division venue each cluster venue advances to
+- Admin creates grouped mappings by division venue (one document per division)
+- Each division venue can serve multiple cluster venues within the same state
 - When cluster fixtures complete, top 2 winners automatically advance
 - System uses this mapping to assign teams to division fixtures
-- Division venues serve multiple cluster venues
+- Auto-mapping occurs for states with single division venues
 - Final venues are pre-defined (Isha Yoga Center)
 
 ### Related Collections
