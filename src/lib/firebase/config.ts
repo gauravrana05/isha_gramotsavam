@@ -6,6 +6,7 @@ import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 
 // Your web app's Firebase configuration
+// Supports both local development and Replit deployment
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyDCSeY8hL1GsD86RGwU3kgIU4THEF9yMy0",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "isha-gramotsavam.firebaseapp.com",

@@ -1,0 +1,37 @@
+run = "npm start"
+
+[deployment]
+build = ["npm", "run", "build"]
+run = ["npm", "start"]
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[env]
+NODE_ENV = "production"
+
+[nix]
+channel = "stable-22_11"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix", "package.json"]
+
+[languages]
+
+[languages.javascript]
+pattern = "**/{*.js,*.jsx,*.ts,*.tsx,*.json}"
+
+[languages.javascript.languageServer]
+start = "typescript-language-server --stdio"
+
+[deployment.run]
+command = ["npm", "start"]
+
+[deployment.build]
+command = ["npm", "run", "build"]
+
+# Increase allocated resources for complex Next.js app
+[resources]
+cpu = 2
+memory = 4096
