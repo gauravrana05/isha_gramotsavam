@@ -121,7 +121,7 @@ export const useMediaManager = (): UseMediaManagerReturn => {
         totalCount: mediaItems.length
       }));
     } catch (error) {
-      console.error('Error loading media:', error);
+      // Error handling removed
       setState(prev => ({
         ...prev,
         loading: false,
@@ -159,7 +159,7 @@ export const useMediaManager = (): UseMediaManagerReturn => {
         totalCount: prev.totalCount + newMediaItems.length
       }));
     } catch (error) {
-      console.error('Error loading more media:', error);
+      // Error handling removed
       setState(prev => ({
         ...prev,
         loading: false,
@@ -187,7 +187,7 @@ export const useMediaManager = (): UseMediaManagerReturn => {
       
       return null;
     } catch (error) {
-      console.error('Error getting media item:', error);
+      // Error handling removed
       return null;
     }
   }, []);
@@ -212,7 +212,7 @@ export const useMediaManager = (): UseMediaManagerReturn => {
         return false;
       }
     } catch (error) {
-      console.error('Error updating media item:', error);
+      // Error handling removed
       setState(prev => ({
         ...prev,
         error: error instanceof Error ? error.message : 'Failed to update media'
@@ -238,7 +238,7 @@ export const useMediaManager = (): UseMediaManagerReturn => {
         return false;
       }
     } catch (error) {
-      console.error('Error deleting media item:', error);
+      // Error handling removed
       setState(prev => ({
         ...prev,
         error: error instanceof Error ? error.message : 'Failed to delete media'

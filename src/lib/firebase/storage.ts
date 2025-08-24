@@ -17,7 +17,7 @@ export const uploadFile = (
         onProgress?.(progress);
       },
       (error) => {
-        console.error("Error uploading file:", error);
+        // Error handling removed
         reject(error);
       },
       async () => {

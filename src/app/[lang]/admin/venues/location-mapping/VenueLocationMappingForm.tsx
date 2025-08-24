@@ -52,8 +52,7 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
       setSelectedVenue(venue);
       setError('');
       
-      console.log('Selected venue:', venue);
-      console.log('Loading taluks for:', venue.address.state, venue.address.district);
+      // Selected venue and loading taluks
       
       // Load taluks for the venue's district
       await loadTaluks(venue.address.state, venue.address.district);
@@ -63,13 +62,10 @@ export default function VenueLocationMappingForm({ venues, districtsWithMultiple
   const loadTaluks = async (state: string, district: string) => {
     setLoading(true);
     try {
-      console.log('Fetching taluks for:', state, district);
       const data = await pincodeService.getTaluksByDistrict(state, district);
-      console.log('Received data:', data);
       setAvailableTaluks(data.taluks || []);
       setSelectedTaluks([]);
     } catch (err: any) {
-      console.error('Error loading taluks:', err);
       setError(err.message || 'Failed to load taluks');
       setAvailableTaluks([]);
     } finally {

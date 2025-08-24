@@ -44,7 +44,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         await loadAndCacheTranslation(targetLang);
         setLanguage(targetLang);
       } catch (error) {
-        console.warn(`Failed to load language ${targetLang}, using default`);
+        // Warning removed
         setLanguage(DEFAULT_LANGUAGE);
       } finally {
         setIsLoading(false);
@@ -57,7 +57,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Function to switch language and update URL
   const switchLanguage = (newLang: LanguageCode) => {
     if (!isValidLanguageCode(newLang)) {
-      console.warn(`Invalid language code: ${newLang}`);
+      // Warning removed
       return;
     }
 
@@ -86,7 +86,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       
       setIsLoading(false);
     }).catch((error) => {
-      console.error(`Failed to switch to language ${newLang}:`, error);
+      // Error handling removed
       setIsLoading(false);
     });
   };

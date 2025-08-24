@@ -54,7 +54,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
           setError(teamsResult.error || 'Failed to load teams');
         }
       } catch (teamsError) {
-        console.error('Error fetching teams:', teamsError);
+        // Error handling removed
         setTeams([]);
       }
       
@@ -63,7 +63,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
         const checkedInResult = await getVenueCheckedInTeams(venueId, 'isha_gramotsavam_2025');
         setCheckedInTeamsResult(checkedInResult);
       } catch (checkedInError) {
-        console.error('Error fetching checked-in teams:', checkedInError);
+        // Error handling removed
         setCheckedInTeamsResult({ success: false, teams: [], teamsBySport: {}, totalTeams: 0 });
       }
       
@@ -72,7 +72,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
         const fixturesData = await getVenueFixtures(venueId);
         setFixtures(fixturesData);
       } catch (fixturesError) {
-        console.error('Error fetching fixtures:', fixturesError);
+        // Error handling removed
         setFixtures([]);
       }
       
@@ -90,7 +90,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
           });
         }
       } catch (venueError) {
-        console.error('Error fetching venue details:', venueError);
+        // Error handling removed
         // Use fallback venue data
         setVenue({
           id: venueId,
@@ -100,7 +100,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
       }
       
     } catch (err) {
-      console.error('Error loading venue data:', err);
+      // Error handling removed
       setError('Failed to load venue data');
     } finally {
       setLoading(false);
@@ -251,7 +251,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
         </div>
         
         {/* Test Data Management (Development Only) */}
-        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        {/* <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <h4 className="font-medium text-yellow-800 mb-2">Development Tools</h4>
           <Link href={`/en/volunteer/venues/${venueId}/test-data`}>
             <button className="w-full p-3 text-left bg-yellow-100 border border-yellow-300 rounded-lg hover:bg-yellow-200 transition-all">
@@ -264,7 +264,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
               </div>
             </button>
           </Link>
-        </div>
+        </div> */}
       </div>
 
       {/* Sports Overview */}

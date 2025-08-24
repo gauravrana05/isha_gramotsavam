@@ -56,12 +56,9 @@ class BackgroundSyncService {
       if (this.isSupported) {
         this.swRegistration = await navigator.serviceWorker.ready;
         this.setupMessageHandler();
-        console.log('Background sync service initialized');
-      } else {
-        console.warn('Background sync not supported in this browser');
       }
     } catch (error) {
-      console.error('Failed to initialize background sync service:', error);
+      // Failed to initialize background sync service
     }
   }
 
@@ -84,7 +81,7 @@ class BackgroundSyncService {
    */
   async registerSync(tag: string = 'isha-gramotsavam-sync'): Promise<boolean> {
     if (!this.isSupported || !this.swRegistration) {
-      console.warn('Background sync not available');
+      // Background sync not available
       return false;
     }
 
@@ -92,10 +89,8 @@ class BackgroundSyncService {
       // Type assertion for background sync support
       const registration = this.swRegistration as any;
       await registration.sync.register(tag);
-      console.log(`Background sync registered: ${tag}`);
       return true;
     } catch (error) {
-      console.error('Failed to register background sync:', error);
       return false;
     }
   }
@@ -173,7 +168,6 @@ class BackgroundSyncService {
    * Handle sync status updates from service worker
    */
   private handleSyncStatusUpdate(data: any): void {
-    console.log('Sync status update:', data);
     
     // Dispatch custom event for components to listen to
     window.dispatchEvent(new CustomEvent('background-sync-update', {
@@ -191,10 +185,8 @@ class BackgroundSyncService {
 
     try {
       const persistent = await navigator.storage.persist();
-      console.log(`Persistent storage: ${persistent}`);
       return persistent;
     } catch (error) {
-      console.error('Failed to request persistent storage:', error);
       return false;
     }
   }
@@ -219,7 +211,6 @@ class BackgroundSyncService {
 
       return { quota, usage, usagePercentage };
     } catch (error) {
-      console.error('Failed to get storage quota:', error);
       return { quota: 0, usage: 0, usagePercentage: 0 };
     }
   }
@@ -286,13 +277,11 @@ class BackgroundSyncService {
       const permission = await Notification.requestPermission();
       
       if (permission === 'granted') {
-        console.log('Push notifications enabled for sync status');
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error('Failed to setup push notifications:', error);
       return false;
     }
   }
@@ -302,7 +291,7 @@ class BackgroundSyncService {
    */
   destroy(): void {
     // Cleanup any intervals, listeners, etc.
-    console.log('Background sync service destroyed');
+    // Background sync service destroyed
   }
 }
 

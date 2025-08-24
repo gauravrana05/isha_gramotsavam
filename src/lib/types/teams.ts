@@ -7,7 +7,7 @@ export interface Team {
   description: string;
   
   // Event & Sport Association
-  eventId: string;
+  eventId?: string;
   sportId: string;
   sportName: string;
   genderCategory: 'men' | 'women' | 'mixed';

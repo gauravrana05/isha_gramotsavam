@@ -149,7 +149,6 @@ export async function performGlobalSearch(
     };
 
   } catch (error) {
-    console.error('Error in global search:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -269,7 +268,6 @@ export async function performSmartFiltering(
     };
 
   } catch (error) {
-    console.error('Error in smart filtering:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -332,7 +330,6 @@ export async function performStatisticalAnalysis(
     };
 
   } catch (error) {
-    console.error('Error in statistical analysis:', error);
     
     if (error instanceof z.ZodError) {
       return {

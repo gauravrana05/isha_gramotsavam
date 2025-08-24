@@ -33,7 +33,7 @@ export default function VideoSection({ variant = 'glimpses' }: VideoSectionProps
   const handlePlay = () => {
     setIsPlaying(true)
     // Here you would implement the actual video player logic
-    console.log('Playing video...')
+    // Playing video
   }
 
   return (

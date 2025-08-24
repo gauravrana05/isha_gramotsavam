@@ -97,7 +97,7 @@
 //     // Update team verification record
 //     await updateTeamVerificationRecord(teamId);
 
-//     console.log(`Player ${playerId} in team ${teamId} ${status} by ${volunteerId}`);
+//     // Console log removed
 
 //     return {
 //       success: true,
@@ -105,7 +105,7 @@
 //     };
 
 //   } catch (error) {
-//     console.error("Error verifying player:", error);
+//     // Error handling removed
     
 //     if (error instanceof z.ZodError) {
 //       return { 

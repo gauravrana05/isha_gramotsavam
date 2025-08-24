@@ -105,7 +105,7 @@ export default function TeamMatchDayVerificationPage() {
         setError(result.error || 'Failed to load team data');
       }
     } catch (err) {
-      console.error('Error loading team data:', err);
+      // Error handling removed
       setError('Failed to load team data');
     } finally {
       setLoading(false);
@@ -139,7 +139,7 @@ export default function TeamMatchDayVerificationPage() {
         showError(`Error: ${result.error}`);
       }
     } catch (error) {
-      console.error('Error verifying player:', error);
+      // Error handling removed
       showError('Failed to verify player. Please try again.');
     } finally {
       setSubmitting(false);
@@ -198,11 +198,11 @@ export default function TeamMatchDayVerificationPage() {
             successCount++;
           } else {
             errorCount++;
-            console.error(`Failed to ${actionText} player ${player.name}:`, result.error);
+            // Error handling removed
           }
         } catch (error) {
           errorCount++;
-          console.error(`Error ${actionText}ing player ${player.name}:`, error);
+          // Error handling removed
         }
       }
 
@@ -217,7 +217,7 @@ export default function TeamMatchDayVerificationPage() {
       
       setSelectedPlayers(new Set()); // Clear selection
     } catch (error) {
-      console.error('Bulk action error:', error);
+      // Error handling removed
       showError(`Bulk ${actionText} failed. Please try again.`);
     } finally {
       setSubmitting(false);

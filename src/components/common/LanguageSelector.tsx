@@ -26,7 +26,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
 
   return (
-    <div className="relative w-30">
+    <div className="relative">
       <Select
         value={language}
         onValueChange={handleLanguageChange}

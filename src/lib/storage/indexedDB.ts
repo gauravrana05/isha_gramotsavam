@@ -148,14 +148,14 @@ class IndexedDBManager {
       const request = indexedDB.open(this.dbName, this.version);
 
       request.onerror = () => {
-        console.error('Failed to open IndexedDB:', request.error);
+        // Error handling removed
         this.db = null; // Ensure db is null on error
         reject(request.error);
       };
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('IndexedDB initialized successfully');
+        // Console log removed
         resolve();
       };
 
@@ -170,7 +170,7 @@ class IndexedDBManager {
    * Handle database schema upgrades
    */
   private handleUpgrade(db: IDBDatabase, oldVersion: number, newVersion: number): void {
-    console.log(`Upgrading IndexedDB from version ${oldVersion} to ${newVersion}`);
+    // Console log removed
 
     // Create stores that don't exist
     for (const storeConfig of this.stores) {
@@ -191,7 +191,7 @@ class IndexedDBManager {
           }
         }
 
-        console.log(`Created object store: ${storeConfig.name}`);
+        // Console log removed
       }
     }
 
@@ -258,7 +258,7 @@ class IndexedDBManager {
    */
   async getAll(storeName: string): Promise<OfflineDocument[]> {
     if (!this.db) {
-      console.warn('Database not initialized, returning empty array');
+      // Warning removed
       return [];
     }
 
@@ -273,16 +273,16 @@ class IndexedDBManager {
         };
 
         request.onerror = () => {
-          console.warn('IndexedDB getAll failed:', request.error);
+          // Warning removed
           resolve([]); // Return empty array instead of rejecting
         };
 
         transaction.onerror = () => {
-          console.warn('IndexedDB transaction failed:', transaction.error);
+          // Warning removed
           resolve([]); // Return empty array instead of rejecting
         };
       } catch (error) {
-        console.warn('IndexedDB getAll exception:', error);
+        // Warning removed
         resolve([]); // Return empty array instead of rejecting
       }
     });
@@ -433,7 +433,7 @@ class IndexedDBManager {
     if (this.db) {
       this.db.close();
       this.db = null;
-      console.log('IndexedDB connection closed');
+      // Console log removed
     }
   }
 
@@ -445,12 +445,12 @@ class IndexedDBManager {
       const deleteRequest = indexedDB.deleteDatabase(dbName);
       
       deleteRequest.onsuccess = () => {
-        console.log(`Database ${dbName} deleted successfully`);
+        // Console log removed
         resolve();
       };
       
       deleteRequest.onerror = () => {
-        console.error(`Failed to delete database ${dbName}:`, deleteRequest.error);
+        // Error handling removed
         reject(deleteRequest.error);
       };
     });

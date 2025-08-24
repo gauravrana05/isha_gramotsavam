@@ -13,7 +13,7 @@ import {
   Hash,
   Crown,
   MapPin,
-  Eye
+  Eye,
 } from 'lucide-react';
 
 interface PageProps {
@@ -44,7 +44,6 @@ async function getFixtureDetails(fixtureId: string) {
     
     return { success: true, fixture: serializedFixture };
   } catch (error) {
-    console.error('Error fetching fixture:', error);
     return { success: false, error: 'Failed to fetch fixture' };
   }
 }
@@ -72,7 +71,6 @@ async function getTeamDetails(teamIds: string[]) {
     
     return teams;
   } catch (error) {
-    console.error('Error fetching team details:', error);
     return {};
   }
 }
@@ -98,7 +96,6 @@ async function getFixtureMatches(fixtureId: string) {
     });
 
   } catch (error) {
-    console.error('Error fetching matches:', error);
     return [];
   }
 }
@@ -210,11 +207,13 @@ export default async function AdminFixtureDetailPage({ params }: PageProps) {
             </div>
           </div>
           <div className="text-right">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor((fixture as any)?.status)}`}>
-              {getStatusIcon((fixture as any)?.status)}
-              <span className="ml-2 capitalize">{(fixture as any)?.status?.replace('_', ' ')}</span>
-            </span>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="flex items-center gap-3 mb-2">
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor((fixture as any)?.status)}`}>
+                {getStatusIcon((fixture as any)?.status)}
+                <span className="ml-2 capitalize">{(fixture as any)?.status?.replace('_', ' ')}</span>
+              </span>
+            </div>
+            <div className="text-xs text-gray-500">
               Level: <span className="font-medium capitalize">{(fixture as any)?.level}</span>
             </div>
           </div>

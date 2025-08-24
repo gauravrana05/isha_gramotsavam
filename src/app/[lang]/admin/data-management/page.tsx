@@ -24,8 +24,6 @@ import { PageLoader } from '@/components/ui';
 // Import individual collection management components
 import UsersManagement from './components/UsersManagementFixed';
 import TeamsManagement from './components/TeamsManagementEnhanced';
-import EventsManagement from './components/EventsManagement';
-import SportsManagement from './components/SportsManagement';
 import VenuesManagement from './components/VenuesManagementEnhanced';
 import MatchesManagement from './components/MatchesManagement';
 import FixturesManagement from './components/FixturesManagement';

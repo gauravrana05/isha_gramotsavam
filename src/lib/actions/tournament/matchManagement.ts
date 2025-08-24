@@ -124,7 +124,6 @@ export async function updateMatchResult(
       tournamentComplete: nextRoundMatch === null
     };
   } catch (error) {
-    console.error('Error updating match result:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -281,46 +280,60 @@ async function checkAndTriggerLevelAdvancement(
           fixtureData.sportName,
           fixtureData.genderCategory
         );
-        console.log(`Teams ${winners.slice(0, 2).join(', ')} advanced to division level at ${mapping.divisionVenueName}`);
       }
     } else if (fixtureData.level === 'division' && winners.length >= 2) {
-      const batch = adminDb.batch();
+      // Find the Isha Yoga Center finals venue
+      const finalsVenueSnapshot = await adminDb
+        .collection('venues')
+        .where('type', '==', 'final')
+        .where('name', '==', 'Isha Yoga Center')
+        .where('isActive', '==', true)
+        .limit(1)
+        .get();
       
-      for (const teamId of winners.slice(0, 2)) {
-        const teamAssignmentRef = adminDb.collection('teamVenueAssignment').doc(teamId);
-        batch.update(teamAssignmentRef, {
-          currentLevel: 'final',
-          finalVenueId: 'isha_yoga_center',
-          finalVenueName: 'Isha Yoga Center',
-          divisionQualified: true,
-          qualifiedAt: new Date(),
-          updatedAt: new Date()
-        });
+      if (!finalsVenueSnapshot.empty) {
+        const finalsVenue = {
+          id: finalsVenueSnapshot.docs[0].id,
+          name: finalsVenueSnapshot.docs[0].data().name
+        };
+        
+        const batch = adminDb.batch();
+        
+        for (const teamId of winners.slice(0, 2)) {
+          const teamAssignmentRef = adminDb.collection('teamVenueAssignment').doc(teamId);
+          batch.update(teamAssignmentRef, {
+            currentLevel: 'final',
+            finalVenueId: finalsVenue.id,
+            finalVenueName: finalsVenue.name,
+            divisionQualified: true,
+            qualifiedAt: new Date(),
+            updatedAt: new Date()
+          });
 
-        const teamRef = adminDb.collection('teams').doc(teamId);
-        batch.update(teamRef, {
-          currentTournamentLevel: 'final',
-          finalVenueId: 'isha_yoga_center',
-          finalVenueName: 'Isha Yoga Center',
-          divisionQualified: true,
-          divisionQualifiedAt: new Date(),
-          checkedIn: false,
-          tournamentNumber: null
-        });
+          const teamRef = adminDb.collection('teams').doc(teamId);
+          batch.update(teamRef, {
+            currentTournamentLevel: 'final',
+            finalVenueId: finalsVenue.id,
+            finalVenueName: finalsVenue.name,
+            divisionQualified: true,
+            divisionQualifiedAt: new Date(),
+            checkedIn: false,
+            tournamentNumber: null
+          });
+        }
+        
+        await batch.commit();
+        await createAdvancementNotification(
+          winners.slice(0, 2), 
+          'final', 
+          finalsVenue.name,
+          fixtureData.sportName,
+          fixtureData.genderCategory
+        );
       }
-      
-      await batch.commit();
-      await createAdvancementNotification(
-        winners.slice(0, 2), 
-        'final', 
-        'Isha Yoga Center',
-        fixtureData.sportName,
-        fixtureData.genderCategory
-      );
-      console.log(`Teams ${winners.slice(0, 2).join(', ')} advanced to finals at Isha Yoga Center`);
     }
   } catch (error) {
-    console.error('Error in level advancement:', error);
+    // Error in level advancement
   }
 }
 
@@ -363,7 +376,7 @@ async function createAdvancementNotification(
     
     await batch.commit();
   } catch (error) {
-    console.error('Error creating advancement notifications:', error);
+    // Error creating advancement notifications
   }
 }
 
@@ -431,7 +444,6 @@ export async function updateStandaloneMatchResult(
     revalidatePath(`/volunteer/venues/${matchData?.venueId}/matches`);
     revalidatePath(`/volunteer/venues/${matchData?.venueId}/fixtures`);
     
-    console.log(`Match ${matchId} result updated: ${result.winnerName} wins`);
     
     return {
       success: true,
@@ -439,7 +451,6 @@ export async function updateStandaloneMatchResult(
     };
     
   } catch (error) {
-    console.error('Error updating match result:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -457,7 +468,6 @@ async function updateFixtureAndAdvanceWinner(
         const fixtureRef = adminDb.collection('fixtures').doc(fixtureId);
         const fixtureDoc = await fixtureRef.get();
         if (!fixtureDoc.exists) {
-            console.error(`[Advancement] Fixture ${fixtureId} not found.`);
             return;
         }
 
@@ -468,7 +478,6 @@ async function updateFixtureAndAdvanceWinner(
         const completedBracketMatch = allBracketMatches.find(m => m.matchId === completedMatchData.matchId);
 
         if (!completedBracketMatch) {
-            console.error(`Could not find match ${completedMatchData.matchId} in the fixture's bracket.`);
             return;
         }
 
@@ -486,7 +495,6 @@ async function updateFixtureAndAdvanceWinner(
             // Update the team slot in the next match within the bracket
             allBracketMatches = allBracketMatches.map(m => {
                 if (m.matchId === nextMatchId) {
-                    console.log(`[Advancement] Advancing winner to ${nextSlot} in fixture bracket match ${nextMatchId}`);
                     return { ...m, [nextSlot]: winnerId };
                 }
                 return m;
@@ -508,7 +516,6 @@ async function updateFixtureAndAdvanceWinner(
             const targetMatchData = allBracketMatches.find(m => m.matchId === nextMatchId);
             if (targetMatchData && targetMatchData.team1Id && targetMatchData.team2Id) {
                 updatePayload.status = 'ready';
-                console.log(`[Advancement] Standalone match ${nextMatchId} is now ready.`);
             }
             
             await targetMatchRef.update({ ...updatePayload, updatedAt: FieldValue.serverTimestamp() });
@@ -520,10 +527,9 @@ async function updateFixtureAndAdvanceWinner(
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        console.log(`[Advancement] Fixture ${fixtureId} updated successfully.`);
 
     } catch (error) {
-        console.error('Error during fixture update and winner advancement:', error);
+        // Error during fixture update and winner advancement
     }
 }
 
@@ -539,11 +545,26 @@ async function checkAndCompleteTournament(
     
     const fixtureData = fixtureDoc.data();
     
-    if (matchData.roundName !== 'Final') {
-      return;
+    // Check if this is a final round match (handles various naming conventions)
+    const isFinalRound = matchData.roundName === 'Final' || 
+                        matchData.roundName === 'final' || 
+                        matchData.roundName?.toLowerCase().includes('final');
+    
+    if (!isFinalRound) {
+      // Also check if this is the last match in the fixture
+      const allMatches = await adminDb.collection('matches')
+        .where('fixtureId', '==', fixtureId)
+        .get();
+      
+      const completedMatches = allMatches.docs.filter(doc => doc.data().status === 'completed').length;
+      const totalMatches = allMatches.docs.length;
+      
+      // If this match completion makes all matches completed, treat as tournament completion
+      if (completedMatches < totalMatches) {
+        return; // Tournament not yet complete
+      }
     }
     
-    console.log(`Final match completed for fixture ${fixtureId}. Winner: ${winnerName}`);
     
     const allMatches = await adminDb.collection('matches')
       .where('fixtureId', '==', fixtureId)
@@ -572,15 +593,16 @@ async function checkAndCompleteTournament(
       updatedAt: FieldValue.serverTimestamp()
     });
     
+    console.log(`🎯 Tournament completed for fixture ${fixtureId} (${(fixtureData as any)?.level} level) with ${winners.length} winners`);
+    
     await triggerLevelAdvancement(fixtureData, winners);
     
     revalidatePath(`/volunteer/venues/${(fixtureData as any)?.venueId}/fixtures`);
     revalidatePath(`/volunteer/venues/${(fixtureData as any)?.venueId}/fixtures/${fixtureId}`);
     
-    console.log(`Tournament ${fixtureId} completed. Champion: ${winnerName}, Winners advancing: ${winners.length}`);
     
   } catch (error) {
-    console.error('Error completing tournament:', error);
+    // Error completing tournament
   }
 }
 
@@ -638,6 +660,8 @@ async function calculateFinalStandings(
 
 async function triggerLevelAdvancement(fixtureData: any, winners: string[]) {
   try {
+    console.log(`🚀 Triggering level advancement for ${fixtureData.level} level with ${winners.length} winners`);
+    
     if (fixtureData.level === 'cluster' && winners.length >= 2) {
       const mappingSnapshot = await adminDb.collection('clusterDivisionMapping')
         .where('clusterVenueId', '==', fixtureData.venueId)
@@ -680,70 +704,113 @@ async function triggerLevelAdvancement(fixtureData: any, winners: string[]) {
 
           const teamRef = adminDb.collection('teams').doc(teamId);
           batch.update(teamRef, {
+            currentLevel: 'division',
             currentTournamentLevel: 'division',
             divisionVenueId: mapping.divisionVenueId,
             divisionVenueName: mapping.divisionVenueName,
             clusterQualified: true,
             clusterQualifiedAt: FieldValue.serverTimestamp(),
+            advancedToDivisionAt: FieldValue.serverTimestamp(),
             checkedIn: false,
             tournamentNumber: null,
-            matchDayStatus: 'pending'
+            matchDayStatus: 'pending',
+            updatedAt: FieldValue.serverTimestamp()
           });
         }
         
         await batch.commit();
-        console.log(`Teams ${winners.slice(0, 2).join(', ')} advanced to division level at ${mapping.divisionVenueName}`);
       }
     } else if (fixtureData.level === 'division' && winners.length >= 2) {
-      // Get team details first (outside batch)
-      const teamDataMap = {};
-      for (const teamId of winners.slice(0, 2)) {
-        const teamDoc = await adminDb.collection('teams').doc(teamId).get();
-        (teamDataMap as any)[teamId] = teamDoc.data();
-      }
+      console.log(`📍 Division level advancement: Looking for Isha Yoga Center finals venue`);
       
-      const batch = adminDb.batch();
+      // Find the Isha Yoga Center finals venue
+      const finalsVenueSnapshot = await adminDb
+        .collection('venues')
+        .where('type', '==', 'final')
+        .where('name', '==', 'Isha Yoga Center')
+        .where('isActive', '==', true)
+        .limit(1)
+        .get();
       
-      for (const teamId of winners.slice(0, 2)) {
-        const teamData = (teamDataMap as any)[teamId];
+      if (!finalsVenueSnapshot.empty) {
+        const finalsVenue = {
+          id: finalsVenueSnapshot.docs[0].id,
+          ...(finalsVenueSnapshot.docs[0].data() as any)
+        };
         
-        // Create new finals venue assignment
-        const assignmentRef = adminDb.collection('teamVenueAssignment').doc();
-        batch.set(assignmentRef, {
-          assignmentId: assignmentRef.id,
-          teamId: teamId,
-          teamName: teamData?.name || '',
-          eventId: fixtureData.eventId,
-          finalVenueId: 'isha_yoga_center',
-          finalVenueName: 'Isha Yoga Center',
-          assignmentLevel: 'final',
-          status: 'assigned',
-          assignedBy: 'system_auto',
-          assignedAt: FieldValue.serverTimestamp(),
-          advancedFrom: 'division',
-          sourceDivisionVenueId: fixtureData.venueId,
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp()
-        });
+        console.log(`✅ Found finals venue: ${finalsVenue.name} (${finalsVenue.id})`);
+        
+        // Get team details first (outside batch)
+        const teamDataMap = {};
+        for (const teamId of winners.slice(0, 2)) {
+          const teamDoc = await adminDb.collection('teams').doc(teamId).get();
+          (teamDataMap as any)[teamId] = teamDoc.data();
+        }
+        
+        const batch = adminDb.batch();
+        
+        for (const teamId of winners.slice(0, 2)) {
+          const teamData = (teamDataMap as any)[teamId];
+          
+          // Create new finals venue assignment
+          const assignmentRef = adminDb.collection('teamVenueAssignment').doc();
+          batch.set(assignmentRef, {
+            assignmentId: assignmentRef.id,
+            teamId: teamId,
+            teamName: teamData?.name || '',
+            eventId: fixtureData.eventId,
+            finalVenueId: finalsVenue.id,
+            finalVenueName: finalsVenue.name,
+            assignmentLevel: 'final',
+            status: 'assigned',
+            assignedBy: 'system_auto',
+            assignedAt: FieldValue.serverTimestamp(),
+            advancedFrom: 'division',
+            sourceDivisionVenueId: fixtureData.venueId,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp()
+          });
 
-        const teamRef = adminDb.collection('teams').doc(teamId);
-        batch.update(teamRef, {
-          currentTournamentLevel: 'final',
-          finalVenueId: 'isha_yoga_center',
-          finalVenueName: 'Isha Yoga Center',
-          divisionQualified: true,
-          divisionQualifiedAt: FieldValue.serverTimestamp(),
-          checkedIn: false,
-          tournamentNumber: null,
-          matchDayStatus: 'pending'
-        });
+          const teamRef = adminDb.collection('teams').doc(teamId);
+          batch.update(teamRef, {
+            currentLevel: 'final',
+            currentTournamentLevel: 'final',
+            finalVenueId: finalsVenue.id,
+            finalVenueName: finalsVenue.name,
+            divisionQualified: true,
+            divisionQualifiedAt: FieldValue.serverTimestamp(),
+            checkedIn: false,
+            tournamentNumber: null,
+            matchDayStatus: 'pending',
+            updatedAt: FieldValue.serverTimestamp()
+          });
+        }
+        
+        await batch.commit();
+        console.log(`🎉 Successfully advanced ${winners.length} teams from division to finals`);
+      } else {
+        console.log(`❌ Finals venue (Isha Yoga Center) not found!`);
       }
-      
-      await batch.commit();
-      console.log(`Teams ${winners.slice(0, 2).join(', ')} advanced to finals at Isha Yoga Center`);
+    }
+
+    // Also trigger the comprehensive advancement function to handle any missed teams
+    if (fixtureData.level === 'cluster') {
+      try {
+        const { advanceClusterWinnersToDivision } = await import('@/lib/actions/admin/teamVenueAssignment');
+        await advanceClusterWinnersToDivision();
+      } catch (error) {
+        // Error calling comprehensive advancement - this is supplementary so don't fail
+      }
+    } else if (fixtureData.level === 'division') {
+      try {
+        const { advanceDivisionWinnersToFinals } = await import('@/lib/actions/admin/teamVenueAssignment');
+        await advanceDivisionWinnersToFinals();
+      } catch (error) {
+        // Error calling comprehensive advancement - this is supplementary so don't fail
+      }
     }
   } catch (error) {
-    console.error('Error in level advancement:', error);
+    // Error in level advancement
   }
 }
 
@@ -799,7 +866,6 @@ export async function getFixtureDetails(fixtureId: string) {
       teams
     };
   } catch (error) {
-    console.error('Error getting fixture details:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -830,7 +896,6 @@ export async function getAvailableMatches(fixtureId: string) {
       teams: result.teams
     };
   } catch (error) {
-    console.error('Error getting available matches:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -868,7 +933,6 @@ export async function getMatchDetails(matchId: string) {
       match: serializedMatch
     };
   } catch (error) {
-    console.error('Error getting match details:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -915,7 +979,6 @@ export async function startMatch(matchId: string, volunteerId: string) {
     };
     
   } catch (error) {
-    console.error('Error starting match:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'

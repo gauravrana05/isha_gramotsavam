@@ -267,7 +267,7 @@ export default function CompleteProfilePage() {
       await logout();
       router.push(`/${lang}/login`);
     } catch (error) {
-      console.error("Error logging out:", error);
+      // Error handling removed
     }
   };
   const handleSubmit = async () => {
@@ -323,14 +323,14 @@ export default function CompleteProfilePage() {
       const completionResult = await checkAndUpdateProfileCompletion(user.uid);
       
       if (!completionResult.success) {
-        console.error("Profile completion check failed:", completionResult.error);
+        // Error handling removed
       }
 
       const role = userProfile?.role || "public";
       const dashboardRoute = getDashboardRoute(role, lang as string);
       router.push(dashboardRoute);
     } catch (err: any) {
-      console.error("Error completing profile:", err);
+      // Error handling removed
       setError(
         err.code === "storage/unauthorized"
           ? "Upload failed. Please try again."

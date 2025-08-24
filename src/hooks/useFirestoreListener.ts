@@ -82,7 +82,7 @@ export function useDocumentListener<T = DocumentData>(
           setError(null);
         },
         (firestoreError: FirestoreError) => {
-          console.error('Firestore document listener error:', firestoreError);
+          // Error handling removed
           setError(firestoreError);
           setLoading(false);
           
@@ -92,7 +92,7 @@ export function useDocumentListener<T = DocumentData>(
         }
       );
     } catch (err) {
-      console.error('Error setting up document listener:', err);
+      // Error handling removed
       setError(err as FirestoreError);
       setLoading(false);
     }
@@ -167,7 +167,7 @@ export function useCollectionListener<T = DocumentData>(
           setError(null);
         },
         (firestoreError: FirestoreError) => {
-          console.error('Firestore collection listener error:', firestoreError);
+          // Error handling removed
           setError(firestoreError);
           setLoading(false);
           
@@ -177,7 +177,7 @@ export function useCollectionListener<T = DocumentData>(
         }
       );
     } catch (err) {
-      console.error('Error setting up collection listener:', err);
+      // Error handling removed
       setError(err as FirestoreError);
       setLoading(false);
     }
@@ -317,7 +317,7 @@ export function useMultipleListeners() {
 //           }, delay);
 //         },
 //         (firestoreError: FirestoreError) => {
-//           console.error('Debounced Firestore listener error:', firestoreError);
+//           // Error handling removed
 //           setError(firestoreError);
 //           setLoading(false);
           
@@ -327,7 +327,7 @@ export function useMultipleListeners() {
 //         }
 //       );
 //     } catch (err) {
-//       console.error('Error setting up debounced listener:', err);
+//       // Error handling removed
 //       setError(err as FirestoreError);
 //       setLoading(false);
 //     }

@@ -61,7 +61,7 @@ export const auditLogService = {
         timestamp: serverTimestamp(),
       });
     } catch (error) {
-      console.error("Error creating player verification audit log:", error);
+      // Error creating player verification audit log
     }
   },
 
@@ -104,7 +104,7 @@ export const auditLogService = {
         timestamp: serverTimestamp(),
       });
     } catch (error) {
-      console.error("Error creating document upload audit log:", error);
+      // Error creating document upload audit log
     }
   },
 
@@ -145,7 +145,7 @@ export const auditLogService = {
         timestamp: serverTimestamp(),
       });
     } catch (error) {
-      console.error("Error creating on-ground verification audit log:", error);
+      // Error creating on-ground verification audit log
     }
   },
 
@@ -177,7 +177,7 @@ export const auditLogService = {
         timestamp: serverTimestamp(),
       });
     } catch (error) {
-      console.error("Error creating bulk verification audit log:", error);
+      // Error creating bulk verification audit log
     }
   },
 
@@ -209,7 +209,7 @@ export const auditLogService = {
         timestamp: serverTimestamp(),
       });
     } catch (error) {
-      console.error("Error creating team status change audit log:", error);
+      // Error creating team status change audit log
     }
   },
 };

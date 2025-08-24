@@ -18,7 +18,6 @@ export const metadata = {
   title: "Isha Gramotsavam",
   description: "Official app for Isha Gramotsavam - Sports tournament celebrating rural excellence",
   manifest: "/manifest.json",
-  themeColor: "#F28C38",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -30,12 +29,15 @@ export const metadata = {
   },
 };
 
+export const viewport = {
+  themeColor: "#F28C38",
+};
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  console.log("Rendering root layout.tsx");
   return (
     <html lang="en">
       <head>

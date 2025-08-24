@@ -239,7 +239,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   const sizeStyles = sizeConfig[size];
   
   if (!config) {
-    console.warn(`Unknown status: ${status}`);
+    // Warning removed
     return null;
   }
   

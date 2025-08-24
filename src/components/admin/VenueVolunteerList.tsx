@@ -39,7 +39,7 @@ export default function VenueVolunteerList({
         onAssignmentRemoved();
       }
     } catch (error) {
-      console.error('Failed to remove assignment:', error);
+      // Error handling removed
     }
   };
 

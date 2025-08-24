@@ -18,7 +18,7 @@ export const createUserProfile = beforeUserCreated(async (event) => {
     const phoneNumber = event.data?.phoneNumber;
 
     if (!uid) {
-      console.error("No UID found in event data for user creation.");
+      // Error handling removed
       // This error will prevent the user from being created.
       throw new HttpsError("invalid-argument", "No UID found in event data, cannot create user.");
     }
@@ -73,13 +73,13 @@ export const createUserProfile = beforeUserCreated(async (event) => {
     // Set the data in Firestore
     await admin.firestore().collection("users").doc(uid).create(userProfileData);
 
-    console.log(`Successfully created Firestore profile for new user: ${uid}`);
+    // Console log removed
     
     // Return an empty object to allow user creation to proceed
     return {};
 
   } catch (error: unknown) {
-    console.error("FATAL: Error creating user profile:", error);
+    // Error handling removed
     
     // To prevent the user account from being created in a broken state,
     // re-throw the error.
@@ -191,7 +191,7 @@ export const createPlayerUser = onCall(async (request: CallableRequest) => {
 
     } catch (error: any) {
       if (error.code !== 'auth/user-not-found') {
-        console.error("Error checking existing user:", error);
+        // Error handling removed
         throw new HttpsError("internal", "Error checking existing user");
       }
     }
@@ -246,7 +246,7 @@ export const createPlayerUser = onCall(async (request: CallableRequest) => {
     // Update the user profile with player-specific data
     await admin.firestore().collection("users").doc(userRecord.uid).set(userProfileData, { merge: true });
 
-    console.log(`Created Firebase user for player: ${userRecord.uid}`);
+    // Console log removed
 
     return {
       success: true,
@@ -256,7 +256,7 @@ export const createPlayerUser = onCall(async (request: CallableRequest) => {
     };
 
   } catch (error) {
-    console.error("Error creating player user:", error);
+    // Error handling removed
     
     if (error instanceof HttpsError) {
       throw error;

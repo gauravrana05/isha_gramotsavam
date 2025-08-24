@@ -57,7 +57,7 @@ export const pincodeService = {
         state: data.state || "",
       };
     } catch (error) {
-      console.error("Error fetching pincode data:", error);
+      // Error fetching pincode data
       throw new Error("Failed to fetch address data");
     }
   },
@@ -78,7 +78,7 @@ export const pincodeService = {
       
       return data.acceptedDistricts;
     } catch (error) {
-      console.error("Error fetching districts:", error);
+      // Error fetching districts
       throw new Error("Failed to fetch districts");
     }
   },
@@ -104,7 +104,7 @@ export const pincodeService = {
         panchayats: data.acceptedPanchayats || [],
       };
     } catch (error) {
-      console.error("Error fetching taluks and panchayats:", error);
+      // Error fetching taluks and panchayats
       throw new Error("Failed to fetch taluks and panchayats");
     }
   },
@@ -127,7 +127,7 @@ export const pincodeService = {
       
       return data.acceptedPanchayats;
     } catch (error) {
-      console.error("Error fetching panchayats:", error);
+      // Error fetching panchayats
       throw new Error("Failed to fetch panchayats");
     }
   },

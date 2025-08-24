@@ -239,7 +239,7 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
         updateDocumentState(type as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack', { url, error: null });
       }
     } catch (error) {
-      console.error('Error refreshing documents:', error);
+      // Error handling removed
     }
   }, [user, updateDocumentState]);
 

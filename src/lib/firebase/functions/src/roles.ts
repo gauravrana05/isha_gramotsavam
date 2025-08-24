@@ -112,7 +112,7 @@ export const assignEventRole = onCall(async (request: CallableRequest) => {
       }
     });
 
-    console.log(`Role ${role} assigned to user ${userId} for event ${eventId}`);
+    // Console log removed
 
     return {
       success: true,
@@ -121,7 +121,7 @@ export const assignEventRole = onCall(async (request: CallableRequest) => {
     };
 
   } catch (error) {
-    console.error("Error assigning event role:", error);
+    // Error handling removed
     throw new HttpsError("internal", "Failed to assign role");
   }
 });
@@ -180,7 +180,7 @@ export const promoteToPlayer = onCall(async (request: CallableRequest) => {
       }
     );
 
-    console.log(`User ${userId} promoted to player for team ${teamId}`);
+    // Console log removed
 
     return {
       success: true,
@@ -188,7 +188,7 @@ export const promoteToPlayer = onCall(async (request: CallableRequest) => {
     };
 
   } catch (error) {
-    console.error("Error promoting to player:", error);
+    // Error handling removed
     throw new HttpsError("internal", "Failed to promote to player");
   }
 });
@@ -238,7 +238,7 @@ export const promoteToTeamCaptain = onCall(async (request: CallableRequest) => {
     };
 
   } catch (error) {
-    console.error("Error promoting to team captain:", error);
+    // Error handling removed
     throw new HttpsError("internal", "Failed to promote to team captain");
   }
 });
@@ -263,7 +263,7 @@ export const getCurrentEventRole = onCall( { region: "us-central1" }, async (req
     };
 
   } catch (error) {
-    console.error("Error getting current event role:", error);
+    // Error handling removed
     throw new HttpsError("internal", "Failed to get current role");
   }
 });
@@ -316,7 +316,7 @@ export const expireEventRoles = onCall(async (request: CallableRequest) => {
 
     await batch.commit();
 
-    console.log(`Expired ${expiredCount} event roles`);
+    // Console log removed
 
     return {
       success: true,
@@ -325,7 +325,7 @@ export const expireEventRoles = onCall(async (request: CallableRequest) => {
     };
 
   } catch (error) {
-    console.error("Error expiring event roles:", error);
+    // Error handling removed
     throw new HttpsError("internal", "Failed to expire roles");
   }
 });
@@ -337,7 +337,7 @@ export const onPlayerAdded = onDocumentCreated("teams/{teamId}/players/{playerId
   const playerId = event.params.playerId;
 
   if (!playerData || !playerData.userId) {
-    console.log("Player data or userId missing");
+    // Console log removed
     return;
   }
 
@@ -345,7 +345,7 @@ export const onPlayerAdded = onDocumentCreated("teams/{teamId}/players/{playerId
     // Get team data to determine event
     const teamDoc = await admin.firestore().collection("teams").doc(teamId).get();
     if (!teamDoc.exists) {
-      console.log("Team not found for player promotion");
+      // Console log removed
       return;
     }
 
@@ -354,7 +354,7 @@ export const onPlayerAdded = onDocumentCreated("teams/{teamId}/players/{playerId
 
     // Don't promote if user is already the team captain
     if (teamData?.captainId === playerData.userId) {
-      console.log(`User ${playerData.userId} is already captain of team ${teamId}, skipping player promotion`);
+      // Console log removed
       return;
     }
 
@@ -373,15 +373,15 @@ export const onPlayerAdded = onDocumentCreated("teams/{teamId}/players/{playerId
       }
     );
 
-    console.log(`Auto-promoted user ${playerData.userId} to player for team ${teamId}`);
+    // Console log removed
 
     // If the player has a phone number but no userId (new user), we might need to handle that separately
     if (!playerData.userId && playerData.phone) {
-      console.log(`Player ${playerId} added with phone ${playerData.phone} but no userId - will promote when they register`);
+      // Console log removed
     }
 
   } catch (error) {
-    console.error("Error auto-promoting player:", error);
+    // Error handling removed
   }
 });
 
@@ -396,7 +396,7 @@ export const onTeamCreated = onDocumentCreated(
     const teamId = event.params.teamId;
 
     if (!teamData || !teamData.captainId) {
-      console.log("Team data or captainId missing");
+      // Console log removed
       return;
     }
 
@@ -420,7 +420,7 @@ export const onTeamCreated = onDocumentCreated(
         `Auto-promoted user ${teamData.captainId} to captain for team ${teamId}`
       );
     } catch (error) {
-      console.error("Error auto-promoting team captain:", error);
+      // Error handling removed
     }
   }
 );
@@ -451,7 +451,7 @@ async function getCurrentUserRole(userId: string, eventId: string): Promise<stri
 
     return roleData.role || 'public';
   } catch (error) {
-    console.error("Error getting user role:", error);
+    // Error handling removed
     return 'public';
   }
 }

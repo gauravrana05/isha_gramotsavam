@@ -72,7 +72,6 @@ export async function getTeamsPendingVerification(volunteerId: string) {
     };
 
   } catch (error) {
-    console.error("Error getting teams pending verification:", error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to get verification queue"
@@ -134,7 +133,6 @@ export async function getTeamForVerification(teamId: string, volunteerId: string
     };
 
   } catch (error) {
-    console.error("Error getting team for verification:", error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to get team details"

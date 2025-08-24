@@ -43,14 +43,14 @@ async function getFixtureDetails(fixtureId: string) {
     
     return { success: true, fixture: serializedFixture };
   } catch (error) {
-    console.error('Error fetching fixture:', error);
+    // Error handling removed
     return { success: false, error: 'Failed to fetch fixture' };
   }
 }
 
 async function getTeamDetails(teamIds: string[]) {
   try {
-    console.log(`Batch querying ${teamIds.length} teams for fixture view...`);
+    // Console log removed
     const startTime = Date.now();
     
     const teams: Record<string, any> = {};
@@ -81,11 +81,10 @@ async function getTeamDetails(teamIds: string[]) {
     }
     
     const endTime = Date.now();
-    console.log(`Loaded ${Object.keys(teams).length} teams for fixture view (took ${endTime - startTime}ms)`);
     
     return teams;
   } catch (error) {
-    console.error('Error fetching team details:', error);
+    // Error handling removed
     return {};
   }
 }
@@ -98,7 +97,7 @@ async function getFixtureMatches(fixtureId: string) {
     
     return serializeFirestoreDocs(matchesSnapshot.docs);
   } catch (error) {
-    console.error('Error fetching matches:', error);
+    // Error handling removed
     return [];
   }
 }
@@ -106,7 +105,7 @@ async function getFixtureMatches(fixtureId: string) {
 export default async function FixtureDetailPage({ params }: PageProps) {
   const { venueId, fixtureId } = await params;
   
-  console.log(`Loading fixture detail page for: ${fixtureId}`);
+  // Console log removed
   const pageStartTime = Date.now();
   
   // Load fixture details and standalone matches in parallel
@@ -147,7 +146,6 @@ export default async function FixtureDetailPage({ params }: PageProps) {
   const uniqueTeamIds = Array.from(new Set(allTeamIds));
   const teams = await getTeamDetails(uniqueTeamIds);
   const pageEndTime = Date.now();
-  console.log(`Fixture detail page loaded completely (took ${pageEndTime - pageStartTime}ms)`);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':

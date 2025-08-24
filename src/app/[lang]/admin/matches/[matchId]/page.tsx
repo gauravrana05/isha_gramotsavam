@@ -45,7 +45,7 @@ async function getMatchDetails(matchId: string) {
     
     return { success: true, match: serializedMatch };
   } catch (error) {
-    console.error('Error fetching match:', error);
+    // Error handling removed
     return { success: false, error: 'Failed to fetch match' };
   }
 }
@@ -66,7 +66,7 @@ async function getFixtureInfo(fixtureId: string) {
       status: fixtureData?.status
     };
   } catch (error) {
-    console.error('Error fetching fixture:', error);
+    // Error handling removed
     return null;
   }
 }

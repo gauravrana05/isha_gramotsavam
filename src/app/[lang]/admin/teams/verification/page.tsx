@@ -136,7 +136,7 @@ export default function AdminTeamVerificationPage() {
       setHasMore(result.pagination?.hasMore ?? false);
 
     } catch (err: any) {
-      console.error('Error loading verification queue:', err);
+      // Error handling removed
       setError(err.message || 'Failed to load verification queue');
     } finally {
       setLoading(false);
@@ -173,7 +173,7 @@ export default function AdminTeamVerificationPage() {
       loadVerificationQueue();
       
     } catch (err: any) {
-      console.error('Error processing bulk action:', err);
+      // Error handling removed
       setError(err.message || 'Failed to process bulk action');
     } finally {
       setBulkProcessing(false);

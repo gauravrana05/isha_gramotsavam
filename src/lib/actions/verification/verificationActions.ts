@@ -132,7 +132,7 @@
 //       });
 //     });
 
-//     console.log(`Team ${teamId} ${status} by ${verifiedBy}`);
+//     // Console log removed
 
 //     return {
 //       success: true,
@@ -140,7 +140,7 @@
 //     };
 
 //   } catch (error) {
-//     console.error("Error verifying team:", error);
+//     // Error handling removed
     
 //     if (error instanceof z.ZodError) {
 //       return { 
@@ -202,7 +202,7 @@
 //     // Update team verification record (outside transaction to avoid conflicts)
 //     await updateTeamVerificationRecord(teamId);
 
-//     console.log(`Player ${playerId} in team ${teamId} ${status} by ${volunteerId}`);
+//     // Console log removed
 
 //     return {
 //       success: true,
@@ -210,7 +210,7 @@
 //     };
 
 //   } catch (error) {
-//     console.error("Error verifying player:", error);
+//     // Error handling removed
     
 //     if (error instanceof z.ZodError) {
 //       return { 
@@ -270,7 +270,7 @@
 //     };
 
 //   } catch (error) {
-//     console.error("Error getting teams pending verification:", error);
+//     // Error handling removed
 //     return { 
 //       success: false, 
 //       error: error instanceof Error ? error.message : "Failed to get verification queue"
@@ -350,7 +350,7 @@
 //     };
 
 //   } catch (error) {
-//     console.error("Error getting team for verification:", error);
+//     // Error handling removed
 //     return { 
 //       success: false, 
 //       error: error instanceof Error ? error.message : "Failed to get team details"

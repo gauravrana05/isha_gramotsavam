@@ -143,7 +143,7 @@ export default function ClusterDivisionMappingTable({ mappings, onDelete, onEdit
         isDeleting: false
       });
     } catch (error) {
-      console.error('Failed to delete mapping:', error);
+      // Error handling removed
       setDeleteModal(prev => ({ ...prev, isDeleting: false }));
     }
   };

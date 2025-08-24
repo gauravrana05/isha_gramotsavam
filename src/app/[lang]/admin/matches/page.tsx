@@ -117,7 +117,7 @@ export default function AdminMatchesPage() {
       setMatches(matchesData);
       
     } catch (err: any) {
-      console.error('Error loading matches:', err);
+      // Error handling removed
       setError('Failed to load matches. Please check your permissions.');
     } finally {
       setLoading(false);
@@ -133,7 +133,7 @@ export default function AdminMatchesPage() {
       }));
       setVenues(venuesData);
     } catch (error) {
-      console.error('Error loading venues:', error);
+      // Error handling removed
     }
   };
 

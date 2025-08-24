@@ -42,7 +42,6 @@ class SportsService {
         sportId: doc.id
       })) as Sport[];
     } catch (error) {
-      console.error('Error fetching active sports:', error);
       throw new Error('Failed to fetch sports');
     }
   }
@@ -63,7 +62,6 @@ class SportsService {
         sportId: doc.id
       })) as Sport[];
     } catch (error) {
-      console.error('Error fetching all sports:', error);
       throw new Error('Failed to fetch sports');
     }
   }
@@ -84,7 +82,6 @@ class SportsService {
         sportId: sportDoc.id
       } as Sport;
     } catch (error) {
-      console.error(`Error fetching sport ${sportId}:`, error);
       throw new Error(`Failed to fetch sport: ${sportId}`);
     }
   }
@@ -104,7 +101,6 @@ class SportsService {
       const docRef = await addDoc(collection(db, this.COLLECTION_NAME), docData);
       return docRef.id;
     } catch (error) {
-      console.error('Error creating sport:', error);
       throw new Error('Failed to create sport');
     }
   }
@@ -127,7 +123,6 @@ class SportsService {
         updatedAt: serverTimestamp()
       });
     } catch (error) {
-      console.error(`Error updating sport ${sportId}:`, error);
       throw new Error(`Failed to update sport: ${sportId}`);
     }
   }
@@ -141,7 +136,6 @@ class SportsService {
         isActive: false
       });
     } catch (error) {
-      console.error(`Error deleting sport ${sportId}:`, error);
       throw new Error(`Failed to delete sport: ${sportId}`);
     }
   }
@@ -162,7 +156,6 @@ class SportsService {
         genderCategory: sport.genderCategories?.[0] || 'mixed'
       };
     } catch (error) {
-      console.error(`Error getting legacy config for ${sportId}:`, error);
       return null;
     }
   }
@@ -180,7 +173,6 @@ class SportsService {
 
       });
     } catch (error) {
-      console.error(`Error fetching sports for gender ${gender}:`, error);
       throw new Error('Failed to fetch sports by gender');
     }
   }
@@ -219,7 +211,6 @@ class SportsService {
         reasons
       };
     } catch (error) {
-      console.error(`Error checking eligibility for ${sportId}:`, error);
       return { eligible: false, reasons: ['Error checking eligibility'] };
     }
   }
@@ -244,7 +235,6 @@ class SportsService {
         genderCategories: sport.genderCategories
       };
     } catch (error) {
-      console.error(`Error getting sport config for ${sportId}:`, error);
       return null;
     }
   }
@@ -298,7 +288,6 @@ class SportsService {
         };
       });
     } catch (error) {
-      console.error('Error fetching sports for preview:', error);
       throw new Error('Failed to fetch sports for preview');
     }
   }
@@ -321,9 +310,7 @@ class SportsService {
       }
 
       await batch.commit();
-      console.log('Default sports initialized successfully');
     } catch (error) {
-      console.error('Error initializing default sports:', error);
       throw new Error('Failed to initialize default sports');
     }
   }

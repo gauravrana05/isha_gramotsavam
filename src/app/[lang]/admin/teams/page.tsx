@@ -51,7 +51,13 @@ interface TeamData {
   status: string;
   createdAt: any;
   eventId: string;
-  clusterVenue?: string;
+  clusterVenue?: string; // Keep for backward compatibility
+  currentVenueAssignment?: {
+    venueId: string;
+    venueName: string;
+    assignmentLevel: string;
+    assignedAt: string | null;
+  };
 }
 
 export default function AdminTeamsPage() {
@@ -166,7 +172,7 @@ export default function AdminTeamsPage() {
         setStats(result.stats);
       }
     } catch (err: any) {
-      console.error('Error loading team stats:', err);
+      // Error handling removed
     }
   };
 
@@ -240,14 +246,23 @@ export default function AdminTeamsPage() {
     {
       key: 'venue',
       header: 'Venue',
-      accessor: 'clusterVenue',
+      accessor: (team) => team.currentVenueAssignment?.venueName || team.clusterVenue || '',
       priority: 'low',
-      width: '140px',
-      render: (_, team) => (
-        <div className="text-sm text-gray-500">
-          {team.clusterVenue || <span className="text-gray-400 italic">Not assigned</span>}
-        </div>
-      ),
+      width: '180px',
+      render: (_, team) => {
+        const venue = team.currentVenueAssignment;
+        if (!venue) {
+          return (
+            <div className="text-sm text-gray-400 italic">Not assigned</div>
+          );
+        }
+        return (
+          <div>
+            <div className="text-sm text-gray-900">{venue.venueName}</div>
+            <div className="text-xs text-gray-500 capitalize">{venue.assignmentLevel} level</div>
+          </div>
+        );
+      },
     },
     {
       key: 'players',

@@ -22,6 +22,12 @@ export interface LightweightTeam {
   currentPlayers: number;
   maxPlayers: number;
   genderCategory: string;
+  currentVenueAssignment?: {
+    venueId: string;
+    venueName: string;
+    assignmentLevel: string;
+    assignedAt: string | null;
+  };
 }
 
 export interface LightweightPlayer {
@@ -87,7 +93,8 @@ export function optimizeTeamDocument(teamDoc: any): LightweightTeam {
     district: teamDoc.district || '',
     currentPlayers: teamDoc.currentPlayers || 0,
     maxPlayers: teamDoc.maxPlayers || 6,
-    genderCategory: teamDoc.genderCategory || 'mixed'
+    genderCategory: teamDoc.genderCategory || 'mixed',
+    currentVenueAssignment: teamDoc.currentVenueAssignment || null
   };
 }
 
@@ -169,7 +176,7 @@ export function serializeTimestamp(timestamp: any): string | null {
       return new Date(timestamp).toISOString();
     }
   } catch (error) {
-    console.error('Error serializing timestamp:', error);
+    // Error handling removed
   }
   
   return null;

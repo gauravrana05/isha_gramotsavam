@@ -64,7 +64,7 @@ export default function VenueMediaPage() {
         setAvailableFixtures(fixtures);
         setAvailableMatches(matches);
       } catch (error) {
-        console.error('Error loading context data:', error);
+        // Error handling removed
       }
     };
 

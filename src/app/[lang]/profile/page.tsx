@@ -388,13 +388,13 @@ export default function ProfilePage() {
       const completionResult = await checkAndUpdateProfileCompletion(user.uid);
       
       if (!completionResult.success) {
-        console.error("Profile completion check failed:", completionResult.error);
+        // Error handling removed
       }
 
       toggleEdit(section);
       setSuccess("Profile updated successfully!");
     } catch (error) {
-      console.error("Error updating profile:", error);
+      // Error handling removed
       setError("Failed to update profile. Please try again.");
     } finally {
       setFormLoading(false);
@@ -406,7 +406,7 @@ export default function ProfilePage() {
       await logout();
       router.push(`/${lang}/login`);
     } catch (error) {
-      console.error("Error logging out:", error);
+      // Error handling removed
     }
   };
 

@@ -2,39 +2,29 @@
 
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { pincodeService } from '@/lib/services/pincodeService';
 
-// District data organized by state
-const DISTRICTS_BY_STATE = {
-  'Tamil Nadu': [
-    'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore', 'Dharmapuri', 
-    'Dindigul', 'Erode', 'Kallakurichi', 'Kancheepuram', 'Kanyakumari', 'Karur', 
-    'Krishnagiri', 'Madurai', 'Mayiladuthurai', 'Nagapattinam', 'Namakkal', 'Nilgiris', 
-    'Perambalur', 'Pudukkottai', 'Ramanathapuram', 'Ranipet', 'Salem', 'Sivaganga', 
-    'Tenkasi', 'Thanjavur', 'Theni', 'Tiruchirappalli', 'Tirunelveli', 'Tirupattur', 
-    'Tiruppur', 'Tiruvallur', 'Tiruvannamalai', 'Tiruvarur', 'Tuticorin', 'Vellore', 
-    'Viluppuram', 'Virudhunagar'
-  ],
-  'Andhra Pradesh': [
-    'Anantapur', 'Chittoor', 'East Godavari', 'Guntur', 'Kadapa', 'Krishna', 
-    'Kurnool', 'Nellore', 'Srikakulam', 'Visakhapatnam', 'West Godavari'
-  ],
-  'Telangana': [
-    'Adilabad', 'Bhadradri Kothagudem', 'Hyderabad', 'Jagtial', 'Jangaon', 
-    'Jayashankar Bhupalpally', 'Jogulamba Gadwal', 'Kamareddy', 'Karimnagar', 
-    'Khammam', 'Komaram Bheem Asifabad', 'Mahabubabad', 'Mahabubnagar', 
-    'Mancherial', 'Medak', 'Medchal-Malkajgiri', 'Mulugu', 'Nagarkurnool', 
-    'Nalgonda', 'Narayanpet', 'Nirmal', 'Nizamabad', 'Peddapalli', 
-    'Rajanna Sircilla', 'Rangareddy', 'Sangareddy', 'Siddipet', 'Suryapet', 
-    'Vikarabad', 'Wanaparthy', 'Warangal', 'Yadadri Bhuvanagiri', 'Hanumakonda'
-  ],
-  'Odisha': [
-    'Angul', 'Balangir', 'Balasore', 'Bargarh', 'Bhadrak', 'Boudh', 'Cuttack', 
-    'Debagarh', 'Dhenkanal', 'Gajapati', 'Ganjam', 'Jagatsinghpur', 'Jajpur', 
-    'Jharsuguda', 'Kalahandi', 'Kandhamal', 'Kendrapara', 'Kendujhar', 'Khordha', 
-    'Koraput', 'Malkangiri', 'Mayurbhanj', 'Nabarangpur', 'Nayagarh', 'Nuapada', 
-    'Puri', 'Rayagada', 'Sambalpur', 'Sonepur', 'Sundargarh'
-  ]
-};
+// States to process - will fetch districts dynamically from API
+const STATES = ['Tamil Nadu', 'Andhra Pradesh', 'Telangana', 'Odisha'];
+
+// For testing - limit to first few districts of first state
+const IS_TEST_MODE = process.env.NODE_ENV === 'test' || process.argv.includes('--test');
+
+// Convert text to title case while preserving content in parentheses
+function toTitleCasePreservingParens(text: string): string {
+  return text.replace(/\w+(\([^)]*\))?/g, (match) => {
+    const parenIndex = match.indexOf('(');
+    if (parenIndex === -1) {
+      // No parentheses, convert whole word to title case
+      return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+    } else {
+      // Has parentheses, convert only the part before parentheses
+      const beforeParens = match.substring(0, parenIndex);
+      const parensContent = match.substring(parenIndex);
+      return beforeParens.charAt(0).toUpperCase() + beforeParens.slice(1).toLowerCase() + parensContent;
+    }
+  });
+}
 
 // Venue name templates
 const VENUE_PREFIXES = ['District', 'Central', 'Municipal', 'Government'];
@@ -167,32 +157,39 @@ async function getSportsData() {
       }
     };
   } catch (error) {
-    console.error('Error fetching sports data:', error);
+    // Error handling removed
     throw error;
   }
 }
 
 export async function createAllClusterVenues() {
   try {
-    console.log('Starting creation of all cluster venues...');
+    // Console log removed
     
     // First fetch sports data
-    console.log('Fetching sports data from collection...');
+    // Console log removed
     const sportsData = await getSportsData();
-    console.log('Sports data fetched:', sportsData);
+    // Console log removed
     
     const batch = adminDb.batch();
     const venueIds: string[] = [];
     let venueCount = 0;
 
     // Process each state and its districts
-    for (const [state, districts] of Object.entries(DISTRICTS_BY_STATE)) {
-      console.log(`Processing ${state} with ${districts.length} districts...`);
+    for (const state of STATES) {
+      // Console log removed
       
-      for (const district of districts) {
-        const venueName = generateVenueName(district);
-        const shortName = generateShortName(venueName, district);
-        const coordinates = generateCoordinatesForDistrict(district, state);
+      try {
+        const districts = await pincodeService.getDistrictsByState(state);
+        // Console log removed
+        
+        for (const district of districts) {
+        // API returns districts in UPPERCASE, convert to title case for names and addresses
+        // Keep original UPPERCASE for district field
+        const districtTitleCase = toTitleCasePreservingParens(district);
+        const venueName = generateVenueName(districtTitleCase);
+        const shortName = generateShortName(venueName, districtTitleCase);
+        const coordinates = generateCoordinatesForDistrict(districtTitleCase, state);
         const pincode = generatePincode(state);
         const contactName = generateContactName();
         const contactPhone = generatePhoneNumber(state);
@@ -209,9 +206,9 @@ export async function createAllClusterVenues() {
           type: 'cluster',
           
           // Location
-          address: `Sports Complex Road, ${district}, ${state}`,
+          address: `Sports Complex Road, ${districtTitleCase}, ${state}`,
           pincode: pincode,
-          district: district,
+          district: district, // Store original UPPERCASE district from API
           state: state,
           coordinates: coordinates,
           
@@ -255,8 +252,13 @@ export async function createAllClusterVenues() {
         // Commit batch every 500 operations (Firestore limit)
         if (venueCount % 500 === 0) {
           await batch.commit();
-          console.log(`Committed batch of 500 venues. Total processed: ${venueCount}`);
+          // Console log removed
         }
+      }
+      } catch (error) {
+        // Error handling removed
+        // Continue with next state instead of failing completely
+        continue;
       }
     }
 
@@ -265,16 +267,16 @@ export async function createAllClusterVenues() {
       await batch.commit();
     }
 
-    console.log(`Successfully created ${venueCount} cluster venues`);
+    // Console log removed
     return {
       success: true,
-      message: `Created ${venueCount} cluster venues across ${Object.keys(DISTRICTS_BY_STATE).length} states`,
+      message: `Created ${venueCount} cluster venues across ${STATES.length} states`,
       venueCount,
       venueIds
     };
 
   } catch (error) {
-    console.error('Error creating cluster venues:', error);
+    // Error handling removed
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -295,7 +297,7 @@ export async function getClusterVenuesCount() {
     };
 
   } catch (error) {
-    console.error('Error getting cluster venues count:', error);
+    // Error handling removed
     return {
       success: false,
       count: 0,
@@ -306,7 +308,7 @@ export async function getClusterVenuesCount() {
 
 export async function deleteAllClusterVenues() {
   try {
-    console.log('Deleting all cluster venues...');
+    // Console log removed
     
     // Get all cluster venues for the event
     const venuesSnapshot = await adminDb.collection('venues')
@@ -341,7 +343,7 @@ export async function deleteAllClusterVenues() {
       console.log(`Deleted batch ${Math.floor(i / batchSize) + 1} (${batchVenueIds.length} venues)`);
     }
 
-    console.log(`Successfully deleted ${deletedCount} cluster venues`);
+    // Console log removed
     return {
       success: true,
       message: `Deleted ${deletedCount} cluster venues`,
@@ -349,7 +351,7 @@ export async function deleteAllClusterVenues() {
     };
 
   } catch (error) {
-    console.error('Error deleting cluster venues:', error);
+    // Error handling removed
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'

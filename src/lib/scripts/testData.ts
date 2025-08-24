@@ -5,7 +5,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 export async function createTestTeams(venueId: string, count: number = 25) {
   try {
-    console.log(`Creating ${count} test teams for venue ${venueId}...`);
+    // Console log removed
     
     const batch = adminDb.batch();
     const teamIds: string[] = [];
@@ -64,6 +64,30 @@ export async function createTestTeams(venueId: string, count: number = 25) {
       
       batch.set(teamRef, teamData);
       
+      // Create test players for this team
+      for (let j = 1; j <= 11; j++) {
+        const playerRef = adminDb.collection('teams').doc(teamId).collection('players').doc();
+        const playerData = {
+          userId: `test_user_${i}_${j}`,
+          firstName: `Player${j}`,
+          lastName: `Team${i}`,
+          email: `player${j}.team${i}@test.com`,
+          phone: `+919000${i.toString().padStart(2, '0')}${j.toString().padStart(2, '0')}`,
+          position: j <= 11 ? 'main' : 'substitute',
+          jerseyNumber: j,
+          addedAt: FieldValue.serverTimestamp(),
+          addedBy: `test_captain_${i}`,
+          verificationStatus: 'verified',
+          verifiedAt: FieldValue.serverTimestamp(),
+          verifiedBy: 'test_admin',
+          isDeleted: false,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        };
+        
+        batch.set(playerRef, playerData);
+      }
+      
       // Create team venue assignment
       const assignmentRef = adminDb.collection('teamVenueAssignment').doc(teamId);
       const assignmentData = {
@@ -94,7 +118,7 @@ export async function createTestTeams(venueId: string, count: number = 25) {
     
     await batch.commit();
     
-    console.log(`Successfully created ${count} test teams`);
+    // Console log removed
     return {
       success: true,
       message: `Created ${count} test teams`,
@@ -102,7 +126,7 @@ export async function createTestTeams(venueId: string, count: number = 25) {
     };
     
   } catch (error) {
-    console.error('Error creating test teams:', error);
+    // Error handling removed
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -112,7 +136,7 @@ export async function createTestTeams(venueId: string, count: number = 25) {
 
 export async function deleteTestTeams(venueId: string) {
   try {
-    console.log(`Deleting test teams for venue ${venueId}...`);
+    // Console log removed
     
     // Get all teams assigned to this venue that were created by test system
     const assignmentsSnapshot = await adminDb.collection('teamVenueAssignment')
@@ -121,7 +145,7 @@ export async function deleteTestTeams(venueId: string) {
       .get();
     
     if (assignmentsSnapshot.empty) {
-      console.log('No test teams found to delete');
+      // Console log removed
       return {
         success: true,
         message: 'No test teams found to delete',
@@ -130,7 +154,7 @@ export async function deleteTestTeams(venueId: string) {
     }
     
     const teamIds = assignmentsSnapshot.docs.map(doc => doc.data().teamId);
-    console.log(`Found ${teamIds.length} test teams to delete`);
+    // Console log removed
     
     // Delete in batches (Firestore limit is 500 operations per batch)
     const batchSize = 500;
@@ -153,7 +177,7 @@ export async function deleteTestTeams(venueId: string) {
       }
       
       await batch.commit();
-      console.log(`Deleted batch ${Math.floor(i / batchSize) + 1} (${batchTeamIds.length} teams)`);
+      // Deleted batch with teams
     }
     
     // Also clean up any fixtures created with test teams
@@ -162,7 +186,7 @@ export async function deleteTestTeams(venueId: string) {
     // Clean up any test matches
     await deleteTestMatches(venueId);
     
-    console.log(`Successfully deleted ${deletedCount} test teams`);
+    // Console log removed
     return {
       success: true,
       message: `Deleted ${deletedCount} test teams and related data`,
@@ -170,7 +194,7 @@ export async function deleteTestTeams(venueId: string) {
     };
     
   } catch (error) {
-    console.error('Error deleting test teams:', error);
+    // Error handling removed
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -193,11 +217,11 @@ async function deleteTestFixtures(venueId: string) {
       });
       
       await batch.commit();
-      console.log(`Deleted ${fixturesSnapshot.docs.length} test fixtures`);
+      // Console log removed
     }
     
   } catch (error) {
-    console.error('Error deleting test fixtures:', error);
+    // Error handling removed
   }
 }
 
@@ -216,11 +240,163 @@ async function deleteTestMatches(venueId: string) {
       });
       
       await batch.commit();
-      console.log(`Deleted ${matchesSnapshot.docs.length} test matches`);
+      // Console log removed
     }
     
   } catch (error) {
-    console.error('Error deleting test matches:', error);
+    // Error handling removed
+  }
+}
+
+export async function createTestFixtures(venueId: string) {
+  try {
+    // Get teams assigned to this venue
+    const assignmentsSnapshot = await adminDb.collection('teamVenueAssignment')
+      .where('clusterVenueId', '==', venueId)
+      .where('assignedBy', '==', 'test_system')
+      .get();
+    
+    if (assignmentsSnapshot.empty) {
+      return {
+        success: false,
+        error: 'No test teams found for this venue. Create teams first.'
+      };
+    }
+    
+    const teams = assignmentsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        teamId: data.teamId,
+        teamName: `Test Team ${data.teamId.slice(-2)}`
+      };
+    });
+    
+    const batch = adminDb.batch();
+    
+    // Create a volleyball tournament fixture
+    const fixtureRef = adminDb.collection('fixtures').doc();
+    const fixtureData = {
+      name: 'Test Volleyball Tournament',
+      eventId: 'isha_gramotsavam_2025',
+      sportId: 'volleyball',
+      sportName: 'Volleyball',
+      genderCategory: 'men',
+      venueId: venueId,
+      level: 'cluster',
+      status: 'in_progress',
+      assignedTeams: teams,
+      bracket: {
+        matches: [],
+        winners: []
+      },
+      maxTeams: teams.length,
+      currentTeams: teams.length,
+      createdBy: 'test_system',
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    };
+    
+    batch.set(fixtureRef, fixtureData);
+    await batch.commit();
+    
+    return {
+      success: true,
+      message: 'Test fixture created successfully',
+      fixtureId: fixtureRef.id
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+
+export async function createTestMatches(venueId: string) {
+  try {
+    // Get fixture for this venue
+    const fixturesSnapshot = await adminDb.collection('fixtures')
+      .where('venueId', '==', venueId)
+      .where('createdBy', '==', 'test_system')
+      .get();
+    
+    if (fixturesSnapshot.empty) {
+      return {
+        success: false,
+        error: 'No test fixtures found. Create fixtures first.'
+      };
+    }
+    
+    const fixture = fixturesSnapshot.docs[0];
+    const fixtureData = fixture.data();
+    const teams = fixtureData.assignedTeams || [];
+    
+    if (teams.length < 2) {
+      return {
+        success: false,
+        error: 'Need at least 2 teams to create matches'
+      };
+    }
+    
+    const batch = adminDb.batch();
+    const matchesToCreate = Math.min(5, Math.floor(teams.length / 2)); // Create up to 5 test matches
+    
+    for (let i = 0; i < matchesToCreate; i++) {
+      const team1 = teams[i * 2];
+      const team2 = teams[i * 2 + 1];
+      
+      const matchRef = adminDb.collection('matches').doc();
+      const matchData = {
+        fixtureId: fixture.id,
+        eventId: 'isha_gramotsavam_2025',
+        sportId: 'volleyball',
+        sportName: 'Volleyball',
+        genderCategory: 'men',
+        venueId: venueId,
+        roundName: 'Round 1',
+        matchNumber: i + 1,
+        status: i < 2 ? 'completed' : i < 3 ? 'in_progress' : 'ready',
+        team1: {
+          teamId: team1.teamId,
+          teamName: team1.teamName,
+          tournamentNumber: (i * 2) + 1
+        },
+        team2: {
+          teamId: team2.teamId,
+          teamName: team2.teamName,
+          tournamentNumber: (i * 2) + 2
+        },
+        result: i < 2 ? {
+          winnerName: Math.random() > 0.5 ? team1.teamName : team2.teamName,
+          winnerTeamId: Math.random() > 0.5 ? team1.teamId : team2.teamId,
+          score: {
+            team1Score: Math.floor(Math.random() * 3) + 1,
+            team2Score: Math.floor(Math.random() * 3) + 1
+          }
+        } : null,
+        scheduledTime: FieldValue.serverTimestamp(),
+        createdBy: 'test_system',
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      };
+      
+      batch.set(matchRef, matchData);
+    }
+    
+    await batch.commit();
+    
+    return {
+      success: true,
+      message: `Created ${matchesToCreate} test matches`,
+      matchCount: matchesToCreate
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
   }
 }
 
@@ -237,7 +413,7 @@ export async function getTestTeamsCount(venueId: string) {
     };
     
   } catch (error) {
-    console.error('Error getting test teams count:', error);
+    // Error handling removed
     return {
       success: false,
       count: 0,

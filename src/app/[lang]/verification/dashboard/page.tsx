@@ -81,7 +81,7 @@ export default function VerificationDashboardPage() {
       setTeams(teamsData);
       setFilteredTeams(teamsData);
     } catch (err: any) {
-      console.error("Error loading teams:", err);
+      // Error handling removed
       setError("Failed to load teams data");
     } finally {
       setLoading(false);

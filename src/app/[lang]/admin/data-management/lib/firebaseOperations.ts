@@ -59,7 +59,7 @@ export class FirebaseCollectionManager {
       });
       return docRef.id;
     } catch (error) {
-      console.error(`Error creating ${this.collectionName} document:`, error);
+      // Error handling removed
       throw error;
     }
   }
@@ -86,7 +86,7 @@ export class FirebaseCollectionManager {
       await batch.commit();
       return docIds;
     } catch (error) {
-      console.error(`Error creating batch ${this.collectionName} documents:`, error);
+      // Error handling removed
       throw error;
     }
   }
@@ -105,7 +105,7 @@ export class FirebaseCollectionManager {
       }
       return null;
     } catch (error) {
-      console.error(`Error reading ${this.collectionName} document:`, error);
+      // Error handling removed
       throw error;
     }
   }
@@ -165,7 +165,7 @@ export class FirebaseCollectionManager {
         hasMore
       };
     } catch (error) {
-      console.error(`Error reading ${this.collectionName} documents:`, error);
+      // Error handling removed
       throw error;
     }
   }
@@ -191,7 +191,7 @@ export class FirebaseCollectionManager {
 
       return documents;
     } catch (error) {
-      console.error(`Error reading test data from ${this.collectionName}:`, error);
+      // Error handling removed
       throw error;
     }
   }
@@ -205,7 +205,7 @@ export class FirebaseCollectionManager {
         updatedAt: Timestamp.now()
       });
     } catch (error) {
-      console.error(`Error updating ${this.collectionName} document:`, error);
+      // Error handling removed
       throw error;
     }
   }
@@ -216,7 +216,7 @@ export class FirebaseCollectionManager {
       const docRef = doc(db, this.collectionName, docId);
       await deleteDoc(docRef);
     } catch (error) {
-      console.error(`Error deleting ${this.collectionName} document:`, error);
+      // Error handling removed
       throw error;
     }
   }
@@ -233,7 +233,7 @@ export class FirebaseCollectionManager {
       
       await batch.commit();
     } catch (error) {
-      console.error(`Error deleting batch ${this.collectionName} documents:`, error);
+      // Error handling removed
       throw error;
     }
   }
@@ -255,7 +255,7 @@ export class FirebaseCollectionManager {
       
       return docIds.length;
     } catch (error) {
-      console.error(`Error deleting all test data from ${this.collectionName}:`, error);
+      // Error handling removed
       throw error;
     }
   }
@@ -292,7 +292,7 @@ export class FirebaseCollectionManager {
         byType: Object.keys(byType).length > 0 ? byType : undefined
       };
     } catch (error) {
-      console.error(`Error getting ${this.collectionName} stats:`, error);
+      // Error handling removed
       throw error;
     }
   }
@@ -326,7 +326,7 @@ export const firebaseUtils = {
         source: 'admin_data_management'
       });
     } catch (error) {
-      console.error('Error creating audit log:', error);
+      // Error handling removed
     }
   },
 
@@ -352,7 +352,7 @@ export const firebaseUtils = {
         const deleted = await manager.deleteAllTestData();
         results[name] = deleted;
       } catch (error) {
-        console.error(`Error cleaning test data from ${name}:`, error);
+        // Error handling removed
         results[name] = -1; // Indicate error
       }
     }

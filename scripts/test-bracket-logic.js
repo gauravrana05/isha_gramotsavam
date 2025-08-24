@@ -31,8 +31,7 @@ function generateKnockoutBracket(teams) {
   const bracketSize = Math.pow(2, Math.ceil(Math.log2(teamCount)));
   const byeCount = bracketSize - teamCount;
   
-  console.log(`\n🏆 TOURNAMENT BRACKET GENERATION`);
-  console.log(`📊 Teams: ${teamCount}, Bracket Size: ${bracketSize}, Byes: ${byeCount}`);
+  // Tournament bracket generation for ${teamCount} teams
   
   const matches = [];
   let matchCounter = 1;
@@ -41,12 +40,9 @@ function generateKnockoutBracket(teams) {
   const byeTeams = teams.slice(0, byeCount);
   const firstRoundTeams = teams.slice(byeCount);
   
-  console.log(`\n🎯 BYE TEAMS (Top ${byeCount} seeds):`);
-  byeTeams.forEach((team, i) => {
-    console.log(`   ${i + 1}. ${team.name} (Seed ${team.tournamentNumber})`);
-  });
+  // Bye teams: top ${byeCount} seeds
   
-  console.log(`\n⚔️ FIRST ROUND TEAMS (${firstRoundTeams.length} teams, ${firstRoundTeams.length/2} matches):`);
+  // First round: ${firstRoundTeams.length} teams, ${firstRoundTeams.length/2} matches
   
   // Calculate total matches needed (teamCount - 1, since each match eliminates one team)
   const totalMatchesNeeded = teamCount - 1;
@@ -59,7 +55,7 @@ function generateKnockoutBracket(teams) {
       const team1 = firstRoundTeams[i];
       const team2 = firstRoundTeams[i + 1];
       
-      console.log(`   Match ${matchCounter}: ${team1.name} (${team1.tournamentNumber}) vs ${team2.name} (${team2.tournamentNumber})`);
+      // Match ${matchCounter}: ${team1.name} vs ${team2.name}
       
       const match = {
         matchId: `match_${matchCounter++}`,
@@ -88,17 +84,17 @@ function generateKnockoutBracket(teams) {
   // After first round: firstRoundMatches winners + byeCount bye teams = total teams advancing to R16
   let teamsRemaining = firstRoundMatches + byeCount;
   
-  console.log(`\n📊 After R32: ${teamsRemaining} teams advance to next round`);
+  // After first round: ${teamsRemaining} teams advance
   
   // Create subsequent rounds until we reach the final
   while (teamsRemaining > 1) {
     const roundName = getRoundName(teamsRemaining);
     const matchesThisRound = Math.floor(teamsRemaining / 2);
     
-    console.log(`\n🔄 ${roundName.toUpperCase()} (${matchesThisRound} matches, ${teamsRemaining} teams remaining):`);
+    // ${roundName}: ${matchesThisRound} matches, ${teamsRemaining} teams remaining
     
     for (let i = 0; i < matchesThisRound; i++) {
-      console.log(`   Match ${matchCounter}: TBD vs TBD`);
+      // Match ${matchCounter}: TBD vs TBD
       
       const match = {
         matchId: `match_${matchCounter++}`,
@@ -115,10 +111,7 @@ function generateKnockoutBracket(teams) {
     teamsRemaining = matchesThisRound;
   }
   
-  console.log(`\n📈 SUMMARY:`);
-  console.log(`   Total Matches: ${matches.length}`);
-  console.log(`   Total Rounds: ${Math.ceil(Math.log2(bracketSize))}`);
-  console.log(`   Expected for ${teamCount} teams: ${teamCount - 1} matches`);
+  // Summary: ${matches.length} matches, ${Math.ceil(Math.log2(bracketSize))} rounds
   
   return {
     matches,
@@ -142,12 +135,8 @@ for (let i = 1; i <= 25; i++) {
 try {
   const result = generateKnockoutBracket(teams);
   
-  console.log(`\n✅ BRACKET GENERATION SUCCESSFUL!`);
-  console.log(`\n🎯 Expected Calculation Check:`);
-  console.log(`   - 25 teams need ${25 - 1} = 24 total matches`);
-  console.log(`   - Generated: ${result.matches.length} matches`);
-  console.log(`   - ✅ ${result.matches.length === 24 ? 'CORRECT!' : 'INCORRECT!'}`);
+  // Bracket generation complete: ${result.matches.length} matches generated
   
 } catch (error) {
-  console.error('❌ Error:', error.message);
+  // Error in bracket generation
 }

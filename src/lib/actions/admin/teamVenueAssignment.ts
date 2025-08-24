@@ -13,7 +13,6 @@ interface TeamData {
 
 export async function assignTeamToVenue(teamData: TeamData) {
   try {
-    console.log(`Starting venue assignment for team: ${teamData.name} from ${teamData.district}, ${teamData.state}`);
 
     // Check if team is already assigned
     const existingAssignment = await adminDb
@@ -23,7 +22,6 @@ export async function assignTeamToVenue(teamData: TeamData) {
       .get();
 
     if (!existingAssignment.empty) {
-      console.log('Team already assigned to venue');
       return { success: true, message: 'Team already assigned' };
     }
 
@@ -33,7 +31,6 @@ export async function assignTeamToVenue(teamData: TeamData) {
     if (!venue) {
       // Queue for manual assignment
       await queueForManualAssignment(teamData, '', 'No matching venue found');
-      console.log('Team queued for manual assignment - no matching venue');
       return { success: true, message: 'Queued for manual assignment', requiresManualAssignment: true };
     }
 
@@ -46,7 +43,6 @@ export async function assignTeamToVenue(teamData: TeamData) {
 
     if (currentAssignments.size >= venue.maxTeams) {
       await queueForManualAssignment(teamData, '', 'Venue at capacity');
-      console.log('Team queued for manual assignment - venue at capacity');
       return { success: true, message: 'Venue at capacity, queued for manual assignment', requiresManualAssignment: true };
     }
 
@@ -56,6 +52,8 @@ export async function assignTeamToVenue(teamData: TeamData) {
       teamName: teamData.name,
       venueId: venue.venueId,
       venueName: venue.venueName,
+      clusterVenueId: venue.venueId,        // Add for volunteer queries
+      clusterVenueName: venue.venueName,    // Add for volunteer queries
       assignmentLevel: 'cluster',
       status: 'assigned',
       assignedAt: FieldValue.serverTimestamp(),
@@ -75,7 +73,6 @@ export async function assignTeamToVenue(teamData: TeamData) {
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    console.log(`Team successfully assigned to venue: ${venue.venueName} (${currentAssignments.size + 1}/${venue.maxTeams} capacity)`);
     return { 
       success: true, 
       message: 'Team successfully assigned to venue',
@@ -87,7 +84,6 @@ export async function assignTeamToVenue(teamData: TeamData) {
     };
 
   } catch (error) {
-    console.error('Failed to assign team to venue:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
@@ -101,7 +97,6 @@ async function findMatchingVenue(teamData: TeamData, eventId: string) {
       .where('type', '==', 'cluster')
       .get();
 
-      console.log("This is team data", teamData);
 
     const districtVenues = venuesSnapshot.docs.filter(doc => {
       const venue = doc.data();
@@ -111,7 +106,6 @@ async function findMatchingVenue(teamData: TeamData, eventId: string) {
     // Step 2: If exactly one venue in district, assign directly
     if (districtVenues.length === 1) {
       const venue = districtVenues[0].data();
-      console.log(`Direct assignment: Found single cluster venue ${venue.name} for district ${teamData.district}`);
       return {
         venueId: districtVenues[0].id,
         venueName: venue.name,
@@ -121,7 +115,6 @@ async function findMatchingVenue(teamData: TeamData, eventId: string) {
 
     // Step 3: If multiple venues in district, use location mapping
     if (districtVenues.length > 1) {
-      console.log(`Multiple venues found in ${teamData.district}, checking location mappings...`);
       
       // Get venue-location mappings (without event ID constraint)
       const mappingsSnapshot = await adminDb
@@ -146,7 +139,6 @@ async function findMatchingVenue(teamData: TeamData, eventId: string) {
           if (locations.panchayats?.length > 0 && !locations.panchayats.includes(teamData.panchayat)) continue;
           
           // Found matching venue mapping
-          console.log(`Mapping assignment: Found venue ${mapping.venueName} via location mapping`);
           return {
             venueId: mapping.venueId,
             venueName: mapping.venueName,
@@ -155,17 +147,14 @@ async function findMatchingVenue(teamData: TeamData, eventId: string) {
         }
       }
       
-      console.log(`No location mapping found for team in ${teamData.district} with multiple venues`);
     }
 
     // Step 4: No venues in district
     if (districtVenues.length === 0) {
-      console.log(`No cluster venues found in district ${teamData.district}`);
     }
 
     return null;
   } catch (error) {
-    console.error('Error finding matching venue:', error);
     return null;
   }
 }
@@ -190,21 +179,203 @@ async function queueForManualAssignment(teamData: TeamData, eventId: string, rea
     const queueRef = await adminDb.collection('manualVenueAssignmentQueue').add(queueData);
     await queueRef.update({ queueId: queueRef.id });
     
-    console.log(`Team ${teamData.name} queued for manual assignment: ${reason}`);
   } catch (error) {
-    console.error('Error queuing team for manual assignment:', error);
+  }
+}
+
+// Function to handle team progression from division to finals
+export async function advanceDivisionWinnersToFinals() {
+  try {
+    // Get all division venue assignments to find completed tournaments
+    const divisionAssignmentsSnapshot = await adminDb
+      .collection('teamVenueAssignment')
+      .where('assignmentLevel', '==', 'division')
+      .get();
+    
+    const divisionAssignments = divisionAssignmentsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    // Group teams by division venue to process winners by venue
+    const teamsByDivisionVenue = divisionAssignments.reduce((acc: any, assignment: any) => {
+      const venueId = assignment.divisionVenueId || assignment.venueId;
+      if (!acc[venueId]) {
+        acc[venueId] = [];
+      }
+      acc[venueId].push(assignment);
+      return acc;
+    }, {});
+    
+    const progressionResults = [];
+    
+    // Process each division venue
+    for (const [divisionVenueId, teams] of Object.entries(teamsByDivisionVenue)) {
+      try {
+        const result = await processDivisionVenueWinners(divisionVenueId as string, teams as any[]);
+        progressionResults.push(result);
+      } catch (error) {
+        progressionResults.push({
+          divisionVenueId,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+    
+    return {
+      success: true,
+      processedVenues: progressionResults.length,
+      successfulProgressions: progressionResults.filter(r => r.success).length,
+      results: progressionResults
+    };
+    
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+}
+
+async function processDivisionVenueWinners(divisionVenueId: string, teams: any[]) {
+  try {
+    // Get completed fixtures for this division venue
+    const fixturesSnapshot = await adminDb
+      .collection('fixtures')
+      .where('venueId', '==', divisionVenueId)
+      .where('level', '==', 'division')
+      .where('status', '==', 'completed')
+      .get();
+    
+    if (fixturesSnapshot.empty) {
+      return {
+        divisionVenueId,
+        success: true,
+        message: 'No completed division tournaments yet',
+        advancedTeams: 0
+      };
+    }
+    
+    // Find the Isha Yoga Center finals venue
+    const finalsVenueSnapshot = await adminDb
+      .collection('venues')
+      .where('type', '==', 'final')
+      .where('name', '==', 'Isha Yoga Center')
+      .where('isActive', '==', true)
+      .limit(1)
+      .get();
+    
+    if (finalsVenueSnapshot.empty) {
+      return {
+        divisionVenueId,
+        success: false,
+        error: 'Finals venue (Isha Yoga Center) not found'
+      };
+    }
+    
+    const finalsVenue = {
+      id: finalsVenueSnapshot.docs[0].id,
+      ...(finalsVenueSnapshot.docs[0].data() as any)
+    };
+    
+    // Get winners from completed fixtures (top 2 teams per sport/gender)
+    const winnersByCategory = new Map();
+    
+    for (const fixtureDoc of fixturesSnapshot.docs) {
+      const fixture = fixtureDoc.data();
+      if (fixture.finalStandings && fixture.finalStandings.length > 0) {
+        const categoryKey = `${fixture.sportId}_${fixture.genderCategory}`;
+        const topTeams = fixture.finalStandings.slice(0, 2); // Top 2 teams advance
+        winnersByCategory.set(categoryKey, topTeams);
+      }
+    }
+    
+    // Advance the winners to finals (Isha Yoga Center)
+    let advancedCount = 0;
+    const batch = adminDb.batch();
+
+    for (const categoryKey of Array.from(winnersByCategory.keys())) {
+      const winners = winnersByCategory.get(categoryKey);
+      if (!winners) continue;
+      
+      for (const winner of winners) {
+        // Skip if winner doesn't have required data
+        if (!winner.teamId || !winner.teamName) continue;
+        
+        // Check if team is already assigned to finals level to avoid duplicates
+        const existingAssignmentSnapshot = await adminDb
+          .collection('teamVenueAssignment')
+          .where('teamId', '==', winner.teamId)
+          .where('assignmentLevel', '==', 'final')
+          .limit(1)
+          .get();
+        
+        if (!existingAssignmentSnapshot.empty) {
+          continue; // Skip if already assigned
+        }
+        
+        // Create finals venue assignment
+        const assignmentData = {
+          teamId: winner.teamId,
+          teamName: winner.teamName,
+          finalVenueId: finalsVenue.id,
+          finalVenueName: finalsVenue.name,
+          assignmentLevel: 'final',
+          status: 'assigned',
+          assignedAt: FieldValue.serverTimestamp(),
+          assignedBy: 'system_auto',
+          advancedFrom: 'division',
+          sourceDivisionVenueId: divisionVenueId,
+          rank: winner.position || winner.rank || 0,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        };
+        
+        const assignmentRef = adminDb.collection('teamVenueAssignment').doc();
+        batch.set(assignmentRef, {
+          ...assignmentData,
+          assignmentId: assignmentRef.id
+        });
+        
+        // Update team document
+        const teamRef = adminDb.collection('teams').doc(winner.teamId);
+        batch.update(teamRef, {
+          currentLevel: 'final',
+          finalVenueId: finalsVenue.id,
+          finalVenueName: finalsVenue.name,
+          advancedToFinalsAt: FieldValue.serverTimestamp(),
+          divisionQualified: true,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+        advancedCount++;
+      }
+    }
+    
+    await batch.commit();
+    
+    return {
+      divisionVenueId,
+      success: true,
+      message: `Advanced ${advancedCount} teams to ${finalsVenue.name} Finals`,
+      advancedTeams: advancedCount,
+      targetFinalVenue: finalsVenue.name
+    };
+  } catch (error) {
+    return {
+      divisionVenueId,
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 }
 
 // New function to handle team progression from cluster to division
 export async function advanceClusterWinnersToDivision() {
   try {
-    const eventId = 'isha_gramotsavam_2025';
-    
     // Get all cluster venue assignments to find completed tournaments
     const clusterAssignmentsSnapshot = await adminDb
       .collection('teamVenueAssignment')
-      .where('eventId', '==', eventId)
       .where('assignmentLevel', '==', 'cluster')
       .get();
     
@@ -228,10 +399,9 @@ export async function advanceClusterWinnersToDivision() {
     // Process each cluster venue
     for (const [clusterVenueId, teams] of Object.entries(teamsByClusterVenue)) {
       try {
-        const result = await processClusterVenueWinners(clusterVenueId as string, teams as any[], eventId);
+        const result = await processClusterVenueWinners(clusterVenueId as string, teams as any[]);
         progressionResults.push(result);
       } catch (error) {
-        console.error(`Error processing cluster venue ${clusterVenueId}:`, error);
         progressionResults.push({
           clusterVenueId,
           success: false,
@@ -248,7 +418,6 @@ export async function advanceClusterWinnersToDivision() {
     };
     
   } catch (error) {
-    console.error('Error advancing cluster winners:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -256,13 +425,12 @@ export async function advanceClusterWinnersToDivision() {
   }
 }
 
-async function processClusterVenueWinners(clusterVenueId: string, teams: any[], eventId: string) {
+async function processClusterVenueWinners(clusterVenueId: string, teams: any[]) {
   try {
     // Get completed fixtures for this cluster venue
     const fixturesSnapshot = await adminDb
       .collection('fixtures')
       .where('venueId', '==', clusterVenueId)
-      .where('eventId', '==', eventId)
       .where('status', '==', 'completed')
       .get();
     
@@ -354,20 +522,34 @@ async function processClusterVenueWinners(clusterVenueId: string, teams: any[], 
       const winners = winnersByCategory.get(categoryKey);
       if (!winners) continue;
       for (const winner of winners) {
+        // Skip if winner doesn't have required data
+        if (!winner.teamId || !winner.teamName) continue;
+        
+        // Check if team is already assigned to division level to avoid duplicates
+        const existingAssignmentSnapshot = await adminDb
+          .collection('teamVenueAssignment')
+          .where('teamId', '==', winner.teamId)
+          .where('assignmentLevel', '==', 'division')
+          .limit(1)
+          .get();
+        
+        if (!existingAssignmentSnapshot.empty) {
+          continue; // Skip if already assigned
+        }
+        
         // Create division venue assignment
         const assignmentData = {
           teamId: winner.teamId,
           teamName: winner.teamName,
           divisionVenueId: targetDivisionVenue.id,
           divisionVenueName: (targetDivisionVenue as any).name ?? '',
-          eventId,
           assignmentLevel: 'division',
           status: 'assigned',
           assignedAt: FieldValue.serverTimestamp(),
           assignedBy: 'system_auto',
           advancedFrom: 'cluster',
           sourceClusterVenueId: clusterVenueId,
-          rank: winner.rank,
+          rank: winner.position || winner.rank || 0,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp()
         };
@@ -401,7 +583,6 @@ async function processClusterVenueWinners(clusterVenueId: string, teams: any[], 
       targetDivisionVenue: (targetDivisionVenue as any).name ?? ''
     };
   } catch (error) {
-    console.error(`Error processing cluster venue ${clusterVenueId}:`, error);
     return {
       clusterVenueId,
       success: false,

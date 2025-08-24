@@ -144,7 +144,7 @@
 //     };
 
 //   } catch (error) {
-//     console.error('Error generating admin report:', error);
+//     // Error handling removed
     
 //     if (error instanceof z.ZodError) {
 //       return {
@@ -206,7 +206,7 @@
 //     };
 
 //   } catch (error) {
-//     console.error('Error performing trend analysis:', error);
+//     // Error handling removed
     
 //     if (error instanceof z.ZodError) {
 //       return {
@@ -266,7 +266,7 @@
 //     };
 
 //   } catch (error) {
-//     console.error('Error executing custom query:', error);
+//     // Error handling removed
     
 //     if (error instanceof z.ZodError) {
 //       return {

@@ -44,7 +44,7 @@ async function getVenueMatches(venueId: string, fixtureId?: string) {
     
     return serializeFirestoreDocs(docs);
   } catch (error) {
-    console.error('Error fetching matches:', error);
+    // Error handling removed
     return [];
   }
 }
@@ -62,7 +62,7 @@ async function getFixtureInfo(fixtureId: string) {
       updatedAt: data?.updatedAt?.toDate?.()?.toISOString() || null
     };
   } catch (error) {
-    console.error('Error fetching fixture:', error);
+    // Error handling removed
     return null;
   }
 }

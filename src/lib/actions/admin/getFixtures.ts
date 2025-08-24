@@ -103,7 +103,6 @@ export async function getFixtures(params: z.infer<typeof GetFixturesSchema>) {
           matchDoc => matchDoc.data().status === 'completed'
         ).length;
       } catch (error) {
-        console.error(`Error counting matches for fixture ${doc.id}:`, error);
       }
       
       // Serialize timestamps
@@ -132,7 +131,6 @@ export async function getFixtures(params: z.infer<typeof GetFixturesSchema>) {
     };
 
   } catch (error) {
-    console.error('Error fetching fixtures:', error);
     
     if (error instanceof z.ZodError) {
       return { 
@@ -207,7 +205,6 @@ export async function getFixtureStats(params: z.infer<typeof GetFixtureStatsSche
     };
 
   } catch (error) {
-    console.error('Error fetching fixture stats:', error);
     
     if (error instanceof z.ZodError) {
       return { 
@@ -317,7 +314,6 @@ export async function getFixtureDetails(fixtureId: string, includeMatches: boole
     };
     
   } catch (error) {
-    console.error('Error getting fixture details:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred',

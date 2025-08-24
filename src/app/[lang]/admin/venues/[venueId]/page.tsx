@@ -105,7 +105,7 @@ export default function VenueDetailPage() {
         setError('Venue not found');
       }
     } catch (err: any) {
-      console.error('Error loading venue:', err);
+      // Error handling removed
       setError('Failed to load venue details');
     } finally {
       setLoading(false);

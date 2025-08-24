@@ -165,7 +165,7 @@ export default function VerificationSidebar({
     try {
       await logout();
     } catch (error) {
-      console.error('Logout failed:', error);
+      // Handle logout error silently
     }
   };
 

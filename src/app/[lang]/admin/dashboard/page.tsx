@@ -110,7 +110,7 @@ export default function AdminDashboard() {
       }
       
     } catch (err: any) {
-      console.error('Error loading dashboard data:', err);
+      // Error handling removed
       setError(err.message || 'Failed to load dashboard data. Please check your permissions.');
     } finally {
       setLoading(false);

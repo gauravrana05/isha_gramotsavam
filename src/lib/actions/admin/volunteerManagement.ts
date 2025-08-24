@@ -71,9 +71,7 @@ export async function addVolunteer(formData: FormData) {
 
     // Check if user exists in Firebase Authentication
     try {
-      console.log("coming here):");
       const existingAuthUser = await adminAuth.getUserByPhoneNumber(formattedPhone);
-      console.log("didnt reach here");
       userId = existingAuthUser.uid;
       existingUser = true;
 
@@ -100,7 +98,6 @@ export async function addVolunteer(formData: FormData) {
         userId = userRecord.uid;
         existingUser = false;
       } else {
-        console.error('Error checking existing user:', error);
         return {
           success: false,
           error: 'Error checking existing user'
@@ -120,7 +117,6 @@ export async function addVolunteer(formData: FormData) {
           try {
             await adminAuth.deleteUser(userId);
           } catch (cleanupError) {
-            console.error('Error cleaning up created user:', cleanupError);
           }
         }
         return {
@@ -179,7 +175,6 @@ export async function addVolunteer(formData: FormData) {
 
     revalidatePath('/admin/users/volunteers');
 
-    console.log(`Volunteer ${userId} ${existingUser ? 'updated' : 'created'} successfully`);
 
     return {
       success: true,
@@ -188,7 +183,6 @@ export async function addVolunteer(formData: FormData) {
       existed: existingUser
     };
   } catch (error) {
-    console.error('Error adding volunteer:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to add volunteer'
@@ -223,7 +217,6 @@ export async function getVolunteerVenueAssignments(adminUid: string) {
       assignments
     };
   } catch (error) {
-    console.error('Error fetching volunteer venue assignments:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch assignments'
@@ -301,7 +294,6 @@ export async function getVolunteerVenueAssignmentDetails(adminUid: string) {
       assignments
     };
   } catch (error) {
-    console.error('Error fetching volunteer venue assignment details:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch assignment details'

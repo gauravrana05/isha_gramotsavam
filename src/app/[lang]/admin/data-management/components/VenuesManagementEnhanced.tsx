@@ -110,7 +110,7 @@ export default function VenuesManagementEnhanced() {
 
     } catch (err: any) {
       setError(err.message || 'Failed to load venues');
-      console.error('Error loading venues:', err);
+      // Error handling removed
     } finally {
       setLoading(false);
     }
@@ -234,7 +234,7 @@ export default function VenuesManagementEnhanced() {
 
     } catch (err: any) {
       setError(err.message || 'Failed to create venues');
-      console.error('Error creating venues:', err);
+      // Error handling removed
     } finally {
       setCreateLoading(false);
     }
@@ -333,7 +333,7 @@ export default function VenuesManagementEnhanced() {
         }
       };
     } catch (error) {
-      console.error('Error fetching sports data:', error);
+      // Error handling removed
       throw error;
     }
   };
@@ -369,7 +369,7 @@ export default function VenuesManagementEnhanced() {
 
     } catch (err: any) {
       setError(err.message || 'Failed to upload venues');
-      console.error('Error uploading venues:', err);
+      // Error handling removed
     } finally {
       setUploadLoading(false);
     }

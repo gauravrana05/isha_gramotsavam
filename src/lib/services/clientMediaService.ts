@@ -86,7 +86,7 @@ export class ClientMediaUploadService {
           }
         },
         (error) => {
-          console.error('Upload error:', error);
+          // Upload error occurred
           reject(new Error(`Upload failed: ${error.message}`));
         },
         async () => {
@@ -94,7 +94,7 @@ export class ClientMediaUploadService {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             resolve(downloadURL);
           } catch (error) {
-            console.error('Error getting download URL:', error);
+            // Error getting download URL
             reject(new Error('Failed to get download URL'));
           }
         }
@@ -152,7 +152,7 @@ export class ClientMediaUploadService {
         url
       };
     } catch (error) {
-      console.error('Error uploading fixture media:', error);
+      // Error uploading fixture media
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed'
@@ -210,7 +210,7 @@ export class ClientMediaUploadService {
         url
       };
     } catch (error) {
-      console.error('Error uploading match media:', error);
+      // Error uploading match media
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed'
@@ -266,7 +266,7 @@ export class ClientMediaUploadService {
         url
       };
     } catch (error) {
-      console.error('Error uploading venue media:', error);
+      // Error uploading venue media
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed'
@@ -361,7 +361,7 @@ export class ClientMediaUploadService {
       
       return { success: true };
     } catch (error) {
-      console.error('Error deleting media:', error);
+      // Error deleting media
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Delete failed'
@@ -382,7 +382,7 @@ export class ClientMediaUploadService {
       
       return { success: true };
     } catch (error) {
-      console.error('Error updating media:', error);
+      // Error updating media
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Update failed'

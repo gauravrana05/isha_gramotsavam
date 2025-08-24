@@ -5,6 +5,89 @@ import { z } from 'zod';
 import { optimizeTeamDocument, optimizePlayerDocument, createPaginatedResponse } from '@/lib/utils/documentOptimizer';
 import type { Query, CollectionReference, DocumentData } from 'firebase-admin/firestore';
 
+// Helper function to get current venue assignment with priority logic
+async function getCurrentVenueAssignment(teamId: string) {
+  try {
+    // Query all venue assignments for this team
+    const assignmentsSnapshot = await adminDb
+      .collection('teamVenueAssignment')
+      .where('teamId', '==', teamId)
+      .get();
+    
+    if (assignmentsSnapshot.empty) {
+      return null;
+    }
+    
+    const assignments = assignmentsSnapshot.docs.map(doc => ({
+      ...(doc.data() as any),
+      docId: doc.id
+    }));
+    
+    // Priority logic: finals > division > cluster
+    // First look for finals assignment
+    let finalAssignment = assignments.find(a => 
+      a.assignmentLevel === 'final' || 
+      a.finalVenueId ||
+      a.currentLevel === 'final'
+    );
+    if (finalAssignment) {
+      return {
+        venueId: finalAssignment.finalVenueId || finalAssignment.venueId,
+        venueName: finalAssignment.finalVenueName || finalAssignment.venueName || 'Finals Venue',
+        assignmentLevel: 'final',
+        assignedAt: finalAssignment.assignedAt?.toDate?.()?.toISOString() || null
+      };
+    }
+    
+    // Then look for division assignment
+    let divisionAssignment = assignments.find(a => 
+      a.assignmentLevel === 'division' || 
+      a.divisionVenueId ||
+      a.currentLevel === 'division'
+    );
+    if (divisionAssignment) {
+      return {
+        venueId: divisionAssignment.divisionVenueId || divisionAssignment.venueId,
+        venueName: divisionAssignment.divisionVenueName || divisionAssignment.venueName || 'Division Venue',
+        assignmentLevel: 'division',
+        assignedAt: divisionAssignment.assignedAt?.toDate?.()?.toISOString() || null
+      };
+    }
+    
+    // Finally look for cluster assignment
+    let clusterAssignment = assignments.find(a => 
+      a.assignmentLevel === 'cluster' || 
+      a.clusterVenueId || 
+      a.currentLevel === 'cluster' ||
+      !a.assignmentLevel // Default to cluster if no level specified
+    );
+    if (clusterAssignment) {
+      return {
+        venueId: clusterAssignment.clusterVenueId || clusterAssignment.venueId,
+        venueName: clusterAssignment.clusterVenueName || clusterAssignment.venueName || 'Cluster Venue',
+        assignmentLevel: 'cluster',
+        assignedAt: clusterAssignment.assignedAt?.toDate?.()?.toISOString() || null
+      };
+    }
+    
+    // If no specific assignment found, return the first one with fallback logic
+    if (assignments.length > 0) {
+      const assignment = assignments[0];
+      return {
+        venueId: assignment.venueId || assignment.clusterVenueId || assignment.divisionVenueId || assignment.finalVenueId,
+        venueName: assignment.venueName || assignment.clusterVenueName || assignment.divisionVenueName || assignment.finalVenueName || 'Unknown Venue',
+        assignmentLevel: assignment.assignmentLevel || 'cluster',
+        assignedAt: assignment.assignedAt?.toDate?.()?.toISOString() || null
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error in getCurrentVenueAssignment:', error);
+    return null;
+  }
+}
+
 // Team document interface
 interface TeamDocument {
   id: string;
@@ -147,10 +230,9 @@ export async function getAdminTeams(
       appliedFilters.push('currentTournamentLevel');
     }
     
-    if (validatedFilters.venueId) {
-      query = query.where('clusterVenueId', '==', validatedFilters.venueId);
-      appliedFilters.push('venueId');
-    }
+    // Note: Venue filtering will be applied post-query since venue assignments 
+    // are in a separate collection and we need to check multiple fields
+    const venueIdFilter = validatedFilters.venueId;
     
     // Date range filters
     if (validatedFilters.createdAfter) {
@@ -216,8 +298,26 @@ export async function getAdminTeams(
     // Apply final pagination after client-side filtering
     const paginatedTeams = teams.slice(0, validatedFilters.limit);
     
+    // Load venue assignments for these teams
+    const teamsWithVenues = await Promise.all(paginatedTeams.map(async (team) => {
+      const currentVenueAssignment = await getCurrentVenueAssignment(team.id);
+      return {
+        ...team,
+        currentVenueAssignment
+      };
+    }));
+    
+    // Apply venue filter if specified
+    let filteredTeams = teamsWithVenues;
+    if (venueIdFilter) {
+      filteredTeams = teamsWithVenues.filter(team => 
+        team.currentVenueAssignment?.venueId === venueIdFilter
+      );
+      appliedFilters.push('venueId');
+    }
+    
     // Optimize team documents for transfer
-    const optimizedTeams = paginatedTeams.map(optimizeTeamDocument);
+    const optimizedTeams = filteredTeams.map(optimizeTeamDocument);
     
     return {
       success: true,
@@ -237,7 +337,6 @@ export async function getAdminTeams(
     };
 
   } catch (error) {
-    console.error('Error in getAdminTeams:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -298,15 +397,8 @@ export async function getAdminTeamDetails(teamId: string, requestingUserId: stri
         updatedAt: verificationDoc.data()?.updatedAt?.toDate?.()?.toISOString() || null
       } : null;
       
-      // Get team venue assignment if exists
-      const venueAssignmentRef = adminDb.collection('teamVenueAssignment').doc(teamId);
-      const venueAssignmentDoc = await transaction.get(venueAssignmentRef);
-      
-      const venueAssignment = venueAssignmentDoc.exists ? {
-        ...venueAssignmentDoc.data(),
-        assignedAt: venueAssignmentDoc.data()?.assignedAt?.toDate?.()?.toISOString() || null,
-        updatedAt: venueAssignmentDoc.data()?.updatedAt?.toDate?.()?.toISOString() || null
-      } : null;
+      // Get current venue assignment with priority logic
+      const venueAssignment = await getCurrentVenueAssignment(teamId);
       
       return {
         team: {
@@ -329,7 +421,6 @@ export async function getAdminTeamDetails(teamId: string, requestingUserId: stri
     };
 
   } catch (error) {
-    console.error('Error getting admin team details:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get team details'
@@ -470,7 +561,6 @@ export async function getAdminTeamStats(
     };
 
   } catch (error) {
-    console.error('Error getting admin team stats:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -555,7 +645,6 @@ export async function bulkUpdateTeamStatus(
     };
 
   } catch (error) {
-    console.error('Error in bulk update team status:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to bulk update teams'

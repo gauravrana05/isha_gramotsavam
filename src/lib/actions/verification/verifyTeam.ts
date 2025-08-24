@@ -52,7 +52,6 @@ export async function updateTeamVerificationRecord(teamId: string): Promise<void
 
     // Trigger automatic venue assignment for newly verified team
     try {
-      console.log('Starting venue assignment for verified team:', teamId);
       const teamDoc = await adminDb.collection("teams").doc(teamId).get();
       const teamData = teamDoc.data();
       
@@ -65,20 +64,11 @@ export async function updateTeamVerificationRecord(teamId: string): Promise<void
           panchayat: teamData.panchayat || ''
         };
 
-        console.log('Team data for venue assignment:', teamForVenueAssignment);
         const venueAssignmentResult = await assignTeamToVenue(teamForVenueAssignment);
-        console.log('Venue assignment result:', venueAssignmentResult);
         
-        if (!venueAssignmentResult.success) {
-          console.error('Venue assignment failed:', venueAssignmentResult.error);
-        } else {
-          console.log('Venue assignment successful:', venueAssignmentResult.message);
-        }
-      } else {
-        console.error('Team data not found for venue assignment');
+        // Venue assignment completed
       }
     } catch (venueError) {
-      console.error('Error assigning venue to auto-verified team:', venueError);
       // Don't fail the verification if venue assignment fails
     }
   }
@@ -147,9 +137,7 @@ export async function verifyTeam(request: VerifyTeamRequest) {
         };
 
         const venueAssignmentResult = await assignTeamToVenue(teamForVenueAssignment);
-        console.log('Venue assignment result:', venueAssignmentResult);
       } catch (venueError) {
-        console.error('Error assigning venue to verified team:', venueError);
         // Don't fail the verification if venue assignment fails
       }
     }
@@ -173,15 +161,12 @@ export async function verifyTeam(request: VerifyTeamRequest) {
       read: false
     });
 
-    console.log(`Team ${teamId} ${status} by ${volunteerId}`);
-
     return {
       success: true,
       message: `Team ${status} successfully`
     };
 
   } catch (error) {
-    console.error("Error verifying team:", error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to verify team"

@@ -133,7 +133,7 @@ const decodeStateFromURL = (searchParams: URLSearchParams): Partial<TableState> 
     try {
       state.sort = JSON.parse(sort);
     } catch (e) {
-      console.warn('Invalid sort parameter in URL');
+      // Warning removed
     }
   }
   
@@ -142,7 +142,7 @@ const decodeStateFromURL = (searchParams: URLSearchParams): Partial<TableState> 
     try {
       state.filters = JSON.parse(filters);
     } catch (e) {
-      console.warn('Invalid filters parameter in URL');
+      // Warning removed
     }
   }
   

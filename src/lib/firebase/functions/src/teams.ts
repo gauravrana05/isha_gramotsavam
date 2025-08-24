@@ -89,10 +89,10 @@ export const addPlayerToTeam = onCall(async (request: CallableRequest) => {
       try {
         const existingUser = await admin.auth().getUserByPhoneNumber(`+91${playerData.phone}`);
         firebaseUserId = existingUser.uid;
-        console.log(`Using existing Firebase user: ${firebaseUserId}`);
+        // Console log removed
       } catch (error: any) {
         if (error.code !== 'auth/user-not-found') {
-          console.error("Error checking existing user:", error);
+          // Error handling removed
           throw error;
         }
         // Create new Firebase user
@@ -102,7 +102,7 @@ export const addPlayerToTeam = onCall(async (request: CallableRequest) => {
           disabled: false
         });
         firebaseUserId = userRecord.uid;
-        console.log(`Created new Firebase user: ${firebaseUserId}`);
+        // Console log removed
       }
       
       // Update user profile in Firestore (the createUserProfile trigger handles basic profile)
@@ -125,10 +125,10 @@ export const addPlayerToTeam = onCall(async (request: CallableRequest) => {
       };
       
       await admin.firestore().collection("users").doc(firebaseUserId).set(userProfileData, { merge: true });
-      console.log(`Updated user profile for: ${firebaseUserId}`);
+      // Console log removed
       
     } catch (error) {
-      console.error("Error creating Firebase user:", error);
+      // Error handling removed
       throw new HttpsError("internal", `Failed to create user account for player: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
@@ -195,7 +195,7 @@ export const addPlayerToTeam = onCall(async (request: CallableRequest) => {
     // Update verification record
     await updateVerificationRecord(teamId);
 
-    console.log(`Player ${playerId} added to team ${teamId}`);
+    // Console log removed
 
     return {
       success: true,
@@ -203,7 +203,7 @@ export const addPlayerToTeam = onCall(async (request: CallableRequest) => {
       message: "Player added successfully"
     };
   } catch (error) {
-    console.error("Error adding player to team:", error);
+    // Error handling removed
     if (error instanceof HttpsError) {
       throw error;
     }
@@ -265,7 +265,7 @@ export const submitTeamForVerificationEnhanced = onCall(async (request: Callable
       read: false
     });
 
-    console.log(`Team ${teamId} submitted for verification successfully`);
+    // Console log removed
 
     return {
       success: true,
@@ -273,7 +273,7 @@ export const submitTeamForVerificationEnhanced = onCall(async (request: Callable
       message: "Team submitted for verification successfully"
     };
   } catch (error) {
-    console.error("Error submitting team for verification:", error);
+    // Error handling removed
     if (error instanceof HttpsError) {
       throw error;
     }
@@ -312,7 +312,7 @@ async function checkPlayerExistsInEvent(playerIdentifier: string, eventId: strin
 
     return { exists: false };
   } catch (error) {
-    console.error("Error checking player existence in event:", error);
+    // Error handling removed
     return { exists: false }; // Fail-safe
   }
 }

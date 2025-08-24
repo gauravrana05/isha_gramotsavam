@@ -30,7 +30,7 @@ export default function SportsInitPage() {
       setSports(allSports);
       
     } catch (error: any) {
-      console.error('Initialization error:', error);
+      // Error handling removed
       setMessage(`❌ Error: ${error.message}`);
     } finally {
       setLoading(false);

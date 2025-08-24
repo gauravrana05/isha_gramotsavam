@@ -24,7 +24,6 @@ class SyncService {
    */
   async initialize(): Promise<void> {
     await this.storage;
-    console.log('SyncService initialized');
   }
 
   /**
@@ -131,7 +130,6 @@ class SyncService {
   private async executeSyncAction(action: SyncAction): Promise<boolean> {
     // This is a placeholder for Firebase integration
     // In a real implementation, this would make actual Firebase calls
-    console.log(`Executing sync action: ${action.type} on ${action.collection}/${action.documentId}`);
     
     // Simulate network request
     await new Promise(resolve => setTimeout(resolve, 100));

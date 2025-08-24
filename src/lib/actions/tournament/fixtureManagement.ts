@@ -44,7 +44,6 @@ export async function assignTeamNumbers(
       message: 'Team numbers assigned successfully' 
     };
   } catch (error) {
-    console.error('Error assigning team numbers:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -59,10 +58,8 @@ export async function createKnockoutDraw(
   genderCategory: 'men' | 'women'
 ) {
   try {
-    console.log(`Creating knockout draw for venue: ${venueId}, sport: ${sportId}, gender: ${genderCategory}`);
-    
     // First try to get teams via teamVenueAssignment (more reliable)
-    const venueTeamsResult = await getVenueCheckedInTeams(venueId, eventId);
+    const venueTeamsResult = await getVenueCheckedInTeams(venueId);
     
     if (!venueTeamsResult.success) {
       return {
@@ -73,8 +70,6 @@ export async function createKnockoutDraw(
     
     const sportKey = `${sportId}_${genderCategory}`;
     const sportTeams = venueTeamsResult.teamsBySport[sportKey] || [];
-    
-    console.log(`Found ${sportTeams.length} checked-in teams for ${sportKey}`);
     
     if (sportTeams.length === 0) {
       return { 
@@ -99,19 +94,12 @@ export async function createKnockoutDraw(
     const venueData = venueDoc.data();
     const sportData = sportDoc.data();
     
-    // Determine tournament level based on venue type
-    const venueLocationMappingQuery = await adminDb.collection('venueLocationMapping')
-      .where('venueId', '==', venueId)
-      .where('isActive', '==', true)
-      .get();
-    
-    const level = !venueLocationMappingQuery.empty ? 
-      venueLocationMappingQuery.docs[0].data().venueType : 'cluster';
+    // Determine tournament level directly from venue type
+    const level = (venueData?.type as 'cluster' | 'division' | 'final') || 'cluster';
     
     // Create fixture
     const fixtureData: Omit<Fixture, 'fixtureId'> = {
       name: `${sportData?.name || 'Tournament'} ${genderCategory} - ${venueData?.name || 'Venue'} ${level}`,
-      eventId,
       sportId,
       sportName: sportData?.name || 'Unknown Sport',
       genderCategory,
@@ -167,7 +155,6 @@ export async function createKnockoutDraw(
       await fixtureRef.update({
           'bracket.matches': updatedBracketMatches
       });
-      console.log(`Fixture ${fixtureRef.id} bracket has been updated with real match IDs and correct nextMatchId references.`);
     }
     
     revalidatePath(`/volunteer/venues/${venueId}/fixtures`);
@@ -183,7 +170,6 @@ export async function createKnockoutDraw(
       matchesCreated: matchCreationResult.success ? matchCreationResult.matchesCreated : 0
     };
   } catch (error) {
-    console.error('Error creating knockout draw:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -330,20 +316,27 @@ function getRoundName(roundSize: number): string {
   }
 }
 
-export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
+export async function getVenueCheckedInTeams(venueId: string, eventId?: string) {
   try {
-    console.log(`Getting checked-in teams for venue: ${venueId}, event: ${eventId}`);
     const startTime = Date.now();
     
-    // Get team venue assignments
-    const venueAssignmentsSnapshot = await adminDb.collection('teamVenueAssignment')
-      .where('clusterVenueId', '==', venueId)
-      .where('eventId', '==', eventId)
-      .get();
+    // Get team venue assignments at different levels
+    const [clusterQuery, divisionQuery, finalQuery] = await Promise.all([
+      adminDb.collection('teamVenueAssignment')
+        .where('clusterVenueId', '==', venueId)
+        .get(),
+      adminDb.collection('teamVenueAssignment')
+        .where('divisionVenueId', '==', venueId)
+        .get(),
+      adminDb.collection('teamVenueAssignment')
+        .where('finalVenueId', '==', venueId)
+        .get()
+    ]);
     
-    console.log(`Found ${venueAssignmentsSnapshot.docs.length} team assignments for venue`);
+    // Combine all assignment documents
+    const allAssignments = [...clusterQuery.docs, ...divisionQuery.docs, ...finalQuery.docs];
     
-    if (venueAssignmentsSnapshot.empty) {
+    if (allAssignments.length === 0) {
       return { 
         success: true, 
         teams: [],
@@ -353,10 +346,9 @@ export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
     }
     
     // Extract team IDs for batch query
-    const teamIds = venueAssignmentsSnapshot.docs.map(doc => doc.data().teamId);
+    const teamIds = allAssignments.map(doc => doc.data().teamId);
     
     // Batch query all teams at once instead of individual queries
-    console.log(`Batch querying ${teamIds.length} teams...`);
     const teamRefs = teamIds.map(id => adminDb.collection('teams').doc(id));
     const teamDocs = await adminDb.getAll(...teamRefs);
     
@@ -369,8 +361,7 @@ export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
     });
     
     // Process teams in parallel using Promise.all
-    console.log(`Processing ${teamIds.length} teams in parallel...`);
-    const teamProcessingPromises = venueAssignmentsSnapshot.docs.map(async (assignmentDoc) => {
+    const teamProcessingPromises = allAssignments.map(async (assignmentDoc) => {
       const assignment = assignmentDoc.data();
       const teamData = teamLookup.get(assignment.teamId);
       
@@ -396,7 +387,6 @@ export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
     const checkedInTeams = processedTeams.filter(team => team !== null);
     
     const endTime = Date.now();
-    console.log(`Found ${checkedInTeams.length} checked-in teams for venue (took ${endTime - startTime}ms)`);
     
     // Group by sport and gender
     const teamsBySport = checkedInTeams.reduce((acc, team) => {
@@ -415,7 +405,6 @@ export async function getVenueCheckedInTeams(venueId: string, eventId: string) {
       totalTeams: checkedInTeams.length
     };
   } catch (error) {
-    console.error('Error getting venue checked-in teams:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -441,7 +430,6 @@ async function createMatchesFromBracket(
   teams: any[]
 ) {
   try {
-    console.log(`Creating ${bracketMatches.length} matches from bracket...`);
     const startTime = Date.now();
     
     const batch = adminDb.batch();
@@ -500,7 +488,6 @@ async function createMatchesFromBracket(
       const match: Omit<Match, 'matchId'> = {
         fixtureId,
         fixtureName: fixture.name,
-        eventId: fixture.eventId,
         sportId: fixture.sportId,
         sportName: fixture.sportName,
         genderCategory: fixture.genderCategory,
@@ -535,7 +522,6 @@ async function createMatchesFromBracket(
     await batch.commit();
     
     const endTime = Date.now();
-    console.log(`Created ${matches.length} matches (took ${endTime - startTime}ms)`);
     
     return {
       success: true,
@@ -544,7 +530,6 @@ async function createMatchesFromBracket(
     };
     
   } catch (error) {
-    console.error('Error creating matches from bracket:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -604,7 +589,6 @@ export async function getVenueDetails(venueId: string) {
       }
     };
   } catch (error) {
-    console.error('Error fetching venue details:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch venue details'
@@ -660,7 +644,6 @@ export async function getVenueFixtures(venueId: string) {
       ...serializeFirestoreData(doc.data())
     }));
   } catch (error) {
-    console.error('Error fetching fixtures:', error);
     return [];
   }
 }
@@ -709,7 +692,6 @@ export async function deleteFixture(fixtureId: string, venueId: string) {
       message: 'Fixture deleted successfully' 
     };
   } catch (error) {
-    console.error('Error deleting fixture:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'

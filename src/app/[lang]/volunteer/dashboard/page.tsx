@@ -79,7 +79,7 @@ export default function VolunteerDashboard() {
         setAssignments([]);
       }
     } catch (err) {
-      console.error('Error loading venue assignments:', err);
+      // Error handling removed
       setError('Failed to load venue assignments');
       setAssignments([]);
     } finally {

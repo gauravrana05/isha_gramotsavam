@@ -155,7 +155,6 @@ export async function getAdminUsers(
       }
     };
   } catch (error) {
-    console.error('Error in getAdminUsers:', error);
     if (error instanceof z.ZodError) {
       return { success: false, error: 'Validation error', users: [] };
     }

@@ -35,10 +35,9 @@ export default function DebugDataPage() {
       }));
       setUsers(usersData);
 
-      console.log('Teams:', teamsData);
-      console.log('Users:', usersData);
+      // Teams and users data loaded
     } catch (error) {
-      console.error('Error loading data:', error);
+      // Error loading data
     }
   };
 

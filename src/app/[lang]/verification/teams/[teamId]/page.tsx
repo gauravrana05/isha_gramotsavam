@@ -151,7 +151,7 @@ export default function TeamVerificationPage() {
               }
             }
           } catch (error) {
-            console.warn(`Could not load user documents for player ${playerData.userId}:`, error);
+            // Could not load user documents
           }
         }
         
@@ -208,7 +208,6 @@ export default function TeamVerificationPage() {
       
       setPlayers(loadedPlayers);
     } catch (err: any) {
-      console.error("Error loading team:", err);
       setError("Failed to load team data");
     } finally {
       setLoading(false);
@@ -217,7 +216,7 @@ export default function TeamVerificationPage() {
 
   const handlePlayerStatusChange = async (playerId: string, status: 'approved' | 'rejected', comments?: string) => {
     if (!teamIdStr) {
-      console.error("Team ID is missing, cannot update player status.");
+      // Team ID is missing
       return;
     }
     try {
@@ -280,12 +279,10 @@ export default function TeamVerificationPage() {
           await updateTeamVerificationRecord(teamIdStr);
         }
       } catch (err) {
-        console.error('Error updating team verification record:', err);
-        // Optionally, show a user-facing error or handle as needed
+        // Error updating team verification record
       }
       
     } catch (error) {
-      console.error('Error updating player status:', error);
       showError('Failed to save verification. Please try again.');
       loadTeamData(); // Reload data on error
     } finally {
@@ -404,7 +401,7 @@ export default function TeamVerificationPage() {
           await updateTeamVerificationRecord(teamIdStr);
         }
       } catch (err) {
-        console.error('Error updating team verification record:', err);
+        // Error updating team verification record
       }
 
       // Reload team data to get updated status from server
@@ -414,7 +411,6 @@ export default function TeamVerificationPage() {
       setSelectedPlayers(new Set()); // Clear selection
 
     } catch(error) {
-      console.error('Bulk action error:', error);
       showError(`Some ${actionText}s may have failed. Please check and try again.`);
       // Reload data on error to ensure UI consistency
       loadTeamData();
@@ -426,7 +422,7 @@ export default function TeamVerificationPage() {
   const updateTeamStatus = async (updatedPlayers: TeamPlayer[]) => {
     if (!teamData) return;
     if (!teamIdStr) {
-      console.error("Team ID is missing, cannot update player status.");
+      // Team ID is missing
       return;
     } 
     const approvedCount = updatedPlayers.filter(p => p.verificationStatus === 'approved').length;
@@ -463,10 +459,9 @@ export default function TeamVerificationPage() {
           district: teamData.district,
           panchayat: teamData.panchayat
         });
-        console.log('Venue assignment result:', result.message);
+        // Venue assignment completed
       } catch (error) {
-        console.error('Error assigning team to venue:', error);
-        // Don't fail the verification process if venue assignment fails
+        // Error assigning team to venue - don't fail verification
       }
     }
 

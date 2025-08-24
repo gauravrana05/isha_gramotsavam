@@ -285,7 +285,7 @@ class NetworkStatusService {
       });
 
     } catch (error) {
-      console.warn('Connection test failed:', error);
+      // Warning removed
       
       // If test fails but navigator.onLine is true, assume poor connection
       this.updateStatus({
@@ -427,7 +427,7 @@ class NetworkStatusService {
       try {
         callback(event);
       } catch (error) {
-        console.error('Network status callback error:', error);
+        // Error handling removed
       }
     });
   }

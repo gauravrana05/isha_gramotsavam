@@ -20,11 +20,11 @@ export default async function LangLayout({ children, params }: LayoutProps) {
   
   // Validate language parameter
   if (!isValidLanguageCode(lang)) {
-    console.warn(`Invalid language code: ${lang}, redirecting to default language`);
+    // Warning removed
     redirect(`/${DEFAULT_LANGUAGE}`);
   }
 
-  console.log("Rendering [lang]/layout.tsx for", lang);
+  // Console log removed
   
   // Note: We don't set document.lang here as this runs server-side
   // The lang attribute will be set in the root layout
@@ -33,7 +33,7 @@ export default async function LangLayout({ children, params }: LayoutProps) {
 }
 
 export async function generateStaticParams(): Promise<{ lang: LanguageCode }[]> {
-  console.log("Generating static params for [lang]");
+  // Console log removed
   return [
     { lang: "en" },
     { lang: "ta" },
@@ -50,7 +50,7 @@ export async function generateMetadata({
 }: LayoutProps): Promise<Metadata> {
   // Await the params Promise
   const { lang } = await params;
-  console.log("Generating metadata for lang:", lang);
+  // Console log removed
   const resolvedLang = (lang ?? "en") as LanguageCode;
 
   const translations: Record<LanguageCode, { title: string; description: string }> = {

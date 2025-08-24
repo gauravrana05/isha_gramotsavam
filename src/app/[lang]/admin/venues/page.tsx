@@ -131,7 +131,7 @@ export default function VenuesManagement() {
       
       setVenues(venuesData);
     } catch (err: any) {
-      console.error('Error loading venues:', err);
+      // Error handling removed
       setError('Failed to load venues. Please check your permissions.');
     } finally {
       setLoading(false);
@@ -177,7 +177,7 @@ export default function VenuesManagement() {
       
       setVolunteerModal({ isOpen: false, venue: null });
     } catch (err: any) {
-      console.error('Error assigning volunteer:', err);
+      // Error handling removed
       setError('Failed to assign volunteer. Please try again.');
     }
   };
@@ -198,7 +198,7 @@ export default function VenuesManagement() {
       );
       
     } catch (err: any) {
-      console.error('Error deleting venue:', err);
+      // Error handling removed
       setError('Failed to delete venue. Please try again.');
     } finally {
       setDeletingVenue(null);

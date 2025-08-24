@@ -96,7 +96,7 @@ export default function AdminSportsPage() {
       
       setSports(sportsData);
     } catch (err: any) {
-      console.error('Error loading sports:', err);
+      // Error handling removed
       setError('Failed to load sports. Please check your permissions.');
     } finally {
       setLoading(false);
@@ -126,7 +126,7 @@ export default function AdminSportsPage() {
       );
       
     } catch (err: any) {
-      console.error('Error deactivating sport:', err);
+      // Error handling removed
       setError('Failed to deactivate sport. Please try again.');
     } finally {
       setDeletingSport(null);

@@ -117,7 +117,7 @@ export default function AuditLogsPage() {
       }
       
     } catch (err: any) {
-      console.error('Error loading audit logs:', err);
+      // Error handling removed
       setError('Failed to load audit logs. Please check your permissions.');
     } finally {
       setLoading(false);

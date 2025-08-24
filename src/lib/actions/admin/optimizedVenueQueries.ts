@@ -286,7 +286,6 @@ export async function getAdminVenues(
     };
 
   } catch (error) {
-    console.error('Error in getAdminVenues:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -457,7 +456,6 @@ export async function getTeamAssignments(
     };
 
   } catch (error) {
-    console.error('Error in getTeamAssignments:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -607,7 +605,6 @@ export async function bulkAssignTeamsToVenues(
     };
 
   } catch (error) {
-    console.error('Error in bulk assign teams to venues:', error);
     
     if (error instanceof z.ZodError) {
       return {

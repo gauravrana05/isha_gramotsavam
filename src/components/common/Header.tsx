@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ChevronDown, Menu, X } from 'lucide-react'
 import LanguageSelector from './LanguageSelector'
+import { useAuth } from '@/context/AuthContext'
 
 interface HeaderProps {
   lang: string
@@ -14,6 +15,7 @@ interface HeaderProps {
 export default function Header({ lang }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSportsDropdownOpen, setIsSportsDropdownOpen] = useState(false)
+  const { user } = useAuth()
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen)
   const closeMobileMenu = () => setIsMobileMenuOpen(false)
@@ -85,12 +87,21 @@ export default function Header({ lang }: HeaderProps) {
                 About Us
               </Link>
 
-              <Link
-                href={`/${lang}/profile`}
-                className="text-white hover:text-primary-500 transition-colors duration-200 font-medium"
-              >
-                Profile
-              </Link>
+              {user ? (
+                <Link
+                  href={`/${lang}/profile`}
+                  className="text-white hover:text-primary-500 transition-colors duration-200 font-medium"
+                >
+                  Profile
+                </Link>
+              ) : (
+                <Link
+                  href={`/${lang}/login`}
+                  className="text-white hover:text-primary-500 transition-colors duration-200 font-medium"
+                >
+                  Login
+                </Link>
+              )}
 
               {/* Language Selector */}
               <LanguageSelector 
@@ -173,13 +184,23 @@ export default function Header({ lang }: HeaderProps) {
                 About Us
               </Link>
 
-              <Link
-                href={`/${lang}/profile`}
-                className="block text-white hover:text-primary-500 transition-colors font-medium"
-                onClick={closeMobileMenu}
-              >
-                Profile
-              </Link>
+              {user ? (
+                <Link
+                  href={`/${lang}/profile`}
+                  className="block text-white hover:text-primary-500 transition-colors font-medium"
+                  onClick={closeMobileMenu}
+                >
+                  Profile
+                </Link>
+              ) : (
+                <Link
+                  href={`/${lang}/login`}
+                  className="block text-white hover:text-primary-500 transition-colors font-medium"
+                  onClick={closeMobileMenu}
+                >
+                  Login
+                </Link>
+              )}
             </div>
           </div>
         )}

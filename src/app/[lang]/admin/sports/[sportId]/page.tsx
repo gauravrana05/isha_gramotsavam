@@ -74,7 +74,7 @@ export default function SportDetailPage() {
         setError('Sport not found');
       }
     } catch (err: any) {
-      console.error('Error loading sport:', err);
+      // Error handling removed
       setError('Failed to load sport details');
     } finally {
       setLoading(false);

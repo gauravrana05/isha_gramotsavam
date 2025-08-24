@@ -62,19 +62,9 @@ export default function VolunteerAssignmentForm({
         }
       }
 
-      // Debug: Log form data
-      console.log('Form data being sent:', {
-        eventId: formData.get('eventId'),
-        volunteerId: formData.get('volunteerId'),
-        volunteerName: formData.get('volunteerName'),
-        volunteerType: formData.get('volunteerType'),
-        venueId: formData.get('venueId'),
-        venueName: formData.get('venueName'),
-        assignedBy: formData.get('assignedBy')
-      });
+      // Submitting form data
 
       const result = await assignVolunteerToVenue(formData);
-      console.log('Assignment result:', result);
       
       if (result.success) {
         setSuccess(result.message || 'Volunteer assigned successfully!');
@@ -87,7 +77,6 @@ export default function VolunteerAssignmentForm({
         setError(result.error || 'Failed to assign volunteer');
       }
     } catch (err: any) {
-      console.error('Volunteer assignment error:', err);
       setError(err.message || 'Failed to assign volunteer');
     } finally {
       setLoading(false);

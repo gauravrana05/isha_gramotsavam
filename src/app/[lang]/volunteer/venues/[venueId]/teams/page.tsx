@@ -52,7 +52,7 @@ export default function MatchDayTeamsPage() {
         setError(teamsResult.error || 'Failed to load teams');
       }
     } catch (err) {
-      console.error('Error loading teams:', err);
+      // Error handling removed
       setError('Failed to load teams');
     } finally {
       setLoading(false);
@@ -307,7 +307,7 @@ export default function MatchDayTeamsPage() {
           {
             label: 'Photo',
             icon: Camera,
-            onClick: (team) => console.log('View photo:', team),
+            onClick: (team) => {/* View photo action */},
             variant: 'secondary',
              // @ts-expect-error: 'show' is not a valid property on ActionButton, but used for conditional rendering
             show: (team : any) => !!team?.teamImageUrl

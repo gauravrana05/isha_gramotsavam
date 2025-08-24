@@ -138,7 +138,7 @@ export default function CreateEventPage() {
       }));
       setAvailableSports(sportsData.filter(sport => (sport as any).isActive))
     } catch (err: any) {
-      console.error('Error loading sports:', err);
+      // Error handling removed
     } finally {
       setLoadingSports(false);
     }
@@ -155,7 +155,7 @@ export default function CreateEventPage() {
       }));
       setAvailableVenues(venuesData.filter(venue => (venue as any).isActive));
     } catch (err: any) {
-      console.error('Error loading venues:', err);
+      // Error handling removed
     } finally {
       setLoadingVenues(false);
     }
@@ -299,7 +299,7 @@ export default function CreateEventPage() {
       await addDoc(collection(db, 'events'), eventData);
       router.push(`/${lang}/admin/events`);
     } catch (err: any) {
-      console.error('Error creating event:', err);
+      // Error handling removed
       setError('Failed to create event. Please try again.');
     } finally {
       setLoading(false);

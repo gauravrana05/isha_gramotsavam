@@ -143,7 +143,7 @@ export default function AnalyticsDashboard() {
 
       setData(mockData);
     } catch (error) {
-      console.error('Error loading analytics data:', error);
+      // Error handling removed
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -79,7 +79,7 @@ export default function VerificationTeamsPage() {
       setTeams(teamsData);
       applyFilters(teamsData, selectedFilter, searchQuery);
     } catch (err: any) {
-      console.error("Error loading teams:", err);
+      // Error handling removed
       setError("Failed to load teams data");
     } finally {
       setLoading(false);

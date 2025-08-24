@@ -87,7 +87,6 @@ export class MediaUploadService {
           }
         },
         (error) => {
-          console.error('Upload error:', error);
           reject(new Error(`Upload failed: ${error.message}`));
         },
         async () => {
@@ -95,7 +94,6 @@ export class MediaUploadService {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             resolve(downloadURL);
           } catch (error) {
-            console.error('Error getting download URL:', error);
             reject(new Error('Failed to get download URL'));
           }
         }
@@ -153,7 +151,6 @@ export class MediaUploadService {
         url
       };
     } catch (error) {
-      console.error('Error uploading fixture media:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed'
@@ -211,7 +208,6 @@ export class MediaUploadService {
         url
       };
     } catch (error) {
-      console.error('Error uploading match media:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed'
@@ -267,7 +263,6 @@ export class MediaUploadService {
         url
       };
     } catch (error) {
-      console.error('Error uploading venue media:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed'
@@ -375,7 +370,7 @@ export class MediaUploadService {
           const thumbnailRef = ref(storage, thumbnailPath);
           await deleteObject(thumbnailRef);
         } catch (error) {
-          console.log('No thumbnail to delete');
+          // No thumbnail to delete
         }
       }
       
@@ -384,7 +379,6 @@ export class MediaUploadService {
       
       return { success: true };
     } catch (error) {
-      console.error('Error deleting media:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Delete failed'
@@ -405,7 +399,6 @@ export class MediaUploadService {
       
       return { success: true };
     } catch (error) {
-      console.error('Error updating media:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Update failed'

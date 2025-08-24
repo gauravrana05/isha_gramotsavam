@@ -159,7 +159,7 @@ export default function EditEventPage() {
         setError('Event not found');
       }
     } catch (err: any) {
-      console.error('Error loading event:', err);
+      // Error handling removed
       setError('Failed to load event details');
     } finally {
       setLoading(false);
@@ -190,7 +190,7 @@ export default function EditEventPage() {
       }));
       setAvailableSports(sportsData.filter(sport => (sport as any).isActive));
     } catch (err: any) {
-      console.error('Error loading sports:', err);
+      // Error handling removed
     } finally {
       setLoadingSports(false);
     }
@@ -207,7 +207,7 @@ export default function EditEventPage() {
       }));
       setAvailableVenues(venuesData.filter(venue => (venue as any).isActive));
     } catch (err: any) {
-      console.error('Error loading venues:', err);
+      // Error handling removed
     } finally {
       setLoadingVenues(false);
     }
@@ -351,7 +351,7 @@ export default function EditEventPage() {
       await updateDoc(eventDoc, eventData);
       router.push(`/${lang}/admin/events/${eventId}`);
     } catch (err: any) {
-      console.error('Error updating event:', err);
+      // Error handling removed
       setError('Failed to update event. Please try again.');
     } finally {
       setSaving(false);

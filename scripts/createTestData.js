@@ -4,9 +4,9 @@ async function run() {
   try {
     const venueId = 'AsyteU6KNh7b9YehSkYy';
     const result = await createTestTeams(venueId, 25);
-    console.log('Test teams creation result:', JSON.stringify(result, null, 2));
+    // Test teams creation completed
   } catch (error) {
-    console.error('Error creating test teams:', error);
+    // Error creating test teams
   }
 }
 

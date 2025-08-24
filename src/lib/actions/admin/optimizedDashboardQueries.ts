@@ -93,7 +93,6 @@ export async function getAdminDashboardOverview(
     };
 
   } catch (error) {
-    console.error('Error in getAdminDashboardOverview:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -275,7 +274,6 @@ export async function getTournamentOverview(
     };
 
   } catch (error) {
-    console.error('Error in getTournamentOverview:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -366,7 +364,6 @@ async function getTeamsOverview(filters: any) {
   
   return overview;
   } catch (error) {
-    console.error('Error in getTeamsOverview:', error);
     return {
       total: 0,
       byStatus: {},
@@ -454,7 +451,6 @@ async function getPlayersOverview(filters: any) {
   
   return overview;
   } catch (error) {
-    console.error('Error in getPlayersOverview:', error);
     return {
       total: 0,
       byVerificationStatus: {},
@@ -539,7 +535,6 @@ async function getVerificationOverview(filters: any) {
   
   return overview;
   } catch (error) {
-    console.error('Error in getVerificationOverview:', error);
     return {
       totalInQueue: 0,
       processed: 0,
@@ -597,7 +592,6 @@ async function getVenuesOverview(filters: any) {
   
   return overview;
   } catch (error) {
-    console.error('Error in getVenuesOverview:', error);
     return {
       total: 0,
       active: 0,
@@ -660,7 +654,6 @@ async function getMatchesOverview(filters: any) {
     
     return overview;
   } catch (error) {
-    console.error('Error in getMatchesOverview:', error);
     return {
       total: 0,
       completed: 0,
@@ -752,7 +745,6 @@ async function getRecentActivity(filters: any) {
       .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
       .slice(0, recentLimit);
   } catch (error) {
-    console.error('Error in getRecentActivity:', error);
     return [];
   }
 }

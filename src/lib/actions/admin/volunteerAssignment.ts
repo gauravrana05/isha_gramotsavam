@@ -53,7 +53,6 @@ export async function assignVolunteerToVenue(formData: FormData) {
       assignmentId: docRef.id
     };
   } catch (error) {
-    console.error('Error assigning volunteer to venue:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -90,7 +89,6 @@ export async function removeVolunteerAssignment(assignmentId: string) {
       message: 'Volunteer assignment removed successfully'
     };
   } catch (error) {
-    console.error('Error removing volunteer assignment:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -121,7 +119,6 @@ export async function updateVolunteerAssignmentStatus(
       message: `Volunteer assignment ${status} successfully`
     };
   } catch (error) {
-    console.error('Error updating volunteer assignment status:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -213,7 +210,6 @@ export async function getVolunteerAssignments(volunteerId: string) {
       assignments
     };
   } catch (error) {
-    console.error('Error fetching volunteer assignments:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch assignments',

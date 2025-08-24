@@ -26,7 +26,7 @@ const db = admin.firestore();
 
 async function createTestTeams(venueId, count = 25) {
   try {
-    console.log(`Creating ${count} test teams for venue ${venueId}...`);
+    // Creating test teams for venue
     
     const batch = db.batch();
     const teamIds = [];
@@ -115,7 +115,7 @@ async function createTestTeams(venueId, count = 25) {
     
     await batch.commit();
     
-    console.log(`Successfully created ${count} test teams`);
+    // Successfully created test teams
     return {
       success: true,
       message: `Created ${count} test teams`,
@@ -123,7 +123,7 @@ async function createTestTeams(venueId, count = 25) {
     };
     
   } catch (error) {
-    console.error('Error creating test teams:', error);
+    // Error creating test teams
     return {
       success: false,
       error: error.message || 'Unknown error occurred'
@@ -137,10 +137,8 @@ const count = parseInt(process.argv[3]) || 25;
 
 createTestTeams(venueId, count)
   .then(result => {
-    console.log('Result:', JSON.stringify(result, null, 2));
     process.exit(0);
   })
   .catch(error => {
-    console.error('Script error:', error);
     process.exit(1);
   });

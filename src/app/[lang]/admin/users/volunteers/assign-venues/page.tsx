@@ -99,7 +99,7 @@ function AssignmentModal({ isOpen, onClose, onSuccess }: AssignmentModalProps) {
         setVenues(venuesResult.venues || []);
       }
     } catch (error) {
-      console.error('Error loading modal data:', error);
+      // Error handling removed
     }
   };
 
@@ -379,7 +379,7 @@ export default function VolunteerVenueAssignmentPage() {
               loadAssignments(); // Reload data
             }
           } catch (error) {
-            console.error('Failed to remove assignment:', error);
+            // Error handling removed
           }
         }
       }

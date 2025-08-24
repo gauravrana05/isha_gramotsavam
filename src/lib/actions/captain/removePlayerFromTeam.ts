@@ -84,7 +84,6 @@ export async function removePlayerFromTeam({ teamId, playerId, captainId }: Remo
       message: "Player removed successfully"
     };
   } catch (error) {
-    console.error("Error removing player from team:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to remove player from team"

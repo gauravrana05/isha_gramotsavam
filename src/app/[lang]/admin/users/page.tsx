@@ -58,14 +58,14 @@ export default function AdminUsersPage() {
 
   // Load users when table state changes (server-side via AdvancedTable.onDataLoad)
   const handleDataLoad = useCallback(async (params: TableParams) => {
-    console.log('🔄 handleDataLoad called with params:', params, 'user:', user?.uid);
+    // Console log removed
     try {
       // Guard against running when not authenticated
       if (!user?.uid) {
-        console.log('❌ No user UID, returning early');
+        // Console log removed
         return;
       }
-      console.log('✅ Starting data load...');
+      // Console log removed
       setLoading(true);
 
       // Add a small delay to see if this is the issue
@@ -110,20 +110,20 @@ export default function AdminUsersPage() {
       );
 
       if (!result.success) {
-        console.log('❌ API call failed:', result.error);
+        // Console log removed
         setError(result.error || 'Failed to load users');
         setUsers([]);
         setTotal(0);
         return;
       }
 
-      console.log('✅ Data loaded successfully:', result.users?.length, 'users');
+      // Console log removed
       setError('');
       setUsers(result.users || []);
       setTotal(result.pagination?.total || (result.users?.length ?? 0));
     } catch (e: any) {
-      console.log('❌ Exception during data load:', e);
-      console.error('Error loading users:', e);
+      // Console log removed
+      // Error handling removed
       setError(e?.message || 'Failed to load users');
       setUsers([]);
       setTotal(0);

@@ -76,9 +76,7 @@ class OfflineDataService {
     try {
       this.storage = await getOfflineStorage();
       this.initialized = true;
-      console.log('OfflineDataService initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize OfflineDataService:', error);
       throw error;
     }
   }
@@ -134,7 +132,6 @@ class OfflineDataService {
             timestamp
           };
         } catch (firebaseError) {
-          console.warn('Failed to sync create to Firebase, queued for later:', firebaseError);
           
           // Add to sync queue
           await this.addToSyncQueue({
@@ -180,7 +177,6 @@ class OfflineDataService {
         needsSync: true
       };
     } catch (error) {
-      console.error(`Failed to create document in ${collection}:${id}`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -244,7 +240,6 @@ class OfflineDataService {
             };
           }
         } catch (firebaseError) {
-          console.warn('Failed to read from Firebase, falling back to offline:', firebaseError);
         }
       }
 
@@ -270,7 +265,6 @@ class OfflineDataService {
         timestamp: Date.now()
       };
     } catch (error) {
-      console.error(`Failed to read document from ${collection}:${id}`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -341,7 +335,6 @@ class OfflineDataService {
             timestamp
           };
         } catch (firebaseError) {
-          console.warn('Failed to sync update to Firebase, queued for later:', firebaseError);
         }
       }
 
@@ -366,7 +359,6 @@ class OfflineDataService {
         needsSync: true
       };
     } catch (error) {
-      console.error(`Failed to update document in ${collection}:${id}`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -418,7 +410,6 @@ class OfflineDataService {
             timestamp
           };
         } catch (firebaseError) {
-          console.warn('Failed to sync delete to Firebase, queued for later:', firebaseError);
         }
       }
 
@@ -442,7 +433,6 @@ class OfflineDataService {
         needsSync: true
       };
     } catch (error) {
-      console.error(`Failed to delete document from ${collection}:${id}`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -539,7 +529,6 @@ class OfflineDataService {
             timestamp: Date.now()
           };
         } catch (firebaseError) {
-          console.warn('Failed to query Firebase, falling back to offline:', firebaseError);
         }
       }
 
@@ -572,7 +561,6 @@ class OfflineDataService {
         timestamp: Date.now()
       };
     } catch (error) {
-      console.error(`Failed to query ${collectionName}`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -613,7 +601,6 @@ class OfflineDataService {
             }
           },
           (error) => {
-            console.error('Firebase listener error:', error);
             // Fall back to cached data
             this.read<T>(collectionName, id, { ...options, useOfflineFirst: true })
               .then(result => {
@@ -627,7 +614,7 @@ class OfflineDataService {
         this.listeners.set(listenerId, unsubscribe);
         return unsubscribe;
       } catch (error) {
-        console.error('Failed to setup Firebase listener:', error);
+        // Failed to setup Firebase listener
       }
     }
 
@@ -665,7 +652,6 @@ class OfflineDataService {
         isOnline: navigator.onLine
       };
     } catch (error) {
-      console.error('Failed to get sync status:', error);
       return {
         lastSync: 0,
         pendingActions: 0,
@@ -680,7 +666,6 @@ class OfflineDataService {
    */
   async forcSync(userId?: string): Promise<{ success: boolean; synced: number; failed: number }> {
     // This will be implemented in the sync engine
-    console.log('Force sync requested for user:', userId);
     return { success: true, synced: 0, failed: 0 };
   }
 

@@ -16,7 +16,6 @@ export async function checkAndUpdateProfileCompletion(userId: string) {
     
     const isComplete = checkProfileCompletion(userData);
     
-    console.log("isComplete", isComplete);
     if (isComplete && !userData?.isProfileComplete) {
       await userDocRef.update({
         isProfileComplete: true,
@@ -49,7 +48,6 @@ export async function checkAndUpdateProfileCompletion(userId: string) {
     return { success: true, isComplete: userData?.isProfileComplete || false };
     
   } catch (error) {
-    console.error('Error:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
@@ -107,7 +105,6 @@ async function checkAndUpdateTeamVerification(userId: string) {
     return teamUpdates;
     
   } catch (error) {
-    console.error(`Error checking team verification for user ${userId}:`, error);
     return [];
   }
 }
@@ -132,8 +129,6 @@ function checkProfileCompletion(userData: any): boolean {
     userData?.district && 
     userData?.panchayat
   );
-  console.log(hasDocuments,"hasFields",  hasFields);
-  console.log(userData);
   return hasDocuments && hasFields;
 }
 

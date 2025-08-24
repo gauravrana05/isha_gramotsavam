@@ -32,12 +32,10 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Disable experimental features that might conflict with PWA
-  experimental: {
-    turbo: {
-      // Disable Turbopack for development if it causes issues
-      rules: {},
-    },
+  // Turbopack configuration (moved from experimental as it's now stable)
+  turbopack: {
+    // Disable Turbopack for development if it causes issues
+    rules: {},
   },
 };
 

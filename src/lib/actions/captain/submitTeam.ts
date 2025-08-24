@@ -55,7 +55,7 @@ async function validateTeamForSubmission(teamId: string, captainId: string): Pro
       }
     }
   } catch (error) {
-    console.warn('Could not load sport configuration, using team maxPlayers as minimum:', error);
+    // Could not load sport configuration, using team maxPlayers as minimum
   }
 
   // Check if team has minimum required players
@@ -154,7 +154,6 @@ export async function submitTeamForVerification(request: SubmitTeamRequest) {
       read: false
     });
 
-    console.log(`Team ${teamId} submitted for verification successfully`);
 
     return {
       success: true,
@@ -162,7 +161,6 @@ export async function submitTeamForVerification(request: SubmitTeamRequest) {
       message: "Team submitted for verification successfully"
     };
   } catch (error) {
-    console.error("Error submitting team for verification:", error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to submit team for verification"

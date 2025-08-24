@@ -57,13 +57,13 @@ class OfflineStorage {
       // Only initialize IndexedDB in browser environment
       if (typeof window !== 'undefined') {
         this.db = await getIndexedDB();
-        console.log('OfflineStorage initialized successfully with IndexedDB');
+        // Console log removed
       } else {
         console.log('OfflineStorage initialized in server environment (memory cache only)');
       }
       this.initialized = true;
     } catch (error) {
-      console.warn('Failed to initialize IndexedDB, falling back to memory cache only:', error);
+      // Warning removed
       // Continue with just memory cache - don't throw error
       this.db = null;
       this.initialized = true;
@@ -103,7 +103,7 @@ class OfflineStorage {
         try {
           await this.db.put(collection, document);
         } catch (error) {
-          console.warn('Failed to store in IndexedDB:', error);
+          // Warning removed
         }
       }
 
@@ -119,7 +119,7 @@ class OfflineStorage {
 
       return { success: true, timestamp: document.timestamp };
     } catch (error) {
-      console.error(`Failed to store document in ${collection}:${id}`, error);
+      // Error handling removed
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
@@ -173,7 +173,7 @@ class OfflineStorage {
 
       return { success: false, error: 'Document not found' };
     } catch (error) {
-      console.error(`Failed to get document from ${collection}:${id}`, error);
+      // Error handling removed
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
@@ -198,7 +198,7 @@ class OfflineStorage {
       try {
         documents = await this.db.getAll(collection);
       } catch (error) {
-        console.warn('Failed to get documents from IndexedDB:', error);
+        // Warning removed
         return { success: true, data: [], fromCache: false };
       }
 
@@ -230,7 +230,7 @@ class OfflineStorage {
         timestamp: Date.now()
       };
     } catch (error) {
-      console.error(`Failed to get all documents from ${collection}`, error);
+      // Error handling removed
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
@@ -264,7 +264,7 @@ class OfflineStorage {
         timestamp: Date.now()
       };
     } catch (error) {
-      console.error(`Failed to query ${collection} by index ${indexName}`, error);
+      // Error handling removed
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
@@ -302,7 +302,7 @@ class OfflineStorage {
 
       return { success: true };
     } catch (error) {
-      console.error(`Failed to delete document from ${collection}:${id}`, error);
+      // Error handling removed
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
@@ -328,7 +328,7 @@ class OfflineStorage {
 
       return { success: true };
     } catch (error) {
-      console.error(`Failed to hard delete document from ${collection}:${id}`, error);
+      // Error handling removed
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
@@ -359,7 +359,7 @@ class OfflineStorage {
         timestamp: Date.now()
       };
     } catch (error) {
-      console.error(`Failed to get unsynced documents from ${collection}`, error);
+      // Error handling removed
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
@@ -404,7 +404,7 @@ class OfflineStorage {
 
       return { success: true };
     } catch (error) {
-      console.error(`Failed to mark documents as synced in ${collection}`, error);
+      // Error handling removed
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
@@ -429,7 +429,7 @@ class OfflineStorage {
 
       return { success: true };
     } catch (error) {
-      console.error(`Failed to clear collection ${collection}`, error);
+      // Error handling removed
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
@@ -470,7 +470,7 @@ class OfflineStorage {
         }
       };
     } catch (error) {
-      console.error('Failed to get storage info', error);
+      // Error handling removed
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }

@@ -42,7 +42,6 @@ export async function createVenueLocationMapping(formData: FormData) {
       mappingId: docRef.id
     };
   } catch (error) {
-    console.error('Error creating venue location mapping:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -76,7 +75,6 @@ export async function updateVenueLocationMapping(mappingId: string, formData: Fo
       message: 'Venue location mapping updated successfully'
     };
   } catch (error) {
-    console.error('Error updating venue location mapping:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -103,7 +101,6 @@ export async function deleteVenueLocationMapping(mappingId: string) {
       message: 'Venue location mapping deactivated successfully'
     };
   } catch (error) {
-    console.error('Error deleting venue location mapping:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -125,7 +122,6 @@ export async function deleteClusterDivisionMapping(mappingId: string) {
       message: 'Cluster-division mapping deactivated successfully'
     };
   } catch (error) {
-    console.error('Error deleting cluster-division mapping:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -176,7 +172,6 @@ export async function removeClusterFromDivisionMapping(mappingId: string, cluste
       message: `Removed ${clusterVenueIds.length} clusters from mapping`
     };
   } catch (error) {
-    console.error('Error removing clusters from mapping:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -241,8 +236,6 @@ export async function createGroupedClusterDivisionMapping(formData: FormData) {
       mappingId: docRef.id
     };
   } catch (error) {
-    console.error('Error creating grouped cluster-division mapping:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -303,8 +296,6 @@ export async function updateGroupedClusterDivisionMapping(mappingId: string, for
       message: 'Cluster-division mapping updated successfully'
     };
   } catch (error) {
-    console.error('Error updating grouped cluster-division mapping:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -396,7 +387,6 @@ export async function autoMapClustersToDivisions() {
       errors
     };
   } catch (error) {
-    console.error('Error in auto-mapping:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'

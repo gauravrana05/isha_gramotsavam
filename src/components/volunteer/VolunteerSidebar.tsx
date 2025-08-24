@@ -217,7 +217,7 @@ export default function VolunteerSidebar({
     try {
       await logout();
     } catch (error) {
-      console.error('Logout failed:', error);
+      // Error handling removed
     }
   };
 

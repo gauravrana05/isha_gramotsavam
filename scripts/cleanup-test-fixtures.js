@@ -26,7 +26,7 @@ const db = admin.firestore();
 
 async function cleanupTestFixtures(venueId) {
   try {
-    console.log(`Cleaning up test fixtures for venue ${venueId}...`);
+    // Cleaning up test fixtures for venue
     
     // Get all fixtures for this venue
     const fixturesSnapshot = await db.collection('fixtures')
@@ -34,7 +34,7 @@ async function cleanupTestFixtures(venueId) {
       .get();
     
     if (fixturesSnapshot.empty) {
-      console.log('No fixtures found to delete');
+      // No fixtures found to delete
       return { success: true, deletedCount: 0 };
     }
     
@@ -46,7 +46,7 @@ async function cleanupTestFixtures(venueId) {
     
     await batch.commit();
     
-    console.log(`Deleted ${fixturesSnapshot.docs.length} fixtures`);
+    // Deleted fixtures
     
     // Also clean up related matches
     const matchesSnapshot = await db.collection('matches')
@@ -61,7 +61,7 @@ async function cleanupTestFixtures(venueId) {
       });
       
       await matchBatch.commit();
-      console.log(`Deleted ${matchesSnapshot.docs.length} matches`);
+      // Deleted matches
     }
     
     return {
@@ -71,7 +71,7 @@ async function cleanupTestFixtures(venueId) {
     };
     
   } catch (error) {
-    console.error('Error cleaning up fixtures:', error);
+    // Error cleaning up fixtures
     return {
       success: false,
       error: error.message || 'Unknown error occurred'
@@ -84,10 +84,8 @@ const venueId = process.argv[2] || 'AsyteU6KNh7b9YehSkYy';
 
 cleanupTestFixtures(venueId)
   .then(result => {
-    console.log('Cleanup result:', JSON.stringify(result, null, 2));
     process.exit(0);
   })
   .catch(error => {
-    console.error('Script error:', error);
     process.exit(1);
   });

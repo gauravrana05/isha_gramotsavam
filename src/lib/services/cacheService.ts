@@ -97,7 +97,7 @@ class SmartCacheService {
       
       return true;
     } catch (error) {
-      console.error('Failed to set cache entry:', error);
+      // Failed to set cache entry
       return false;
     }
   }
@@ -140,7 +140,7 @@ class SmartCacheService {
 
       return entry.data as T;
     } catch (error) {
-      console.error('Failed to get cache entry:', error);
+      // Failed to get cache entry
       return null;
     } finally {
       this.stats.averageAccessTime = 
@@ -222,7 +222,7 @@ class SmartCacheService {
           ttl: this.defaultTTL * 2 // Longer TTL for warmed data
         });
       } catch (error) {
-        console.warn(`Failed to warm up cache for key: ${key}`, error);
+        // Failed to warm up cache for key
       }
     });
 
@@ -247,7 +247,7 @@ class SmartCacheService {
             tags: ['prefetched']
           });
         } catch (error) {
-          console.warn(`Failed to prefetch data for key: ${key}`, error);
+          // Failed to prefetch data for key
         }
       }
     });
@@ -391,7 +391,7 @@ class SmartCacheService {
     
     if (candidates.length > 0) {
       // Trigger prefetch in background (would need data loader callback)
-      console.debug('Predictive prefetch candidates:', candidates);
+      // Predictive prefetch candidates identified
     }
   }
 
@@ -516,7 +516,7 @@ class SmartCacheService {
     
     if (cleaned > 0) {
       this.updateStats();
-      console.debug(`Cache cleanup: removed ${cleaned} expired entries`);
+      // Cache cleanup completed
     }
   }
 

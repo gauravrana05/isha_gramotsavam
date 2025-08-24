@@ -36,13 +36,12 @@ function calculateAge(dob: string): number | null {
 
 async function checkPlayerExistsInEvent(
   playerIdentifier: string,
-  eventId: string,
-  identifierType: "userId" | "phone"
+  eventId?: string,
+  identifierType: "userId" | "phone" = "userId"
 ): Promise<{ exists: boolean; teamId?: string; teamName?: string }> {
   try {
     const teamsRef = adminDb.collection("teams");
     const query = teamsRef
-      .where("eventId", "==", eventId)
       .where(identifierType === "userId" ? "captainId" : "captainProfile.phone", "==", playerIdentifier);
 
     const snapshot = await query.get();
@@ -57,7 +56,6 @@ async function checkPlayerExistsInEvent(
 
     return { exists: false };
   } catch (error) {
-    console.error("Error checking player existence:", error);
     return { exists: false };
   }
 }
@@ -65,7 +63,6 @@ async function checkPlayerExistsInEvent(
 export async function createTeamAndPromoteCaptain(request: CreateTeamRequest) {
   try {
     const { teamData, captainId } = request;
-    const eventId = "gramotsavam_2025";
 
     // Validate required fields
     if (!teamData.name || !teamData.sportName) {
@@ -89,16 +86,16 @@ export async function createTeamAndPromoteCaptain(request: CreateTeamRequest) {
     }
 
     // Duplicate check by userId & phone
-    const existingUser = await checkPlayerExistsInEvent(captainId, eventId, "userId");
+    const existingUser = await checkPlayerExistsInEvent(captainId, undefined, "userId");
     if (existingUser.exists) {
       return {
         success: false,
-        error: `You are already registered in team "${existingUser.teamName}" for this event.`,
+        error: `You are already registered in team "${existingUser.teamName}".`,
       };
     }
 
     if (userProfile.phoneNumber) {
-      const existingPhone = await checkPlayerExistsInEvent(userProfile.phoneNumber, eventId, "phone");
+      const existingPhone = await checkPlayerExistsInEvent(userProfile.phoneNumber, undefined, "phone");
       if (existingPhone.exists) {
         return {
           success: false,
@@ -114,7 +111,7 @@ export async function createTeamAndPromoteCaptain(request: CreateTeamRequest) {
       const sportDoc = await adminDb.collection("sports").doc(sportId).get();
       sportConfig = sportDoc.exists ? sportDoc.data() : null;
     } catch (err) {
-      console.warn("Sport config load failed:", err);
+      // Sport config load failed - will use fallback
     }
 
     if (!sportConfig) {
@@ -139,7 +136,6 @@ export async function createTeamAndPromoteCaptain(request: CreateTeamRequest) {
         phone: userProfile.phoneNumber,
         panchayat: userProfile.panchayat,
       },
-      eventId,
       sportId: teamData.sportId || teamData.sportName.toLowerCase(),
       sportName: teamData.sportName,
       genderCategory: teamData.genderCategory || sportConfig.genderCategories[0] || "mixed",
@@ -229,7 +225,7 @@ export async function createTeamAndPromoteCaptain(request: CreateTeamRequest) {
     });
 
     // Promote to captain role
-    await promoteUserToCaptain(captainId, teamId, eventId);
+    await promoteUserToCaptain(captainId, teamId);
 
     // Revalidate captain views
     revalidatePath("/captain/teams");
@@ -240,7 +236,6 @@ export async function createTeamAndPromoteCaptain(request: CreateTeamRequest) {
       teamId,
     };
   } catch (error: any) {
-    console.error("Error creating team:", error);
     return {
       success: false,
       error: error.message || "Failed to create team. Please try again.",
@@ -249,22 +244,20 @@ export async function createTeamAndPromoteCaptain(request: CreateTeamRequest) {
 }
 
 // Simplified role promotion - much faster than the complex cloud function
-export async function promoteUserToCaptain(userId: string, teamId: string, eventId: string) {
+export async function promoteUserToCaptain(userId: string, teamId: string, eventId?: string) {
   try {
     // Simple role update - just update the role field in users collection
     await adminDb.collection("users").doc(userId).update({
       role: "captain",
       teamId: teamId,
-      eventId: eventId,
       updatedAt: FieldValue.serverTimestamp()
     });
 
     // Create simple captain access record (optional - for permissions)
-    await adminDb.collection("userRoles").doc(`${userId}_${eventId}`).set({
+    await adminDb.collection("userRoles").doc(userId).set({
       userId: userId,
       role: "captain",
       teamId: teamId,
-      eventId: eventId,
       permissions: ["manage_team", "add_players", "edit_team", "view_matches"],
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp()
@@ -272,7 +265,6 @@ export async function promoteUserToCaptain(userId: string, teamId: string, event
 
     return { success: true };
   } catch (error: any) {
-    console.error("Error promoting user to captain:", error);
     throw new Error(`Failed to promote user to captain: ${error.message}`);
   }
 } 

@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setUserProfile(null);
     } catch (error) {
-      console.error("Error signing out:", error);
+      // Error signing out
       throw error;
     }
   };
@@ -64,11 +64,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else {
               // The user is new and the profile is being created by the backend trigger.
               // We'll show a loading state and wait.
-              console.log("New user detected. Waiting for server-side profile creation...");
+              // New user detected. Waiting for server-side profile creation
               setLoading(true);
               // Set a timeout to prevent infinite loading if profile creation fails
               profileCreationTimeout = setTimeout(async () => {
-                console.warn("Profile creation timed out. Creating fallback profile...");
+                // Profile creation timed out. Creating fallback profile
                 
                 // Create a basic user profile if Cloud Function didn't create it
                 try {
@@ -119,11 +119,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   };
                   
                   await setDoc(doc(db, "users", firebaseUser.uid), fallbackProfile);
-                  console.log("Fallback profile created successfully");
+                  // Fallback profile created successfully
                   
                   // The onSnapshot listener will pick up the new document
                 } catch (error) {
-                  console.error("Failed to create fallback profile:", error);
+                  // Failed to create fallback profile
                   setLoading(false);
                   setUserProfile(null);
                 }
@@ -131,7 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           },
           (err) => {
-            console.error("Error listening to user profile:", err);
+            // Error listening to user profile
             setUserProfile(null);
             setLoading(false);
           }

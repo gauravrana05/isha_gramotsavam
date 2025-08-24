@@ -7,7 +7,7 @@ export interface Fixture {
   name: string; // e.g., "Volleyball Men's - Coimbatore District Cluster"
   
   // Event & Sport Association
-  eventId: string;
+  eventId?: string;
   sportId: string;
   sportName: string;
   genderCategory: 'men' | 'women';
@@ -63,7 +63,7 @@ export interface Match {
   // Tournament Context
   fixtureId: string;
   fixtureName: string;
-  eventId: string;
+  eventId?: string;
   sportId: string;
   sportName: string;
   genderCategory: 'men' | 'women';

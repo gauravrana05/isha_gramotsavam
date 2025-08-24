@@ -89,7 +89,7 @@ class ActionQueueService {
       this.setupNetworkListener();
       this.startPeriodicProcessing();
     } catch (error) {
-      console.error('Failed to initialize ActionQueueService:', error);
+      // Failed to initialize ActionQueueService
     }
   }
 
@@ -142,7 +142,7 @@ class ActionQueueService {
 
       return queuedAction.id;
     } catch (error) {
-      console.error('Failed to enqueue action:', error);
+      // Failed to enqueue action
       throw error;
     }
   }
@@ -163,7 +163,7 @@ class ActionQueueService {
       
       return result.success;
     } catch (error) {
-      console.error('Failed to dequeue action:', error);
+      // Failed to dequeue action
       return false;
     }
   }
@@ -191,7 +191,7 @@ class ActionQueueService {
 
       return [];
     } catch (error) {
-      console.error('Failed to get pending actions:', error);
+      // Failed to get pending actions
       return [];
     }
   }
@@ -248,7 +248,7 @@ class ActionQueueService {
 
       return result;
     } catch (error) {
-      console.error('Failed to process queue:', error);
+      // Failed to process queue
       result.success = false;
       result.errors.push(error instanceof Error ? error.message : 'Unknown error');
       return result;
@@ -288,7 +288,7 @@ class ActionQueueService {
 
       return cleared;
     } catch (error) {
-      console.error('Failed to clear completed actions:', error);
+      // Failed to clear completed actions
       return 0;
     }
   }
@@ -408,7 +408,7 @@ class ActionQueueService {
 
       return result;
     } catch (error) {
-      console.error('Error processing action:', error);
+      // Error processing action
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -442,7 +442,7 @@ class ActionQueueService {
         tags: ['rollback']
       });
     } catch (error) {
-      console.error('Failed to apply optimistic update:', error);
+      // Failed to apply optimistic update
     }
   }
 
@@ -465,7 +465,7 @@ class ActionQueueService {
 
       this.cacheService.delete(`rollback_${action.id}`);
     } catch (error) {
-      console.error('Failed to rollback optimistic update:', error);
+      // Failed to rollback optimistic update
     }
   }
 
@@ -490,7 +490,7 @@ class ActionQueueService {
         });
       }
     } catch (error) {
-      console.error('Failed to mark action in progress:', error);
+      // Failed to mark action in progress
     }
   }
 
@@ -507,7 +507,7 @@ class ActionQueueService {
         });
       }
     } catch (error) {
-      console.error('Failed to mark action completed:', error);
+      // Failed to mark action completed
     }
   }
 
@@ -533,7 +533,7 @@ class ActionQueueService {
         userId: action.userId
       });
     } catch (err) {
-      console.error('Failed to handle action failure:', err);
+      // Failed to handle action failure
     }
   }
 
@@ -556,7 +556,7 @@ class ActionQueueService {
       this.stats.averageRetryCount = actions.length > 0 ? totalRetries / actions.length : 0;
       
     } catch (error) {
-      console.error('Failed to update stats:', error);
+      // Failed to update stats
     }
   }
 
@@ -565,7 +565,7 @@ class ActionQueueService {
       try {
         callback(this.stats);
       } catch (error) {
-        console.error('Progress callback error:', error);
+        // Progress callback error
       }
     });
   }

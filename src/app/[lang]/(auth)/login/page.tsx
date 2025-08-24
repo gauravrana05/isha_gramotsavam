@@ -55,11 +55,15 @@ export default function LoginPage() {
     if (!window.recaptchaVerifier) {
       window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
         size: "invisible",
-        callback: () => console.log("reCAPTCHA solved"),
+        callback: () => {/* reCAPTCHA solved */},
         "expired-callback": () => {
-          console.log("reCAPTCHA expired");
+          // reCAPTCHA expired
           setError(t("error_recaptcha_expired"));
         },
+        // Add timeout and error handling
+        "error-callback": () => {
+          setError("RecaptchaVerifier error. Please try again.");
+        }
       });
     }
   };
@@ -76,6 +80,21 @@ export default function LoginPage() {
     return phone;
   };
 
+  // Timeout wrapper for async operations
+  const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number = 30000): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+        
+        // Clear timeout if promise resolves first
+        promise.finally(() => clearTimeout(timeoutId));
+      })
+    ]);
+  };
+
   const handleSendCode = async () => {
     if (!phoneNumber.trim()) {
       setError(t("error_no_phone"));
@@ -83,26 +102,50 @@ export default function LoginPage() {
     }
     setError("");
     setLoading(true);
+    
     try {
       setUpRecaptcha();
       const formattedPhone = formatPhoneNumber(phoneNumber);
       const appVerifier = window.recaptchaVerifier!;
-      const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+      
+      // Add timeout wrapper to prevent hanging
+      const result = await withTimeout(
+        signInWithPhoneNumber(auth, formattedPhone, appVerifier),
+        30000 // 30 second timeout
+      );
+      
       setConfirmationResult(result);
       setStep("otp");
       setCanResend(false);
       setResendTimer(30);
-      console.log("OTP sent successfully");
+      // OTP sent successfully
     } catch (err: any) {
-      console.error("Error sending OTP:", err);
-      setError(
-        err.code === "auth/invalid-phone-number"
-          ? t("error_invalid_phone")
-          : err.message || t("error_generic")
-      );
+      console.error('OTP Send Error:', err);
+      
+      let errorMessage;
+      if (err.message?.includes('timed out')) {
+        errorMessage = "Request timed out. Please check your connection and try again.";
+      } else if (err.code === "auth/invalid-phone-number") {
+        errorMessage = t("error_invalid_phone");
+      } else if (err.code === "auth/too-many-requests") {
+        errorMessage = "Too many attempts. Please try again later.";
+      } else if (err.code === "auth/network-request-failed") {
+        errorMessage = "Network error. Please check your connection.";
+      } else {
+        errorMessage = err.message || t("error_generic");
+      }
+      
+      setError(errorMessage);
+      
+      // Clean up recaptcha on error
       if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = undefined;
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (cleanupErr) {
+          console.warn('RecaptchaVerifier cleanup error:', cleanupErr);
+        } finally {
+          window.recaptchaVerifier = undefined;
+        }
       }
     } finally {
       setLoading(false);
@@ -130,6 +173,15 @@ export default function LoginPage() {
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    // Handle Enter key - verify OTP when all digits are filled
+    if (e.key === 'Enter') {
+      const otpValue = otp.join('');
+      if (otpValue.length === 6 && !loading) {
+        e.preventDefault();
+        handleVerifyCode();
+      }
+      return;
+    }
     // Handle backspace
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
@@ -180,17 +232,32 @@ export default function LoginPage() {
     }
     setError("");
     setLoading(true);
+    
     try {
-      await confirmationResult.confirm(otpValue);
-      console.log("Phone number verified successfully");
+      // Add timeout wrapper to prevent hanging
+      await withTimeout(
+        confirmationResult.confirm(otpValue),
+        20000 // 20 second timeout for OTP verification
+      );
+      // Phone number verified successfully
       
     } catch (err: any) {
-      console.error("Error verifying OTP:", err);
-      setError(
-        err.code === "auth/invalid-verification-code"
-          ? t("error_invalid_otp")
-          : err.message || t("error_generic")
-      );
+      console.error('OTP Verification Error:', err);
+      
+      let errorMessage;
+      if (err.message?.includes('timed out')) {
+        errorMessage = "Verification timed out. Please try again.";
+      } else if (err.code === "auth/invalid-verification-code") {
+        errorMessage = t("error_invalid_otp");
+      } else if (err.code === "auth/code-expired") {
+        errorMessage = "OTP has expired. Please request a new one.";
+      } else if (err.code === "auth/network-request-failed") {
+        errorMessage = "Network error. Please check your connection.";
+      } else {
+        errorMessage = err.message || t("error_generic");
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -207,24 +274,53 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // Clean up existing recaptcha
       if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = undefined;
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (cleanupErr) {
+          console.warn('RecaptchaVerifier cleanup error during resend:', cleanupErr);
+        } finally {
+          window.recaptchaVerifier = undefined;
+        }
       }
 
       setUpRecaptcha();
       const formattedPhone = formatPhoneNumber(phoneNumber);
       const appVerifier = window.recaptchaVerifier!;
-      const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+      
+      // Add timeout wrapper for resend operation
+      const result = await withTimeout(
+        signInWithPhoneNumber(auth, formattedPhone, appVerifier),
+        30000 // 30 second timeout
+      );
+      
       setConfirmationResult(result);
-      console.log("OTP resent successfully");
+      // OTP resent successfully
     } catch (err: any) {
-      console.error("Error resending OTP:", err);
-      setError('Failed to resend OTP. Please try again.');
+      console.error('OTP Resend Error:', err);
+      
+      let errorMessage;
+      if (err.message?.includes('timed out')) {
+        errorMessage = "Resend timed out. Please try again.";
+      } else if (err.code === "auth/too-many-requests") {
+        errorMessage = "Too many attempts. Please wait before trying again.";
+      } else {
+        errorMessage = 'Failed to resend OTP. Please try again.';
+      }
+      
+      setError(errorMessage);
       setCanResend(true);
+      
+      // Clean up recaptcha on error
       if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-        window.recaptchaVerifier = undefined;
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (cleanupErr) {
+          console.warn('RecaptchaVerifier cleanup error:', cleanupErr);
+        } finally {
+          window.recaptchaVerifier = undefined;
+        }
       }
     } finally {
       setLoading(false);
@@ -236,9 +332,18 @@ export default function LoginPage() {
     setConfirmationResult(null);
     setStep("phone");
     setError('');
+    setCanResend(false);
+    setResendTimer(30);
+    
+    // Clean up recaptcha properly
     if (window.recaptchaVerifier) {
-      window.recaptchaVerifier.clear();
-      window.recaptchaVerifier = undefined;
+      try {
+        window.recaptchaVerifier.clear();
+      } catch (cleanupErr) {
+        console.warn('RecaptchaVerifier cleanup error during number change:', cleanupErr);
+      } finally {
+        window.recaptchaVerifier = undefined;
+      }
     }
   };
 
@@ -261,17 +366,24 @@ export default function LoginPage() {
         <div className="mb-6 text-center"><div className="font-fira text-3xl font-semibold ">Namaskaram</div>
           <div className="font-fira pt-4 font-small text-sm">We&apos;ll check if you have an account, and help create one if you don&apos;t.</div></div>
 
-        <div className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleSendCode(); }} className="space-y-4">
           <Input
             type="tel"
             placeholder={"Phone"}
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && phoneNumber.length >= 10 && !loading) {
+                e.preventDefault();
+                handleSendCode();
+              }
+            }}
             disabled={loading}
             className="text-lg font-fira"
             variant="large"
             maxLength={10}
             aria-label={t("phone_number_placeholder")}
+            tabIndex={1}
           />
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -287,21 +399,27 @@ export default function LoginPage() {
             variant="primary"
             fullWidth
             aria-label={t("send_otp")}
+            tabIndex={2}
           >
             Continue
           </ButtonLoader>
           <div className="hr-sect">or</div>
           <div className="text-center">
-            <button
-              onClick={() => router.push(`/${lang}/public/`)}
-              className="text-info font-fira other-login-button text-sm"
-              aria-label={t("continue_as_guest")}
-            >
-              Continue as Guest
-            </button>
+            <ButtonLoader
+            onClick={() => router.push(`/${lang}/public/`)}
+            size="md"
+            className="text-info font-fira"
+            variant="ghost"
+            fullWidth
+            aria-label={t("continue_as_guest")}
+            tabIndex={3}
+          >
+            Continue as Guest
+          </ButtonLoader>
+            
           </div>
           <div id="recaptcha-container" className="hidden" />
-        </div>
+        </form>
         <div className="mt-6 text-center">
           <p className="text-sm font-fira">
             By clicking on continue, you accept our{" "}
@@ -343,7 +461,7 @@ export default function LoginPage() {
         <div className="text-center">
           <button
             onClick={handleChangeNumber}
-            tabIndex={9}
+            tabIndex={7}
             className="text-[#CE4520] font-fira text-sm hover:underline"
           >
             Change Number
@@ -351,7 +469,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <div className="space-y-6">
+      <form onSubmit={(e) => { e.preventDefault(); if (!isVerifyDisabled) handleVerifyCode(); }} className="space-y-6">
         <div className="mb-4">
           <div className="flex justify-center items-center space-x-2 mb-4">
             {otp.map((digit, index) => (
@@ -381,6 +499,8 @@ export default function LoginPage() {
               <button
                 onClick={handleResendCode}
                 className="text-primary-600 font-fira text-sm hover:underline"
+                tabIndex={8}
+                type="button"
               >
                 Resend OTP
               </button>
@@ -407,10 +527,11 @@ export default function LoginPage() {
           size="lg"
           variant="primary"
           fullWidth
+          tabIndex={9}
         >
           Verify
         </ButtonLoader>
-      </div>
+      </form>
 
       <div className="mt-6 text-center">
         <p className="text-sm font-fira text-gray-600">

@@ -47,7 +47,7 @@ export const useServiceWorker = () => {
           });
         })
         .catch((error) => {
-          console.error("Service Worker registration failed:", error);
+          // Error handling removed
         });
     };
 

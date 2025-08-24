@@ -29,7 +29,7 @@ export default function LocationMappingTable({ mappings, onEdit }: LocationMappi
       await deleteVenueLocationMapping(mappingId);
       // The page will automatically revalidate due to revalidatePath in the server action
     } catch (error) {
-      console.error('Failed to delete mapping:', error);
+      // Error handling removed
       // You could add toast notification here
     }
   };

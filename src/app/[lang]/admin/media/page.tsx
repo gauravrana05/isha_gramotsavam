@@ -127,7 +127,7 @@ export default function AdminMediaPage() {
       await loadMedia(filters, 100);
       
     } catch (err: any) {
-      console.error('Error loading data:', err);
+      // Error handling removed
       setError('Failed to load data. Please check your permissions.');
     } finally {
       setLoading(false);

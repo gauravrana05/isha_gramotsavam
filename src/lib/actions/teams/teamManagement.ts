@@ -89,7 +89,7 @@
 
 //     return { exists: false };
 //   } catch (error) {
-//     console.error("Error checking player existence in event:", error);
+//     // Error handling removed
 //     return { exists: false };
 //   }
 // }
@@ -174,7 +174,7 @@
 //         };
 //       }
 //     } catch (error) {
-//       console.error("Error loading sport configuration:", error);
+//       // Error handling removed
 //     }
 
 //     // Use transaction for data consistency
@@ -301,7 +301,7 @@
 //       return teamRef.id;
 //     });
 
-//     console.log(`Enhanced team ${result} created successfully`);
+//     // Console log removed
 
 //     return {
 //       success: true,
@@ -309,7 +309,7 @@
 //       message: "Team created successfully"
 //     };
 //   } catch (error) {
-//     console.error("Error creating enhanced team:", error);
+//     // Error handling removed
     
 //     if (error instanceof z.ZodError) {
 //       return { 
@@ -479,7 +479,7 @@
 //       return firebaseUserId;
 //     });
 
-//     console.log(`Player ${result} added to team ${teamId}`);
+//     // Console log removed
 
 //     return {
 //       success: true,
@@ -487,7 +487,7 @@
 //       message: "Player added successfully"
 //     };
 //   } catch (error) {
-//     console.error("Error adding player to team:", error);
+//     // Error handling removed
     
 //     if (error instanceof z.ZodError) {
 //       return { 
@@ -570,7 +570,7 @@
 //       });
 //     });
 
-//     console.log(`Team ${teamId} submitted for verification successfully`);
+//     // Console log removed
 
 //     return {
 //       success: true,
@@ -578,7 +578,7 @@
 //       message: "Team submitted for verification successfully"
 //     };
 //   } catch (error) {
-//     console.error("Error submitting team for verification:", error);
+//     // Error handling removed
 //     return { 
 //       success: false, 
 //       error: error instanceof Error ? error.message : "Failed to submit team for verification"

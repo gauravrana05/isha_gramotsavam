@@ -79,7 +79,7 @@ export const verifyTeam = onCall(async (request: CallableRequest) => {
       read: false
     });
 
-    console.log(`Team ${teamId} ${status} by ${auth.uid}`);
+    // Console log removed
 
     return {
       success: true,
@@ -87,7 +87,7 @@ export const verifyTeam = onCall(async (request: CallableRequest) => {
     };
 
   } catch (error) {
-    console.error("Error verifying team:", error);
+    // Error handling removed
     throw new HttpsError("internal", "Failed to verify team");
   }
 });
@@ -130,7 +130,7 @@ export const verifyPlayer = onCall(async (request: CallableRequest) => {
     // Update team verification record
     await updateTeamVerificationRecord(teamId);
 
-    console.log(`Player ${playerId} in team ${teamId} ${status} by ${auth.uid}`);
+    // Console log removed
 
     return {
       success: true,
@@ -138,7 +138,7 @@ export const verifyPlayer = onCall(async (request: CallableRequest) => {
     };
 
   } catch (error) {
-    console.error("Error verifying player:", error);
+    // Error handling removed
     throw new HttpsError("internal", "Failed to verify player");
   }
 });
@@ -179,7 +179,7 @@ export const getTeamsPendingVerification = onCall( { region: "us-central1" },asy
     };
 
   } catch (error) {
-    console.error("Error getting teams pending verification:", error);
+    // Error handling removed
     throw new HttpsError("internal", "Failed to get verification queue");
   }
 });
@@ -243,7 +243,7 @@ export const getTeamForVerification = onCall(async (request: CallableRequest) =>
     };
 
   } catch (error) {
-    console.error("Error getting team for verification:", error);
+    // Error handling removed
     throw new HttpsError("internal", "Failed to get team details");
   }
 });

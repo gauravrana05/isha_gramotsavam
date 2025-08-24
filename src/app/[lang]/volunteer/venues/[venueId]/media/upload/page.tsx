@@ -73,7 +73,7 @@ export default function MediaUploadPage() {
         });
       }
     } catch (err) {
-      console.error('Error loading context info:', err);
+      // Error handling removed
       setError('Failed to load context information');
     } finally {
       setLoading(false);

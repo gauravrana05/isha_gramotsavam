@@ -117,21 +117,21 @@ export default function TeamRegistrationPage() {
         genderCategory: userProfile.gender,
       };
       
-      console.log("Creating team with optimized server action...");
+      // Console log removed
       const result = await createTeamAndPromoteCaptain({ 
         teamData, 
         captainId: user.uid 
       });
       
       if (result.success) {
-        console.log("Team created and user promoted successfully");
+        // Console log removed
         router.push(`/${lang}/captain/teams/${result.teamId}/players/invite`);
       } else {
         throw new Error(result.error || "Failed to create team.");
       }
 
     } catch (err: any) {
-      console.error("Error creating team:", err);
+      // Error handling removed
       setError(err.message || "Failed to create team. Please try again.");
     } finally {
       setLoading(false);

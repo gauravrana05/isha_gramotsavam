@@ -42,7 +42,7 @@ export const usePincodeValidation = (): UsePincodeValidationReturn => {
         setAddressData(null);
       }
     } catch (err: any) {
-      console.error("Hook caught error:", err); // Log the error caught by the hook
+      // Error handling removed // Log the error caught by the hook
       // Provide a more user-friendly message, potentially including the original error
       const userMessage = err.message || 'Failed to validate pincode. Please try again.';
       setError(userMessage); 

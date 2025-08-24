@@ -195,28 +195,23 @@ export async function getAdminPlayers(
     try {
       playersSnapshot = await playersQuery.limit(queryLimit).get();
     } catch (indexError: any) {
-      console.warn('Primary query failed, attempting fallbacks:', indexError?.message || indexError);
+      // Primary query failed, attempting fallbacks
       usedFallback = true;
       
       // Try progressively simpler queries
       try {
         // First fallback: Basic collection group query with just isDeleted filter
-        console.warn('Fallback 1: Basic collection group with isDeleted filter');
         const fallback1Query = adminDb.collectionGroup('players')
           .where('isDeleted', '!=', true)
           .limit(queryLimit);
         playersSnapshot = await fallback1Query.get();
-        console.warn('Fallback 1 successful');
       } catch (fallback1Error) {
         try {
           // Second fallback: Pure collection group query without any filters
-          console.warn('Fallback 2: Pure collection group query');
           const fallback2Query = adminDb.collectionGroup('players').limit(queryLimit);
           playersSnapshot = await fallback2Query.get();
-          console.warn('Fallback 2 successful - will filter deleted items client-side');
         } catch (fallback2Error) {
           // Final attempt: Try to get individual team collections (requires knowing team IDs)
-          console.error('All collection group queries failed. This might indicate a deeper configuration issue.');
           throw new Error(`All database query methods failed. Please check Firestore rules and indexes. Original error: ${indexError?.message || indexError}`);
         }
       }
@@ -242,7 +237,6 @@ export async function getAdminPlayers(
           });
         }
       } catch (teamFetchError) {
-        console.warn('Error fetching team data, proceeding without team information:', teamFetchError instanceof Error ? teamFetchError.message : teamFetchError);
       }
     }
     
@@ -251,7 +245,6 @@ export async function getAdminPlayers(
       try {
         const playerData = doc.data();
         if (!playerData) {
-          console.warn(`Empty player data for doc ${doc.id}`);
           return null;
         }
         
@@ -271,7 +264,6 @@ export async function getAdminPlayers(
           } : null
         };
       } catch (playerProcessError) {
-        console.warn(`Error processing player doc ${doc.id}:`, playerProcessError instanceof Error ? playerProcessError.message : playerProcessError);
         return null;
       }
     }).filter(player => player !== null); // Remove any null entries
@@ -435,7 +427,6 @@ export async function getAdminPlayers(
     };
 
   } catch (error) {
-    console.error('Error in getAdminPlayers:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -487,25 +478,20 @@ export async function getAdminPlayerStats(
     try {
       playersSnapshot = await playersQuery.get();
     } catch (indexError: any) {
-      console.warn('Stats query failed, attempting fallbacks:', indexError?.message || indexError);
+      // Stats query failed, attempting fallbacks
       usedFallback = true;
       
       try {
         // First fallback: Basic collection group query with just isDeleted filter
-        console.warn('Stats Fallback 1: Basic collection group with isDeleted filter');
         const fallback1Query = adminDb.collectionGroup('players')
           .where('isDeleted', '!=', true);
         playersSnapshot = await fallback1Query.get();
-        console.warn('Stats Fallback 1 successful');
       } catch (fallback1Error) {
         try {
           // Second fallback: Pure collection group query without any filters
-          console.warn('Stats Fallback 2: Pure collection group query');
           const fallback2Query = adminDb.collectionGroup('players');
           playersSnapshot = await fallback2Query.get();
-          console.warn('Stats Fallback 2 successful - will filter deleted items client-side');
         } catch (fallback2Error) {
-          console.error('All stats collection group queries failed.');
           throw new Error(`Stats database query failed. Please check Firestore rules and indexes. Original error: ${indexError?.message || indexError}`);
         }
       }
@@ -531,7 +517,6 @@ export async function getAdminPlayerStats(
           });
         }
       } catch (teamFetchError) {
-        console.warn('Error fetching team data for stats, proceeding without team information:', teamFetchError instanceof Error ? teamFetchError.message : teamFetchError);
       }
     }
     
@@ -540,7 +525,6 @@ export async function getAdminPlayerStats(
       try {
         const playerData = doc.data();
         if (!playerData) {
-          console.warn(`Empty player data for stats doc ${doc.id}`);
           return null;
         }
         
@@ -551,7 +535,6 @@ export async function getAdminPlayerStats(
           team: teamData 
         } as PlayerDocument;
       } catch (playerProcessError) {
-        console.warn(`Error processing player doc for stats ${doc.id}:`, playerProcessError instanceof Error ? playerProcessError.message : playerProcessError);
         return null;
       }
     }).filter(player => player !== null); // Remove any null entries
@@ -706,7 +689,6 @@ export async function getAdminPlayerStats(
     };
 
   } catch (error) {
-    console.error('Error getting admin player stats:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -790,7 +772,6 @@ export async function bulkVerifyPlayers(
     };
 
   } catch (error) {
-    console.error('Error in bulk verify players:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to bulk verify players'

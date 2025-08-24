@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🔄 Running updateTeamVerificationRecord for team: ${teamId}`);
+    // Running updateTeamVerificationRecord for team
     
     await updateTeamVerificationRecord(teamId);
     
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Error updating team verification record:', error);
+    // Error updating team verification record
     return NextResponse.json(
       { 
         success: false, 
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`🔄 Running updateTeamVerificationRecord for team: ${teamId}`);
+    // Running updateTeamVerificationRecord for team
     
     await updateTeamVerificationRecord(teamId);
     
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Error updating team verification record:', error);
+    // Error updating team verification record
     return NextResponse.json(
       { 
         success: false, 

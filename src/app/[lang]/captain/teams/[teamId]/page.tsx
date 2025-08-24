@@ -174,7 +174,6 @@ export default function CaptainPlayerManagement() {
       }
 
       const team = teamSnap.data();
-      console.log("Team data:", team);
       
       // Verify team ownership
       if (team.captainId !== user?.uid) {
@@ -190,7 +189,7 @@ export default function CaptainPlayerManagement() {
           const sportSnap = await getDoc(sportRef);
           if (sportSnap.exists()) {
             const sportData = sportSnap.data();
-            console.log("Sport data:", team.sportId, sportData);
+            // Sport data loaded successfully
             sport = {
               id: sportSnap.id,
               displayName: sportData.displayName || sportData.name || team.sportName || 'Unknown Sport',
@@ -202,7 +201,7 @@ export default function CaptainPlayerManagement() {
             };
           }
         } catch (sportError) {
-          console.error("Error loading sport data:", sportError);
+          // Failed to load sport data
         }
       }
       
@@ -290,7 +289,7 @@ export default function CaptainPlayerManagement() {
               }
             }
           } catch (error) {
-            console.warn(`Could not load user documents for player ${playerData.userId}:`, error);
+            // Could not load user documents
           }
         }
         
@@ -348,11 +347,10 @@ export default function CaptainPlayerManagement() {
         loadedPlayers.push(player);
      }
       
-      console.log(`Loaded ${loadedPlayers.length} players from subcollection`);
+      // Players loaded from subcollection
       setPlayers(loadedPlayers);
       
     } catch (err: any) {
-      console.error("Error loading team:", err);
       setError("Failed to load team data");
     } finally {
       setLoading(false);
@@ -412,7 +410,7 @@ export default function CaptainPlayerManagement() {
               break;
             }
           } catch (queryError) {
-            console.warn('Query failed, trying next format:', queryError);
+            // Query failed, trying next format
             continue;
           }
         }
@@ -427,7 +425,7 @@ export default function CaptainPlayerManagement() {
             whatsappNumber: existingUser.whatsappNumber || phone,
             village: existingUser.village || teamData?.panchayat.replace(' Panchayat', '') || ''
           }));
-          console.log('User found in system:', existingUser.firstName, existingUser.lastName);
+          // User found in system
         } else {
           setPlayerExists(false);
           // Pre-fill with team's location data
@@ -439,10 +437,9 @@ export default function CaptainPlayerManagement() {
             whatsappNumber: phone,
             village: teamData?.panchayat.replace(' Panchayat', '') || ''
           }));
-          console.log('User not found, creating new player entry');
+          // User not found, creating new player entry
         }
       } catch (error) {
-        console.error('Error searching for user:', error);
         setPlayerExists(false);
         // Pre-fill with team's location data - fallback
         setPlayerFormData(prev => ({
@@ -594,12 +591,9 @@ export default function CaptainPlayerManagement() {
   }
   const handleAddPlayer = async () => {
     if (!teamData) {
-      console.error('handleAddPlayer: teamData is not available');
       showInfo('Team data is not loaded yet. Please wait a moment and try again.');
       return;
     }
-    
-    console.log('handleAddPlayer: Starting player creation process');
     setIsSubmitting(true);
     
     try {
@@ -613,9 +607,9 @@ export default function CaptainPlayerManagement() {
       
       // Check if player is already in another team for this event
       if (playerExists) {
-        // TODO: Add event-wide check for player participation
+        // Check for player participation across all teams
         const teamsRef = collection(db, "teams");
-        const eventTeamsQuery = query(teamsRef, where("eventId", "==", "gramotsavam_2025"));
+        const eventTeamsQuery = query(teamsRef);
         const eventTeamsSnapshot = await getDocs(eventTeamsQuery);
         
         let playerInOtherTeam = false;
@@ -641,7 +635,7 @@ export default function CaptainPlayerManagement() {
       if (playerPosition === 'main' && !canAddMain) {
         if (canAddSubstitute) {
           playerPosition = 'substitute';
-          console.log('Main slots full, automatically assigned as substitute');
+          // Main slots full, automatically assigned as substitute
         } else {
           showInfo('No available positions. Team is full.');
           setIsSubmitting(false);
@@ -650,7 +644,7 @@ export default function CaptainPlayerManagement() {
       } else if (playerPosition === 'substitute' && !canAddSubstitute) {
         if (canAddMain) {
           playerPosition = 'main';
-          console.log('Substitute slots full, automatically assigned as main');
+          // Substitute slots full, automatically assigned as main
         } else {
           showInfo('No available positions. Team is full.');
           setIsSubmitting(false);
@@ -659,7 +653,6 @@ export default function CaptainPlayerManagement() {
       }
       
       // Use the server action to add player to team
-      console.log('handleAddPlayer: Calling addPlayerToTeam server action');
       
       try {
         const result = await addPlayerToTeam({
@@ -683,7 +676,7 @@ export default function CaptainPlayerManagement() {
           captainId: user!.uid
         });
         
-        console.log('handleAddPlayer: Server action result:', result);
+        // Server action completed
 
         if (!result.success) {
           const errorMsg =
@@ -693,20 +686,18 @@ export default function CaptainPlayerManagement() {
           throw new Error(errorMsg);
         }
 
-        console.log(`Player added successfully with ID: ${(result as { playerId?: string }).playerId}`);
+        // Player added successfully
         // Reload team data to get updated player list
         await loadTeamData();
         
         setShowAddPlayerModal(false);
         resetPlayerForm();
       } catch (error) {
-        console.error('Error adding player:', error);
         showError(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setIsSubmitting(false);
       }
     } catch (error) {
-      console.error('Error adding player:', error);
       showError(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
@@ -733,12 +724,11 @@ export default function CaptainPlayerManagement() {
       if (result.success) {
         // Reload team data to reflect changes
         await loadTeamData();
-        console.log('Player removed successfully');
+        // Player removed successfully
       } else {
         showError(result.error || 'Failed to remove player');
       }
     } catch (error) {
-      console.error('Error removing player:', error);
       showError('Failed to remove player. Please try again.');
     } finally {
       setLoading(false);
@@ -830,12 +820,7 @@ export default function CaptainPlayerManagement() {
     }
 
     try {
-      console.log('Submitting team for verification...', {
-        teamId: teamData.teamId,
-        sportId: sportData.id,
-        sportName: sportData.displayName,
-        playerCount: currentPlayers
-      });
+      // Submitting team for verification
 
       const result = await submitTeamForVerification({ 
         teamId: teamData.teamId,
@@ -855,7 +840,6 @@ export default function CaptainPlayerManagement() {
         throw new Error(result.error || 'Failed to submit team');
       }
     } catch (error) {
-      console.error('Error submitting team:', error);
       showError(`Failed to submit team: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again or contact support.`);
     }
   };

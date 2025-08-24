@@ -62,7 +62,7 @@ export default function TeamsManagementEnhanced() {
 
     } catch (err: any) {
       setError(err.message || 'Failed to load teams');
-      console.error('Error loading teams:', err);
+      // Error handling removed
     } finally {
       setLoading(false);
     }
@@ -90,7 +90,7 @@ export default function TeamsManagementEnhanced() {
 
     } catch (err: any) {
       setError(err.message || 'Failed to create teams');
-      console.error('Error creating teams:', err);
+      // Error handling removed
     } finally {
       setCreateLoading(false);
     }

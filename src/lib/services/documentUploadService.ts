@@ -100,7 +100,6 @@ export class DocumentUploadService {
           }
         },
         (error) => {
-          console.error('Upload error:', error);
           reject(new Error(`Upload failed: ${error.message}`));
         },
         async () => {
@@ -109,7 +108,6 @@ export class DocumentUploadService {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             resolve(downloadURL);
           } catch (error) {
-            console.error('Error getting download URL:', error);
             reject(new Error('Failed to get download URL'));
           }
         }
@@ -126,7 +124,6 @@ export class DocumentUploadService {
       const storageRef = ref(storage, storagePath);
       return await getDownloadURL(storageRef);
     } catch (error) {
-      console.log(`Document not found: ${documentType} for user ${userId}`);
       return null;
     }
   }
@@ -152,7 +149,6 @@ export class DocumentUploadService {
       const storageRef = ref(storage, storagePath);
       await deleteObject(storageRef);
     } catch (error) {
-      console.error(`Error deleting ${documentType} for user ${userId}:`, error);
       throw new Error(`Failed to delete ${documentType}`);
     }
   }
@@ -181,7 +177,6 @@ export class DocumentUploadService {
           throw new Error(`Invalid document type: ${documentType}`);
       }
     } catch (error) {
-      console.error(`Error replacing ${documentType}:`, error);
       throw error;
     }
   }

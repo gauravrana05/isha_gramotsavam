@@ -58,7 +58,7 @@ export default function FixturesPage() {
       setCheckedInTeamsResult(teamsResult);
       setFixtures(fixturesResult || []);
     } catch (err) {
-      console.error('Error loading data:', err);
+      // Error handling removed
       setError('Failed to load fixtures data');
     } finally {
       setLoading(false);
@@ -264,13 +264,17 @@ export default function FixturesPage() {
                 f.sportId === sportId && f.genderCategory === genderCategory
               );
               
+              // Get sport name from the first team in this sport group
+              const firstTeam = (sportTeams as any)?.[0];
+              const sportName = firstTeam?.sportName || firstTeam?.displayName || sportId.replace('_', ' ');
+              
               return (
                 <div key={sportKey} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                   <div className="flex items-center">
                     <Trophy className="w-5 h-5 text-gray-400 mr-3" />
                     <div>
                       <h3 className="font-medium text-gray-900 capitalize">
-                        {sportId.replace('_', ' ')} - {genderCategory}
+                        {sportName} - {genderCategory}
                       </h3>
                       <p className="text-sm text-gray-600">
                         {(sportTeams as any)?.length} teams checked in

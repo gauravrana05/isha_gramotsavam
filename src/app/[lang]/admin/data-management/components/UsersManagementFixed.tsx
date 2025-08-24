@@ -80,7 +80,7 @@ export default function UsersManagementFixed() {
       
     } catch (err: any) {
       setError(err.message || 'Failed to load users');
-      console.error('Error loading users:', err);
+      // Error handling removed
     } finally {
       setLoading(false);
     }

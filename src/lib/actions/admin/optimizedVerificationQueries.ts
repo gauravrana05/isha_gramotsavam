@@ -327,7 +327,6 @@ export async function getAdminVerificationQueue(
     };
 
   } catch (error) {
-    console.error('Error in getAdminVerificationQueue:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -476,7 +475,6 @@ export async function getVerificationWorkload(
     };
 
   } catch (error) {
-    console.error('Error getting verification workload:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -592,7 +590,6 @@ export async function bulkProcessVerifications(
     };
 
   } catch (error) {
-    console.error('Error in bulk process verifications:', error);
     
     if (error instanceof z.ZodError) {
       return {
@@ -661,7 +658,6 @@ async function getTeamVerificationsMap(teamIds: string[]): Promise<Map<string, a
         });
       }
     } catch (error) {
-      console.error(`Error fetching verification for team ${teamId}:`, error);
     }
   }
   

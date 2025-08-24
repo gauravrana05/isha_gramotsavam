@@ -103,7 +103,7 @@ export default function EventsManagement() {
       
       setEvents(eventsData);
     } catch (err: any) {
-      console.error('Error loading events:', err);
+      // Error handling removed
       setError('Failed to load events. Please check your permissions.');
     } finally {
       setLoading(false);
@@ -137,7 +137,7 @@ export default function EventsManagement() {
       );
       
     } catch (err: any) {
-      console.error('Error deactivating event:', err);
+      // Error handling removed
       setError('Failed to deactivate event. Please try again.');
     } finally {
       setDeletingEvent(null);

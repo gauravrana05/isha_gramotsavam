@@ -90,7 +90,7 @@ export default function AdminFixturesPage() {
       setFixtures(fixturesData);
       
     } catch (err: any) {
-      console.error('Error loading fixtures:', err);
+      // Error handling removed
       setError('Failed to load fixtures. Please check your permissions.');
     } finally {
       setLoading(false);
@@ -106,7 +106,7 @@ export default function AdminFixturesPage() {
       }));
       setVenues(venuesData);
     } catch (error) {
-      console.error('Error loading venues:', error);
+      // Error handling removed
     }
   };
 

@@ -67,7 +67,7 @@ export default function VenueVolunteerAssignmentModal({
       const activeVolunteers = volunteersData.filter(volunteer => volunteer.isActive !== false);
       setVolunteers(activeVolunteers);
     } catch (err: any) {
-      console.error('Error loading volunteers:', err);
+      // Error handling removed
       setError('Failed to load volunteers. Please try again.');
     } finally {
       setLoadingVolunteers(false);

@@ -79,7 +79,7 @@ export default function EventDetailPage() {
         setError('Event not found');
       }
     } catch (err: any) {
-      console.error('Error loading event:', err);
+      // Error handling removed
       setError('Failed to load event details');
     } finally {
       setLoading(false);

@@ -114,7 +114,7 @@ export default function CaptainDashboard() {
       
       
     } catch (err: any) {
-      console.error("Error loading captain data:", err);
+      // Error handling removed
       setError("Failed to load dashboard data");
     } finally {
       setLoading(false);

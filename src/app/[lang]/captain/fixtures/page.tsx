@@ -4,7 +4,11 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase/config";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, orderBy, limit } from "firebase/firestore";
+import { AdvancedTable } from '@/components/ui/AdvancedTable';
+import type { Column } from '@/components/ui/Table';
+import type { FilterField } from '@/components/ui/FilterSidebar';
+import Link from "next/link";
 import Image from "next/image";
 import { 
   Calendar, 
@@ -16,7 +20,11 @@ import {
   Trophy,
   MapPin,
   Users,
-  Target
+  Target,
+  Eye,
+  Edit,
+  UserCheck,
+  Star
 } from "lucide-react";
 
 interface CaptainTeam {
@@ -36,10 +44,11 @@ interface CaptainTeam {
   maxPlayers: number;
 }
 
-interface Fixture {
+interface CaptainFixture {
   id: string;
   name: string;
   sportId: string;
+  sportName?: string;
   genderCategory: string;
   venueId: string;
   venue?: {
@@ -54,11 +63,13 @@ interface Fixture {
     winners?: any[];
   };
   createdAt: any;
+  hasCaptainTeam?: boolean;
+  captainTeamNames?: string[];
 }
 
 export default function CaptainFixturesPage() {
   const [teams, setTeams] = useState<CaptainTeam[]>([]);
-  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [fixtures, setFixtures] = useState<CaptainFixture[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -95,6 +106,7 @@ export default function CaptainFixturesPage() {
       
       const captainTeams: CaptainTeam[] = [];
       const venueIds = new Set<string>();
+      const captainTeamIds = new Set<string>();
       
       for (const docSnapshot of querySnapshot.docs) {
         const teamData = docSnapshot.data();
@@ -104,6 +116,38 @@ export default function CaptainFixturesPage() {
         const playersSnapshot = await getDocs(playersCollection);
         const currentPlayers = playersSnapshot.docs.filter(doc => !doc.data().isDeleted).length;
         
+        // Load venue assignments from teamVenueAssignment collection (get ALL assignments)
+        let venueAssignment: any = null;
+        try {
+          const venueAssignmentQuery = query(
+            collection(db, "teamVenueAssignment"),
+            where("teamId", "==", docSnapshot.id)
+          );
+          const venueAssignmentSnapshot = await getDocs(venueAssignmentQuery);
+          
+          // Process all venue assignments for this team
+          venueAssignmentSnapshot.docs.forEach(assignDoc => {
+            const assignmentData = assignDoc.data();
+            const venueId = assignmentData.venueId || assignmentData.clusterVenueId || assignmentData.divisionVenueId;
+            const venueName = assignmentData.venueName || assignmentData.clusterVenueName || assignmentData.divisionVenueName || 'Unknown Venue';
+            
+            if (venueId) {
+              venueIds.add(venueId);
+              
+              // Use the first valid venue assignment for the team display
+              if (!venueAssignment) {
+                venueAssignment = {
+                  venueId: venueId,
+                  venueName: venueName,
+                  assignmentLevel: assignmentData.assignmentLevel || assignmentData.currentLevel || 'cluster'
+                };
+              }
+            }
+          });
+        } catch (venueError) {
+          console.error('Error loading venue assignments:', venueError);
+        }
+        
         const team: CaptainTeam = {
           teamId: docSnapshot.id,
           name: teamData.teamName || teamData.name || '',
@@ -111,15 +155,17 @@ export default function CaptainFixturesPage() {
           panchayat: teamData.panchayat || '',
           district: teamData.district || '',
           state: teamData.state || '',
-          venueId: teamData.venueId,
+          venueId: venueAssignment?.venueId,
+          venue: venueAssignment ? {
+            name: venueAssignment.venueName,
+            address: ''
+          } : undefined,
           status: teamData.status || 'draft',
           currentPlayers,
           maxPlayers: teamData.maxPlayers || 12
         };
         
-        if (teamData.venueId) {
-          venueIds.add(teamData.venueId);
-        }
+        captainTeamIds.add(docSnapshot.id);
         
         captainTeams.push(team);
       }
@@ -135,7 +181,7 @@ export default function CaptainFixturesPage() {
           );
           const fixturesSnapshot = await getDocs(fixturesQuery);
           
-          const venueFixtures: Fixture[] = [];
+          const venueFixtures: CaptainFixture[] = [];
           
           for (const fixtureDoc of fixturesSnapshot.docs) {
             const fixtureData = fixtureDoc.data();
@@ -153,22 +199,32 @@ export default function CaptainFixturesPage() {
                   };
                 }
               } catch (error) {
-                console.warn("Could not load venue details:", error);
+                // Warning removed
               }
             }
+            
+            // Check if any captain teams are in this fixture
+            const assignedTeams = fixtureData.assignedTeams || [];
+            const hasCaptainTeam = assignedTeams.some((team: any) => captainTeamIds.has(team.teamId));
+            const captainTeamNames = assignedTeams
+              .filter((team: any) => captainTeamIds.has(team.teamId))
+              .map((team: any) => team.teamName || team.name);
             
             venueFixtures.push({
               id: fixtureDoc.id,
               name: fixtureData.name || `${fixtureData.sportId} Tournament`,
               sportId: fixtureData.sportId || '',
+              sportName: fixtureData.sportName || fixtureData.sportId || '',
               genderCategory: fixtureData.genderCategory || '',
               venueId: fixtureData.venueId || '',
               venue: venue ?? undefined,
               status: fixtureData.status || 'scheduled',
               level: fixtureData.level || 'Panchayat',
-              assignedTeams: fixtureData.assignedTeams || [],
+              assignedTeams: assignedTeams,
               bracket: fixtureData.bracket || {},
-              createdAt: fixtureData.createdAt || null
+              createdAt: fixtureData.createdAt || null,
+              hasCaptainTeam,
+              captainTeamNames
             });
           }
           
@@ -189,7 +245,7 @@ export default function CaptainFixturesPage() {
       }
 
     } catch (err: any) {
-      console.error("Error loading captain fixtures:", err);
+      // Error handling removed
       setError("Failed to load fixtures data");
     } finally {
       setLoading(false);
@@ -222,6 +278,169 @@ export default function CaptainFixturesPage() {
       case 'rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  // AdvancedTable configuration
+  const columns: Column<CaptainFixture>[] = [
+    {
+      key: 'name',
+      header: 'Tournament',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex items-center">
+            <Trophy className="w-5 h-5 text-gray-400 mr-3" />
+            <div>
+              <div className="text-sm font-medium text-gray-900">
+                {item.name}
+                {item.hasCaptainTeam && (
+                  <Star className="w-4 h-4 text-yellow-500 ml-2 inline" />
+                )}
+              </div>
+              <div className="text-sm text-gray-500">{item.sportName} • {item.genderCategory}</div>
+              <div className="text-sm text-gray-500">Level: {item.level}</div>
+              {item.hasCaptainTeam && item.captainTeamNames && (
+                <div className="text-xs text-blue-600 mt-1">
+                  Your teams: {item.captainTeamNames.join(', ')}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
+      sortable: true
+    },
+    {
+      key: 'venue',
+      header: 'Venue',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div>
+            {item.venue ? (
+              <div>
+                <div className="text-sm font-medium text-gray-900 flex items-center">
+                  <MapPin className="w-4 h-4 text-gray-400 mr-1" />
+                  {item.venue.name}
+                </div>
+                <div className="text-xs text-gray-500">{item.venue.address}</div>
+              </div>
+            ) : (
+              <span className="text-sm text-gray-500">Venue TBD</span>
+            )}
+          </div>
+        );
+      },
+      sortable: true
+    },
+    {
+      key: 'assignedTeams',
+      header: 'Teams',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex items-center">
+            <Users className="w-4 h-4 text-gray-400 mr-1" />
+            <span className="text-sm text-gray-900">{item.assignedTeams?.length || 0}</span>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'progress',
+      header: 'Progress',
+      render: (value, item, index) => {
+        if (!item) return null;
+        const completed = item.bracket?.matches?.filter(m => m.status === 'completed').length || 0;
+        const total = item.bracket?.matches?.length || 0;
+        return (
+          <div>
+            <div className="text-sm text-gray-900">{completed} / {total}</div>
+            <div className="text-xs text-gray-500">matches completed</div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+            {getStatusIcon(item.status)}
+            <span className="ml-1 capitalize">{item.status.replace('_', ' ')}</span>
+          </span>
+        );
+      },
+      sortable: true
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex space-x-2">
+            <button
+              onClick={() => router.push(`/${lang}/captain/teams`)}
+              className="text-[#F28C38] hover:text-[#E67A26] flex items-center text-sm"
+            >
+              <UserCheck className="w-4 h-4 mr-1" />
+              Manage Teams
+            </button>
+          </div>
+        );
+      }
+    }
+  ];
+
+  const filters: FilterField[] = [
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { label: 'All', value: '' },
+        { label: 'Scheduled', value: 'scheduled' },
+        { label: 'In Progress', value: 'in_progress' },
+        { label: 'Completed', value: 'completed' }
+      ]
+    },
+    {
+      key: 'level',
+      label: 'Level',
+      type: 'select',
+      options: [
+        { label: 'All Levels', value: '' },
+        ...Array.from(new Set(fixtures.map(f => f.level))).map(level => ({
+          label: level,
+          value: level
+        }))
+      ]
+    },
+    {
+      key: 'hasCaptainTeam',
+      label: 'My Teams Only',
+      type: 'select',
+      options: [
+        { label: 'All Tournaments', value: '' },
+        { label: 'My Teams Only', value: 'true' }
+      ]
+    },
+    {
+      key: 'sportName',
+      label: 'Sport',
+      type: 'text'
+    }
+  ];
+
+  // Custom filter function for hasCaptainTeam
+  const customFilterFunction = (item: CaptainFixture, filters: Record<string, any>): boolean => {
+    if (filters.hasCaptainTeam === 'true') {
+      return item.hasCaptainTeam === true;
+    }
+    return true;
   };
 
   if (authLoading || loading) {
@@ -313,143 +532,37 @@ export default function CaptainFixturesPage() {
           </div>
         )}
 
-        {/* Fixtures Section */}
-        {fixtures.length > 0 ? (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="p-4 sm:p-6 border-b border-gray-200">
-              <h2 className="text-lg sm:text-xl font-semibold text-[#4A2F1D]">Tournament Fixtures</h2>
-              <p className="text-gray-600 text-sm mt-1">Tournaments at your team venues</p>
-            </div>
-
-            {/* Desktop View */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tournament</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Venue</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teams</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Matches</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {fixtures.map((fixture) => (
-                    <tr key={fixture.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <Trophy className="w-5 h-5 text-gray-400 mr-3" />
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{fixture.name}</div>
-                            <div className="text-sm text-gray-500">Level: {fixture.level}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {fixture.venue ? (
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{fixture.venue.name}</div>
-                            <div className="text-xs text-gray-500">{fixture.venue.address}</div>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-500">Venue TBD</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {fixture.assignedTeams?.length || 0}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {fixture.bracket?.matches?.filter(m => m.status === 'completed').length || 0} / {fixture.bracket?.matches?.length || 0}
-                        </div>
-                        <div className="text-xs text-gray-500">completed</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(fixture.status)}`}>
-                          {getStatusIcon(fixture.status)}
-                          <span className="ml-1 capitalize">{fixture.status.replace('_', ' ')}</span>
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile View */}
-            <div className="md:hidden space-y-4 p-4">
-              {fixtures.map((fixture) => (
-                <div key={fixture.id} className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center flex-1">
-                      <Trophy className="w-5 h-5 text-gray-400 mr-3" />
-                      <div className="flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">{fixture.name}</h3>
-                        <p className="text-sm text-gray-500">Level: {fixture.level}</p>
-                      </div>
-                    </div>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(fixture.status)} ml-2`}>
-                      {getStatusIcon(fixture.status)}
-                      <span className="ml-1 capitalize">{fixture.status.replace('_', ' ')}</span>
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-2 mb-4">
-                    <div>
-                      <span className="text-xs text-gray-500">Venue</span>
-                      <p className="text-sm font-medium text-gray-900">
-                        {fixture.venue ? fixture.venue.name : 'Venue TBD'}
-                      </p>
-                      {fixture.venue?.address && (
-                        <p className="text-xs text-gray-500">{fixture.venue.address}</p>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-xs text-gray-500">Teams</span>
-                        <p className="text-sm font-medium text-gray-900">{fixture.assignedTeams?.length || 0}</p>
-                      </div>
-                      <div>
-                        <span className="text-xs text-gray-500">Matches</span>
-                        <p className="text-sm font-medium text-gray-900">
-                          {fixture.bracket?.matches?.filter(m => m.status === 'completed').length || 0} / {fixture.bracket?.matches?.length || 0}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Winners Display */}
-                  {fixture.bracket?.winners && fixture.bracket.winners.length > 0 && (
-                    <div className="p-2 bg-green-50 border border-green-200 rounded">
-                      <div className="flex items-center text-green-800">
-                        <Trophy className="w-4 h-4 mr-1" />
-                        <span className="text-sm font-medium">Winners: {fixture.bracket.winners.length} teams advanced</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : teams.length > 0 ? (
-          <div className="bg-white rounded-lg border p-8 text-center">
-            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Fixtures Available</h3>
-            <p className="text-gray-600">No tournament fixtures have been created for your team venues yet.</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg border p-8 text-center">
-            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Teams Created</h3>
-            <p className="text-gray-600 mb-4">You haven&apos;t created any teams yet. Create a team to see fixture schedules.</p>
-            <button
-              onClick={() => router.push(`/${lang}/captain/teams`)}
-              className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
-            >
-              Go to My Teams
-            </button>
-          </div>
-        )}
+        {/* Tournament Fixtures Table */}
+        <AdvancedTable
+          title="Tournament Fixtures"
+          subtitle="View tournaments and fixture schedules for your teams"
+          data={fixtures}
+          columns={columns}
+          loading={loading}
+          
+          searchable={true}
+          searchPlaceholder="Search tournaments, sports, venues..."
+          searchFields={['name', 'sportName']}
+          
+          filterable={true}
+          filters={filters}
+          
+          sortable={true}
+          defaultSort={[{ key: 'createdAt', direction: 'desc' }]}
+          
+          pagination={{ enabled: true, pageSize: 10 }}
+          
+          persistState={true}
+          stateKey="captain-fixtures"
+          
+          emptyState={{
+            icon: Calendar,
+            title: teams.length > 0 ? 'No Fixtures Available' : 'No Teams Created',
+            description: teams.length > 0 
+              ? 'No tournament fixtures have been created for your team venues yet.'
+              : "You haven't created any teams yet. Create a team to see fixture schedules."
+          }}
+        />
       </div>
     </div>
   );

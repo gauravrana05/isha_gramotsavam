@@ -298,7 +298,7 @@ export default function CaptainSidebar({
                   await logout();
                   setIsMobileOpen(false);
                 } catch (error) {
-                  console.error('Error logging out:', error);
+                  // Handle logout error silently
                 }
               }}
               className="w-full flex items-center px-4 text-sm font-medium text-red-700 rounded-lg hover:bg-red-50 hover:text-red-900 transition-colors h-12"

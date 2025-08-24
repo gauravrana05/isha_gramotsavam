@@ -114,7 +114,7 @@ export default function VenueTalukMappingModal({
         setSelectedTaluks([]);
       }
     } catch (err: any) {
-      console.error('Error loading taluks:', err);
+      // Error loading taluks
       setError(err.message || 'Failed to load taluks');
       setAvailableTaluks([]);
     } finally {

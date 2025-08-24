@@ -59,7 +59,6 @@ interface MatchDayPlayerData {
 
 export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: string) {
   try {
-    console.log(`Getting match day teams for venue: ${venueId}`);
     const startTime = Date.now();
 
     const userDoc = await adminDb.collection("users").doc(volunteerId).get();
@@ -72,17 +71,30 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
       return { success: false, error: "Not authorized to perform match day verification" };
     }
 
-    const teamVenueQuery = await adminDb
-      .collection('teamVenueAssignment')
-      .where('clusterVenueId', '==', venueId)
-      .where('eventId', '==', 'isha_gramotsavam_2025')
-      .get();
+    // Query for teams assigned to this venue at different levels
+    const [clusterQuery, divisionQuery, finalQuery] = await Promise.all([
+      adminDb
+        .collection('teamVenueAssignment')
+        .where('clusterVenueId', '==', venueId)
+        .get(),
+      adminDb
+        .collection('teamVenueAssignment')
+        .where('divisionVenueId', '==', venueId)
+        .get(),
+      adminDb
+        .collection('teamVenueAssignment')
+        .where('finalVenueId', '==', venueId)
+        .get()
+    ]);
 
-    if (teamVenueQuery.empty) {
+    // Combine all assignment documents
+    const allAssignments = [...clusterQuery.docs, ...divisionQuery.docs, ...finalQuery.docs];
+    
+    if (allAssignments.length === 0) {
       return { success: true, teams: [] };
     }
 
-    const teamIds = teamVenueQuery.docs.map(doc => doc.data().teamId);
+    const teamIds = allAssignments.map(doc => doc.data().teamId);
 
     const [teamDocs, ...playerSnapshots] = await Promise.all([
       adminDb.getAll(...teamIds.map(id => adminDb.collection('teams').doc(id))),
@@ -98,7 +110,7 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
       }
     });
 
-    const teamProcessingPromises = teamVenueQuery.docs.map(async (assignmentDoc, index) => {
+    const teamProcessingPromises = allAssignments.map(async (assignmentDoc, index) => {
       const assignment = assignmentDoc.data();
       const teamData = teamLookup.get(assignment.teamId);
       const playersSnapshot = playerSnapshots[index];
@@ -131,7 +143,6 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
     const teams = processedTeams.filter(team => team !== null);
 
     const endTime = Date.now();
-    console.log(`Loaded ${teams.length} match day teams (took ${endTime - startTime}ms)`);
 
     return {
       success: true,
@@ -139,7 +150,6 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
     };
 
   } catch (error) {
-    console.error("Error getting venue teams for match day:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to get venue teams"
@@ -199,7 +209,7 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
             }
           }
         } catch (error) {
-          console.warn(`Could not load fresh documents for player ${playerData.userId}:`, error);
+          // Could not load fresh documents for player - using existing data
         }
       }
 
@@ -251,7 +261,6 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
     };
 
   } catch (error) {
-    console.error("Error getting team for match day verification:", error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to get team details"
@@ -345,7 +354,6 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
         const venueAssignmentQuery = await adminDb
           .collection('teamVenueAssignment')
           .where('teamId', '==', finalTeamId)
-          .where('eventId', '==', 'isha_gramotsavam_2025')
           .limit(1)
           .get();
         
@@ -377,7 +385,6 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
         revalidatePath(`/volunteer/venues/${teamVenueId}/fixtures`);
       }
 
-      console.log(`Team ${finalTeamId} auto-checked in at venue ${teamVenueId} after all players verified`);
     }
 
     // Log audit for on-ground verification
@@ -401,11 +408,8 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
         );
       }
     } catch (auditError) {
-      console.error('Error logging audit for match day verification:', auditError);
       // Don't fail the main operation if audit logging fails
     }
-
-    console.log(`Player ${playerId} match day verification ${status} by ${verifiedBy}`);
 
     return {
       success: true,
@@ -415,7 +419,6 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
     };
 
   } catch (error) {
-    console.error("Error verifying player for match day:", error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to verify player"
@@ -444,15 +447,12 @@ export async function uploadTeamImage(teamId: string, imageUrl: string, uploaded
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    console.log(`Team image uploaded for team ${teamId} by ${uploadedBy}`);
-
     return {
       success: true,
       message: "Team image uploaded successfully"
     };
 
   } catch (error) {
-    console.error("Error uploading team image:", error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Failed to upload team image"

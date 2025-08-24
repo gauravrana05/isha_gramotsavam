@@ -108,7 +108,7 @@ export default function EditSportPage() {
         setError('Sport not found');
       }
     } catch (err: any) {
-      console.error('Error loading sport:', err);
+      // Error loading sport
       setError('Failed to load sport details');
     } finally {
       setLoading(false);
@@ -201,7 +201,7 @@ export default function EditSportPage() {
       await updateDoc(sportDoc, finalData);
       router.push(`/${lang}/admin/sports/${sportId}`);
     } catch (err: any) {
-      console.error('Error updating sport:', err);
+      // Error updating sport
       setError('Failed to update sport. Please try again.');
     } finally {
       setSaving(false);

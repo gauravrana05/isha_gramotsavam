@@ -54,7 +54,7 @@ const defaultNotifications: Notification[] = [
     icon: Calendar,
     action: {
       label: 'View Fixtures',
-      onClick: () => console.log('View fixtures'),
+      onClick: () => {/* View fixtures */},
     },
   },
   {

@@ -9,11 +9,11 @@ function initializeFirebaseAdmin() {
   try {
     // Check if Firebase Admin is already initialized
     if (getApps().length > 0) {
-      console.log('Firebase Admin already initialized');
+      // Console log removed
       return getFirestore();
     }
 
-    console.log('Initializing Firebase Admin...');
+    // Console log removed
     
     // Validate environment variables
     const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -24,9 +24,9 @@ function initializeFirebaseAdmin() {
       throw new Error('Missing Firebase Admin environment variables');
     }
 
-    console.log('Project ID:', projectId);
-    console.log('Client Email:', clientEmail);
-    console.log('Private Key length:', privateKey.length);
+    // Console log removed
+    // Console log removed
+    // Console log removed
 
     // Create service account config
     const serviceAccount: ServiceAccount = {
@@ -41,11 +41,11 @@ function initializeFirebaseAdmin() {
       projectId: projectId,
     });
 
-    console.log('Firebase Admin initialized successfully');
+    // Console log removed
     return getFirestore(app);
     
   } catch (error) {
-    console.error('Firebase Admin initialization failed:', error);
+    // Error handling removed
     throw new Error(`Firebase Admin setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -55,7 +55,7 @@ try {
   adminDb = initializeFirebaseAdmin();
   adminAuth = getAuth();
 } catch (error) {
-  console.error('Critical error initializing Firebase Admin:', error);
+  // Error handling removed
   throw error;
 }
 

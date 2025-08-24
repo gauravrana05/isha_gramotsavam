@@ -180,7 +180,7 @@
 //       revalidatePath(`/volunteer/venues/${matchData.venueId}/fixtures`);
 //     }
     
-//     console.log(`Match ${matchId} result updated: ${result.winnerName} wins`);
+//     // Console log removed
     
 //     return {
 //       success: true,
@@ -188,7 +188,7 @@
 //     };
     
 //   } catch (error) {
-//     console.error('Error updating match result:', error);
+//     // Error handling removed
     
 //     if (error instanceof z.ZodError) {
 //       return {
@@ -211,7 +211,7 @@
 //   winnerName: string
 // ) {
 //   try {
-//     console.log(`Final match completed for fixture ${fixtureId}. Winner: ${winnerName}`);
+//     // Console log removed
     
 //     // Get all completed matches for standings calculation
 //     const allMatchesSnapshot = await adminDb.collection('matches')
@@ -250,10 +250,10 @@
 //     // Trigger level advancement outside transaction
 //     await triggerLevelAdvancement(fixtureData, winners);
     
-//     console.log(`Tournament ${fixtureId} completed. Champion: ${winnerName}, Winners advancing: ${winners.length}`);
+//     // Console log removed
     
 //   } catch (error) {
-//     console.error('Error completing tournament:', error);
+//     // Error handling removed
 //   }
 // }
 
@@ -273,7 +273,7 @@
 //         teamData[teamId] = teamDoc.data();
 //       }
 //     } catch (error) {
-//       console.error(`Error fetching team ${teamId}:`, error);
+//       // Error handling removed
 //     }
 //   }
   
@@ -391,10 +391,10 @@
 //         }
 //       });
       
-//       console.log(`Teams ${winners.slice(0, 2).join(', ')} advanced to finals at Isha Yoga Center`);
+//       // Teams advanced to finals at Isha Yoga Center
 //     }
 //   } catch (error) {
-//     console.error('Error in level advancement:', error);
+//     // Error handling removed
 //   }
 // }
 
@@ -438,7 +438,7 @@
 //       });
 //     });
     
-//     console.log(`Match ${matchId} started by ${volunteerId}`);
+//     // Console log removed
     
 //     return {
 //       success: true,
@@ -446,7 +446,7 @@
 //     };
     
 //   } catch (error) {
-//     console.error('Error starting match:', error);
+//     // Error handling removed
     
 //     if (error instanceof z.ZodError) {
 //       return {

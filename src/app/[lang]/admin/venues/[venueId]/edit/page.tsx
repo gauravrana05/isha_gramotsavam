@@ -186,7 +186,6 @@ export default function EditVenuePage() {
         setError('Venue not found');
       }
     } catch (err: any) {
-      console.error('Error loading venue:', err);
       setError('Failed to load venue details');
     } finally {
       setLoading(false);
@@ -271,7 +270,6 @@ export default function EditVenuePage() {
         normalizeSupportedSports(activeSports);
       }
     } catch (err: any) {
-      console.error('Error loading sports:', err);
       setError('Failed to load sports. Please try again.');
     } finally {
       setLoadingSports(false);
@@ -317,7 +315,7 @@ export default function EditVenuePage() {
       }));
       setVolunteersData(volunteersMap);
     } catch (err: any) {
-      console.error('Error loading volunteers:', err);
+      // Failed to load volunteers
     }
   };
 
@@ -466,9 +464,8 @@ export default function EditVenuePage() {
         ));
       }
       
-      console.log('Volunteer assigned successfully with assignment record:', assignmentDocRef.id);
+      // Volunteer assigned successfully
     } catch (err: any) {
-      console.error('Error assigning volunteer:', err);
       setError('Failed to assign volunteer. Please try again.');
     }
   };
@@ -526,7 +523,7 @@ export default function EditVenuePage() {
         // Delete all matching assignment records
         for (const assignmentDoc of assignmentSnapshot.docs) {
           await deleteDoc(assignmentDoc.ref);
-          console.log('Deleted assignment record:', assignmentDoc.id);
+          // Deleted assignment record
         }
         
         // Check if the volunteer is technical_volunteer and revert to general_volunteer
@@ -553,7 +550,6 @@ export default function EditVenuePage() {
         }));
         
       } catch (err: any) {
-        console.error('Error removing volunteer assignment:', err);
         setError('Failed to remove volunteer assignment. Please try again.');
       }
     }
@@ -608,14 +604,13 @@ export default function EditVenuePage() {
         updatedAt: serverTimestamp()
       };
       
-      console.log('Submitting venueData:', venueData); // Debug: Verify submitted data
+      // Submitting venue data
 
       const venueDoc = doc(db, 'venues', venueId as string);
       await updateDoc(venueDoc, venueData);
       
       router.push(`/${lang}/admin/venues/${venueId}`);
     } catch (err: any) {
-      console.error('Error updating venue:', err);
       setError('Failed to update venue. Please try again.');
     } finally {
       setSaving(false);

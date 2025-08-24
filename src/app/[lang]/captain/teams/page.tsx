@@ -22,7 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import { AlertModal } from '@/components/ui/Modal';
 import { useAlert } from '@/hooks/useAlert';
 import { db } from "@/lib/firebase/config";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, orderBy } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, orderBy, limit } from "firebase/firestore";
 import { addPlayerToTeam } from "@/lib/actions/captain/addPlayerToTeam";
 import { removePlayerFromTeam } from "@/lib/actions/captain/removePlayerFromTeam";
 import { submitTeamForVerification } from "@/lib/actions/captain/submitTeam";
@@ -78,7 +78,7 @@ interface TeamPlayer {
       uploadedBy?: string | null;
     };
   };
-  verificationStatus: 'pending' | 'verified' | 'rejected';
+  verificationStatus: 'pending' | 'approved' | 'rejected';
   verificationComments?: string[];
 }
 
@@ -104,6 +104,17 @@ interface TeamData {
   status: string;
   currentPlayers: number;
   currentSubstitutes: number;
+  // Venue assignment info
+  assignedVenue?: {
+    venueId: string;
+    venueName: string;
+    assignmentLevel: string;
+  };
+  // Check-in status info
+  checkedIn?: boolean;
+  checkedInAt?: Date;
+  checkedInVenue?: string;
+  matchDayStatus?: string;
 }
 
 interface SportData {
@@ -168,7 +179,7 @@ export default function MyTeamPage() {
       
       // Check if teams exist, but don't error out immediately like dashboard
       if (querySnapshot.empty) {
-        console.log("No teams found for captain:", user.uid);
+        // No teams found for captain
         setTeamData(null);
         setPlayers([]);
         setLoading(false);
@@ -178,8 +189,6 @@ export default function MyTeamPage() {
       const teamDoc = querySnapshot.docs[0];
       const team = teamDoc.data();
       const teamIdStr = teamDoc.id;
-      
-      console.log("Team data:", team);
 
       // Load sport data from database
       let sport: SportData | null = null;
@@ -189,7 +198,7 @@ export default function MyTeamPage() {
           const sportSnap = await getDoc(sportRef);
           if (sportSnap.exists()) {
             const sportData = sportSnap.data();
-            console.log("Sport data:", team.sportId, sportData);
+            // Sport data loaded successfully
             sport = {
               id: sportSnap.id,
               displayName: sportData.displayName || sportData.name || team.sportName || 'Unknown Sport',
@@ -201,7 +210,7 @@ export default function MyTeamPage() {
             };
           }
         } catch (sportError) {
-          console.error("Error loading sport data:", sportError);
+          // Failed to load sport data
         }
       }
       
@@ -225,6 +234,28 @@ export default function MyTeamPage() {
 
       setSportData(sport);
       
+      // Load venue assignment if exists
+      let venueAssignment = null;
+      try {
+        const venueAssignmentQuery = query(
+          collection(db, "teamVenueAssignment"),
+          where("teamId", "==", teamIdStr),
+          orderBy("assignedAt", "desc"),
+          limit(1)
+        );
+        const venueAssignmentSnapshot = await getDocs(venueAssignmentQuery);
+        if (!venueAssignmentSnapshot.empty) {
+          const assignmentData = venueAssignmentSnapshot.docs[0].data();
+          venueAssignment = {
+            venueId: assignmentData.venueId || assignmentData.clusterVenueId || assignmentData.divisionVenueId,
+            venueName: assignmentData.venueName || assignmentData.clusterVenueName || assignmentData.divisionVenueName,
+            assignmentLevel: assignmentData.assignmentLevel || 'cluster'
+          };
+        }
+      } catch (venueError) {
+        // Venue assignment loading failed, continue without it
+      }
+
       // Create team data structure using actual database values
       const actualTeamData: TeamData = {
         teamId: teamIdStr,
@@ -247,7 +278,12 @@ export default function MyTeamPage() {
         players: [],
         status: team.status || 'draft',
         currentPlayers: team.currentPlayers || 0,
-        currentSubstitutes: team.currentSubstitutes || 0
+        currentSubstitutes: team.currentSubstitutes || 0,
+        assignedVenue: venueAssignment || undefined,
+        checkedIn: team.checkedIn || false,
+        checkedInAt: team.checkedInAt?.toDate ? team.checkedInAt.toDate() : null,
+        checkedInVenue: team.checkedInVenue || null,
+        matchDayStatus: team.matchDayStatus || 'pending'
       };
 
       setTeamData(actualTeamData);
@@ -270,6 +306,7 @@ export default function MyTeamPage() {
         // Load latest document information from users collection if userId exists
         let userDocuments = playerData.documents;
         let actualProfileComplete = playerData.isProfileComplete || false;
+        let actualVerificationStatus = playerData.verificationStatus || playerData.status || 'pending';
         
         if (playerData.userId) {
           try {
@@ -287,9 +324,19 @@ export default function MyTeamPage() {
                   userDocuments.aadhaarBack?.url
                 );
               }
+              
+              // Check for verification status in user document as well
+              if (userData.verificationStatus) {
+                actualVerificationStatus = userData.verificationStatus;
+              }
+              
+              // Also check for team-specific verification status
+              if (userData.teams && userData.teams[teamIdStr] && userData.teams[teamIdStr].verificationStatus) {
+                actualVerificationStatus = userData.teams[teamIdStr].verificationStatus;
+              }
             }
           } catch (error) {
-            console.warn(`Could not load user documents for player ${playerData.userId}:`, error);
+            // Could not load user documents
           }
         }
         
@@ -340,18 +387,17 @@ export default function MyTeamPage() {
               uploadedBy: userDocuments?.aadhaarBack?.uploadedBy || null
             }
           },
-          verificationStatus: playerData.verificationStatus || 'pending',
+          verificationStatus: actualVerificationStatus,
           verificationComments: playerData.verificationComments || []
         };
         
         loadedPlayers.push(player);
      }
       
-      console.log(`Loaded ${loadedPlayers.length} players from subcollection`);
+      // Players loaded from subcollection
       setPlayers(loadedPlayers);
       
     } catch (err: any) {
-      console.error("Error loading team:", err);
       setError("Failed to load team data");
     } finally {
       setLoading(false);
@@ -411,7 +457,7 @@ export default function MyTeamPage() {
               break;
             }
           } catch (queryError) {
-            console.warn('Query failed, trying next format:', queryError);
+            // Query failed, trying next format
             continue;
           }
         }
@@ -426,7 +472,7 @@ export default function MyTeamPage() {
             whatsappNumber: existingUser.whatsappNumber || phone,
             village: existingUser.village || teamData?.panchayat.replace(' Panchayat', '') || ''
           }));
-          console.log('User found in system:', existingUser.firstName, existingUser.lastName);
+          // User found in system
         } else {
           setPlayerExists(false);
           // Pre-fill with team's location data
@@ -438,10 +484,9 @@ export default function MyTeamPage() {
             whatsappNumber: phone,
             village: teamData?.panchayat.replace(' Panchayat', '') || ''
           }));
-          console.log('User not found, creating new player entry');
+          // User not found, creating new player entry
         }
       } catch (error) {
-        console.error('Error searching for user:', error);
         setPlayerExists(false);
         // Pre-fill with team's location data - fallback
         setPlayerFormData(prev => ({
@@ -548,12 +593,9 @@ export default function MyTeamPage() {
 
   const handleAddPlayer = async () => {
     if (!teamData) {
-      console.error('handleAddPlayer: teamData is not available');
       showInfo('Team data is not loaded yet. Please wait a moment and try again.');
       return;
     }
-    
-    console.log('handleAddPlayer: Starting player creation process');
     setIsSubmitting(true);
     
     try {
@@ -565,11 +607,11 @@ export default function MyTeamPage() {
         return;
       }
       
-      // Check if player is already in another team for this event
+      // Check if player is already in another team
       if (playerExists) {
-        // TODO: Add event-wide check for player participation
+        // Check for player participation across all teams
         const teamsRef = collection(db, "teams");
-        const eventTeamsQuery = query(teamsRef, where("eventId", "==", "gramotsavam_2025"));
+        const eventTeamsQuery = query(teamsRef);
         const eventTeamsSnapshot = await getDocs(eventTeamsQuery);
         
         let playerInOtherTeam = false;
@@ -595,7 +637,7 @@ export default function MyTeamPage() {
       if (playerPosition === 'main' && !canAddMain) {
         if (canAddSubstitute) {
           playerPosition = 'substitute';
-          console.log('Main slots full, automatically assigned as substitute');
+          // Main slots full, automatically assigned as substitute
         } else {
           showInfo('No available positions. Team is full.');
           setIsSubmitting(false);
@@ -604,7 +646,7 @@ export default function MyTeamPage() {
       } else if (playerPosition === 'substitute' && !canAddSubstitute) {
         if (canAddMain) {
           playerPosition = 'main';
-          console.log('Substitute slots full, automatically assigned as main');
+          // Substitute slots full, automatically assigned as main
         } else {
           showInfo('No available positions. Team is full.');
           setIsSubmitting(false);
@@ -613,7 +655,6 @@ export default function MyTeamPage() {
       }
       
       // Use the server action to add player to team
-      console.log('handleAddPlayer: Calling addPlayerToTeam server action');
       
       try {
         const result = await addPlayerToTeam({
@@ -637,7 +678,7 @@ export default function MyTeamPage() {
           captainId: user!.uid
         });
         
-        console.log('handleAddPlayer: Server action result:', result);
+        // Server action completed
         
         if (!result.success) {
           const errorMsg = typeof (result as any).error === 'string' 
@@ -646,7 +687,7 @@ export default function MyTeamPage() {
           throw new Error(errorMsg);
         }
         
-        console.log(`Player added successfully with ID: ${result.playerId}`);
+        // Player added successfully
         
         // Reload team data to get updated player list
         await loadTeamData();
@@ -654,13 +695,11 @@ export default function MyTeamPage() {
         setShowAddPlayerModal(false);
         resetPlayerForm();
       } catch (error) {
-        console.error('Error adding player:', error);
         showError(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setIsSubmitting(false);
       }
     } catch (error) {
-      console.error('Error adding player:', error);
       showError(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
@@ -687,12 +726,11 @@ export default function MyTeamPage() {
       if (result.success) {
         // Reload team data to reflect changes
         await loadTeamData();
-        console.log('Player removed successfully');
+        // Player removed successfully
       } else {
         showError(result.error || 'Failed to remove player');
       }
     } catch (error) {
-      console.error('Error removing player:', error);
       showError('Failed to remove player. Please try again.');
     } finally {
       setLoading(false);
@@ -700,24 +738,71 @@ export default function MyTeamPage() {
   };
 
   const getPlayerStatusColor = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return 'text-[#3A7F3F] bg-green-50';
+    // Check for 'approved' status
+    if (player.verificationStatus === 'approved') return 'text-[#3A7F3F] bg-green-50';
     if (player.verificationStatus === 'rejected') return 'text-red-600 bg-red-50';
     if (player.isProfileComplete) return 'text-[#C79016] bg-yellow-50';
     return 'text-gray-600 bg-gray-50';
   };
 
   const getPlayerStatusIcon = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return <CheckCircle className="w-4 h-4" />;
+    // Check for 'approved' status
+    if (player.verificationStatus === 'approved') return <CheckCircle className="w-4 h-4" />;
     if (player.verificationStatus === 'rejected') return <X className="w-4 h-4" />;
     if (player.isProfileComplete) return <Clock className="w-4 h-4" />;
     return <AlertCircle className="w-4 h-4" />;
   };
 
   const getPlayerStatusText = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return 'Verified';
+    // Check if player is verified by admin/verification team
+    if (player.verificationStatus === 'approved') return 'Verified';
     if (player.verificationStatus === 'rejected') return 'Rejected';
+    // Check if documents are complete and ready for review
     if (player.isProfileComplete) return 'Pending Review';
     return 'Docs Incomplete';
+  };
+
+  const getTeamDisplayStatus = () => {
+    if (!teamData) return '';
+    
+    // Check if team is checked in (highest priority)
+    if (teamData.checkedIn || teamData.matchDayStatus === 'checked_in') {
+      return 'Checked In';
+    }
+    
+    // Check match day status
+    if (teamData.matchDayStatus === 'verified') {
+      return 'Match Day Verified';
+    }
+    
+    // Fall back to regular status
+    switch (teamData.status) {
+      case 'draft': return 'Draft';
+      case 'submitted': return 'Submitted';
+      case 'verified': return 'Verified';
+      case 'rejected': return 'Rejected';
+      default: return teamData.status || 'Unknown';
+    }
+  };
+
+  const getTeamStatusColor = () => {
+    if (!teamData) return 'text-gray-600';
+    
+    if (teamData.checkedIn || teamData.matchDayStatus === 'checked_in') {
+      return 'text-green-600';
+    }
+    
+    if (teamData.matchDayStatus === 'verified') {
+      return 'text-blue-600';
+    }
+    
+    switch (teamData.status) {
+      case 'draft': return 'text-gray-600';
+      case 'submitted': return 'text-yellow-600';
+      case 'verified': return 'text-green-600';
+      case 'rejected': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
   };
 
   const filteredPlayers = players.filter(player =>
@@ -782,12 +867,7 @@ export default function MyTeamPage() {
     }
 
     try {
-      console.log('Submitting team for verification...', {
-        teamId: teamData.teamId,
-        sportId: sportData.id,
-        sportName: sportData.displayName,
-        playerCount: currentPlayers
-      });
+      // Submitting team for verification
 
       const result = await submitTeamForVerification({ 
         teamId: teamData.teamId,
@@ -807,7 +887,6 @@ export default function MyTeamPage() {
         throw new Error(result.error || 'Failed to submit team');
       }
     } catch (error) {
-      console.error('Error submitting team:', error);
       showError(`Failed to submit team: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again or contact support.`);
     }
   };
@@ -909,9 +988,44 @@ export default function MyTeamPage() {
                 </h3>
                 <p className="text-sm text-blue-700 mt-1">
                   This team has been submitted for verification and is now read-only. You cannot add, edit, or remove players at this time.
-                  Status: <span className="font-semibold capitalize">{teamData?.status}</span>
+                  Status: <span className="font-semibold">{getTeamDisplayStatus()}</span>
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Team Status Card */}
+        {teamData && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-[#4A2F1D] mb-2">Team Status</h3>
+                <p className={`text-xl font-semibold ${getTeamStatusColor()}`}>
+                  {getTeamDisplayStatus()}
+                </p>
+                {teamData.assignedVenue && (
+                  <p className="text-gray-600 text-sm mt-2">
+                    <strong>Venue:</strong> {teamData.assignedVenue.venueName}
+                    {teamData.assignedVenue.assignmentLevel && (
+                      <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                        {teamData.assignedVenue.assignmentLevel}
+                      </span>
+                    )}
+                  </p>
+                )}
+                {teamData.checkedIn && teamData.checkedInAt && (
+                  <p className="text-green-600 text-sm mt-1">
+                    Checked in on {teamData.checkedInAt.toLocaleDateString()} at {teamData.checkedInAt.toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
+              <div className={`w-4 h-4 rounded-full ${
+                teamData.checkedIn || teamData.matchDayStatus === 'checked_in' ? 'bg-green-500' :
+                teamData.status === 'verified' ? 'bg-blue-500' :
+                teamData.status === 'submitted' ? 'bg-yellow-500' :
+                teamData.status === 'rejected' ? 'bg-red-500' : 'bg-gray-500'
+              }`}></div>
             </div>
           </div>
         )}
@@ -1196,11 +1310,19 @@ export default function MyTeamPage() {
         {isReadOnly && (
           <div className="bg-gray-50 rounded-lg p-6 text-center">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">
-              Team Status: <span className="capitalize text-blue-600">{teamData?.status}</span>
+              Team Status: <span className={getTeamStatusColor()}>{getTeamDisplayStatus()}</span>
             </h3>
             <p className="text-gray-600">
-              This team has been submitted and is currently under review. No modifications can be made at this time.
+              {teamData.checkedIn || teamData.matchDayStatus === 'checked_in' 
+                ? 'This team has been checked in and is ready for matches.'
+                : 'This team has been submitted and is currently under review. No modifications can be made at this time.'
+              }
             </p>
+            {teamData.assignedVenue && (
+              <p className="text-gray-600 mt-2">
+                <strong>Assigned Venue:</strong> {teamData.assignedVenue.venueName}
+              </p>
+            )}
           </div>
         )}
       </div>

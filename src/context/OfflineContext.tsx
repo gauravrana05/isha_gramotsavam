@@ -119,7 +119,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
           networkService.stopMonitoring();
         };
       } catch (error) {
-        console.error('Failed to initialize offline capabilities:', error);
+        // Error handling removed
         setIsOfflineCapable(false);
       }
     };
@@ -163,7 +163,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await queueService.forceSync(user.uid);
       await updateSyncStatus();
     } catch (error) {
-      console.error('Auto sync failed:', error);
+      // Error handling removed
     } finally {
       setIsSyncing(false);
     }
@@ -187,7 +187,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       await updateSyncStatus();
     } catch (error) {
-      console.error('Force sync failed:', error);
+      // Error handling removed
       throw error;
     } finally {
       setIsSyncing(false);
@@ -202,7 +202,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await queueService.clearCompleted(user.uid);
       await updateSyncStatus();
     } catch (error) {
-      console.error('Failed to clear sync queue:', error);
+      // Error handling removed
       throw error;
     }
   }, [user?.uid, updateSyncStatus]);
@@ -212,7 +212,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const queueService = getActionQueue();
       queueService.pause();
     } catch (error) {
-      console.error('Failed to pause sync:', error);
+      // Error handling removed
     }
   }, []);
 
@@ -221,7 +221,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const queueService = getActionQueue();
       queueService.resume();
     } catch (error) {
-      console.error('Failed to resume sync:', error);
+      // Error handling removed
     }
   }, []);
 
@@ -234,7 +234,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // await dataService.clearAllData(user.uid);
       await updateSyncStatus();
     } catch (error) {
-      console.error('Failed to clear offline data:', error);
+      // Error handling removed
       throw error;
     }
   }, [user?.uid, updateSyncStatus]);
@@ -249,7 +249,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
         unsyncedCount: syncStatus.pendingActions
       };
     } catch (error) {
-      console.error('Failed to get storage info:', error);
+      // Error handling removed
       return {
         totalSize: 0,
         collections: {},

@@ -134,7 +134,7 @@ export default function UserDetailPage() {
         setError('User not found');
       }
     } catch (err: any) {
-      console.error('Error loading user:', err);
+      // Error handling removed
       setError('Failed to load user data');
     } finally {
       setLoading(false);
@@ -186,7 +186,7 @@ export default function UserDetailPage() {
 
       setTeams(userTeams);
     } catch (err: any) {
-      console.error('Error loading user teams:', err);
+      // Error handling removed
     }
   };
 

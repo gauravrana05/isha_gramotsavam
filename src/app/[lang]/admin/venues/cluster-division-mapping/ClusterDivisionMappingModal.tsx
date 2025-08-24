@@ -195,7 +195,7 @@ export default function ClusterDivisionMappingModal({
       }
     } catch (err) {
       setError('An unexpected error occurred');
-      console.error(`Error ${editingMapping ? 'updating' : 'creating'} mapping:`, err);
+      // Error handling removed
     } finally {
       setIsSubmitting(false);
     }

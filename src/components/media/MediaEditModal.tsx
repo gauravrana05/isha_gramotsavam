@@ -87,7 +87,7 @@ export const MediaEditModal: React.FC<MediaEditModalProps> = ({
         setError('Failed to save changes. Please try again.');
       }
     } catch (error) {
-      console.error('Error saving media:', error);
+      // Error handling removed
       setError(error instanceof Error ? error.message : 'Failed to save changes');
     } finally {
       setSaving(false);

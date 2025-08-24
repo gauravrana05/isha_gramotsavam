@@ -44,7 +44,7 @@ const loadTranslation = async (lang: LanguageCode) => {
         return en;
     }
   } catch (error) {
-    console.warn(`Failed to load translation for ${lang}, falling back to English`);
+    // Warning removed
     return en;
   }
 };

@@ -131,9 +131,8 @@ export default function CreateVenuePage() {
       
       const activeVolunteers = volunteersData.filter(volunteer => volunteer.isActive !== false);
       setAvailableVolunteers(activeVolunteers);
-      console.log('Loaded general volunteers:', activeVolunteers); // Debug log
+      // Loaded general volunteers
     } catch (err: any) {
-      console.error('Error loading volunteers:', err);
       setError('Failed to load volunteers. Please try again.');
     } finally {
       setLoadingVolunteers(false);
@@ -152,7 +151,6 @@ export default function CreateVenuePage() {
       const activeSports = sportsData.filter(sport => sport.isActive);
       setAvailableSports(activeSports);
     } catch (err: any) {
-      console.error('Error loading sports:', err);
       setError('Failed to load sports. Please try again.');
     } finally {
       setLoadingSports(false);
@@ -241,7 +239,6 @@ export default function CreateVenuePage() {
           updatedAt: new Date()
         });
       } catch (err: any) {
-        console.error('Error updating volunteer role:', err);
         setError('Failed to update volunteer role. Please try again.');
       }
     }
@@ -260,7 +257,6 @@ export default function CreateVenuePage() {
           updatedAt: new Date()
         });
       } catch (err: any) {
-        console.error('Error reverting volunteer role:', err);
         setError('Failed to revert volunteer role. Please try again.');
       }
     }
@@ -397,10 +393,33 @@ export default function CreateVenuePage() {
         updatedAt: serverTimestamp()
       };
 
-      await addDoc(collection(db, 'venues'), venueData);
+      // Create venue document
+      const venueDocRef = await addDoc(collection(db, 'venues'), venueData);
+      
+      // Create volunteer assignments in separate collection for assign-venues table
+      const volunteerAssignmentPromises = formData.assignedVolunteers.map(async (assignment) => {
+        const assignmentData = {
+          volunteerId: assignment.volunteerId,
+          volunteerName: assignment.volunteerName,
+          volunteerEmail: assignment.volunteerEmail,
+          venueId: venueDocRef.id,
+          venueName: formData.name,
+          assignmentType: assignment.volunteerType,
+          status: 'assigned',
+          assignedAt: serverTimestamp(),
+          assignedBy: user?.uid || 'admin',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+        
+        return addDoc(collection(db, 'volunteerVenueAssignment'), assignmentData);
+      });
+      
+      // Wait for all volunteer assignments to be created
+      await Promise.all(volunteerAssignmentPromises);
+      
       router.push(`/${lang}/admin/venues`);
     } catch (err: any) {
-      console.error('Error creating venue:', err);
       setError('Failed to create venue. Please try again.');
     } finally {
       setLoading(false);

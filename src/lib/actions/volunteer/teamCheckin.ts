@@ -42,7 +42,6 @@ export async function verifyTeamPlayers(
       message: 'Player verifications updated successfully' 
     };
   } catch (error) {
-    console.error('Error verifying team players:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -110,7 +109,6 @@ export async function checkInTeam(teamId: string, venueId: string, volunteerId: 
       message: 'Team checked in successfully' 
     };
   } catch (error) {
-    console.error('Error checking in team:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -118,15 +116,24 @@ export async function checkInTeam(teamId: string, venueId: string, volunteerId: 
   }
 }
 
-export async function getVenueTeams(venueId: string, eventId: string) {
+export async function getVenueTeams(venueId: string, eventId?: string) {
   try {
-    // Get teams assigned to this venue
-    const teamsQuery = await adminDb.collection('teamVenueAssignment')
-      .where('clusterVenueId', '==', venueId)
-      .where('eventId', '==', eventId)
-      .get();
+    // Get teams assigned to this venue at different levels
+    const [clusterQuery, divisionQuery, finalQuery] = await Promise.all([
+      adminDb.collection('teamVenueAssignment')
+        .where('clusterVenueId', '==', venueId)
+        .get(),
+      adminDb.collection('teamVenueAssignment')
+        .where('divisionVenueId', '==', venueId)
+        .get(),
+      adminDb.collection('teamVenueAssignment')
+        .where('finalVenueId', '==', venueId)
+        .get()
+    ]);
     
-    const teamIds = teamsQuery.docs.map(doc => doc.data().teamId);
+    // Combine all assignment documents
+    const allAssignments = [...clusterQuery.docs, ...divisionQuery.docs, ...finalQuery.docs];
+    const teamIds = allAssignments.map(doc => doc.data().teamId);
     
     if (teamIds.length === 0) {
       return { success: true, teams: [] };
@@ -159,7 +166,6 @@ export async function getVenueTeams(venueId: string, eventId: string) {
     
     return { success: true, teams: teamsData };
   } catch (error) {
-    console.error('Error getting venue teams:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -183,7 +189,6 @@ export async function getTeamPlayersForVerification(teamId: string) {
     
     return { success: true, players };
   } catch (error) {
-    console.error('Error getting team players:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -222,7 +227,6 @@ export async function uncheckTeam(teamId: string, venueId: string, reason: strin
       message: 'Team unchecked successfully' 
     };
   } catch (error) {
-    console.error('Error unchecking team:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error occurred'

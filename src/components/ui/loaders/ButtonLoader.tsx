@@ -12,6 +12,7 @@ export interface ButtonLoaderProps {
   className?: string;
   onClick?: () => void;
   type?: 'button' | 'submit' | 'reset';
+  tabIndex?: number;
 }
 
 const ButtonLoader: React.FC<ButtonLoaderProps> = ({
@@ -24,7 +25,8 @@ const ButtonLoader: React.FC<ButtonLoaderProps> = ({
   disabled = false,
   className = '',
   onClick,
-  type = 'button'
+  type = 'button',
+  tabIndex
 }) => {
   const baseClasses = `
     inline-flex items-center justify-center gap-2 
@@ -95,6 +97,7 @@ const ButtonLoader: React.FC<ButtonLoaderProps> = ({
       type={type}
       onClick={onClick}
       disabled={isDisabled}
+      tabIndex={tabIndex}
       className={`
         ${baseClasses}
         ${sizeClasses[size]}

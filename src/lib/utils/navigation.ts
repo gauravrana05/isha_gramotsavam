@@ -11,7 +11,6 @@ export const ALL_ROLES = ["admin", "captain", "player", "general_volunteer", "te
 
 
 export const getDashboardRoute = (role: string | null | undefined, lang: string): string => {
-  console.log("THe role of the user is", role);
   const userRole = role || "public";
   switch (userRole) {
     case "admin":
@@ -32,6 +31,42 @@ export const getDashboardRoute = (role: string | null | undefined, lang: string)
   }
 };
 
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+};
+
+const retryOperation = async <T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 2,
+  delay: number = 1000
+): Promise<T> => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
+  }
+  throw new Error('All retry attempts failed');
+};
+
 export const handleRedirect = async (user: any, lang: string, router: AppRouterInstance) => {
   if (!user) {
     router.push(`/${lang}/login`);
@@ -39,11 +74,22 @@ export const handleRedirect = async (user: any, lang: string, router: AppRouterI
   }
 
   try {
-    const userDoc = await getDoc(doc(db, "users", user.uid));
+    
+    const fetchUserProfile = async () => {
+      const userDoc = await withTimeout(
+        getDoc(doc(db, "users", user.uid)),
+        10000
+      );
+      return userDoc;
+    };
+
+    const userDoc = await retryOperation(fetchUserProfile, 2, 1000);
+    
     if (userDoc.exists()) {
       const userData = userDoc.data();
       const role = userData.role;
       const isProfileComplete = userData.isProfileComplete;
+      
       
       const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
 
@@ -57,8 +103,14 @@ export const handleRedirect = async (user: any, lang: string, router: AppRouterI
       router.push(`/${lang}/profile/complete`);
     }
   } catch (error) {
-    console.error("Error checking profile:", error);
-    router.push(`/${lang}/login`);
+    
+    // Check if it's a timeout error
+    if (error instanceof Error && error.message.includes('timed out')) {
+      // For existing users with timeout issues, try going to public dashboard
+      router.push(`/${lang}/guest/dashboard`);
+    } else {
+      router.push(`/${lang}/login`);
+    }
   }
 }
 
@@ -89,7 +141,6 @@ export const useRedirect = (allowedRoles?: string[]) => {
       const isProfileComplete = userData.isProfileComplete;
 
       const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
-      console.log("the role of the use is this ", role, specialRole);
       if (!isProfileComplete && !specialRole) {
         router.push(`/${lang}/profile/complete`);
         return;

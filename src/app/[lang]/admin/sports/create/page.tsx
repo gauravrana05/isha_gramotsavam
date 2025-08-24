@@ -147,7 +147,7 @@ export default function CreateSportPage() {
       await addDoc(collection(db, 'sports'), finalData);
       router.push(`/${lang}/admin/sports`);
     } catch (err: any) {
-      console.error('Error creating sport:', err);
+      // Error creating sport
       setError('Failed to create sport. Please try again.');
     } finally {
       setLoading(false);

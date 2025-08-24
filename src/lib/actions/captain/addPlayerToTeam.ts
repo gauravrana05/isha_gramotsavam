@@ -137,35 +137,48 @@ export async function addPlayerToTeam({ teamId, playerData, captainId }: AddPlay
       userId = existingAuthUser.uid;
       existingUser = true;
 
+      // Prevent captain from adding themselves as a player
+      if (userId === captainId) {
+        return { 
+          success: false, 
+          error: { 
+            code: 'captain-self-add', 
+            message: 'Captain cannot add themselves as a player. You are already part of the team as captain.' 
+          } 
+        };
+      }
+
       // Fetch existing user profile to preserve documents
       const userDoc = await adminDb.collection('users').doc(userId).get();
       const existingUserData = userDoc.exists ? userDoc.data() : {};
 
-      // Update user profile, preserving existing documents
-      await adminDb.collection('users').doc(userId).set(
-        {
-          firstName: playerData.firstName,
-          lastName: playerData.lastName,
-          phoneNumber: cleanPhone,
-          whatsappNumber: playerData.whatsappNumber || cleanPhone,
-          dob: playerData.dateOfBirth,
-          gender: playerData.gender,
-          village: playerData.village,
-          panchayat: playerData.panchayat || teamData.panchayat,
-          taluk: playerData.taluk || teamData.taluk,
-          district: playerData.district || teamData.district,
-          state: playerData.state || teamData.state,
-          pincode: playerData.pincode || '',
-          role: 'player',
-          isProfileComplete: existingUserData?.isProfileComplete || false,
-          currentTeamId: teamId,
-          updatedAt: FieldValue.serverTimestamp(),
-          documents: existingUserData?.documents || defaultDocuments,
-        },
-        { merge: true }
-      );
+      // Update user profile, preserving existing documents and role
+      const updateData: any = {
+        firstName: playerData.firstName,
+        lastName: playerData.lastName,
+        phoneNumber: cleanPhone,
+        whatsappNumber: playerData.whatsappNumber || cleanPhone,
+        dob: playerData.dateOfBirth,
+        gender: playerData.gender,
+        village: playerData.village,
+        panchayat: playerData.panchayat || teamData.panchayat,
+        taluk: playerData.taluk || teamData.taluk,
+        district: playerData.district || teamData.district,
+        state: playerData.state || teamData.state,
+        pincode: playerData.pincode || '',
+        isProfileComplete: existingUserData?.isProfileComplete || false,
+        currentTeamId: teamId,
+        updatedAt: FieldValue.serverTimestamp(),
+        documents: existingUserData?.documents || defaultDocuments,
+      };
 
-      console.log(`Updated existing user profile: ${userId}`);
+      // Preserve captain role if user is the team captain
+      if (userId !== captainId) {
+        updateData.role = 'player';
+      }
+
+      await adminDb.collection('users').doc(userId).set(updateData, { merge: true });
+
     } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
         // Create new Firebase Auth user
@@ -175,6 +188,17 @@ export async function addPlayerToTeam({ teamId, playerData, captainId }: AddPlay
           disabled: false,
         });
         userId = userRecord.uid;
+
+        // Additional check: ensure captain doesn't accidentally create duplicate account
+        if (userId === captainId) {
+          return { 
+            success: false, 
+            error: { 
+              code: 'captain-self-add', 
+              message: 'Captain cannot add themselves as a player. You are already part of the team as captain.' 
+            } 
+          };
+        }
 
         // Create new user profile
         await adminDb.collection('users').doc(userId).set({
@@ -199,9 +223,7 @@ export async function addPlayerToTeam({ teamId, playerData, captainId }: AddPlay
           documents: defaultDocuments,
         });
 
-        console.log(`Created new user profile: ${userId}`);
       } else {
-        console.error('Error checking existing user:', error);
         return { success: false, error: { code: 'internal', message: 'Error checking existing user' } };
       }
     }
@@ -253,7 +275,6 @@ export async function addPlayerToTeam({ teamId, playerData, captainId }: AddPlay
       });
     });
 
-    console.log(`Player ${userId} added to team ${teamId}`);
 
     return {
       success: true,
@@ -262,7 +283,6 @@ export async function addPlayerToTeam({ teamId, playerData, captainId }: AddPlay
       message: existingUser ? 'Existing user linked to team' : 'New user created and added to team',
     };
   } catch (error) {
-    console.error('Error adding player to team:', error);
     return {
       success: false,
       error: {
