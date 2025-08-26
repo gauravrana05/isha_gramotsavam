@@ -3,12 +3,10 @@
 import { useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase/config";
-import { doc, getDoc } from "firebase/firestore";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import { User } from "@prisma/client";
 
-export const ALL_ROLES = ["admin", "captain", "player", "general_volunteer", "technical_volunteer", "verification_volunteer", "guest"];
-
+export const ALL_ROLES = ["admin", "captain", "player", "volunteer", "technical_volunteer", "verification", "public"];
 
 export const getDashboardRoute = (role: string | null | undefined, lang: string): string => {
   const userRole = role || "public";
@@ -19,100 +17,41 @@ export const getDashboardRoute = (role: string | null | undefined, lang: string)
       return `/${lang}/captain/dashboard`;
     case "player":
       return `/${lang}/player/dashboard`;
-    case "general_volunteer":
+    case "volunteer":
     case "technical_volunteer":
       return `/${lang}/volunteer/dashboard`;
-    case "verification_volunteer":
+    case "verification":
       return `/${lang}/verification/dashboard`;
-    case "guest":
-      return `/${lang}/guest/dashboard`;
     default:
       return `/${lang}/public`;
   }
 };
 
-const withTimeout = <T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> => {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`Operation timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    promise
-      .then((value) => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch((error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
-  });
-};
-
-const retryOperation = async <T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 2,
-  delay: number = 1000
-): Promise<T> => {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      if (attempt === maxRetries) {
-        throw error;
-      }
-      await new Promise(resolve => setTimeout(resolve, delay * attempt));
-    }
-  }
-  throw new Error('All retry attempts failed');
-};
-
-export const handleRedirect = async (user: any, lang: string, router: AppRouterInstance) => {
+export const handleRedirect = async (user: User, lang: string, router: AppRouterInstance) => {
   if (!user) {
     router.push(`/${lang}/login`);
     return;
   }
 
   try {
+    const role = user.role;
+    const isProfileComplete = user.profileComplete;
     
-    const fetchUserProfile = async () => {
-      const userDoc = await withTimeout(
-        getDoc(doc(db, "users", user.uid)),
-        10000
-      );
-      return userDoc;
-    };
+    // Special roles that can skip profile completion
+    const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
 
-    const userDoc = await retryOperation(fetchUserProfile, 2, 1000);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const role = userData.role;
-      const isProfileComplete = userData.isProfileComplete;
-      
-      
-      const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
-
-      if (isProfileComplete || specialRole) {
-        const dashboardRoute = getDashboardRoute(role, lang as string);
-        router.push(dashboardRoute);
-      } else {
-        router.push(`/${lang}/profile/complete`);
-      }
+    if (isProfileComplete || specialRole) {
+      const dashboardRoute = getDashboardRoute(role, lang);
+      router.push(dashboardRoute);
     } else {
       router.push(`/${lang}/profile/complete`);
     }
   } catch (error) {
-    
-    // Check if it's a timeout error
-    if (error instanceof Error && error.message.includes('timed out')) {
-      // For existing users with timeout issues, try going to public dashboard
-      router.push(`/${lang}/guest/dashboard`);
-    } else {
-      router.push(`/${lang}/login`);
-    }
+    console.error('Navigation error:', error);
+    // Fallback to login on error
+    router.push(`/${lang}/login`);
   }
-}
+};
 
 export const useRedirect = (allowedRoles?: string[]) => {
   const { user, loading } = useAuth();
@@ -129,16 +68,10 @@ export const useRedirect = (allowedRoles?: string[]) => {
       router.push(`/${lang}/login`);
       return;
     }
-    const checkUser = async () => {
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists()) {
-        router.push(`/${lang}/profile/complete`);
-        return
-      }
 
-      const userData = userDoc.data();
-      const role = userData.role;
-      const isProfileComplete = userData.isProfileComplete;
+    const checkUser = async () => {
+      const role = user.role;
+      const isProfileComplete = user.profileComplete;
 
       const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
       if (!isProfileComplete && !specialRole) {
@@ -146,11 +79,12 @@ export const useRedirect = (allowedRoles?: string[]) => {
         return;
       }
       
-      if (allowedRoles && !allowedRoles.includes(userData.role)) {
-        const dashboardRoute = getDashboardRoute(userData.role, lang as string);
+      if (allowedRoles && !allowedRoles.includes(role)) {
+        const dashboardRoute = getDashboardRoute(role, lang as string);
         router.push(dashboardRoute);
       }
-    }
+    };
+    
     checkUser();
   }, [user, loading, router, lang, allowedRoles]);
-}
+};

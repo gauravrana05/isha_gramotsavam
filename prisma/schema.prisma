@@ -1,0 +1,589 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model audit_logs {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id     String?  @db.Uuid
+  action      String   @db.VarChar(100)
+  entity_type String   @db.VarChar(50)
+  entity_id   String   @db.Uuid
+  changes     Json     @default("{}")
+  metadata    Json     @default("{}")
+  comments    String?
+  ip_address  String?  @db.Inet
+  user_agent  String?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  users       users?   @relation(fields: [user_id], references: [id])
+}
+
+model cluster_division_mappings {
+  id                                                                                                   String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id                                                                                             String                  @db.Uuid
+  state                                                                                                String                  @db.VarChar(100)
+  cluster_venue_mapping_id                                                                             String                  @db.Uuid
+  division_venue_mapping_id                                                                            String                  @db.Uuid
+  auto_assigned                                                                                        Boolean                 @default(false)
+  created_at                                                                                           DateTime                @default(now()) @db.Timestamptz(6)
+  venue_location_mappings_cluster_division_mappings_cluster_venue_mapping_idTovenue_location_mappings  venue_location_mappings @relation("cluster_division_mappings_cluster_venue_mapping_idTovenue_location_mappings", fields: [cluster_venue_mapping_id], references: [id], onDelete: Cascade)
+  venue_location_mappings_cluster_division_mappings_division_venue_mapping_idTovenue_location_mappings venue_location_mappings @relation("cluster_division_mappings_division_venue_mapping_idTovenue_location_mappings", fields: [division_venue_mapping_id], references: [id], onDelete: Cascade)
+  events                                                                                               events                  @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@unique([event_id, cluster_venue_mapping_id])
+}
+
+model events {
+  id                        String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                      String                      @db.VarChar(200)
+  description               String?
+  registration_start_date   DateTime                    @db.Date
+  registration_end_date     DateTime                    @db.Date
+  start_date                DateTime                    @db.Date
+  end_date                  DateTime                    @db.Date
+  status                    EventStatus                 @default(draft)
+  created_by                String                      @db.Uuid
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  cluster_division_mappings cluster_division_mappings[]
+  users                     users                       @relation(fields: [created_by], references: [id])
+  fixtures                  fixtures[]
+  matches                   matches[]
+  taluk_cluster_mappings    taluk_cluster_mappings[]
+  team_venue_assignments    team_venue_assignments[]
+  teams                     teams[]
+  venue_location_mappings   venue_location_mappings[]
+  volunteer_assignments     volunteer_assignments[]
+}
+
+model fixture_results {
+  id                 String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  fixture_id         String    @db.Uuid
+  team_id            String    @db.Uuid
+  finalPosition      Int
+  qualifies_for_next Boolean   @default(false)
+  recorded_by        String?   @db.Uuid
+  recorded_at        DateTime? @db.Timestamptz(6)
+  created_at         DateTime  @default(now()) @db.Timestamptz(6)
+  fixtures           fixtures  @relation(fields: [fixture_id], references: [id], onDelete: Cascade)
+  users              users?    @relation(fields: [recorded_by], references: [id])
+  teams              teams     @relation(fields: [team_id], references: [id], onDelete: Cascade)
+
+  @@unique([fixture_id, finalPosition], map: "fixture_results_fixture_id_position_key")
+  @@unique([fixture_id, team_id])
+}
+
+model fixture_teams {
+  fixture_id                                    String    @db.Uuid
+  team_id                                       String    @db.Uuid
+  assigned_at                                   DateTime  @default(now()) @db.Timestamptz(6)
+  checked_in                                    Boolean   @default(false)
+  checked_in_at                                 DateTime? @db.Timestamptz(6)
+  checked_in_by                                 String?   @db.Uuid
+  final_position                                Int?
+  qualifies_for_next                            Boolean   @default(false)
+  tournament_points                             Int?
+  result_recorded_at                            DateTime? @db.Timestamptz(6)
+  result_recorded_by                            String?   @db.Uuid
+  users_fixture_teams_checked_in_byTousers      users?    @relation("fixture_teams_checked_in_byTousers", fields: [checked_in_by], references: [id])
+  fixtures                                      fixtures  @relation(fields: [fixture_id], references: [id], onDelete: Cascade)
+  users_fixture_teams_result_recorded_byTousers users?    @relation("fixture_teams_result_recorded_byTousers", fields: [result_recorded_by], references: [id])
+  teams                                         teams     @relation(fields: [team_id], references: [id], onDelete: Cascade)
+
+  @@id([fixture_id, team_id])
+  @@unique([fixture_id, final_position])
+}
+
+model fixtures {
+  id                        String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                      String                  @db.VarChar(200)
+  event_id                  String?                 @db.Uuid
+  sport_id                  String                  @db.Uuid
+  venue_location_mapping_id String                  @db.Uuid
+  gender_category           GenderCategory
+  level                     TournamentLevel
+  status                    FixtureStatus           @default(draft)
+  created_at                DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                @default(now()) @db.Timestamptz(6)
+  fixture_results           fixture_results[]
+  fixture_teams             fixture_teams[]
+  events                    events?                 @relation(fields: [event_id], references: [id])
+  sports                    sports                  @relation(fields: [sport_id], references: [id])
+  venue_location_mappings   venue_location_mappings @relation(fields: [venue_location_mapping_id], references: [id])
+  matches                   matches[]
+}
+
+model matches {
+  id                                                  String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  fixture_id                                          String                  @db.Uuid
+  event_id                                            String?                 @db.Uuid
+  sport_id                                            String                  @db.Uuid
+  venue_location_mapping_id                           String                  @db.Uuid
+  gender_category                                     GenderCategory
+  round_name                                          String                  @db.VarChar(100)
+  match_number                                        Int
+  team1_id                                            String?                 @db.Uuid
+  team2_id                                            String?                 @db.Uuid
+  depends_on_match1_id                                String?                 @db.Uuid
+  depends_on_match2_id                                String?                 @db.Uuid
+  next_match_id                                       String?                 @db.Uuid
+  next_slot                                           String?                 @db.VarChar(10)
+  winner_id                                           String?                 @db.Uuid
+  winner_name                                         String?                 @db.VarChar(200)
+  team1_score                                         Int?
+  team2_score                                         Int?
+  score_details                                       String?
+  result_entered_by                                   String?                 @db.Uuid
+  result_entered_at                                   DateTime?               @db.Timestamptz(6)
+  status                                              MatchStatus             @default(scheduled)
+  created_at                                          DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                                          DateTime                @default(now()) @db.Timestamptz(6)
+  matches_matches_depends_on_match1_idTomatches       matches?                @relation("matches_depends_on_match1_idTomatches", fields: [depends_on_match1_id], references: [id])
+  other_matches_matches_depends_on_match1_idTomatches matches[]               @relation("matches_depends_on_match1_idTomatches")
+  matches_matches_depends_on_match2_idTomatches       matches?                @relation("matches_depends_on_match2_idTomatches", fields: [depends_on_match2_id], references: [id])
+  other_matches_matches_depends_on_match2_idTomatches matches[]               @relation("matches_depends_on_match2_idTomatches")
+  events                                              events?                 @relation(fields: [event_id], references: [id])
+  fixtures                                            fixtures                @relation(fields: [fixture_id], references: [id], onDelete: Cascade)
+  matches_matches_next_match_idTomatches              matches?                @relation("matches_next_match_idTomatches", fields: [next_match_id], references: [id])
+  other_matches_matches_next_match_idTomatches        matches[]               @relation("matches_next_match_idTomatches")
+  users                                               users?                  @relation(fields: [result_entered_by], references: [id])
+  sports                                              sports                  @relation(fields: [sport_id], references: [id])
+  teams_matches_team1_idToteams                       teams?                  @relation("matches_team1_idToteams", fields: [team1_id], references: [id])
+  teams_matches_team2_idToteams                       teams?                  @relation("matches_team2_idToteams", fields: [team2_id], references: [id])
+  venue_location_mappings                             venue_location_mappings @relation(fields: [venue_location_mapping_id], references: [id])
+  teams_matches_winner_idToteams                      teams?                  @relation("matches_winner_idToteams", fields: [winner_id], references: [id])
+
+  @@unique([fixture_id, match_number])
+}
+
+model media {
+  id          String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  file_name   String      @db.VarChar(255)
+  file_path   String      @db.VarChar(500)
+  file_type   String      @db.VarChar(50)
+  file_size   BigInt?
+  entity_type MediaEntity
+  entity_id   String      @db.Uuid
+  uploaded_by String?     @db.Uuid
+  status      MediaStatus @default(approved)
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+  users       users?      @relation(fields: [uploaded_by], references: [id])
+}
+
+model notifications {
+  id                  String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id             String           @db.Uuid
+  title               String           @db.VarChar(200)
+  message             String
+  type                NotificationType
+  read                Boolean          @default(false)
+  read_at             DateTime?        @db.Timestamptz(6)
+  related_entity_type String?          @db.VarChar(50)
+  related_entity_id   String?          @db.Uuid
+  action_url          String?          @db.VarChar(500)
+  created_at          DateTime         @default(now()) @db.Timestamptz(6)
+  users               users            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model sport_gender_categories {
+  sport_id        String         @db.Uuid
+  gender_category GenderCategory
+  sports          sports         @relation(fields: [sport_id], references: [id], onDelete: Cascade)
+
+  @@id([sport_id, gender_category])
+}
+
+model sports {
+  id                      String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                    String                    @db.VarChar(100)
+  description             String?
+  main_players_count      Int
+  max_substitutes         Int
+  is_active               Boolean                   @default(true)
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  fixtures                fixtures[]
+  matches                 matches[]
+  sport_gender_categories sport_gender_categories[]
+  teams                   teams[]
+}
+
+model system_config {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  key         String   @unique @db.VarChar(100)
+  value       String
+  description String?
+  updated_by  String?  @db.Uuid
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  users       users?   @relation(fields: [updated_by], references: [id])
+}
+
+model taluk_cluster_mappings {
+  id                       String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id                 String                  @db.Uuid
+  district                 String                  @db.VarChar(100)
+  state                    String                  @db.VarChar(100)
+  taluk                    String                  @db.VarChar(100)
+  cluster_venue_mapping_id String                  @db.Uuid
+  created_at               DateTime                @default(now()) @db.Timestamptz(6)
+  venue_location_mappings  venue_location_mappings @relation(fields: [cluster_venue_mapping_id], references: [id], onDelete: Cascade)
+  events                   events                  @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@unique([event_id, district, taluk])
+}
+
+model team_photos {
+  team_id     String   @id @db.Uuid
+  photo_path  String   @db.VarChar(500)
+  uploaded_by String?  @db.Uuid
+  uploaded_at DateTime @default(now()) @db.Timestamptz(6)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  teams       teams    @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  users       users?   @relation(fields: [uploaded_by], references: [id])
+}
+
+model team_players {
+  id                  String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  team_id             String             @db.Uuid
+  user_id             String             @db.Uuid
+  position            PlayerPosition
+  verification_status VerificationStatus @default(pending)
+  first_name          String             @db.VarChar(100)
+  last_name           String             @db.VarChar(100)
+  phone               String             @db.VarChar(20)
+  whatsapp_number     String?            @db.VarChar(20)
+  date_of_birth       DateTime           @db.Date
+  age                 Int
+  gender              Gender
+  panchayat           String             @db.VarChar(100)
+  taluk               String             @db.VarChar(100)
+  district            String             @db.VarChar(100)
+  state               String             @db.VarChar(100)
+  pincode             String             @db.VarChar(10)
+  added_at            DateTime           @default(now()) @db.Timestamptz(6)
+  added_by            String             @db.VarChar(50)
+  created_at          DateTime           @default(now()) @db.Timestamptz(6)
+  teams               teams              @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  users               users              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([team_id, user_id])
+}
+
+model team_venue_assignments {
+  id                                                                                                String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  team_id                                                                                           String                   @db.Uuid
+  event_id                                                                                          String                   @db.Uuid
+  level                                                                                             TournamentLevel          @default(cluster)
+  cluster_venue_mapping_id                                                                          String                   @db.Uuid
+  division_venue_mapping_id                                                                         String?                  @db.Uuid
+  final_venue_mapping_id                                                                            String?                  @db.Uuid
+  cluster_qualified                                                                                 Boolean                  @default(false)
+  division_qualified                                                                                Boolean                  @default(false)
+  final_qualified                                                                                   Boolean                  @default(false)
+  assignment_method                                                                                 AssignmentMethod         @default(auto_assigned)
+  assigned_by                                                                                       String                   @db.Uuid
+  assigned_at                                                                                       DateTime                 @default(now()) @db.Timestamptz(6)
+  created_at                                                                                        DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at                                                                                        DateTime                 @default(now()) @db.Timestamptz(6)
+  users                                                                                             users                    @relation(fields: [assigned_by], references: [id])
+  venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings  venue_location_mappings  @relation("team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings", fields: [cluster_venue_mapping_id], references: [id])
+  venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings venue_location_mappings? @relation("team_venue_assignments_division_venue_mapping_idTovenue_location_mappings", fields: [division_venue_mapping_id], references: [id])
+  events                                                                                            events                   @relation(fields: [event_id], references: [id])
+  venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings    venue_location_mappings? @relation("team_venue_assignments_final_venue_mapping_idTovenue_location_mappings", fields: [final_venue_mapping_id], references: [id])
+  teams                                                                                             teams                    @relation(fields: [team_id], references: [id], onDelete: Cascade)
+
+  @@unique([team_id, event_id])
+}
+
+model teams {
+  id                                 String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                               String                   @db.VarChar(200)
+  description                        String?
+  event_id                           String?                  @db.Uuid
+  sport_id                           String                   @db.Uuid
+  captain_id                         String                   @db.Uuid
+  captain_name                       String                   @db.VarChar(200)
+  gender_category                    GenderCategory
+  status                             TeamStatus               @default(draft)
+  panchayat                          String                   @db.VarChar(100)
+  taluk                              String                   @db.VarChar(100)
+  district                           String                   @db.VarChar(100)
+  state                              String                   @db.VarChar(100)
+  pincode                            String?                  @db.VarChar(10)
+  current_players                    Int                      @default(0)
+  current_substitutes                Int                      @default(0)
+  tournament_number                  Int?
+  tournament_number_assigned_at      DateTime?                @db.Timestamptz(6)
+  tournament_number_venue_mapping_id String?                  @db.Uuid
+  verified_by                        String?                  @db.Uuid
+  verified_at                        DateTime?                @db.Timestamptz(6)
+  created_at                         DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at                         DateTime                 @default(now()) @db.Timestamptz(6)
+  fixture_results                    fixture_results[]
+  fixture_teams                      fixture_teams[]
+  matches_matches_team1_idToteams    matches[]                @relation("matches_team1_idToteams")
+  matches_matches_team2_idToteams    matches[]                @relation("matches_team2_idToteams")
+  matches_matches_winner_idToteams   matches[]                @relation("matches_winner_idToteams")
+  team_photos                        team_photos?
+  team_players                       team_players[]
+  team_venue_assignments             team_venue_assignments[]
+  users_teams_captain_idTousers      users                    @relation("teams_captain_idTousers", fields: [captain_id], references: [id])
+  events                             events?                  @relation(fields: [event_id], references: [id])
+  sports                             sports                   @relation(fields: [sport_id], references: [id])
+  venue_location_mappings            venue_location_mappings? @relation(fields: [tournament_number_venue_mapping_id], references: [id])
+  users_teams_verified_byTousers     users?                   @relation("teams_verified_byTousers", fields: [verified_by], references: [id])
+}
+
+model user_profile_images {
+  user_id                                      String    @id @db.Uuid
+  profile_photo_path                           String?   @db.VarChar(500)
+  aadhaar_front_path                           String?   @db.VarChar(500)
+  aadhaar_back_path                            String?   @db.VarChar(500)
+  all_images_uploaded                          Boolean   @default(false)
+  verified_by                                  String?   @db.Uuid
+  verified_at                                  DateTime? @db.Timestamptz(6)
+  created_at                                   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at                                   DateTime  @default(now()) @db.Timestamptz(6)
+  users_user_profile_images_user_idTousers     users     @relation("user_profile_images_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade)
+  users_user_profile_images_verified_byTousers users?    @relation("user_profile_images_verified_byTousers", fields: [verified_by], references: [id])
+}
+
+model user_verifications {
+  id                                          String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id                                     String             @db.Uuid
+  verification_type                           VerificationType
+  status                                      VerificationStatus @default(pending)
+  verified_by                                 String?            @db.Uuid
+  verified_at                                 DateTime?          @db.Timestamptz(6)
+  created_at                                  DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at                                  DateTime           @default(now()) @db.Timestamptz(6)
+  users_user_verifications_user_idTousers     users              @relation("user_verifications_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade)
+  users_user_verifications_verified_byTousers users?             @relation("user_verifications_verified_byTousers", fields: [verified_by], references: [id])
+
+  @@unique([user_id, verification_type])
+}
+
+model users {
+  id                                                              String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  phone                                                           String                   @unique @db.VarChar(20)
+  email                                                           String?                  @db.VarChar(255)
+  role                                                            UserRole                 @default(public)
+  language_preference                                             String?                  @default("en") @db.VarChar(10)
+  profile_complete                                                Boolean                  @default(false)
+  first_name                                                      String?                  @db.VarChar(100)
+  last_name                                                       String?                  @db.VarChar(100)
+  date_of_birth                                                   DateTime?                @db.Date
+  gender                                                          Gender?
+  whatsapp_number                                                 String?                  @db.VarChar(20)
+  instagram_handle                                                String?                  @db.VarChar(100)
+  panchayat                                                       String?                  @db.VarChar(100)
+  taluk                                                           String?                  @db.VarChar(100)
+  district                                                        String?                  @db.VarChar(100)
+  state                                                           String?                  @db.VarChar(100)
+  pincode                                                         String?                  @db.VarChar(10)
+  created_at                                                      DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at                                                      DateTime                 @default(now()) @db.Timestamptz(6)
+  audit_logs                                                      audit_logs[]
+  events                                                          events[]
+  fixture_results                                                 fixture_results[]
+  fixture_teams_fixture_teams_checked_in_byTousers                fixture_teams[]          @relation("fixture_teams_checked_in_byTousers")
+  fixture_teams_fixture_teams_result_recorded_byTousers           fixture_teams[]          @relation("fixture_teams_result_recorded_byTousers")
+  matches                                                         matches[]
+  media                                                           media[]
+  notifications                                                   notifications[]
+  system_config                                                   system_config[]
+  team_photos                                                     team_photos[]
+  team_players                                                    team_players[]
+  team_venue_assignments                                          team_venue_assignments[]
+  teams_teams_captain_idTousers                                   teams[]                  @relation("teams_captain_idTousers")
+  teams_teams_verified_byTousers                                  teams[]                  @relation("teams_verified_byTousers")
+  user_profile_images_user_profile_images_user_idTousers          user_profile_images?     @relation("user_profile_images_user_idTousers")
+  user_profile_images_user_profile_images_verified_byTousers      user_profile_images[]    @relation("user_profile_images_verified_byTousers")
+  user_verifications_user_verifications_user_idTousers            user_verifications[]     @relation("user_verifications_user_idTousers")
+  user_verifications_user_verifications_verified_byTousers        user_verifications[]     @relation("user_verifications_verified_byTousers")
+  volunteer_assignments_volunteer_assignments_assigned_byTousers  volunteer_assignments[]  @relation("volunteer_assignments_assigned_byTousers")
+  volunteer_assignments_volunteer_assignments_volunteer_idTousers volunteer_assignments[]  @relation("volunteer_assignments_volunteer_idTousers")
+}
+
+model venue_location_mappings {
+  id                                                                                                     String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id                                                                                               String                      @db.Uuid
+  venue_id                                                                                               String                      @db.Uuid
+  level                                                                                                  TournamentLevel
+  max_teams                                                                                              Int?
+  is_active                                                                                              Boolean                     @default(true)
+  created_at                                                                                             DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                                                                                             DateTime                    @default(now()) @db.Timestamptz(6)
+  cluster_division_mappings_cluster_division_mappings_cluster_venue_mapping_idTovenue_location_mappings  cluster_division_mappings[] @relation("cluster_division_mappings_cluster_venue_mapping_idTovenue_location_mappings")
+  cluster_division_mappings_cluster_division_mappings_division_venue_mapping_idTovenue_location_mappings cluster_division_mappings[] @relation("cluster_division_mappings_division_venue_mapping_idTovenue_location_mappings")
+  fixtures                                                                                               fixtures[]
+  matches                                                                                                matches[]
+  taluk_cluster_mappings                                                                                 taluk_cluster_mappings[]
+  team_venue_assignments_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings        team_venue_assignments[]    @relation("team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings")
+  team_venue_assignments_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings       team_venue_assignments[]    @relation("team_venue_assignments_division_venue_mapping_idTovenue_location_mappings")
+  team_venue_assignments_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings          team_venue_assignments[]    @relation("team_venue_assignments_final_venue_mapping_idTovenue_location_mappings")
+  teams                                                                                                  teams[]
+  events                                                                                                 events                      @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  venues                                                                                                 venues                      @relation(fields: [venue_id], references: [id], onDelete: Cascade)
+  volunteer_assignments                                                                                  volunteer_assignments[]
+}
+
+model venues {
+  id                      String                    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                    String                    @db.VarChar(200)
+  capacity                Int?
+  panchayat               String?                   @db.VarChar(100)
+  taluk                   String?                   @db.VarChar(100)
+  district                String                    @db.VarChar(100)
+  state                   String                    @db.VarChar(100)
+  pincode                 String?                   @db.VarChar(10)
+  contact_phone           String?                   @db.VarChar(20)
+  contact_email           String?                   @db.VarChar(255)
+  contact_person          String?                   @db.VarChar(100)
+  facilities              String?
+  is_active               Boolean                   @default(true)
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  venue_location_mappings venue_location_mappings[]
+}
+
+model volunteer_assignments {
+  id                                              String                  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  event_id                                        String                  @db.Uuid
+  volunteer_id                                    String                  @db.Uuid
+  venue_location_mapping_id                       String                  @db.Uuid
+  volunteer_type                                  VolunteerType
+  contact_phone                                   String?                 @db.VarChar(20)
+  status                                          AssignmentStatus        @default(assigned)
+  assigned_by                                     String                  @db.Uuid
+  assigned_at                                     DateTime                @default(now()) @db.Timestamptz(6)
+  created_at                                      DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                                      DateTime                @default(now()) @db.Timestamptz(6)
+  users_volunteer_assignments_assigned_byTousers  users                   @relation("volunteer_assignments_assigned_byTousers", fields: [assigned_by], references: [id])
+  events                                          events                  @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  venue_location_mappings                         venue_location_mappings @relation(fields: [venue_location_mapping_id], references: [id], onDelete: Cascade)
+  users_volunteer_assignments_volunteer_idTousers users                   @relation("volunteer_assignments_volunteer_idTousers", fields: [volunteer_id], references: [id], onDelete: Cascade)
+
+  @@unique([event_id, volunteer_id, venue_location_mapping_id], map: "volunteer_assignments_unique")
+}
+
+enum AssignmentMethod {
+  auto_assigned
+  manual_assigned
+}
+
+enum AssignmentStatus {
+  assigned
+  confirmed
+  active
+  completed
+}
+
+enum EventStatus {
+  draft
+  registration_open
+  registration_closed
+  active
+  completed
+  cancelled
+}
+
+enum FixtureStatus {
+  draft
+  teams_assigned
+  in_progress
+  completed
+}
+
+enum Gender {
+  M
+  F
+  O
+}
+
+enum GenderCategory {
+  men
+  women
+  mixed
+}
+
+enum MatchStatus {
+  scheduled
+  ready
+  in_progress
+  completed
+  cancelled
+}
+
+enum MediaEntity {
+  match
+  event
+  venue
+}
+
+enum MediaStatus {
+  pending
+  approved
+  rejected
+}
+
+enum NotificationType {
+  info
+  success
+  warning
+  error
+  team_invitation
+  verification_update
+  match_result
+  venue_assignment
+}
+
+enum PlayerPosition {
+  main
+  substitute
+}
+
+enum TeamStatus {
+  draft
+  submitted
+  verified
+  rejected
+}
+
+enum TournamentLevel {
+  cluster
+  division
+  final
+}
+
+enum UserRole {
+  admin
+  captain
+  player
+  genenral_volunteer
+  technical_volunteer
+  verification_volunteer
+  public
+}
+
+enum VerificationStatus {
+  pending
+  approved
+  rejected
+}
+
+enum VerificationType {
+  document_verification
+  onground_verification
+}
+
+enum VolunteerType {
+  general_volunteer
+  technical_volunteer
+}

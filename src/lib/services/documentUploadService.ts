@@ -1,5 +1,5 @@
-import { storage } from '@/lib/firebase/config';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getStorageProvider, generateStoragePath } from '@/lib/storage';
+import type { ProgressCallback, UploadProgress } from '@/lib/storage';
 
 interface DocumentUploadPaths {
   profilePhoto: (userId: string) => string;
@@ -7,57 +7,61 @@ interface DocumentUploadPaths {
   aadhaarBack: (userId: string) => string;
 }
 
+// Helper function to get file extension from file
+const getFileExtension = (file: File): string => {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  return extension || 'jpg';
+};
+
 export const STORAGE_PATHS: DocumentUploadPaths = {
-  profilePhoto: (userId: string) => `profilePhotos/${userId}/profile_photo`,
-  aadhaarFront: (userId: string) => `aadhaar/${userId}/front_${Date.now()}`,
-  aadhaarBack: (userId: string) => `aadhaar/${userId}/back_${Date.now()}`
+  profilePhoto: (userId: string) => generateStoragePath.profilePhoto(userId),
+  aadhaarFront: (userId: string) => generateStoragePath.aadhaarFront(userId),
+  aadhaarBack: (userId: string) => generateStoragePath.aadhaarBack(userId)
 };
 
 export const getTeamPhotoStoragePath = (teamId: string): string => {
-  return `teamPhotos/${teamId}/team_photo_${Date.now()}`;
+  return generateStoragePath.teamPhoto(teamId);
 };
-
-export interface UploadProgress {
-  progress: number;
-  bytesTransferred: number;
-  totalBytes: number;
-}
 
 export class DocumentUploadService {
   
   async uploadProfilePhoto(
     userId: string, 
     file: File, 
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: ProgressCallback
   ): Promise<string> {
-    const storagePath = STORAGE_PATHS.profilePhoto(userId);
+    const extension = getFileExtension(file);
+    const storagePath = generateStoragePath.profilePhoto(userId, extension);
     return this.uploadFile(storagePath, file, onProgress);
   }
   
   async uploadAadhaarFront(
     userId: string, 
     file: File, 
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: ProgressCallback
   ): Promise<string> {
-    const storagePath = STORAGE_PATHS.aadhaarFront(userId);
+    const extension = getFileExtension(file);
+    const storagePath = generateStoragePath.aadhaarFront(userId, extension);
     return this.uploadFile(storagePath, file, onProgress);
   }
   
   async uploadAadhaarBack(
     userId: string, 
     file: File, 
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: ProgressCallback
   ): Promise<string> {
-    const storagePath = STORAGE_PATHS.aadhaarBack(userId);
+    const extension = getFileExtension(file);
+    const storagePath = generateStoragePath.aadhaarBack(userId, extension);
     return this.uploadFile(storagePath, file, onProgress);
   }
 
   async uploadTeamPhoto(
     teamId: string, 
     file: File, 
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: ProgressCallback
   ): Promise<string> {
-    const storagePath = getTeamPhotoStoragePath(teamId);
+    const extension = getFileExtension(file);
+    const storagePath = generateStoragePath.teamPhoto(teamId, extension);
     return this.uploadFile(storagePath, file, onProgress);
   }
 
@@ -71,7 +75,7 @@ export class DocumentUploadService {
   private async uploadFile(
     storagePath: string, 
     file: File, 
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: ProgressCallback
   ): Promise<string> {
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
@@ -83,36 +87,8 @@ export class DocumentUploadService {
       throw new Error('Only image files are allowed');
     }
 
-    const storageRef = ref(storage, storagePath);
-    const uploadTask = uploadBytesResumable(storageRef, file);
-    
-    return new Promise((resolve, reject) => {
-      uploadTask.on('state_changed',
-        (snapshot) => {
-          // Track upload progress
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          if (onProgress) {
-            onProgress({
-              progress,
-              bytesTransferred: snapshot.bytesTransferred,
-              totalBytes: snapshot.totalBytes
-            });
-          }
-        },
-        (error) => {
-          reject(new Error(`Upload failed: ${error.message}`));
-        },
-        async () => {
-          try {
-            // Get download URL
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(downloadURL);
-          } catch (error) {
-            reject(new Error('Failed to get download URL'));
-          }
-        }
-      );
-    });
+    const storageProvider = getStorageProvider();
+    return await storageProvider.upload(storagePath, file, onProgress);
   }
   
   async getDocumentURL(
@@ -121,8 +97,8 @@ export class DocumentUploadService {
   ): Promise<string | null> {
     try {
       const storagePath = STORAGE_PATHS[documentType](userId);
-      const storageRef = ref(storage, storagePath);
-      return await getDownloadURL(storageRef);
+      const storageProvider = getStorageProvider();
+      return storageProvider.getPublicUrl(storagePath);
     } catch (error) {
       return null;
     }
@@ -133,8 +109,16 @@ export class DocumentUploadService {
     documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack'
   ): Promise<boolean> {
     try {
-      const url = await this.getDocumentURL(userId, documentType);
-      return url !== null;
+      const storagePath = STORAGE_PATHS[documentType](userId);
+      const storageProvider = getStorageProvider();
+      
+      // Use exists method if available, otherwise fallback to URL check
+      if (storageProvider.exists) {
+        return await storageProvider.exists(storagePath);
+      } else {
+        const url = await this.getDocumentURL(userId, documentType);
+        return url !== null;
+      }
     } catch {
       return false;
     }
@@ -146,8 +130,8 @@ export class DocumentUploadService {
   ): Promise<void> {
     try {
       const storagePath = STORAGE_PATHS[documentType](userId);
-      const storageRef = ref(storage, storagePath);
-      await deleteObject(storageRef);
+      const storageProvider = getStorageProvider();
+      await storageProvider.delete(storagePath);
     } catch (error) {
       throw new Error(`Failed to delete ${documentType}`);
     }
@@ -157,7 +141,7 @@ export class DocumentUploadService {
     userId: string,
     documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack',
     newFile: File,
-    onProgress?: (progress: UploadProgress) => void
+    onProgress?: ProgressCallback
   ): Promise<string> {
     try {
       // Delete existing document if it exists

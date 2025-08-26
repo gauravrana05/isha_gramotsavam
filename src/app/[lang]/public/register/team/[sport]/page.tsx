@@ -6,12 +6,13 @@ import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/utils/i18n";
 import Image from "next/image";
 import { Users, ArrowRight, Loader2, AlertCircle } from "lucide-react";
-import { createTeamAndPromoteCaptain } from "@/lib/actions/captain/createTeamOptimized";
+import { api } from "@/server/trpc/react";
 
 interface TeamFormData {
   name: string;
   description: string;
   panchayat: string;
+  taluk: string;
   district: string;
   state: string;
 }
@@ -21,6 +22,7 @@ export default function TeamRegistrationPage() {
     name: "",
     description: "",
     panchayat: "",
+    taluk: "",
     district: "",
     state: "",
   });
@@ -32,10 +34,27 @@ export default function TeamRegistrationPage() {
   const { lang, sport } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
   const { t } = useTranslation();
-
-  // Validate sport parameter
-  const validSports = ['volleyball', 'throwball'];
+  
+  // tRPC mutations
+  const createTeamMutation = api.teams.createAndPromoteCaptain.useMutation();
+  
+  // Get sport parameter
   const sportName = Array.isArray(sport) ? sport[0] : sport ?? "sport_name";
+  
+  // Fetch sport data with gender validation
+  const sportQuery = api.sports.getByIdOrName.useQuery(
+    { 
+      identifier: sportName, 
+      userGender: user?.gender as 'M' | 'F' | 'O' | undefined 
+    },
+    { enabled: !!sportName && !!user }
+  );
+  
+  // Fetch user profile completion status
+  const profileDataQuery = api.profile.checkCompletion.useQuery(
+    { userId: user?.id || '' },
+    { enabled: !!user?.id }
+  );
   
   useEffect(() => {
     if (authLoading) return;
@@ -49,21 +68,22 @@ export default function TeamRegistrationPage() {
       router.push(`/${lang}/public`);
       return;
     }
-    // Redirect if profile incomplete
-    if (!userProfile?.isProfileComplete) {
-      router.push(`/${lang}/profile/complete`);
+    // Check profile completion using tRPC data instead of AuthContext
+    if (profileDataQuery.data && !profileDataQuery.data.profileComplete) {
+      // Add redirect parameter so user comes back to team registration after profile completion
+      const returnUrl = encodeURIComponent(`/${lang}/public/register/team/${sportName}`);
+      router.push(`/${lang}/profile/complete?returnTo=${returnUrl}`);
       return;
     }
 
-    // Validate sport
-    if (!validSports.includes(sportName)) {
+    // Check sport validity and gender eligibility
+    if (sportQuery.data) {
+      if (!sportQuery.data.can_register) {
+        setError(sportQuery.data.registration_message || 'Registration not available for this sport');
+        return;
+      }
+    } else if (sportQuery.error) {
       router.push(`/${lang}/public/sports`);
-      return;
-    }
-
-    // Validate gender-sport eligibility
-    if (sportName === 'throwball' && userProfile.gender !== 'F') {
-      setError("Throwball registration is only available for women.");
       return;
     }
 
@@ -72,6 +92,7 @@ export default function TeamRegistrationPage() {
       setFormData(prev => ({
         ...prev,
         panchayat: userProfile.panchayat || "",
+        taluk: userProfile.taluk || "",
         district: userProfile.district || "",
         state: userProfile.state || "",
       }));
@@ -88,13 +109,20 @@ export default function TeamRegistrationPage() {
     if (!formData.name.trim()) return "Please enter team name";
     if (formData.name.length < 3) return "Team name must be at least 3 characters";
     if (!formData.panchayat.trim()) return "Please enter panchayat";
+    if (!formData.taluk.trim()) return "Please enter taluk";
     if (!formData.district.trim()) return "Please enter district";
     if (!formData.state.trim()) return "Please enter state";
     return null;
   };
 
   const handleSubmit = async () => {
-    if (!user || !userProfile) return;
+    if (!user || !userProfile || !sportQuery.data) return;
+
+    // Check if user can register for this sport
+    if (!sportQuery.data.can_register) {
+      setError(sportQuery.data.registration_message || 'Registration not available for this sport');
+      return;
+    }
 
     const validationError = validateForm();
     if (validationError) {
@@ -108,27 +136,24 @@ export default function TeamRegistrationPage() {
     try {
       const teamData = {
         name: formData.name,
-        sportName: sportName.charAt(0).toUpperCase() + sportName.slice(1),
-        sportId: sport === 'volleyball' ? 'gDZ7zitmogfMCLH5YEzO' : '36o6rT3bTu4cQAm49hrd',
+        sportName: sportQuery.data.name,
+        sportId: sportQuery.data.id,
         description: formData.description,
         panchayat: formData.panchayat,
+        taluk: formData.taluk,
         district: formData.district,
         state: formData.state,
-        genderCategory: userProfile.gender,
+        genderCategory: userProfile.gender as 'M' | 'F' | 'mixed',
       };
       
-      // Console log removed
-      const result = await createTeamAndPromoteCaptain({ 
+      // Use tRPC mutation
+      const result = await createTeamMutation.mutateAsync({ 
         teamData, 
-        captainId: user.uid 
+        captainId: user.id 
       });
       
-      if (result.success) {
-        // Console log removed
-        router.push(`/${lang}/captain/teams/${result.teamId}/players/invite`);
-      } else {
-        throw new Error(result.error || "Failed to create team.");
-      }
+      // Navigate to team invite page
+      router.push(`/${lang}/captain/teams/${result.teamId}/players/invite`);
 
     } catch (err: any) {
       // Error handling removed
@@ -150,12 +175,24 @@ export default function TeamRegistrationPage() {
     return null;
   }
 
-  if (!validSports.includes(sportName)) {
+  // Handle sport loading states
+  if (sportQuery.isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#CE4520] mx-auto mb-4" />
+          <p className="text-gray-600">Loading sport details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (sportQuery.error || !sportQuery.data) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Sport</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Sport Not Found</h1>
           <p className="text-gray-600 mb-4">The sport you selected is not available.</p>
           <button 
             onClick={() => router.push(`/${lang}/public/sports`)}
@@ -181,8 +218,8 @@ export default function TeamRegistrationPage() {
               className="mx-auto sm:w-20 sm:h-20"
             />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 capitalize">
-            Register Team for {sportName}
+          <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2">
+            Register Team for {sportQuery.data?.name || sportName}
           </h1>
           <p className="text-sm sm:text-base text-gray-600 font-fira">
             {sportName === 'throwball' ? 'For Women' : 'For Men and Women'}
@@ -251,6 +288,18 @@ export default function TeamRegistrationPage() {
                 type="text"
                 className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg bg-gray-50 font-fira text-sm sm:text-base"
                 value={formData.panchayat}
+                readOnly
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
+                Taluk <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg bg-gray-50 font-fira text-sm sm:text-base"
+                value={formData.taluk}
                 readOnly
               />
             </div>

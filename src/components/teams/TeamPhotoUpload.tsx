@@ -4,8 +4,6 @@ import React, { useRef, useState } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { documentUploadService } from '@/lib/services/documentUploadService';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
 import { LoadingSpinner } from '@/components/ui/loaders';
 
 export interface TeamPhotoUploadProps {
@@ -64,16 +62,8 @@ const TeamPhotoUpload: React.FC<TeamPhotoUploadProps> = ({
         (progress) => setProgress(progress.progress)
       );
 
-      // Update team document with photo info
-      const teamRef = doc(db, 'teams', teamId);
-      await updateDoc(teamRef, {
-        'documents.teamPhoto.storagePath': `teamPhotos/${teamId}`,
-        'documents.teamPhoto.url': downloadURL,
-        'documents.teamPhoto.verified': false,
-        'documents.teamPhoto.uploadedAt': serverTimestamp(),
-        'documents.teamPhoto.uploadedBy': user.uid,
-        updatedAt: serverTimestamp()
-      });
+      // TODO: Update team document via tRPC once team endpoints are updated
+      // For now, just update UI state - tRPC integration pending
 
       setUploading(false);
       setProgress(100);

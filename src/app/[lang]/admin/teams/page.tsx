@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getAdminTeams, getAdminTeamStats } from '@/lib/actions/admin/optimizedTeamQueries';
+import { api } from '@/server/trpc/react';
 import { 
   Users,
   Trophy,
@@ -51,7 +51,7 @@ interface TeamData {
   status: string;
   createdAt: any;
   eventId: string;
-  clusterVenue?: string; // Keep for backward compatibility
+  clusterVenue?: string;
   currentVenueAssignment?: {
     venueId: string;
     venueName: string;
@@ -61,10 +61,6 @@ interface TeamData {
 }
 
 export default function AdminTeamsPage() {
-  const [teams, setTeams] = useState<TeamData[]>([]);
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sportFilter, setSportFilter] = useState<string>('all');
@@ -73,456 +69,323 @@ export default function AdminTeamsPage() {
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
   const pageSize = 25;
 
   const router = useRouter();
   const { lang } = useParams();
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
-    }
+  // Build filters object
+  const filters = useMemo(() => ({
+    limit: pageSize,
+    offset: (currentPage - 1) * pageSize,
+    status: statusFilter as any,
+    sportName: sportFilter !== 'all' ? sportFilter : undefined,
+    district: districtFilter !== 'all' ? districtFilter : undefined,
+    genderCategory: genderFilter as any,
+    searchQuery: searchTerm || undefined,
+  }), [statusFilter, sportFilter, districtFilter, genderFilter, searchTerm, currentPage, pageSize]);
 
-    if (userProfile?.role !== 'admin') {
-      router.push(`/${lang}/player/dashboard`);
-      return;
-    }
+  // tRPC queries
+  const { 
+    data: teamsData, 
+    isLoading: teamsLoading, 
+    error: teamsError 
+  } = api.teams.getAdminTeams.useQuery(filters, {
+    enabled: !!user && user.role === 'admin'
+  });
 
-    loadTeams();
-    loadStats();
-  }, [user, userProfile, authLoading, lang, router, statusFilter, sportFilter, districtFilter, genderFilter, currentPage]);
+  const { 
+    data: statsData, 
+    isLoading: statsLoading 
+  } = api.teams.getAdminTeamStats.useQuery({}, {
+    enabled: !!user && user.role === 'admin'
+  });
 
-  const loadTeams = async () => {
-    try {
-      setLoading(true);
-      
-      if (!user?.uid) {
-        throw new Error('User not authenticated');
-      }
+  // Auth check
+  if (authLoading) {
+    return <PageLoader title="Loading..." />;
+  }
 
-      const result = await getAdminTeams({
-        limit: pageSize,
-        offset: (currentPage - 1) * pageSize,
-        status: statusFilter as
-          | "all"
-          | "verified"
-          | "rejected"
-          | "draft"
-          | "submitted"
-          | "active",
-        verificationStatus: "all", // or set based on a filter if you have one
-        currentTournamentLevel: "all", // or set based on a filter if you have one
-        sportName: sportFilter !== 'all' ? sportFilter : undefined,
-        district: districtFilter !== 'all' ? districtFilter : undefined,
-        genderCategory: genderFilter === 'M'
-          ? 'men'
-          : genderFilter === 'F'
-          ? 'women'
-          : 'all',
-        searchQuery: searchTerm || undefined,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      }, user.uid);
+  if (!user) {
+    router.push(`/${lang}/login`);
+    return null;
+  }
 
-      if (!result.success) {
-        throw new Error(result.error);
-      }
+  if (user.role !== 'admin') {
+    router.push(`/${lang}/player/dashboard`);
+    return null;
+  }
 
-      // Fix: Map LightweightTeam[] to TeamData[] by filling missing fields with defaults/nulls
-      setTeams(
-        (result.teams ?? []).map((team: any) => ({
-          ...team,
-          sportId: team.sportId ?? null,
-          state: team.state ?? null,
-          createdAt: team.createdAt ?? null,
-          eventId: team.eventId ?? null,
-        }))
-      );
-      setHasMore(result.pagination?.hasMore ?? false);
-      setError('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to load teams. Please check your permissions.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const teams = teamsData?.teams || [];
+  const stats = statsData?.stats;
+  const loading = teamsLoading || statsLoading;
+  const error = teamsError?.message || '';
+  const hasMore = teamsData?.pagination?.hasMore || false;
 
-  const loadStats = async () => {
-    try {
-      if (!user?.uid) return;
-
-      const result = await getAdminTeamStats({
-        district: districtFilter !== 'all' ? districtFilter : undefined,
-        sportName: sportFilter !== 'all' ? sportFilter : undefined,
-        genderCategory:
-          genderFilter === 'M'
-            ? 'men'
-            : genderFilter === 'F'
-            ? 'women'
-            : 'all',
-        currentTournamentLevel: "all", // or set based on a filter if you have one
-      }, user.uid);
-
-      if (result.success) {
-        setStats(result.stats);
-      }
-    } catch (err: any) {
-      // Error handling removed
-    }
-  };
-
-  // Remove client-side filtering since it's now handled by the server
-  const filteredTeams = teams;
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'verified': return 'success';
-      case 'submitted': return 'info';
-      case 'pending': return 'warning';
-      case 'draft': return 'inactive';
-      case 'rejected': return 'error';
-      default: return 'inactive';
-    }
-  };
-
-  // Define table columns for AdvancedTable (removed created column)
+  // Table columns configuration
   const columns: Column<TeamData>[] = [
     {
       key: 'name',
-      header: 'Team',
-      accessor: 'name',
+      header: 'Team Name',
       sortable: true,
-      priority: 'high',
-      width: '200px',
-      minWidth: '180px',
-      render: (_, team) => (
-        <div>
-          <div className="text-sm font-medium text-gray-900">{team.name}</div>
-          <div className="text-xs text-gray-500 capitalize">{team.genderCategory}</div>
+      render: (team) => (
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-900">{team.name}</span>
+          <span className="text-sm text-gray-500">{team.sportName} - {team.genderCategory}</span>
         </div>
-      ),
+      )
     },
     {
-      key: 'sport',
-      header: 'Sport',
-      accessor: 'sportName',
-      sortable: true,
-      priority: 'high',
-      width: '120px',
-    },
-    {
-      key: 'captain',
+      key: 'captainProfile',
       header: 'Captain',
-      accessor: (team) => team.captainProfile?.name || '',
-      sortable: true,
-      priority: 'medium',
-      width: '180px',
-      render: (_, team) => (
-        <div>
-          <div className="text-sm text-gray-900">{team.captainProfile.name}</div>
-          <div className="text-xs text-gray-500">{team.captainProfile.phone}</div>
+      render: (team) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-gray-900">{team.captainProfile?.name || 'N/A'}</span>
+          <span className="text-xs text-gray-500">{team.captainProfile?.phone || 'N/A'}</span>
         </div>
-      ),
+      )
     },
     {
       key: 'location',
       header: 'Location',
-      accessor: 'panchayat',
-      sortable: true,
-      priority: 'medium',
-      width: '180px',
-      render: (_, team) => (
-        <div>
-          <div className="text-sm text-gray-900">{team.panchayat}</div>
-          <div className="text-xs text-gray-500">{team.district}</div>
+      render: (team) => (
+        <div className="flex flex-col">
+          <span className="text-sm text-gray-900">{team.panchayat || 'N/A'}</span>
+          <span className="text-xs text-gray-500">{team.district}, {team.state}</span>
         </div>
-      ),
-    },
-    {
-      key: 'venue',
-      header: 'Venue',
-      accessor: (team) => team.currentVenueAssignment?.venueName || team.clusterVenue || '',
-      priority: 'low',
-      width: '180px',
-      render: (_, team) => {
-        const venue = team.currentVenueAssignment;
-        if (!venue) {
-          return (
-            <div className="text-sm text-gray-400 italic">Not assigned</div>
-          );
-        }
-        return (
-          <div>
-            <div className="text-sm text-gray-900">{venue.venueName}</div>
-            <div className="text-xs text-gray-500 capitalize">{venue.assignmentLevel} level</div>
-          </div>
-        );
-      },
+      )
     },
     {
       key: 'players',
       header: 'Players',
-      accessor: 'currentPlayers',
-      sortable: true,
-      priority: 'medium',
-      width: '100px',
-      render: (_, team) => (
-        <div className="text-sm text-gray-900">
-          {team.currentPlayers}/{team.maxPlayers}
+      render: (team) => (
+        <div className="flex items-center space-x-1">
+          <Users className="w-4 h-4 text-gray-400" />
+          <span className={`text-sm ${team.currentPlayers >= team.maxPlayers ? 'text-green-600' : 'text-amber-600'}`}>
+            {team.currentPlayers}/{team.maxPlayers}
+          </span>
         </div>
-      ),
+      )
+    },
+    {
+      key: 'venue',
+      header: 'Venue Assignment',
+      render: (team) => {
+        const venue = team.currentVenueAssignment;
+        if (!venue) {
+          return <span className="text-sm text-gray-400">Not assigned</span>;
+        }
+        return (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-900">{venue.venueName}</span>
+            <span className="text-xs text-gray-500 capitalize">{venue.assignmentLevel}</span>
+          </div>
+        );
+      }
     },
     {
       key: 'status',
       header: 'Status',
-      accessor: 'status',
       sortable: true,
-      priority: 'high',
-      width: '120px',
-      render: (_, team) => (
-        <StatusBadge 
-          status={getStatusColor(team.status)}
-          customLabel={team.status.replace('_', ' ')}
-          variant="soft"
-        />
-      ),
+      render: (team) => {
+        const statusConfig = {
+          'draft': { color: 'gray', icon: AlertCircle },
+          'submitted': { color: 'blue', icon: Clock },
+          'verified': { color: 'green', icon: CheckCircle },
+          'rejected': { color: 'red', icon: XCircle },
+          'active': { color: 'green', icon: Trophy }
+        };
+        
+        const config = statusConfig[team.status as keyof typeof statusConfig] || statusConfig.draft;
+        const Icon = config.icon;
+        
+        return (
+          <StatusBadge 
+            status={team.status} 
+            color={config.color} 
+            icon={<Icon className="w-3 h-3" />}
+          />
+        );
+      }
     },
-  ];
-
-  // Define action buttons for AdvancedTable
-  const actions: ActionButton<TeamData>[] = [
     {
-      label: 'View',
-      icon: Eye,
-      onClick: (team) => router.push(`/${lang}/admin/teams/${team.id}`),
-      variant: 'primary',
-    },
+      key: 'createdAt',
+      header: 'Created',
+      sortable: true,
+      render: (team) => (
+        <span className="text-sm text-gray-500">
+          {new Date(team.createdAt).toLocaleDateString()}
+        </span>
+      )
+    }
   ];
 
-  // Define filters specific to teams (existing filters from the page)
-  const teamFilters: FilterField[] = [
+  // Action buttons for each row
+  const actionButtons: ActionButton<TeamData>[] = [
+    {
+      label: 'View Details',
+      icon: <Eye className="w-4 h-4" />,
+      onClick: (team) => router.push(`/${lang}/admin/teams/${team.id}`),
+      variant: 'secondary'
+    }
+  ];
+
+  // Filter fields configuration
+  const filterFields: FilterField[] = [
+    {
+      key: 'search',
+      type: 'search',
+      placeholder: 'Search teams...',
+      value: searchTerm,
+      onChange: setSearchTerm
+    },
     {
       key: 'status',
-      label: 'Status',
       type: 'select',
+      label: 'Status',
+      value: statusFilter,
+      onChange: setStatusFilter,
       options: [
-        { label: 'Draft', value: 'draft' },
-        { label: 'Submitted', value: 'submitted' },
-        { label: 'Pending', value: 'pending' },
-        { label: 'Verified', value: 'verified' },
-        { label: 'Rejected', value: 'rejected' },
-      ],
+        { value: 'all', label: 'All Status' },
+        { value: 'draft', label: 'Draft' },
+        { value: 'submitted', label: 'Submitted' },
+        { value: 'verified', label: 'Verified' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'active', label: 'Active' }
+      ]
     },
     {
-      key: 'sportName',
-      label: 'Sport',
+      key: 'sport',
       type: 'select',
+      label: 'Sport',
+      value: sportFilter,
+      onChange: setSportFilter,
       options: [
-        { label: 'Volleyball', value: 'Volleyball' },
-        { label: 'Throwball', value: 'Throwball' },
-      ],
+        { value: 'all', label: 'All Sports' },
+        ...(stats?.bySport ? Object.keys(stats.bySport).map(sport => ({
+          value: sport,
+          label: `${sport} (${stats.bySport[sport]})`
+        })) : [])
+      ]
     },
     {
       key: 'district',
+      type: 'select',
       label: 'District',
-      type: 'select',
-      options: stats?.byDistrict ? Object.keys(stats.byDistrict).sort().map(district => ({
-        label: `${district} (${stats.byDistrict[district]})`,
-        value: district
-      })) : [],
-    },
-    {
-      key: 'genderCategory',
-      label: 'Gender Category',
-      type: 'select',
+      value: districtFilter,
+      onChange: setDistrictFilter,
       options: [
-        { label: 'Men', value: 'M' },
-        { label: 'Women', value: 'F' },
-      ],
+        { value: 'all', label: 'All Districts' },
+        ...(stats?.byDistrict ? Object.keys(stats.byDistrict).map(district => ({
+          value: district,
+          label: `${district} (${stats.byDistrict[district]})`
+        })) : [])
+      ]
     },
+    {
+      key: 'gender',
+      type: 'select',
+      label: 'Gender Category',
+      value: genderFilter,
+      onChange: setGenderFilter,
+      options: [
+        { value: 'all', label: 'All Categories' },
+        { value: 'men', label: 'Men' },
+        { value: 'women', label: 'Women' },
+        { value: 'mixed', label: 'Mixed' }
+      ]
+    }
   ];
 
-  // Define export options specific to teams
-  const exportOptions: ExportConfig[] = [
-    {
-      label: 'Export CSV',
-      format: 'csv',
-      onExport: () => {
-        const csvContent = [
-          ['Team Name', 'Sport', 'Gender Category', 'Captain', 'Captain Phone', 'Location', 'Venue', 'Players', 'Status'].join(','),
-          ...filteredTeams.map(team => [
-            team.name,
-            team.sportName,
-            team.genderCategory,
-            team.captainProfile.name,
-            team.captainProfile.phone,
-            `${team.panchayat}, ${team.district}`,
-            team.clusterVenue || 'Not assigned',
-            `${team.currentPlayers}/${team.maxPlayers}`,
-            team.status
-          ].join(','))
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `teams_export_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      },
-    },
-  ];
-
-  // Define stats for StatsCard
-  const statsData = stats ? [
-    {
-      label: 'Total',
-      value: stats.total || teams.length,
-      color: 'info' as const,
-    },
-    {
-      label: 'Verified',
-      value: stats.byStatus?.verified || teams.filter(t => t.status === 'verified').length,
-      color: 'success' as const,
-    },
-    {
-      label: 'Submitted',
-      value: stats.byStatus?.submitted || teams.filter(t => t.status === 'submitted').length,
-      color: 'info' as const,
-    },
-    {
-      label: 'Pending',
-      value: stats.byStatus?.pending || teams.filter(t => t.status === 'pending').length,
-      color: 'warning' as const,
-    },
-    {
-      label: 'Players',
-      value: stats.playerStats?.totalPlayers || teams.reduce((total, team) => total + team.currentPlayers, 0),
-      color: 'secondary' as const,
-    },
-  ] : [];
-
-  if (authLoading || loading) {
-    return <PageLoader title="Loading teams..." variant="minimal" />;
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="bg-primary-500 text-white px-6 py-2 rounded-lg hover:bg-primary-600 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Export configuration
+  const exportConfig: ExportConfig = {
+    filename: 'teams-export',
+    headers: [
+      'Team Name', 'Sport', 'Captain Name', 'Captain Phone', 
+      'Panchayat', 'District', 'State', 'Players', 'Status', 'Created Date'
+    ],
+    data: teams.map(team => [
+      team.name,
+      team.sportName,
+      team.captainProfile?.name || 'N/A',
+      team.captainProfile?.phone || 'N/A',
+      team.panchayat || 'N/A',
+      team.district || 'N/A',
+      team.state || 'N/A',
+      `${team.currentPlayers}/${team.maxPlayers}`,
+      team.status,
+      new Date(team.createdAt).toLocaleDateString()
+    ])
+  };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-fira">Teams Management</h1>
-          <p className="text-gray-600 text-sm font-fira">View and manage team registrations</p>
-        </div>
-      </div>
-
-      {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-600 font-fira">{error}</p>
-          </div>
-        )}
-
+    <div className="space-y-6">
       {/* Stats Cards */}
-      {statsData.length > 0 && (
-        <div className="mb-8">
-          <StatsCard 
-            stats={statsData}
-            columns={5}
-            size="base"
-            showBorder
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Total Teams"
+            value={stats.total?.toString() || '0'}
+            icon={<Users className="w-5 h-5" />}
+            color="blue"
+          />
+          <StatsCard
+            title="Verified Teams"
+            value={stats.verificationStats?.fullyVerified?.toString() || '0'}
+            icon={<CheckCircle className="w-5 h-5" />}
+            color="green"
+          />
+          <StatsCard
+            title="Total Players"
+            value={stats.playerStats?.totalPlayers?.toString() || '0'}
+            icon={<User className="w-5 h-5" />}
+            color="purple"
+          />
+          <StatsCard
+            title="Average Players/Team"
+            value={stats.playerStats?.averagePlayersPerTeam?.toFixed(1) || '0'}
+            icon={<Trophy className="w-5 h-5" />}
+            color="orange"
           />
         </div>
       )}
 
-      {/* Advanced Table with all features */}
-      <AdvancedTable
-        data={filteredTeams}
-        columns={columns}
-        actions={actions}
-        loading={loading}
-        
-        // Search functionality
-        searchable={true}
-        searchPlaceholder="Search teams, captains, or locations..."
-        
-        // Filter functionality
-        filterable={true}
-        filters={teamFilters}
-        
-        // Sort functionality
-        sortable={true}
-        multiSort={true}
-        defaultSort={[{ key: 'name', direction: 'asc' }]}
-        
-        // Pagination - Note: Since this uses server-side data loading,
-        // we'll need to handle this differently or disable for now
-        pagination={{
-          enabled: false // Disable until we implement server-side pagination
-        }}
-        
-        // Export options
-        exportOptions={exportOptions}
-        
-        // Selection (for future bulk actions)
-        selectable={false}
-        
-        // Empty state
-        emptyState={{
-          icon: Users,
-          title: 'No teams found',
-          description: searchTerm || teamFilters.some(f => f.key) 
-            ? 'Try adjusting your search or filters' 
-            : 'Teams will appear here as they register',
-        }}
-        
-        keyExtractor={(team) => team.id}
-        stickyHeader={true}
-      />
-
-      {/* Load More Button (for existing pagination) */}
-      {hasMore && (
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => setCurrentPage(prev => prev + 1)}
-            disabled={loading}
-            className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 flex items-center mx-auto"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                Loading...
-              </>
-            ) : (
-              'Load More Teams'
-            )}
-          </button>
+      {/* Teams Table */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Team Management</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Manage and monitor all registered teams
+          </p>
         </div>
-      )}
+
+        {error && (
+          <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-600 text-sm">Error: {error}</p>
+          </div>
+        )}
+
+        <AdvancedTable<TeamData>
+          data={teams}
+          columns={columns}
+          actionButtons={actionButtons}
+          filterFields={filterFields}
+          loading={loading}
+          exportConfig={exportConfig}
+          pagination={{
+            currentPage,
+            pageSize,
+            hasMore,
+            onPageChange: setCurrentPage
+          }}
+          emptyState={{
+            title: 'No teams found',
+            description: 'No teams match your current filters.',
+            icon: <Users className="w-12 h-12 text-gray-400" />
+          }}
+        />
+      </div>
     </div>
   );
 }

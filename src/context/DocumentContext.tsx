@@ -2,9 +2,9 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { documentUploadService, UploadProgress } from '@/lib/services/documentUploadService';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { documentUploadService } from '@/lib/services/documentUploadService';
+import { api } from '@/server/trpc/react';
+import type { UploadProgress } from '@/lib/storage';
 import type { UserDocuments } from '@/lib/types/user';
 
 export type DocumentType = keyof UserDocuments;
@@ -72,7 +72,7 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
   }, []);
 
   const uploadDocument = useCallback(async (type: DocumentType, file: File): Promise<string> => {
-    if (!user?.uid) {
+    if (!user?.id) {
       throw new Error('User not authenticated');
     }
 
@@ -87,31 +87,36 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
       
       switch (type) {
         case 'profilePhoto':
-          downloadURL = await documentUploadService.uploadProfilePhoto(user.uid, file, onProgress);
+          downloadURL = await documentUploadService.uploadProfilePhoto(user.id, file, onProgress);
           break;
         case 'aadhaarFront':
-          downloadURL = await documentUploadService.uploadAadhaarFront(user.uid, file, onProgress);
+          downloadURL = await documentUploadService.uploadAadhaarFront(user.id, file, onProgress);
           break;
         case 'aadhaarBack':
-          downloadURL = await documentUploadService.uploadAadhaarBack(user.uid, file, onProgress);
+          downloadURL = await documentUploadService.uploadAadhaarBack(user.id, file, onProgress);
           break;
         default:
           throw new Error(`Invalid document type: ${type}`);
       }
 
-      // Update Firestore user document with both storagePath and url
-      const storagePath = documentUploadService.getStoragePath(user.uid, type);
-      const userRef = doc(db, 'users', user.uid);
-      const updateData: any = {
-        [`documents.${type}.storagePath`]: storagePath,
-        [`documents.${type}.url`]: downloadURL,
-        [`documents.${type}.uploadedAt`]: serverTimestamp(),
-        [`documents.${type}.uploadedBy`]: user.uid,
-        [`documents.${type}.verified`]: false, // Admin needs to verify
-        updatedAt: serverTimestamp()
-      };
+      // Update user document in database via direct fetch to tRPC endpoint
+      const response = await fetch('/api/trpc/profile.updateImageUpload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          imageType: type,
+          imagePath: downloadURL,
+        }),
+      });
 
-      await updateDoc(userRef, updateData);
+      if (!response.ok) {
+        throw new Error(`Database update failed: ${response.status}`);
+      }
+
+      await response.json();
 
       updateDocumentState(type, { 
         url: downloadURL, 
@@ -133,7 +138,7 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
   }, [user, documents, updateDocumentState]);
 
   const deleteDocument = useCallback(async (type: DocumentType): Promise<void> => {
-    if (!user?.uid) {
+    if (!user?.id) {
       throw new Error('User not authenticated');
     }
 
@@ -145,20 +150,10 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
         throw new Error(`Invalid document type: ${type}`);
       }
 
-      await documentUploadService.deleteDocument(user.uid, type);
+      await documentUploadService.deleteDocument(user.id, type);
 
-      // Update Firestore user document
-      const userRef = doc(db, 'users', user.uid);
-      const updateData: any = {
-        [`documents.${type}`]: null
-      };
-
-      // Update profile completion status if deleting Aadhaar documents
-      if (type === 'aadhaarFront' || type === 'aadhaarBack') {
-        updateData.isProfileComplete = false;
-      }
-
-      await updateDoc(userRef, updateData);
+      // TODO: Update user document via tRPC once profile endpoints are created
+      // For now, just update local state - tRPC integration pending
 
       updateDocumentState(type, { url: null, uploading: false, progress: 0, error: null });
     } catch (error) {
@@ -169,7 +164,7 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
   }, [user, updateDocumentState]);
 
   const replaceDocument = useCallback(async (type: DocumentType, file: File): Promise<string> => {
-    if (!user?.uid) {
+    if (!user?.id) {
       throw new Error('User not authenticated');
     }
 
@@ -185,14 +180,10 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
         throw new Error(`Invalid document type: ${type}`);
       }
 
-      const downloadURL = await documentUploadService.replaceDocument(user.uid, type, file, onProgress);
+      const downloadURL = await documentUploadService.replaceDocument(user.id, type, file, onProgress);
 
-      // Update Firestore user document
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        [`documents.${type}.url`]: downloadURL,
-        [`documents.${type}.uploadedAt`]: new Date().toISOString()
-      });
+      // TODO: Update user document via tRPC once profile endpoints are created
+      // For now, just update local state - tRPC integration pending
 
       updateDocumentState(type, { 
         url: downloadURL, 
@@ -229,13 +220,13 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
   }, [updateDocumentState]);
 
   const refreshDocuments = useCallback(async (): Promise<void> => {
-    if (!user?.uid) return;
+    if (!user?.id) return;
 
     try {
       const types: DocumentType[] = ['profilePhoto', 'aadhaarFront', 'aadhaarBack'];
       
       for (const type of types) {
-        const url = await documentUploadService.getDocumentURL(user.uid, type as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack');
+        const url = await documentUploadService.getDocumentURL(user.id, type as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack');
         updateDocumentState(type as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack', { url, error: null });
       }
     } catch (error) {

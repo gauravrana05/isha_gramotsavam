@@ -22,7 +22,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const params = useParams();
   const router = useRouter();
   const pathname = usePathname();
-  const { user, userProfile } = useAuth();
+  const { user } = useAuth();
 
   // Initialize language from route params or user preference
   useEffect(() => {
@@ -34,8 +34,8 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         targetLang = params.lang as LanguageCode;
       } 
       // 2. Fallback to user's preferred language if no valid URL lang
-      else if (userProfile?.preferredLanguage && isValidLanguageCode(userProfile.preferredLanguage)) {
-        targetLang = userProfile.preferredLanguage as LanguageCode;
+      else if (user?.preferredLanguage && isValidLanguageCode(user.preferredLanguage)) {
+        targetLang = user.preferredLanguage as LanguageCode;
       }
 
       // Load and cache the translation
@@ -52,7 +52,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     initializeLanguage();
-  }, [params?.lang, userProfile?.preferredLanguage]);
+  }, [params?.lang, user?.preferredLanguage]);
 
   // Function to switch language and update URL
   const switchLanguage = (newLang: LanguageCode) => {
@@ -115,7 +115,13 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
   if (!context) {
-    throw new Error("useLanguage must be used within a LanguageProvider");
+    // Temporary fallback while LanguageProvider is disabled
+    return {
+      language: DEFAULT_LANGUAGE,
+      setLanguage: () => {},
+      switchLanguage: () => {},
+      isLoading: false
+    };
   }
   return context;
 };

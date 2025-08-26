@@ -1,163 +1,199 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User, signOut } from "firebase/auth";
-import { doc, onSnapshot, DocumentData } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase/config";
-import { UserProfile } from "@/lib/types/user";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { User } from "@prisma/client";
 
 interface AuthContextType {
   user: User | null;
-  userProfile: UserProfile | null;
+  userProfile: User | null; // Keep backward compatibility 
   loading: boolean;
+  login: () => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  isAuthenticated: boolean;
+  hasRole: (roles: string | string[]) => boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const logout = async () => {
+  const login = useCallback(async () => {
+    setLoading(true);
     try {
-      await signOut(auth);
-      setUser(null);
-      setUserProfile(null);
+      // Initiate OIDC login flow
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to initiate login');
+      }
+
+      const { authUrl } = await response.json();
+      
+      // Redirect to Isha SSO
+      window.location.href = authUrl;
     } catch (error) {
-      // Error signing out
+      console.error('Login failed:', error);
+      setLoading(false);
       throw error;
     }
-  };
-
-  useEffect(() => {
-    let unsubscribeFromDoc: (() => void) | undefined;
-    let profileCreationTimeout: NodeJS.Timeout | undefined;
-
-
-    const unsubscribeFromAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      if (unsubscribeFromDoc) {
-        unsubscribeFromDoc();
-      }
-      if (profileCreationTimeout) {
-        clearTimeout(profileCreationTimeout);
-      }
-
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        
-        unsubscribeFromDoc = onSnapshot(
-          userDocRef,
-          (docSnap) => {
-            // If a timeout was set, clear it because we've received a snapshot
-            if (profileCreationTimeout) {
-              clearTimeout(profileCreationTimeout);
-            }
-
-            if (docSnap.exists()) {
-              // The user profile exists, update the state
-              const userData = docSnap.data() as DocumentData;
-              setUserProfile({ uid: firebaseUser.uid, ...userData } as UserProfile);
-              setLoading(false);
-            } else {
-              // The user is new and the profile is being created by the backend trigger.
-              // We'll show a loading state and wait.
-              // New user detected. Waiting for server-side profile creation
-              setLoading(true);
-              // Set a timeout to prevent infinite loading if profile creation fails
-              profileCreationTimeout = setTimeout(async () => {
-                // Profile creation timed out. Creating fallback profile
-                
-                // Create a basic user profile if Cloud Function didn't create it
-                try {
-                  const { doc, setDoc, serverTimestamp } = await import("firebase/firestore");
-                  const { db } = await import("@/lib/firebase/config");
-                  
-                  const fallbackProfile = {
-                    uid: firebaseUser.uid,
-                    firstName: "",
-                    lastName: "",
-                    phoneNumber: firebaseUser.phoneNumber || "",
-                    whatsappNumber: firebaseUser.phoneNumber || "",
-                    dob: "",
-                    gender: "",
-                    panchayat: "",
-                    taluk: "",
-                    district: "",
-                    state: "",
-                    pincode: "",
-                    instagramHandle: "",
-                    preferredLanguage: "",
-                    role: "public",
-                    currentTeamId: null,
-                    isProfileComplete: false,
-                    isVerified: false,
-                    documents: {
-                      profilePhoto: {
-                        storagePath: "",
-                        verified: false,
-                        uploadedAt: null,
-                        uploadedBy: null
-                      },
-                      aadhaarFront: {
-                        storagePath: "",
-                        verified: false,
-                        uploadedAt: null,
-                        uploadedBy: null
-                      },
-                      aadhaarBack: {
-                        storagePath: "",
-                        verified: false,
-                        uploadedAt: null,
-                        uploadedBy: null
-                      }
-                    },
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
-                  };
-                  
-                  await setDoc(doc(db, "users", firebaseUser.uid), fallbackProfile);
-                  // Fallback profile created successfully
-                  
-                  // The onSnapshot listener will pick up the new document
-                } catch (error) {
-                  // Failed to create fallback profile
-                  setLoading(false);
-                  setUserProfile(null);
-                }
-              }, 5000); // 5-second timeout
-            }
-          },
-          (err) => {
-            // Error listening to user profile
-            setUserProfile(null);
-            setLoading(false);
-          }
-        );
-      } else {
-        // User is signed out
-        setUser(null);
-        setUserProfile(null);
-        setLoading(false);
-      }
-    });
-
-    // Cleanup subscriptions on component unmount
-    return () => {
-      unsubscribeFromAuth();
-      if (unsubscribeFromDoc) {
-        unsubscribeFromDoc();
-      }
-       if (profileCreationTimeout) {
-        clearTimeout(profileCreationTimeout);
-      }
-    };
   }, []);
 
+  const logout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      // Clear session storage and user state
+      sessionStorage.removeItem('userId');
+      setUser(null);
+      // Redirect to public home page
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Clear local state even if API call fails
+      sessionStorage.removeItem('userId');
+      setUser(null);
+      window.location.href = '/';
+      throw error;
+    }
+  }, []);
+
+  const isAuthenticated = !!user;
+
+  const hasRole = useCallback((roles: string | string[]) => {
+    if (!user) return false;
+    const roleArray = Array.isArray(roles) ? roles : [roles];
+    return roleArray.includes(user.role);
+  }, [user]);
+
+  const refreshUser = useCallback(async () => {
+    const userId = sessionStorage.getItem('userId');
+    if (!userId) return;
+
+    try {
+      const response = await fetch(`/api/auth/me?userId=${userId}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const { user: updatedUser } = await response.json();
+        if (updatedUser) {
+          setUser(updatedUser);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+    }
+  }, []);
+
+  // Initialize auth state from URL params or session storage
+  useEffect(() => {
+    const initializeAuth = async () => {
+      setLoading(true);
+      try {
+        // Check if we just came back from OIDC callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const authSuccess = urlParams.get('auth');
+        const userId = urlParams.get('userId');
+        const mockUser = urlParams.get('mockUser');
+
+        // Handle mock authentication for testing
+        if (mockUser && (mockUser === 'admin' || mockUser === 'public')) {
+          try {
+            const response = await fetch(`/api/auth/mock?role=${mockUser}`, {
+              method: 'GET',
+              credentials: 'include',
+            });
+            
+            if (response.ok) {
+              const { user } = await response.json();
+              if (user) {
+                sessionStorage.setItem('userId', user.id);
+                setUser(user);
+                
+                // Clean up URL parameters
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.delete('mockUser');
+                window.history.replaceState({}, '', newUrl.toString());
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (error) {
+            console.error('Mock auth failed:', error);
+          }
+        }
+
+        if (authSuccess === 'success' && userId) {
+          // Store userId in session storage for persistence
+          sessionStorage.setItem('userId', userId);
+          
+          // Clean up URL parameters
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.delete('auth');
+          newUrl.searchParams.delete('userId');
+          window.history.replaceState({}, '', newUrl.toString());
+        }
+
+        // Try to get userId from session storage
+        const storedUserId = userId || sessionStorage.getItem('userId');
+
+        if (storedUserId) {
+          const response = await fetch(`/api/auth/me?userId=${storedUserId}`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          if (response.ok) {
+            const { user } = await response.json();
+            if (user) {
+              setUser(user);
+            } else {
+              // Clear invalid session
+              sessionStorage.removeItem('userId');
+            }
+          } else {
+            // Clear invalid session
+            sessionStorage.removeItem('userId');
+          }
+        }
+      } catch (error) {
+        console.error('Auth initialization failed:', error);
+        sessionStorage.removeItem('userId');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  const value: AuthContextType = {
+    user,
+    userProfile: user, // Backward compatibility - same as user
+    loading,
+    login,
+    logout,
+    refreshUser,
+    isAuthenticated,
+    hasRole,
+  };
+
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -165,8 +201,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  if (context === undefined) {
+    // Temporary fallback while AuthProvider issues are being resolved
+    return {
+      user: null,
+      userProfile: null,
+      loading: false,
+      login: async () => {
+        const response = await fetch('/api/auth/login', { method: 'POST' });
+        const { authUrl } = await response.json();
+        window.location.href = authUrl;
+      },
+      logout: async () => {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/';
+      },
+      isAuthenticated: false,
+      hasRole: () => false,
+    };
   }
   return context;
+};
+
+// Role-based hook
+export const useRequireAuth = (requiredRoles?: string | string[]) => {
+  const { user, loading, hasRole } = useAuth();
+  
+  const hasRequiredRole = requiredRoles ? hasRole(requiredRoles) : true;
+  
+  return {
+    user,
+    loading,
+    isAuthorized: !!user && hasRequiredRole,
+    hasRole,
+  };
+};
+
+// Admin check hook
+export const useRequireAdmin = () => {
+  return useRequireAuth('admin');
 };

@@ -1,14 +1,11 @@
-import { storage } from '@/lib/firebase/config';
-import { adminDb } from '@/lib/firebase/admin';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { FieldValue } from 'firebase-admin/firestore';
+import { getStorageProvider, generateStoragePath } from '@/lib/storage';
+import type { ProgressCallback } from '@/lib/storage';
+import { db } from '@/lib/db';
 import { 
-  MediaItem, 
   MediaMetadata, 
   MediaUploadProgress, 
   MediaUploadResult,
   MediaBatchUploadResult,
-  MediaFilter,
   MEDIA_CONFIG,
   MediaType 
 } from '@/lib/types/media';
@@ -17,21 +14,15 @@ export class MediaUploadService {
   
   // Storage path generators
   private getFixtureMediaPath(venueId: string, fixtureId: string, type: MediaType, fileName: string): string {
-    const timestamp = Date.now();
-    const folder = type === 'image' ? 'images' : 'videos';
-    return `media/venues/${venueId}/fixtures/${fixtureId}/${folder}/${timestamp}_${fileName}`;
+    return generateStoragePath.fixtureMedia(venueId, fixtureId, type, fileName);
   }
   
   private getMatchMediaPath(venueId: string, matchId: string, type: MediaType, fileName: string): string {
-    const timestamp = Date.now();
-    const folder = type === 'image' ? 'images' : 'videos';
-    return `media/venues/${venueId}/matches/${matchId}/${folder}/${timestamp}_${fileName}`;
+    return generateStoragePath.matchMedia(venueId, matchId, type, fileName);
   }
   
   private getVenueMediaPath(venueId: string, type: MediaType, fileName: string): string {
-    const timestamp = Date.now();
-    const folder = type === 'image' ? 'images' : 'videos';
-    return `media/venues/${venueId}/general/${folder}/${timestamp}_${fileName}`;
+    return generateStoragePath.venueMedia(venueId, type, fileName);
   }
 
   // File validation
@@ -70,35 +61,19 @@ export class MediaUploadService {
       throw new Error(validation.error);
     }
 
-    const storageRef = ref(storage, storagePath);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    const storageProvider = getStorageProvider();
     
-    return new Promise((resolve, reject) => {
-      uploadTask.on('state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          if (onProgress) {
-            onProgress({
-              progress,
-              bytesTransferred: snapshot.bytesTransferred,
-              totalBytes: snapshot.totalBytes,
-              fileName: file.name
-            });
-          }
-        },
-        (error) => {
-          reject(new Error(`Upload failed: ${error.message}`));
-        },
-        async () => {
-          try {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(downloadURL);
-          } catch (error) {
-            reject(new Error('Failed to get download URL'));
-          }
-        }
-      );
-    });
+    // Convert MediaUploadProgress callback to ProgressCallback
+    const progressCallback: ProgressCallback | undefined = onProgress ? (progress) => {
+      onProgress({
+        progress: progress.progress,
+        bytesTransferred: progress.bytesTransferred,
+        totalBytes: progress.totalBytes,
+        fileName: progress.fileName || file.name
+      });
+    } : undefined;
+
+    return await storageProvider.upload(storagePath, file, progressCallback);
   }
 
   // Upload fixture media
@@ -118,36 +93,23 @@ export class MediaUploadService {
       // Upload file
       const url = await this.uploadFile(storagePath, file, onProgress);
       
-      // Create media document
-      const mediaData: Omit<MediaItem, 'mediaId'> = {
-        type: mediaType,
-        fixtureId,
-        venueId,
-        eventId: 'isha_gramotsavam_2025',
-        title: metadata.title,
-        description: metadata.description,
-        tags: metadata.tags || [],
-        storagePath,
-        url,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-        uploadedBy,
-        uploadedByName,
-        uploadedAt: FieldValue.serverTimestamp() as any,
-        status: 'active',
-        capturedDuring: metadata.capturedDuring,
-        location: metadata.location,
-        createdAt: FieldValue.serverTimestamp() as any,
-        updatedAt: FieldValue.serverTimestamp() as any
-      };
-      
-      const docRef = await adminDb.collection('media').add(mediaData);
-      await docRef.update({ mediaId: docRef.id });
+      // Create media document in PostgreSQL using correct schema
+      const media = await db.media.create({
+        data: {
+          fileName: file.name,
+          filePath: storagePath,
+          fileType: file.type,
+          fileSize: BigInt(file.size),
+          entityType: 'venue', // For fixture media, use venue as entity type
+          entityId: venueId, // Link to venue since fixtures are venue-specific
+          uploadedBy,
+          status: 'approved', // Default status
+        }
+      });
       
       return {
         success: true,
-        mediaId: docRef.id,
+        mediaId: media.id,
         url
       };
     } catch (error) {
@@ -175,36 +137,23 @@ export class MediaUploadService {
       // Upload file
       const url = await this.uploadFile(storagePath, file, onProgress);
       
-      // Create media document
-      const mediaData: Omit<MediaItem, 'mediaId'> = {
-        type: mediaType,
-        matchId,
-        venueId,
-        eventId: 'isha_gramotsavam_2025',
-        title: metadata.title,
-        description: metadata.description,
-        tags: metadata.tags || [],
-        storagePath,
-        url,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-        uploadedBy,
-        uploadedByName,
-        uploadedAt: FieldValue.serverTimestamp() as any,
-        status: 'active',
-        capturedDuring: metadata.capturedDuring,
-        location: metadata.location,
-        createdAt: FieldValue.serverTimestamp() as any,
-        updatedAt: FieldValue.serverTimestamp() as any
-      };
-      
-      const docRef = await adminDb.collection('media').add(mediaData);
-      await docRef.update({ mediaId: docRef.id });
+      // Create media document in PostgreSQL using correct schema
+      const media = await db.media.create({
+        data: {
+          fileName: file.name,
+          filePath: storagePath,
+          fileType: file.type,
+          fileSize: BigInt(file.size),
+          entityType: 'match',
+          entityId: matchId,
+          uploadedBy,
+          status: 'approved', // Default status
+        }
+      });
       
       return {
         success: true,
-        mediaId: docRef.id,
+        mediaId: media.id,
         url
       };
     } catch (error) {
@@ -231,35 +180,23 @@ export class MediaUploadService {
       // Upload file
       const url = await this.uploadFile(storagePath, file, onProgress);
       
-      // Create media document
-      const mediaData: Omit<MediaItem, 'mediaId'> = {
-        type: mediaType,
-        venueId,
-        eventId: 'isha_gramotsavam_2025',
-        title: metadata.title,
-        description: metadata.description,
-        tags: metadata.tags || [],
-        storagePath,
-        url,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-        uploadedBy,
-        uploadedByName,
-        uploadedAt: FieldValue.serverTimestamp() as any,
-        status: 'active',
-        capturedDuring: metadata.capturedDuring,
-        location: metadata.location,
-        createdAt: FieldValue.serverTimestamp() as any,
-        updatedAt: FieldValue.serverTimestamp() as any
-      };
-      
-      const docRef = await adminDb.collection('media').add(mediaData);
-      await docRef.update({ mediaId: docRef.id });
+      // Create media document in PostgreSQL using correct schema
+      const media = await db.media.create({
+        data: {
+          fileName: file.name,
+          filePath: storagePath,
+          fileType: file.type,
+          fileSize: BigInt(file.size),
+          entityType: 'venue',
+          entityId: venueId,
+          uploadedBy,
+          status: 'approved', // Default status
+        }
+      });
       
       return {
         success: true,
-        mediaId: docRef.id,
+        mediaId: media.id,
         url
       };
     } catch (error) {
@@ -351,31 +288,22 @@ export class MediaUploadService {
   // Delete media
   async deleteMedia(mediaId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const mediaDoc = await adminDb.collection('media').doc(mediaId).get();
+      const media = await db.media.findUnique({
+        where: { id: mediaId }
+      });
       
-      if (!mediaDoc.exists) {
+      if (!media) {
         return { success: false, error: 'Media not found' };
       }
       
-      const mediaData = mediaDoc.data() as MediaItem;
-      
       // Delete from storage
-      const storageRef = ref(storage, mediaData.storagePath);
-      await deleteObject(storageRef);
+      const storageProvider = getStorageProvider();
+      await storageProvider.delete(media.filePath);
       
-      // Delete thumbnail if exists
-      if (mediaData.thumbnailUrl) {
-        try {
-          const thumbnailPath = mediaData.storagePath.replace(/\.[^/.]+$/, '_thumbnail.jpg');
-          const thumbnailRef = ref(storage, thumbnailPath);
-          await deleteObject(thumbnailRef);
-        } catch (error) {
-          // No thumbnail to delete
-        }
-      }
-      
-      // Delete document
-      await mediaDoc.ref.delete();
+      // Delete from database
+      await db.media.delete({
+        where: { id: mediaId }
+      });
       
       return { success: true };
     } catch (error) {
@@ -386,15 +314,15 @@ export class MediaUploadService {
     }
   }
 
-  // Update media metadata
+  // Update media metadata (limited by current schema)
   async updateMedia(
     mediaId: string,
-    updates: Partial<Pick<MediaItem, 'title' | 'description' | 'tags' | 'status' | 'capturedDuring' | 'location'>>
+    updates: { status?: 'pending' | 'approved' | 'rejected' }
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      await adminDb.collection('media').doc(mediaId).update({
-        ...updates,
-        updatedAt: FieldValue.serverTimestamp()
+      await db.media.update({
+        where: { id: mediaId },
+        data: updates
       });
       
       return { success: true };

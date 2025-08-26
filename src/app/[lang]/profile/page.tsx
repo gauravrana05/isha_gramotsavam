@@ -3,10 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
 import { pincodeService } from "@/lib/services/pincodeService";
-import { checkAndUpdateProfileCompletion } from "@/lib/actions/profile/checkProfileCompletion";
+import { api } from "@/server/trpc/react";
 import { useTranslation } from "@/lib/utils/i18n";
 import Image from "next/image";
 import { LoadingSpinner, PageLoader, SectionLoader } from "@/components/ui/loaders";
@@ -60,27 +58,17 @@ interface FormData {
 }
 
 export default function ProfilePage() {
-  const { user, userProfile, loading, logout } = useAuth();
+  const { user, userProfile, loading, logout, refreshUser } = useAuth();
   const router = useRouter();
   const { lang } = useParams();
   const { t } = useTranslation();
 
-  // Clean Firestore data by removing undefined values and converting dates
-  const cleanFirestoreData = (obj: any): any => {
-    if (obj === null || obj === undefined) return null;
-    if (obj instanceof Date) return obj.toISOString();
-    if (Array.isArray(obj)) return obj.map(cleanFirestoreData);
-    if (typeof obj === 'object') {
-      const cleaned: any = {};
-      for (const [key, value] of Object.entries(obj)) {
-        if (value !== undefined) {
-          cleaned[key] = cleanFirestoreData(value);
-        }
-      }
-      return cleaned;
-    }
-    return obj;
-  };
+  // tRPC mutations
+  const updateProfileMutation = api.profile.updateComplete.useMutation();
+  const profileDataQuery = api.profile.checkCompletion.useQuery(
+    { userId: user?.id || '' },
+    { enabled: !!user?.id }
+  );
 
   const [editState, setEditState] = useState<EditState>({
     basicProfile: false,
@@ -124,30 +112,30 @@ export default function ProfilePage() {
     { code: "or", name: "Odia" },
   ];
 
-  const phoneNumber = user?.phoneNumber?.replace(/^\+91/, '') || '';
-  const whatsappNumber = userProfile?.whatsappNumber?.replace(/^\+91/, '') || '';
+  const phoneNumber = user?.phone?.replace(/^\+91/, '') || '';
+  const whatsappNumber = userProfile?.whatsapp_number?.replace(/^\+91/, '') || '';
 
   useEffect(() => {
     if (loading || !userProfile) return;
 
     setFormData({
-      firstName: userProfile.firstName || "",
-      lastName: userProfile.lastName || "",
+      firstName: userProfile.first_name || "",
+      lastName: userProfile.last_name || "",
       whatsappNumber: whatsappNumber || phoneNumber,
-      dob: userProfile.dob || "",
-      instagramHandle: userProfile.instagramHandle || "",
+      dob: userProfile.date_of_birth ? new Date(userProfile.date_of_birth).toISOString().split('T')[0] : "",
+      instagramHandle: userProfile.instagram_handle || "",
       gender: userProfile.gender || "",
       pincode: userProfile.pincode || "",
       state: userProfile.state || "",
       district: userProfile.district || "",
       taluk: userProfile.taluk || "",
       panchayat: userProfile.panchayat || "",
-      preferredLanguage: userProfile.preferredLanguage || "en",
+      preferredLanguage: userProfile.language_preference || "en",
     });
 
-    if (userProfile.whatsappNumber && userProfile.whatsappNumber === phoneNumber) {
+    if (userProfile.whatsapp_number && userProfile.whatsapp_number === phoneNumber) {
       setIsWhatsAppSame(true);
-    } else if (userProfile.whatsappNumber && userProfile.whatsappNumber !== phoneNumber) {
+    } else if (userProfile.whatsapp_number && userProfile.whatsapp_number !== phoneNumber) {
       setIsWhatsAppSame(false);
     }
 
@@ -349,48 +337,26 @@ export default function ProfilePage() {
     setSuccess("");
 
     try {
-      const userRef = doc(db, "users", user.uid);
-      let updateData: any = {};
+      // Use tRPC to update profile with all current form data
+      await updateProfileMutation.mutateAsync({
+        userId: user.id,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        whatsappNumber: formData.whatsappNumber.trim() || undefined,
+        dateOfBirth: formData.dob,
+        gender: formData.gender as 'M' | 'F',
+        instagramHandle: formData.instagramHandle.trim() || undefined,
+        pincode: formData.pincode || undefined,
+        panchayat: formData.panchayat,
+        taluk: formData.taluk || undefined,
+        district: formData.district,
+        state: formData.state,
+        preferredLanguage: formData.preferredLanguage || undefined,
+      });
 
-      switch (section) {
-        case 'basicProfile':
-          updateData = {
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            whatsappNumber: formData.whatsappNumber,
-            dob: formData.dob,
-            gender: formData.gender,
-            preferredLanguage: formData.preferredLanguage,
-          };
-          break;
-        case 'addressDetails':
-          updateData = {
-            pincode: formData.pincode,
-            state: formData.state,
-            district: formData.district,
-            taluk: formData.taluk,
-            panchayat: formData.panchayat,
-          };
-          break;
-        case 'otherDetails':
-          updateData = {
-            instagramHandle: formData.instagramHandle,
-          };
-          break;
-      }
-
-      await updateDoc(userRef, cleanFirestoreData({
-        ...updateData,
-        updatedAt: new Date().toISOString(),
-      }));
-
-      // Check and update profile completion status using the server action
-      const completionResult = await checkAndUpdateProfileCompletion(user.uid);
+      // Refresh user data to reflect changes
+      await refreshUser();
       
-      if (!completionResult.success) {
-        // Error handling removed
-      }
-
       toggleEdit(section);
       setSuccess("Profile updated successfully!");
     } catch (error) {
@@ -414,7 +380,7 @@ export default function ProfilePage() {
     router.push(`/${lang}/profile/complete`);
   };
 
-  const isProfileComplete = userProfile?.isProfileComplete || false;
+  const isProfileComplete = userProfile?.profile_complete || false;
   const hasAddress = userProfile?.pincode && userProfile?.state && userProfile?.district;
   const hasAadhaar = userProfile?.documents?.aadhaarFront?.url && userProfile?.documents?.aadhaarBack?.url;
 
@@ -502,10 +468,17 @@ export default function ProfilePage() {
             <DocumentUpload
               type="profilePhoto"
               label="Profile Photo"
-              currentUrl={userProfile?.documents?.profilePhoto?.url}
+              currentUrl={profileDataQuery.data?.userProfileImages?.profile_photo_path}
               variant="profile"
               className="flex flex-col justify-center items-center"
-              onSuccess={() => setError("")}
+              onSuccess={async () => {
+                setError("");
+                const { data: updatedData } = await profileDataQuery.refetch();
+                // Refresh user data if profile completion status changed
+                if (updatedData?.profileComplete !== user?.profile_complete) {
+                  await refreshUser();
+                }
+              }}
               onError={(error) => setError(error)}
             />
           </div>
@@ -927,10 +900,17 @@ export default function ProfilePage() {
               <DocumentUpload
                 type="aadhaarFront"
                 label="Aadhar Card Front"
-                currentUrl={userProfile?.documents?.aadhaarFront?.url}
+                currentUrl={profileDataQuery.data?.userProfileImages?.aadhaar_front_path}
                 variant="card"
                 className="flex flex-col justify-center items-center font-fira"
-                onSuccess={() => setError("")}
+                onSuccess={async () => {
+                  setError("");
+                  const { data: updatedData } = await profileDataQuery.refetch();
+                  // Refresh user data if profile completion status changed
+                  if (updatedData?.profileComplete !== user?.profile_complete) {
+                    await refreshUser();
+                  }
+                }}
                 onError={(error) => setError(error)}
               />
             </div>
@@ -938,10 +918,17 @@ export default function ProfilePage() {
               <DocumentUpload
                 type="aadhaarBack"
                 label="Aadhar Card Back"
-                currentUrl={userProfile?.documents?.aadhaarBack?.url}
+                currentUrl={profileDataQuery.data?.userProfileImages?.aadhaar_back_path}
                 variant="card"
                 className="flex flex-col justify-center items-center font-fira"
-                onSuccess={() => setError("")}
+                onSuccess={async () => {
+                  setError("");
+                  const { data: updatedData } = await profileDataQuery.refetch();
+                  // Refresh user data if profile completion status changed
+                  if (updatedData?.profileComplete !== user?.profile_complete) {
+                    await refreshUser();
+                  }
+                }}
                 onError={(error) => setError(error)}
               />
             </div>

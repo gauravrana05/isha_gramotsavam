@@ -1,6 +1,13 @@
+'use client'
+
+import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
+import { useAuth } from '@/context/AuthContext';
+import { api } from '@/server/trpc/react';
+import { LoadingSpinner } from '@/components/ui/loaders';
+import { AlertCircle } from 'lucide-react';
 import RegistrationButton from '@/components/common/RegistrationButton';
 
 interface SportsOverviewPageProps {
@@ -9,8 +16,70 @@ interface SportsOverviewPageProps {
   }>
 }
 
-export default async function SportsOverviewPage({ params }: SportsOverviewPageProps) {
-  const { lang } = await params
+export default function SportsOverviewPage({ params }: SportsOverviewPageProps) {
+  const { user } = useAuth()
+  const resolvedParams = React.use(params)
+  const { lang } = resolvedParams
+  
+  // Fetch sports from database
+  const sportsQuery = api.sports.getAllWithCategories.useQuery()
+  
+  // Transform database data to display format with gender validation
+  const transformSportData = (sport: any) => {
+    const userGender = user?.gender || null
+    let can_register = true
+    let registration_message = ''
+    
+    // Check if user can register based on gender
+    if (userGender) {
+      const canUserRegister = 
+        sport.supports_mixed || 
+        (userGender === 'M' && sport.supports_men) ||
+        (userGender === 'F' && sport.supports_women)
+
+      if (!canUserRegister) {
+        can_register = false
+        const supportedCategories = []
+        if (sport.supports_men) supportedCategories.push('men')
+        if (sport.supports_women) supportedCategories.push('women')
+        if (sport.supports_mixed) supportedCategories.push('mixed teams')
+        
+        registration_message = `This sport is only available for ${supportedCategories.join(' and ')}`
+      }
+    }
+
+    return {
+      ...sport,
+      can_register,
+      registration_message
+    }
+  }
+  
+  // Handle loading and error states
+  if (sportsQuery.isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-[#4A2F1D]">Loading sports...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  if (sportsQuery.error) {
+    return (
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600">Failed to load sports. Please try again later.</p>
+        </div>
+      </div>
+    )
+  }
+  
+  const sports = sportsQuery.data?.map(transformSportData) || []
+  
   return (
     <div className="bg-[#F3F0E5]">
       {/* Hero Section with Background Images */}
@@ -157,29 +226,46 @@ export default async function SportsOverviewPage({ params }: SportsOverviewPageP
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-            {/* Volleyball Card */}
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow font-fira">
+            {sports.map((sport) => {
+              // Helper function to get sport image
+              const getSportImage = (sportName: string): string => {
+                const name = sportName.toLowerCase()
+                if (name.includes('volleyball')) return '/images/sports/volleyball_1.jpg'
+                if (name.includes('throwball')) return '/images/sports/throwball_1.jpg'
+                return '/images/sports/volleyball_1.jpg' // fallback
+              }
+              
+              // Helper function to format category display
+              const formatCategory = (sport: any): string => {
+                const categories = []
+                if (sport.supports_men) categories.push('Men')
+                if (sport.supports_women) categories.push('Women')
+                if (sport.supports_mixed) categories.push('Mixed')
+                return categories.length > 0 ? `For ${categories.join(' & ')}` : 'Category TBD'
+              }
+              
+              return (
+            <div key={sport.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow font-fira">
               <div className="relative h-100">
                 <Image
-                  src="/images/sports/volleyball_2.jpg"
-                  alt="Volleyball at Gramotsavam"
+                  src={getSportImage(sport.name)}
+                  alt={`${sport.name} at Gramotsavam`}
                   fill
                   className="object-cover"
                 />
               </div>
               <div className="p-6">
-                <h3 className="text-2xl font-bold text-earth-brown mb-3 font-fira">Volleyball</h3>
+                <h3 className="text-2xl font-bold text-earth-brown mb-3 font-fira">{sport.name}</h3>
                 <p className="text-earth-brown/80 mb-4 leading-relaxed font-fira">
-                  The most popular sport at Gramotsavam, volleyball brings teams together in intense,
-                  fast-paced matches. Experience the thrill of teamwork and precision in this beloved traditional game.
+                  {sport.description || `Experience the excitement of ${sport.name} at Isha Gramotsavam. A dynamic team sport that brings together skill, strategy, and sportsmanship.`}
                 </p>
 
                 <div className="mb-4">
                   <h4 className="font-semibold text-earth-brown mb-2">Key Features:</h4>
                   <ul className="list-disc list-inside text-sm text-earth-brown/80 space-y-1 font-fira">
-                    <li>6 players per team on court</li>
-                    <li>Best of 3 sets format</li>
-                    <li>Mens teams allowed</li>
+                    <li>{sport.main_players_count} players per team on court</li>
+                    <li>Up to {sport.max_substitutes} substitutes allowed</li>
+                    <li>{formatCategory(sport)}</li>
                     <li>Village-level tournament structure</li>
                   </ul>
                 </div>
@@ -204,82 +290,24 @@ export default async function SportsOverviewPage({ params }: SportsOverviewPageP
 
                 <div className="flex gap-3">
                   <Link
-                    href={`/${lang}/public/sports/volleyball`}
+                    href={`/${lang}/public/sports/${sport.id}`}
                     className="flex-1 bg-saffron lg:pl-3 py-2 rounded-lg font-semibold hover:bg-saffron/90 transition-colors"
                   >
                     Learn More
                   </Link>
-                  <RegistrationButton 
+                  <RegistrationButton
                     lang={lang} 
-                    sport="volleyball" 
+                    sport={sport.name.toLowerCase().replace(/\s+/g, '-')} 
                     size="sm" 
                     className="min-w-[200px]"
+                    disabled={!sport.can_register}
+                    disabledMessage={sport.registration_message}
                   />
                 </div>
               </div>
             </div>
-
-            {/* Throwball Card */}
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow font-fira">
-              <div className="relative h-100">
-                <Image
-                  src="/images/sports/throwball_1.jpg"
-                  alt="Throwball at Gramotsavam"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <div className="p-6">
-                <h3 className="text-2xl font-bold text-earth-brown mb-3">Throwball</h3>
-                <p className="text-earth-brown/80 mb-4 leading-relaxed">
-                  A dynamic sport that combines agility, strategy, and teamwork. Popular among women participants,
-                  throwball showcases incredible athleticism and community spirit.
-                </p>
-
-                <div className="mb-4">
-                  <h4 className="font-semibold text-earth-brown mb-2">Key Features:</h4>
-                  <ul className="list-disc list-inside text-sm text-earth-brown/80 space-y-1">
-                    <li>7 players per team on court</li>
-                    <li>Best of 3 sets format</li>
-                    <li>Womens team allowed</li>
-                    <li>High-energy gameplay</li>
-                  </ul>
-                </div>
-
-                <div className="mb-6">
-                  <h4 className="font-semibold text-earth-brown mb-2">Prize Structure:</h4>
-                  <div className="text-sm text-earth-brown/80">
-                    <div className="flex justify-between">
-                      <span>Finals Winner:</span>
-                      <span className="font-semibold">₹5,00,000</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Division Winner:</span>
-                      <span className="font-semibold">₹25,000</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Cluster Winner:</span>
-                      <span className="font-semibold">₹10,000</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Link
-                    href={`/${lang}/public/sports/throwball`}
-                    className="flex-1 bg-saffron lg:pl-3 py-2 rounded-lg font-semibold hover:bg-saffron/90 transition-colors"
-                  >
-                    Learn More
-                  </Link>
-                  <RegistrationButton 
-                    lang={lang} 
-                    sport="throwball" 
-                    size="sm" 
-                    className="min-w-[200px]"
-                  />
-                </div>
-              </div>
-            </div>
+            )
+          })}
           </div>
         </div>
       </section>

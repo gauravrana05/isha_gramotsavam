@@ -1,6 +1,7 @@
 import ClientProviders from "@/components/system/ClientProviders"; // New client component
 import "@/styles/globals.css";
 import localFont from "next/font/local";
+import { cookies } from "next/headers";
 
 const fira = localFont({
   src: [
@@ -33,11 +34,13 @@ export const viewport = {
   themeColor: "#F28C38",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  
   return (
     <html lang="en">
       <head>
@@ -52,7 +55,9 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body suppressHydrationWarning className={`${fira.className} font-fira`}>
-        <ClientProviders>{children}</ClientProviders>
+        <ClientProviders cookies={cookieStore.toString()}>
+          {children}
+        </ClientProviders>
       </body>
     </html>
   );

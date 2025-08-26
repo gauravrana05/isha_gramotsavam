@@ -1,74 +1,124 @@
 // src/components/public/SportsPreview.tsx
+'use client'
+
 import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import Button from '../ui/Button'
-import RegistrationButton from '../common/RegistrationButton'
+import { useAuth } from '@/context/AuthContext'
+import { api } from '@/server/trpc/react'
+import { LoadingSpinner } from '../ui/loaders'
+import { AlertCircle, Users, Trophy } from 'lucide-react'
 
 interface SportsPreviewProps {
   lang: string
 }
 
-interface SportData {
+interface SportCard {
   id: string
   name: string
-  category: string
-  players: string
-  prize: string
-  image: string
-  registrationLink: string
-  learnMoreLink: string
-  eventInfo: {
-    registrationStart: string
-    registrationEnd: string
-  }
+  description: string | null
+  main_players_count: number
+  max_substitutes: number
+  gender_categories: string[]
+  supports_men: boolean
+  supports_women: boolean
+  supports_mixed: boolean
+  can_register: boolean
+  registration_message: string
+  image_url: string
+  prize_amount: string
+}
+
+// Helper function to get sport image
+const getSportImage = (sportName: string): string => {
+  const name = sportName.toLowerCase()
+  if (name.includes('volleyball')) return '/images/sports/volleyball_1.jpg'
+  if (name.includes('throwball')) return '/images/sports/throwball_1.jpg'
+  return '/images/sports/volleyball_1.jpg' // fallback
+}
+
+// Helper function to format category display
+const formatCategory = (sport: SportCard): string => {
+  const categories = []
+  if (sport.supports_men) categories.push('Men')
+  if (sport.supports_women) categories.push('Women')
+  if (sport.supports_mixed) categories.push('Mixed')
+  
+  return categories.length > 0 ? `For ${categories.join(' & ')}` : 'Category TBD'
+}
+
+// Helper function to format player count
+const formatPlayerCount = (mainPlayers: number, substitutes: number): string => {
+  return `${mainPlayers} + ${substitutes} Players Per Team`
 }
 
 export default function SportsPreview({ lang }: SportsPreviewProps) {
-  // Using hardcoded sports data for better performance and reliability
-  const sports: SportData[] = [
-    {
-      id: 'volleyball',
-      name: 'Volleyball',
-      category: 'For Men & Women',
-      players: '6 + 6 Players Per Team',
-      prize: 'INR 5,00,000',
-      image: '/images/sports/volleyball_1.jpg',
-      registrationLink: `/${lang}/public/register/team/volleyball`,
-      learnMoreLink: `/${lang}/public/sports/volleyball`,
-      eventInfo: {
-        registrationStart: '2025-01-01',
-        registrationEnd: '2025-02-15'
-      }
-    },
-    {
-      id: 'throwball',
-      name: 'Throwball',
-      category: 'For Women',
-      players: '7 + 6 Players Per Team',
-      prize: 'INR 5,00,000',
-      image: '/images/sports/throwball_1.jpg',
-      registrationLink: `/${lang}/public/register/team/throwball`,
-      learnMoreLink: `/${lang}/public/sports/throwball`,
-      eventInfo: {
-        registrationStart: '2025-01-01',
-        registrationEnd: '2025-02-15'
+  const { user } = useAuth()
+  
+  // Fetch sports from database
+  const sportsQuery = api.sports.getAllWithCategories.useQuery()
+  
+  // Transform database data to display format
+  const transformSportData = (sport: any): SportCard => {
+    const userGender = user?.gender || null
+    let can_register = true
+    let registration_message = ''
+    
+    // Check if user can register based on gender
+    if (userGender) {
+      const canUserRegister = 
+        sport.supports_mixed || 
+        (userGender === 'M' && sport.supports_men) ||
+        (userGender === 'F' && sport.supports_women)
+
+      if (!canUserRegister) {
+        can_register = false
+        const supportedCategories = []
+        if (sport.supports_men) supportedCategories.push('men')
+        if (sport.supports_women) supportedCategories.push('women')
+        if (sport.supports_mixed) supportedCategories.push('mixed teams')
+        
+        registration_message = `This sport is only available for ${supportedCategories.join(' and ')}`
       }
     }
-  ]
 
-  const formatSportsData = (sport: SportData) => {
     return {
-      id: sport.id,
-      name: sport.name,
-      category: sport.category,
-      players: sport.players,
-      prize: sport.prize,
-      image: sport.image,
-      registrationLink: sport.registrationLink,
-      learnMoreLink: sport.learnMoreLink
+      ...sport,
+      can_register,
+      registration_message,
+      image_url: getSportImage(sport.name),
+      prize_amount: 'INR 5,00,000' // This could come from database later
     }
   }
+
+  if (sportsQuery.isLoading) {
+    return (
+      <section id="sports-preview" className="bg-isha font-fira py-16 lg:py-24">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center">
+            <LoadingSpinner size="lg" />
+            <p className="mt-4 text-[#4A2F1D]">Loading sports...</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  if (sportsQuery.error) {
+    return (
+      <section id="sports-preview" className="bg-isha font-fira py-16 lg:py-24">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <p className="text-red-600">Failed to load sports. Please try again later.</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  const sports = sportsQuery.data?.map(transformSportData) || []
 
   return (
     <section id="sports-preview" className="bg-isha font-fira py-16 lg:py-24">
@@ -91,18 +141,16 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
 
         {/* Sports Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          {sports.map((sport) => {
-            const sportData = formatSportsData(sport);
-            return (
+          {sports.map((sport) => (
             <div
-              key={sportData.id}
+              key={sport.id}
               className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
             >
               {/* Sport Image */}
               <div className="relative h-64">
                 <Image
-                  src={sportData.image}
-                  alt={sportData.name}
+                  src={sport.image_url}
+                  alt={sport.name}
                   fill
                   className="object-cover"
                 />
@@ -112,21 +160,23 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
               {/* Sport Content */}
               <div className="p-6">
                 <h3 className="text-2xl font-bold text-[#4A2F1D] mb-2">
-                  {sportData.name}
+                  {sport.name}
                 </h3>
 
                 <div className="mb-4">
-                  <p className="text-[#F28C38] font-semibold text-lg mb-2">
-                    {sportData.category} | {sportData.players}
+                  <p className="text-[#F28C38] font-semibold text-lg mb-2 flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    {formatCategory(sport)} | {formatPlayerCount(sport.main_players_count, sport.max_substitutes)}
                   </p>
-                  <p className="text-2xl font-bold text-[#4A2F1D] mb-1">
-                    Winning Prize: {sportData.prize}
+                  <p className="text-2xl font-bold text-[#4A2F1D] mb-1 flex items-center gap-2">
+                    <Trophy className="w-6 h-6 text-yellow-500" />
+                    Winning Prize: {sport.prize_amount}
                   </p>
                 </div>
                 
                 {/* Registration Period */}
                 <p className="text-gray-600 text-sm mb-2">
-                  Registration: {new Date(sport.eventInfo.registrationStart).toLocaleDateString()} - {new Date(sport.eventInfo.registrationEnd).toLocaleDateString()}
+                  Registration: Jan 1, 2025 - Feb 15, 2025
                 </p>
 
                 <p className="text-gray-600 mb-6">
@@ -135,37 +185,56 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <RegistrationButton 
-                    lang={lang} 
-                    sport={sportData.id} 
-                    size="sm" 
-                    className="min-w-[200px]"
-                  />
-                  <Link
-                    href={sportData.learnMoreLink}
-                    className="btn-secondary flex-1 text-center py-3 px-6"
-                  >
-                    Learn More
+                  {sport.can_register ? (
+                    <Link href={`/${lang}/public/register/team/${sport.id}`}>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="w-full sm:w-auto bg-[#F28C38] hover:bg-[#E07B27] text-white border-none"
+                      >
+                        Register Team
+                      </Button>
+                    </Link>
+                  ) : (
+                    <div className="group relative">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full sm:w-auto opacity-50 cursor-not-allowed"
+                        disabled
+                      >
+                        Register Team
+                      </Button>
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                        {sport.registration_message}
+                        <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <Link href={`/${lang}/public/sports/${sport.id}`}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:w-auto border-[#4A2F1D] text-[#4A2F1D] hover:bg-[#4A2F1D] hover:text-white"
+                    >
+                      Learn More
+                    </Button>
                   </Link>
                 </div>
               </div>
             </div>
-            );
-          })}
+          ))}
         </div>
 
-        {/* View All Sports Link */}
-        <div className="text-center mt-12">
-          <Link
-            href={`/${lang}/public/sports`}
-            className="inline-flex items-center text-[#F28C38] hover:text-[#4A2F1D] font-semibold text-lg transition-colors"
-          >
-            View All Sports
-            <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
+        {/* Show message if no sports available */}
+        {sports.length === 0 && (
+          <div className="text-center py-12">
+            <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600 text-lg">No sports available at the moment.</p>
+          </div>
+        )}
       </div>
     </section>
   )

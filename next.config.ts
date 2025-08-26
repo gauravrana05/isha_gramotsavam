@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
         hostname: 'ishalogin.sadhguru.org',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'mvvbnuzqngloikfyzjya.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
     ],
   },
   async redirects() {

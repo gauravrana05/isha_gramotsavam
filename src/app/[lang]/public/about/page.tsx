@@ -15,10 +15,10 @@ export default async function AboutPage({ params }: AboutPageProps) {
     return (
         <main className="min-h-screen bg-[url('/images/backgrounds/rules_background.jpg')]">
             {/* Hero Section */}
-            <section className="py-16 bg-[#F3F0E5]">
+            <section className="py-16 bg-[url('/images/backgrounds/sports_background.png')]">
                 <Container>
                     <div className="text-center">
-                        <h1 className="text-4xl md:text-6xl font-bold text-[#4A2F1D] mb-2 font-fira">
+                        <h1 className="text-4xl md:text-6xl font-bold text-white mb-2 font-fira">
                             About Us
                         </h1>
                     </div>
@@ -56,7 +56,7 @@ export default async function AboutPage({ params }: AboutPageProps) {
             </section>
 
             {/* Vision Section */}
-            <section className="py-16 lg:py-24 bg-[#F3F0E5]">
+            <section className="py-16 lg:py-24">
                 <Container>
                     <div className="text-center mb-12">
                         <h2 className="text-4xl md:text-5xl font-bold text-[#4A2F1D] mb-8 font-fira">

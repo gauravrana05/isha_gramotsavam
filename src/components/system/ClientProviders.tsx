@@ -4,6 +4,7 @@ import React from "react";
 import { LanguageProvider } from "@/context/LanguageContext";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
 import ClientOnly from "@/components/common/ClientOnly";
+import { TRPCReactProvider } from "@/server/trpc/react";
 
 // Import other providers dynamically to avoid hydration issues
 import dynamic from "next/dynamic";
@@ -19,15 +20,20 @@ const OfflineBanner = dynamic(() => import("@/components/system/OfflineBanner"),
 const ToastViewport = dynamic(() => import("@/components/ui/toast/ToastViewport"), { ssr: false });
 const ProgressBar = dynamic(() => import("@/components/ui/progress/ProgressBar"), { ssr: false });
 
-const ClientProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface ClientProvidersProps {
+  children: React.ReactNode;
+  cookies: string;
+}
+
+const ClientProviders: React.FC<ClientProvidersProps> = ({ children, cookies }) => {
   return (
     <ErrorBoundary>
-      <ClientOnly>
-        <LoadingProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <LanguageProvider>
-                <OfflineProvider>
+      <TRPCReactProvider cookies={cookies}>
+        <ClientOnly>
+          <LoadingProvider>
+            <ThemeProvider>
+              <OfflineProvider>
+                <AuthProvider>
                   <DocumentProvider>
                     <NotificationProvider>
                       <ProgressBar />
@@ -37,12 +43,12 @@ const ClientProviders: React.FC<{ children: React.ReactNode }> = ({ children }) 
                       {children}
                     </NotificationProvider>
                   </DocumentProvider>
-                </OfflineProvider>
-              </LanguageProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </LoadingProvider>
-      </ClientOnly>
+                </AuthProvider>
+              </OfflineProvider>
+            </ThemeProvider>
+          </LoadingProvider>
+        </ClientOnly>
+      </TRPCReactProvider>
     </ErrorBoundary>
   );
 };
