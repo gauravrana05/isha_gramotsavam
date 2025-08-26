@@ -67,7 +67,6 @@ export const profileRouter = createTRPCRouter({
         const requiredFields = [
           'first_name',
           'last_name', 
-          'email',
           'phone',
           'date_of_birth',
           'gender',

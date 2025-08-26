@@ -3,16 +3,30 @@ import { type NextRequest } from 'next/server'
 
 import { env } from '@/lib/env'
 import { appRouter } from '@/server/api/root'
+import { createTRPCContext } from '@/server/api/trpc'
 
 const handler = (req: NextRequest) =>
   fetchRequestHandler({
     endpoint: '/api/trpc',
     req,
     router: appRouter,
-    createContext: () => ({
-      // For App Router, context doesn't get req/res by default
-      // TODO: Add authentication context when Isha SSO is implemented
-    }),
+    createContext: async ({ req, resHeaders }) => {
+      // Create mock req/res objects that match what createTRPCContext expects
+      const mockReq = {
+        cookies: Object.fromEntries(
+          req.headers.get('cookie')?.split(';')
+            .map(cookie => cookie.trim().split('=').map(part => part.trim())) || []
+        ),
+        headers: Object.fromEntries(req.headers.entries()),
+      }
+      const mockRes = {}
+      
+      return await createTRPCContext({
+        req: mockReq,
+        res: mockRes,
+        info: { isBatchCall: false, calls: [] } // Add required info property
+      } as any)
+    },
     onError:
       env.NODE_ENV === 'development'
         ? ({ path, error }) => {

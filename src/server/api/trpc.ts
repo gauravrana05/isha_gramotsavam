@@ -4,15 +4,37 @@ import superjson from 'superjson'
 import { ZodError } from 'zod'
 
 // Create context for tRPC
-export const createTRPCContext = (opts: CreateNextContextOptions) => {
+export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   const { req, res } = opts
 
-  // TODO: Add authentication context when Isha SSO is implemented
-  // For now, return basic context
+  // Get user from session/cookies
+  let user = null;
+  try {
+    // Check for user ID in cookies or headers
+    const userId = req.cookies?.userId || req.headers.userid as string;
+    if (userId) {
+      // Import db here to avoid circular dependency issues
+      const { db } = await import('@/lib/db');
+      user = await db.users.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          phone: true,
+          role: true,
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Failed to get user in tRPC context:', error);
+  }
+
   return {
     req,
     res,
-    // user: null, // Will be populated after auth implementation
+    user,
   }
 }
 
@@ -44,12 +66,20 @@ const t = initTRPC.context<Context>().create({
 export const createTRPCRouter = t.router
 export const publicProcedure = t.procedure
 
-// Protected procedure - will be implemented after auth
+// Protected procedure - requires authentication
 export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
-  // TODO: Implement authentication check
-  // For now, just pass through - will be updated with Isha SSO
+  if (!ctx.user) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'You must be logged in to perform this action',
+    })
+  }
+
   return next({
-    ctx,
+    ctx: {
+      ...ctx,
+      user: ctx.user, // Ensure user is available in the context
+    },
   })
 })
 

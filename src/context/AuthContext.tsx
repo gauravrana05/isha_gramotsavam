@@ -111,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const mockUser = urlParams.get('mockUser');
 
         // Handle mock authentication for testing
-        if (mockUser && (mockUser === 'admin' || mockUser === 'public' || mockUser ==='captain')) {
+        if (mockUser && (mockUser === 'admin' || mockUser === 'public' || mockUser ==='captain' || mockUser === 'player')) {
           try {
             const response = await fetch(`/api/auth/mock?role=${mockUser}`, {
               method: 'GET',

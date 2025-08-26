@@ -90,7 +90,7 @@ export default function PlayerDashboard() {
       return;
     }
 
-    if (!userProfile?.isProfileComplete) {
+    if (!userProfile?.profile_complete) {
       router.push(`/${lang}/profile/complete`);
       return;
     }

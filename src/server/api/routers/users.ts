@@ -54,8 +54,7 @@ export const usersRouter = createTRPCRouter({
       const user = await db.users.findUnique({
         where: { phone: input.phone },
         include: {
-          verifications: true,
-          profileImages: true,
+          user_profile_images_user_profile_images_user_idTousers: true,
         },
       })
 
@@ -69,8 +68,7 @@ export const usersRouter = createTRPCRouter({
       const user = await db.users.findUnique({
         where: { id: input.id },
         include: {
-          verifications: true,
-          profileImages: true,
+          user_profile_images_user_profile_images_user_idTousers: true,
         },
       })
 
@@ -139,7 +137,7 @@ export const usersRouter = createTRPCRouter({
             profile_photo_path: input.profilePhotoPath,
             aadhaar_front_path: input.aadhaarFrontPath,
             aadhaar_back_path: input.aadhaarBackPath,
-            allImagesUploaded: Boolean(
+            all_images_uploaded: Boolean(
               input.profilePhotoPath && 
               input.aadhaarFrontPath && 
               input.aadhaarBackPath
@@ -149,7 +147,7 @@ export const usersRouter = createTRPCRouter({
             profile_photo_path: input.profilePhotoPath,
             aadhaar_front_path: input.aadhaarFrontPath,
             aadhaar_back_path: input.aadhaarBackPath,
-            allImagesUploaded: Boolean(
+            all_images_uploaded: Boolean(
               input.profilePhotoPath && 
               input.aadhaarFrontPath && 
               input.aadhaarBackPath
@@ -159,6 +157,7 @@ export const usersRouter = createTRPCRouter({
 
         return profileImage
       } catch (error) {
+        console.error('uploadProfileImage error:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to upload profile images',
@@ -251,7 +250,7 @@ export const usersRouter = createTRPCRouter({
 
       // Filter by verification status if provided
       if (verificationStatus) {
-        where.verifications = {
+        where.user_verifications_user_verifications_user_idTousers = {
           some: {
             status: verificationStatus,
           },
@@ -262,8 +261,7 @@ export const usersRouter = createTRPCRouter({
         db.users.findMany({
           where,
           include: {
-            verifications: true,
-            profileImages: true,
+              user_profile_images: true,
           },
           skip,
           take: limit,

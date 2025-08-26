@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase/config";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { api } from "@/server/trpc/react";
 import { useTranslation } from "@/lib/utils/i18n";
 import Image from "next/image";
 import { Team } from "@/lib/types/teams";
@@ -48,15 +47,21 @@ interface TeamData {
 
 
 export default function CaptainDashboard() {
-  const [teams, setTeams] = useState<TeamData[]>([]);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
   const { t } = useTranslation();
+
+  // Use tRPC to fetch teams for the captain
+  const teamsQuery = api.teams.getAll.useQuery(
+    { 
+      page: 1, 
+      limit: 50, 
+      captainId: user?.id || '' 
+    },
+    { enabled: !!user?.id }
+  );
+
 
   useEffect(() => {
     if (authLoading) return;
@@ -66,62 +71,23 @@ export default function CaptainDashboard() {
       return;
     }
 
-    if (!userProfile?.isProfileComplete) {
+    if (!userProfile?.profile_complete) {
+      console.log("Thisis user profile" , userProfile);
       router.push(`/${lang}/profile/complete`);
       return;
     }
-
-    loadCaptainData();
   }, [user, userProfile, authLoading, router, lang]);
 
-  const loadCaptainData = async () => {
-    if (!user) return;
-
-    try {
-      // Load teams where current user is the captain
-      const teamsQuery = query(
-        collection(db, "teams"),
-        where("captainId", "==", user.uid)
-      );
-      
-      const querySnapshot = await getDocs(teamsQuery);
-      const teamsData: TeamData[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        teamsData.push({
-          id: doc.id,
-          name: data.name || '',
-          sportId: data.sportId || data.sport || '',
-          captainName: data.captainName || '',
-          captainPhone: data.captainPhone || '',
-          panchayat: data.panchayat || '',
-          district: data.district || '',
-          state: data.state || '',
-          players: data.players?.length || 0,
-          maxPlayers: data.maxPlayers || 12,
-          currentPlayers: data.currentPlayers,
-          status: data.status || 'draft',
-          submittedAt: data.submittedAt || '',
-          createdAt: data.createdAt || '',
-          gender: data.gender || 'M',
-          eventId: data.eventId || 'gramotsavam_2025',
-          sportName: data.sportName
-        });
-      });
-
-      setTeams(teamsData);
-      
-      
-    } catch (err: any) {
-      // Error handling removed
-      setError("Failed to load dashboard data");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Get teams data from tRPC query
+  const teams = teamsQuery.data?.teams || [];
+  
+  // Calculate player counts for the first team
+  const team = teams[0];
+  const mainPlayersCount = team?.team_players?.filter(player => player.position === 'main').length || 0;
+  const substitutePlayersCount = team?.team_players?.filter(player => player.position === 'substitute').length || 0;
+  const totalPlayersCount = mainPlayersCount + substitutePlayersCount;
  
-  if (authLoading || loading) {
+  if (authLoading || teamsQuery.isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -132,15 +98,15 @@ export default function CaptainDashboard() {
     );
   }
 
-  if (error) {
+  if (teamsQuery.error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('error', 'Error')}</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <p className="text-gray-600 mb-4">{teamsQuery.error.message || 'Failed to load dashboard data'}</p>
           <button 
-            onClick={() => window.location.reload()}
+            onClick={() => teamsQuery.refetch()}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
             {t('retry', 'Retry')}
@@ -168,7 +134,7 @@ export default function CaptainDashboard() {
             {t('captain_dashboard', 'Captain Dashboard')}
           </h1>
           <p className="text-gray-600">
-            {t('welcome_back_captain', 'Welcome back, {name}! Manage your teams and players.').replace('{name}', userProfile?.firstName || 'Captain')}
+            {t('welcome_back_captain', 'Welcome back, {name}! Manage your teams and players.').replace('{name}', userProfile?.first_name || 'Captain')}
           </p>
         </div>
 
@@ -182,12 +148,12 @@ export default function CaptainDashboard() {
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">{teams[0].name}</h2>
                   <div className="flex flex-col sm:flex-row  sm:items-center gap-4 text-sm text-gray-600">
                   <span className="flex capitalize items-center gap-1">
-                  {teams[0].gender === 'F' ? <UserRound className='w-4 h-4'/> : <User className='w-4 h-4'/>} 
-                    {teams[0].gender === 'F' ? t('women', 'Women') : t('men', 'Men')}</span>
+                  {teams[0].gender_category === 'women' ? <UserRound className='w-4 h-4'/> : <User className='w-4 h-4'/>} 
+                    {teams[0].gender_category === 'women' ? t('women', 'Women') : t('men', 'Men')}</span>
                     
                     <span className="flex  items-center gap-1">
                       <Trophy className="w-4 h-4" />
-                      {teams[0].sportName}
+                      {teams[0].sports?.name}
                     </span>
                     <span className="flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
@@ -198,7 +164,7 @@ export default function CaptainDashboard() {
                 </div>
                 <div className={`px-3 py-1 rounded-full text-sm font-medium ${
                   teams[0].status === 'verified' ? 'bg-green-100 text-green-800' :
-                  teams[0].status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  teams[0].status === 'submitted' ? 'bg-yellow-100 text-yellow-800' :
                   'bg-gray-100 text-gray-800'
                 }`}>
                   {teams[0].status.charAt(0).toUpperCase() + teams[0].status.slice(1)}
@@ -209,16 +175,16 @@ export default function CaptainDashboard() {
             {/* Team Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">{teams[0].currentPlayers || 0}</div>
+                <div className="text-2xl font-bold text-blue-600">{totalPlayersCount}</div>
                 <div className="text-sm text-gray-600">{t('players_registered', 'Players Registered')}</div>
               </div>
               <div className="bg-white rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-purple-600">{teams[0].maxPlayers}</div>
+                <div className="text-2xl font-bold text-purple-600">{mainPlayersCount}</div>
                 <div className="text-sm text-gray-600">{t('main_players', 'Main Players')}</div>
               </div>
               <div className="bg-white rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-orange-600">🏟️</div>
-                <div className="text-sm text-gray-600">{t('venue_tbd', 'Venue TBD')}</div>
+                <div className="text-2xl font-bold text-orange-600">{substitutePlayersCount}</div>
+                <div className="text-sm text-gray-600">{t('substitutes', 'Substitutes')}</div>
               </div>
               <div className="bg-white rounded-lg border p-4 text-center">
                 <div className="text-2xl font-bold text-green-600">📅</div>

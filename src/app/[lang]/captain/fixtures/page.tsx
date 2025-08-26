@@ -85,7 +85,7 @@ export default function CaptainFixturesPage() {
       return;
     }
 
-    if (!userProfile?.isProfileComplete) {
+    if (!userProfile?.profile_complete) {
       router.push(`/${lang}/profile/complete`);
       return;
     }

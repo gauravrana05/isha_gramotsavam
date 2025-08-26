@@ -21,14 +21,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from "@/context/AuthContext";
 import { AlertModal } from '@/components/ui/Modal';
 import { useAlert } from '@/hooks/useAlert';
-import { db } from "@/lib/firebase/config";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, orderBy, limit } from "firebase/firestore";
-import { addPlayerToTeam } from "@/lib/actions/captain/addPlayerToTeam";
-import { removePlayerFromTeam } from "@/lib/actions/captain/removePlayerFromTeam";
-import { submitTeamForVerification } from "@/lib/actions/captain/submitTeam";
+import { api } from "@/server/trpc/react";
 import Image from "next/image";
 import { PlayerDocumentUpload } from "@/components/players";
-import { checkAndUpdateProfileCompletion } from "@/lib/actions/profile/checkProfileCompletion";
 import DocumentPreview from "@/components/documents/DocumentPreview";
 
 interface TeamPlayer {

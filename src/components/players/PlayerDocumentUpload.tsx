@@ -3,9 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { documentUploadService } from '@/lib/services/documentUploadService';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { api } from '@/server/trpc/react';
 import { LoadingSpinner } from '@/components/ui/loaders';
 
 export type PlayerDocumentType = 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack';
@@ -54,6 +52,8 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
     fileInputRef.current?.click();
   };
 
+  const utils = api.useUtils();
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user || !playerUserId) return;
@@ -71,6 +71,9 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
     setProgress(0);
 
     try {
+      // Use existing document upload service with Supabase
+      const { documentUploadService } = await import('@/lib/services/documentUploadService');
+      
       let downloadURL: string;
       
       // Use appropriate upload method based on document type
@@ -100,22 +103,36 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
           throw new Error(`Invalid document type: ${documentType}`);
       }
 
-      // Update the player's user document in the users collection
-      const playerDocRef = doc(db, "users", playerUserId);
-      const updateData: any = {
-        [`documents.${documentType}.storagePath`]: documentUploadService.getStoragePath(playerUserId, documentType),
-        [`documents.${documentType}.url`]: downloadURL,
-        [`documents.${documentType}.verified`]: false,
-        [`documents.${documentType}.uploadedAt`]: serverTimestamp(),
-        [`documents.${documentType}.uploadedBy`]: user.uid,
-        [`documents.${documentType}.uploadedByCaptain`]: true,
-        updatedAt: serverTimestamp()
-      };
+      // Update user document in database via direct fetch to tRPC endpoint (same as DocumentContext)
+      const response = await fetch('/api/trpc/profile.updateImageUpload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: playerUserId,
+          imageType: documentType,
+          imagePath: downloadURL,
+        }),
+      });
 
-      // Note: Profile completion will be handled by checkAndUpdateProfileCompletion 
-      // in the parent component after this upload succeeds
+      if (!response.ok) {
+        throw new Error(`Database update failed: ${response.status}`);
+      }
 
-      await updateDoc(playerDocRef, updateData);
+      const result = await response.json();
+
+      // Force profile completion query to run and update profile_complete field
+      try {
+        await utils.profile.checkCompletion.fetch({ userId: playerUserId });
+      } catch (error) {
+        console.error('Profile completion check failed:', error)
+      }
+
+      // Call onProfileComplete if provided
+      if (onProfileComplete) {
+        onProfileComplete(result.allImagesUploaded);
+      }
 
       setUploading(false);
       setProgress(100);

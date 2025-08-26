@@ -42,7 +42,7 @@ export default function CaptainProfilePage() {
     }
   }, [user, loading, router, lang]);
 
-  const isProfileComplete = userProfile?.isProfileComplete || false;
+  const isProfileComplete = userProfile?.profile_complete || false;
   const hasAddress = userProfile?.pincode && userProfile?.state && userProfile?.district;
   const hasDocuments = userProfile?.documents?.aadhaarFront?.url && userProfile?.documents?.aadhaarBack?.url;
 

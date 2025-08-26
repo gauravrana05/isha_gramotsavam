@@ -53,7 +53,8 @@ interface TeamPlayer {
     last_name: string | null;
     phone: string;
     role: string;
-    user_profile_images: {
+    profile_complete: boolean,
+    user_profile_images_user_profile_images_user_idTousers: {
       user_id: string;
       profile_photo_path: string | null;
       aadhaar_front_path: string | null;
@@ -103,11 +104,11 @@ export default function CaptainPlayerManagement() {
   const router = useRouter();
   const { lang, teamId } = useParams();
   const { user } = useAuth();
-  
+
   const [teamData, setTeamData] = useState<TeamData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  
+
   const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -117,22 +118,21 @@ export default function CaptainPlayerManagement() {
     lastName: '',
     dob: '',
     whatsappNumber: '',
-    village: '',
-    position: 'main' as 'main' | 'substitute'
+    position: 'main' as 'main' | 'substitute',
   });
   const [playerExists, setPlayerExists] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  
+
   // Document upload states
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [documentPlayer, setDocumentPlayer] = useState<TeamPlayer | null>(null);
-  
+
   // Team submission states
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
   const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
-  
+
   if (!teamId || (Array.isArray(teamId) && teamId.length === 0)) {
     throw new Error("Team ID is missing or invalid");
   }
@@ -140,7 +140,7 @@ export default function CaptainPlayerManagement() {
 
   // tRPC queries
   const teamQuery = api.teams.getById.useQuery(
-    { 
+    {
       id: teamIdStr,
       includePhotos: false,
       includePlayers: true,
@@ -152,6 +152,7 @@ export default function CaptainPlayerManagement() {
   const addPlayerMutation = api.teams.addPlayer.useMutation();
   const removePlayerMutation = api.teams.removePlayer.useMutation();
   const submitTeamMutation = api.teams.verify.useMutation();
+  const utils = api.useUtils();
 
   // Handle tRPC query results
   useEffect(() => {
@@ -174,6 +175,7 @@ export default function CaptainPlayerManagement() {
     }
 
     const team = teamQuery.data;
+    console.log(team);
 
     // Verify team ownership
     if (team.captain_id !== user?.id) {
@@ -211,18 +213,16 @@ export default function CaptainPlayerManagement() {
 
   const handlePhoneSearch = async (phone: string) => {
     setPlayerFormData(prev => ({ ...prev, phone }));
-    
+
     if (phone.length === 10) {
       setIsSearching(true);
       try {
-        // Search for existing user by phone number
+        // Search for existing user by phone number using tRPC client
         const normalizedPhone = normalizePhone(phone);
-        const response = await fetch(`/api/trpc/users.getByPhone?input=${encodeURIComponent(JSON.stringify({ phone: normalizedPhone }))}`);
-        const data = await response.json();
-        
-        if (data.result?.data) {
+        const user = await utils.users.getByPhone.fetch({ phone: normalizedPhone });
+
+        if (user) {
           // User exists - pre-fill form with user data
-          const user = data.result.data;
           setPlayerExists(true);
           setPlayerFormData(prev => ({
             ...prev,
@@ -230,7 +230,6 @@ export default function CaptainPlayerManagement() {
             lastName: user.last_name || '',
             dob: user.date_of_birth ? user.date_of_birth.split('T')[0] : '',
             whatsappNumber: phone,
-            village: user.village || teamData?.panchayat || ''
           }));
         } else {
           // User doesn't exist - clear form for new user entry
@@ -241,7 +240,6 @@ export default function CaptainPlayerManagement() {
             lastName: '',
             dob: '',
             whatsappNumber: phone,
-            village: teamData?.panchayat || ''
           }));
         }
       } catch (error) {
@@ -254,7 +252,6 @@ export default function CaptainPlayerManagement() {
           lastName: '',
           dob: '',
           whatsappNumber: phone,
-          village: teamData?.panchayat || ''
         }));
       } finally {
         setIsSearching(false);
@@ -280,11 +277,11 @@ export default function CaptainPlayerManagement() {
     const birthDate = new Date(dob);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    
+
     return age;
   };
 
@@ -293,20 +290,20 @@ export default function CaptainPlayerManagement() {
     if (obj === undefined) {
       return null; // Convert undefined to null (Firestore accepts null but not undefined)
     }
-    
+
     if (obj === null) {
       return null; // Keep null as is
     }
-    
+
     // Handle Date objects - check if they're valid
     if (obj instanceof Date) {
       return isNaN(obj.getTime()) ? null : obj; // Return null for invalid dates, keep valid dates
     }
-    
+
     if (Array.isArray(obj)) {
       return obj.map(cleanFirestoreData);
     }
-    
+
     if (typeof obj === 'object') {
       const cleaned: any = {};
       for (const [key, value] of Object.entries(obj)) {
@@ -315,7 +312,7 @@ export default function CaptainPlayerManagement() {
       }
       return cleaned;
     }
-    
+
     return obj;
   };
 
@@ -344,35 +341,34 @@ export default function CaptainPlayerManagement() {
       lastName: '',
       dob: '',
       whatsappNumber: '',
-      village: '',
-      position: 'main'
+      position: 'main',
     });
     setPlayerExists(false);
   };
   const normalizePhone = (phone: string): string => {
     const digitsOnly = phone.replace(/\D/g, "");
-    
+
     // Handle 10-digit Indian mobile number
     if (digitsOnly.length === 10) {
       return `+91${digitsOnly}`;
     }
-    
+
     // Handle 12-digit number starting with 91
     if (digitsOnly.startsWith("91") && digitsOnly.length === 12) {
       return `+${digitsOnly}`;
     }
-    
+
     // Handle already formatted number
     if (phone.startsWith("+91") && digitsOnly.length === 12) {
       return phone;
     }
-    
+
     // If none of the above, return the digits with +91 prefix as best effort
     if (digitsOnly.length >= 10) {
       const last10Digits = digitsOnly.slice(-10);
       return `+91${last10Digits}`;
     }
-    
+
     throw new Error(`Invalid phone number format: ${phone}. Please enter a 10-digit mobile number.`);
   }
   const handleAddPlayer = async () => {
@@ -381,7 +377,7 @@ export default function CaptainPlayerManagement() {
       return;
     }
     setIsSubmitting(true);
-    
+
     try {
       // Check for duplicate player by phone number
       const existingPlayerInTeam = players.find(p => p.phone === playerFormData.phone);
@@ -390,7 +386,7 @@ export default function CaptainPlayerManagement() {
         setIsSubmitting(false);
         return;
       }
-      
+
       // Auto-select correct position based on availability
       let playerPosition = playerFormData.position;
       if (playerPosition === 'main' && !canAddMain) {
@@ -410,7 +406,7 @@ export default function CaptainPlayerManagement() {
           return;
         }
       }
-      
+
       // Use tRPC mutation to add player
       try {
         // Validate phone number format
@@ -427,18 +423,18 @@ export default function CaptainPlayerManagement() {
           lastName: playerFormData.lastName,
           phone: normalizedPhone,
           whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
-          dateOfBirth: playerFormData.dob,
+          dateOfBirth: new Date(playerFormData.dob),
           age: calculateAge(playerFormData.dob),
           gender: teamData.gender_category === 'women' ? 'F' : 'M',
           position: playerPosition,
           panchayat: teamData.panchayat,
-          taluk: teamData.taluk,
+          taluk: teamData.taluk || '',
           district: teamData.district,
           state: teamData.state,
-          pincode: teamData.pincode || '',
+          pincode: teamData.pincode || '000000',
           verificationStatus: 'pending'
         });
-        
+
         // Player added successfully - refetch team data
         await teamQuery.refetch();
         showSuccess('Player added successfully!');
@@ -457,20 +453,20 @@ export default function CaptainPlayerManagement() {
 
   const removePlayer = async (playerId: string) => {
     if (!teamData || !user) return;
-    
+
     if (!confirm('Are you sure you want to remove this player from the team?')) {
       return;
     }
-    
+
     try {
       setLoading(true);
-      
+
       // Use tRPC mutation to remove player
       await removePlayerMutation.mutateAsync({
         teamId: teamData.id,
         userId: playerId
       });
-      
+
       // Refetch team data to reflect changes
       await teamQuery.refetch();
       showSuccess('Player removed successfully!');
@@ -482,7 +478,7 @@ export default function CaptainPlayerManagement() {
     }
   };
 
-  
+
 
   const getPlayerStatusColor = (player: TeamPlayer) => {
     if (player.verification_status === 'verified') return 'text-[#3A7F3F] bg-green-50';
@@ -538,10 +534,10 @@ export default function CaptainPlayerManagement() {
     }
 
     // TODO: Add document validation when document system is implemented
-    // const playersWithIncompleteDocuments = players.filter(player => !player.isProfileComplete);
-    // if (playersWithIncompleteDocuments.length > 0) {
-    //     validationErrors.push(`${playersWithIncompleteDocuments.length} player(s) have incomplete documents. Please ensure all documents are uploaded.`);
-    // }
+    const playersWithIncompleteDocuments = players.filter(player => !player.users?.profile_complete);
+    if (playersWithIncompleteDocuments.length > 0) {
+      validationErrors.push(`${playersWithIncompleteDocuments.length} player(s) have incomplete documents. Please ensure all documents are uploaded.`);
+    }
 
     if (teamData.gender_category) {
       if (teamData.gender_category === 'women') {
@@ -570,12 +566,14 @@ export default function CaptainPlayerManagement() {
 
     try {
       setIsSubmittingTeam(true);
-      
+
       // Use tRPC mutation to submit team for verification
       const result = await submitTeamMutation.mutateAsync({
-        teamId: teamData.id
+        id: teamData.id,
+        status: 'submitted',
+        verifiedBy: user.id,
       });
-      
+
       setShowSubmissionModal(false);
       showSuccess(`Team "${teamData.name}" submitted for verification successfully!\n\nYou will be notified once the review is complete.`);
       router.push(`/${lang}/captain/dashboard`);
@@ -598,7 +596,7 @@ export default function CaptainPlayerManagement() {
   if (error || !teamData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
+        {/* <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
           <p className="text-gray-600 mb-4">{error || "Failed to load team data"}</p>
@@ -608,7 +606,7 @@ export default function CaptainPlayerManagement() {
           >
             Back to Dashboard
           </button>
-        </div>
+        </div> */}
       </div>
     );
   }
@@ -618,14 +616,14 @@ export default function CaptainPlayerManagement() {
       {/* Header */}
       <div className="bg-[#4A2F1D] text-white py-6">
         <div className="max-w-7xl mx-auto px-4">
-          <button
+          {/* <button
             onClick={() => router.push(`/${lang}/captain/dashboard`)}
             className="flex items-center space-x-2 text-cream-200 hover:text-white mb-4 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
             <span>Back to Dashboard</span>
-          </button>
-          
+          </button> */}
+
           <h1 className="text-3xl font-bold mb-2">{teamData.name}</h1>
           <p className="text-cream-200">Step 2 of 2: Add Players</p>
         </div>
@@ -659,11 +657,11 @@ export default function CaptainPlayerManagement() {
               </div>
               <span className="font-semibold text-[#3A7F3F]">Team Details</span>
             </div>
-            
+
             <div className="flex-1 mx-4 h-2 bg-gray-200 rounded-full">
               <div className="h-full bg-[#F28C38] rounded-full w-full"></div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-[#F28C38] text-white rounded-full flex items-center justify-center font-semibold">
                 2
@@ -708,9 +706,9 @@ export default function CaptainPlayerManagement() {
           <div className="bg-white rounded-lg p-6 shadow-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Profiles Complete</p>
+                <p className="text-gray-600 text-sm">Completed Profiles</p>
                 <p className="text-2xl font-bold text-[#4A2F1D]">
-                  {players.filter(p => p.verification_status === 'verified').length}
+                  {players.filter(p => p.users?.profile_complete).length}
                 </p>
               </div>
               <CheckCircle className="w-8 h-8 text-[#3A7F3F]" />
@@ -729,7 +727,7 @@ export default function CaptainPlayerManagement() {
               <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>Add Player</span>
             </button>
-            
+
             <div className="text-xs sm:text-sm text-gray-600 flex flex-col sm:flex-row gap-1 sm:gap-2">
               <div className="bg-[#3A7F3F] text-white px-2 py-1 rounded text-xs">
                 {sportConfig.main_players_count - mainPlayers} main slots left
@@ -794,7 +792,7 @@ export default function CaptainPlayerManagement() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {player.id !== teamData.captain_id && (
+                          {player.user_id !== teamData.captain_id && (
                             <button
                               onClick={() => removePlayer(player.id)}
                               className="text-red-600 p-1"
@@ -806,20 +804,19 @@ export default function CaptainPlayerManagement() {
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            player.position === 'main' 
-                              ? 'bg-[#3A7F3F] text-white' 
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${player.position === 'main'
+                              ? 'bg-[#3A7F3F] text-white'
                               : 'bg-[#C79016] text-white'
-                          }`}>
+                            }`}>
                             {player.position === 'main' ? 'Main' : 'Sub'}
                           </span>
                           <span className="text-xs text-gray-600">{player.age}y</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="flex space-x-1">
-                            <div className={`w-2 h-2 rounded-full ${player.users?.profileImages?.profile_photo_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Profile"></div>
-                            <div className={`w-2 h-2 rounded-full ${player.users?.profileImages?.aadhaar_front_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
-                            <div className={`w-2 h-2 rounded-full ${player.users?.profileImages?.aadhaar_back_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Profile"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
                           </div>
                           <div className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold rounded-full ${getPlayerStatusColor(player)}`}>
                             {getPlayerStatusIcon(player)}
@@ -860,11 +857,10 @@ export default function CaptainPlayerManagement() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              player.position === 'main' 
-                                ? 'bg-[#3A7F3F] text-white' 
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${player.position === 'main'
+                                ? 'bg-[#3A7F3F] text-white'
                                 : 'bg-[#C79016] text-white'
-                            }`}>
+                              }`}>
                               {player.position === 'main' ? 'Main' : 'Substitute'}
                             </span>
                           </td>
@@ -873,17 +869,17 @@ export default function CaptainPlayerManagement() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex space-x-1">
-                              {player.users?.profileImages?.profile_photo_path ? (
-                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]"  />
+                              {player.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path ? (
+                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-300" title="Profile Photo Missing"></div>
                               )}
-                              {player.users?.profileImages?.aadhaar_front_path ? (
+                              {player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path ? (
                                 <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Front Missing"></div>
                               )}
-                              {player.users?.profileImages?.aadhaar_back_path ? (
+                              {player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path ? (
                                 <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Back Missing"></div>
@@ -905,7 +901,7 @@ export default function CaptainPlayerManagement() {
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
-                              {player.id !==  teamData.captain_id && (
+                              {player.user_id !== teamData.captain_id && (
                                 <button
                                   onClick={() => removePlayer(player.id)}
                                   className="text-red-600 hover:text-red-800 transition-colors"
@@ -930,11 +926,11 @@ export default function CaptainPlayerManagement() {
         {!isReadOnly && teamData?.sports && mainPlayers >= teamData.sports.main_players_count && (
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex flex-col sm:flex-row items-center justify-between">
-              
+
               <div>
                 <h3 className="text-lg font-bold text-[#4A2F1D] mb-2">Ready to Submit?</h3>
                 <p className="text-gray-600">
-                  {mainPlayers >= teamData.sports.main_players_count 
+                  {mainPlayers >= teamData.sports.main_players_count
                     ? `You have ${mainPlayers} main players. Submit your team for verification.`
                     : `Add at least ${teamData.sports.main_players_count} main players to submit.`}
                 </p>
@@ -992,7 +988,7 @@ export default function CaptainPlayerManagement() {
                   placeholder="Enter 10-digit mobile number"
                   value={playerFormData.phone}
                   onChange={(e) => {
-                    const phone = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    const phone = e.target.value.replace(/[^\d]/g, '').slice(0, 10);             
                     handlePhoneSearch(phone);
                   }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
@@ -1054,6 +1050,27 @@ export default function CaptainPlayerManagement() {
                     />
                   </div>
 
+                  {teamData?.gender_category === 'mixed' && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
+                        Gender <span className="text-red-500">*</span>
+                      </label>
+                      <Select
+                        value={playerFormData.gender}
+                        onValueChange={(value) => setPlayerFormData(prev => ({ ...prev, gender: value as 'M' | 'F' | 'O' }))}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select Gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="M">Male</SelectItem>
+                          <SelectItem value="F">Female</SelectItem>
+                          <SelectItem value="O">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
                       Position <span className="text-red-500">*</span>
@@ -1087,7 +1104,7 @@ export default function CaptainPlayerManagement() {
                 </button>
                 <button
                   onClick={handleAddPlayer}
-                  disabled={!playerFormData.firstName || !playerFormData.lastName || !playerFormData.dob || isSubmitting}
+                  disabled={!playerFormData.firstName || !playerFormData.lastName || !playerFormData.dob || isSubmitting || (teamData?.gender_category === 'mixed' && !playerFormData.gender)}
                   className="flex-1 bg-[#F28C38] hover:bg-[#E67A26] disabled:bg-gray-400 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
                 >
                   {isSubmitting ? 'Adding...' : 'Add Player'}
@@ -1133,22 +1150,22 @@ export default function CaptainPlayerManagement() {
                         <p className="font-semibold capitalize">{selectedPlayer.position}</p>
                       </div>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm text-gray-600">WhatsApp Number</label>
                       <p className="font-semibold">{selectedPlayer.whatsapp_number}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm text-gray-600">Village</label>
                       <p className="font-semibold">{selectedPlayer.panchayat}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm text-gray-600">Panchayat</label>
                       <p className="font-semibold">{selectedPlayer.panchayat}</p>
                     </div>
-                    
+
                     <div>
                       <label className="text-sm text-gray-600">District</label>
                       <p className="font-semibold">{selectedPlayer.district}</p>
@@ -1160,19 +1177,19 @@ export default function CaptainPlayerManagement() {
                 <div>
                   <h3 className="text-lg font-bold text-[#4A2F1D] mb-4">Identity Documents</h3>
                   <div className="space-y-4">
-                    
+
                     {/* Profile Photo */}
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Profile Photo</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.profileImages?.profile_photo_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.users?.profileImages?.profile_photo_path && isReadOnly ? (
+                      {selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path && isReadOnly ? (
                         <DocumentPreview
                           type="profilePhoto"
-                          url={selectedPlayer.user.profileImages.profile_photo_path}
+                          url={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers.profile_photo_path}
                           label="Profile Photo"
-                          verified={!!selectedPlayer.user.profileImages.verifiedAt}
+                          verified={!!selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers.verified_at}
                           showActions={false}
                           size="md"
                         />
@@ -1182,7 +1199,7 @@ export default function CaptainPlayerManagement() {
                           playerUserId={selectedPlayer.user_id}
                           documentType="profilePhoto"
                           label="Profile Photo"
-                          currentUrl={selectedPlayer.users?.profileImages?.profile_photo_path || null}
+                          currentUrl={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path || null}
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'profilePhoto', url)}
                           onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.id, isComplete)}
                           variant="card"
@@ -1195,14 +1212,14 @@ export default function CaptainPlayerManagement() {
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Aadhaar Front</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.profileImages?.aadhaar_front_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.users?.profileImages?.aadhaar_front_path && isReadOnly ? (
+                      {selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path && isReadOnly ? (
                         <DocumentPreview
                           type="aadhaarFront"
-                          url={selectedPlayer.user.profileImages.aadhaar_front_path}
+                          url={selectedPlayer.users.user_profile_images_user_profile_images_user_idTousers.aadhaar_front_path}
                           label="Aadhaar Front"
-                          verified={!!selectedPlayer.user.profileImages.verifiedAt}
+                          verified={!!selectedPlayer.users.user_profile_images_user_profile_images_user_idTousers.verified_at}
                           showActions={false}
                           size="md"
                         />
@@ -1212,7 +1229,7 @@ export default function CaptainPlayerManagement() {
                           playerUserId={selectedPlayer.user_id}
                           documentType="aadhaarFront"
                           label="Aadhaar Front"
-                          currentUrl={selectedPlayer.users?.profileImages?.aadhaar_front_path || null}
+                          currentUrl={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path || null}
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'aadhaarFront', url)}
                           onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.id, isComplete)}
                           variant="card"
@@ -1225,14 +1242,14 @@ export default function CaptainPlayerManagement() {
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Aadhaar Back</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.profileImages?.aadhaar_back_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.users?.profileImages?.aadhaar_back_path && isReadOnly ? (
+                      {selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path && isReadOnly ? (
                         <DocumentPreview
                           type="aadhaarBack"
-                          url={selectedPlayer.user.profileImages.aadhaar_back_path}
+                          url={selectedPlayer.users.user_profile_images_user_profile_images_user_idTousers.aadhaar_back_path}
                           label="Aadhaar Back"
-                          verified={!!selectedPlayer.user.profileImages.verifiedAt}
+                          verified={!!selectedPlayer.users.user_profile_images_user_profile_images_user_idTousers.verified_at}
                           showActions={false}
                           size="md"
                         />
@@ -1242,7 +1259,7 @@ export default function CaptainPlayerManagement() {
                           playerUserId={selectedPlayer.user_id}
                           documentType="aadhaarBack"
                           label="Aadhaar Back"
-                          currentUrl={selectedPlayer.users?.profileImages?.aadhaar_back_path || null}
+                          currentUrl={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path || null}
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'aadhaarBack', url)}
                           onProfileComplete={(isComplete: boolean | undefined) => handleProfileComplete(selectedPlayer.id, isComplete === true)}
                           variant="card"
@@ -1255,36 +1272,36 @@ export default function CaptainPlayerManagement() {
 
                 {/* Action Buttons */}
                 <div className="mt-8 flex justify-end space-x-4">
-                <button
-                  onClick={() => setSelectedPlayer(null)}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Close
-                </button>
-                {/* Remove Player button - disabled for captain */}
-                {selectedPlayer.user_id !== teamData.captain_id && !isReadOnly ? (
                   <button
-                    onClick={() => {
-                      removePlayer(selectedPlayer.id);
-                      setSelectedPlayer(null);
-                    }}
-                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    onClick={() => setSelectedPlayer(null)}
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    Remove Player
+                    Close
                   </button>
-                ) : (
-                  <button
-                    className="px-6 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed transition-colors"
-                    disabled
-                  >
-                    { isReadOnly ? 'Cannot Remove (Team Submitted)' : 'Cannot Remove Player' }
-                  </button>
-                )}
+                  {/* Remove Player button - disabled for captain */}
+                  {selectedPlayer.user_id !== teamData.captain_id && !isReadOnly ? (
+                    <button
+                      onClick={() => {
+                        removePlayer(selectedPlayer.id);
+                        setSelectedPlayer(null);
+                      }}
+                      className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Remove Player
+                    </button>
+                  ) : (
+                    <button
+                      className="px-6 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed transition-colors"
+                      disabled
+                    >
+                      {isReadOnly ? 'Cannot Remove (Team Submitted)' : 'Cannot Remove Player'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* Team Submission Confirmation Modal */}
@@ -1331,7 +1348,7 @@ export default function CaptainPlayerManagement() {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Documents:</span>
                       <span className="font-medium text-[#3A7F3F]">
-                        {players.filter(p => p.users?.profileImages?.allImagesUploaded).length === players.length ? 'Complete' : 'Incomplete'}
+                        {players.filter(p => p.users?.user_profile_images_user_profile_images_user_idTousers?.all_images_uploaded).length === players.length ? 'Complete' : 'Incomplete'}
                       </span>
                     </div>
                   </div>
@@ -1383,7 +1400,7 @@ export default function CaptainPlayerManagement() {
           </div>
         </div>
       )}
-      
+
       <AlertModal
         isOpen={alertState.isOpen}
         onClose={hideAlert}

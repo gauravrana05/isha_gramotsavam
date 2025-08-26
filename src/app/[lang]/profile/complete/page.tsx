@@ -391,7 +391,6 @@ export default function CompleteProfilePage() {
               }}
               onError={(error) => setError(error)}
             />
-            <p className="text-sm text-gray-500 mt-2">Optional - You can upload this later</p>
           </div>
         </div>
 
