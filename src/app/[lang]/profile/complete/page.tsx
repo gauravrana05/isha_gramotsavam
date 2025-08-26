@@ -683,7 +683,7 @@ export default function CompleteProfilePage() {
           </div>
           <hr className="mb-6" />
           
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-6 font-fira">
             <DocumentUpload
               type="aadhaarFront"
               label="Aadhaar Card (Front)"

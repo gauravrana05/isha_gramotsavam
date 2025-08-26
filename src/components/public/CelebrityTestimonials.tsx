@@ -163,7 +163,7 @@ export default function CelebrityTestimonials() {
                style={{ 
                  scrollbarWidth: 'none', 
                  msOverflowStyle: 'none',
-                 WebkitScrollbar: { display: 'none' }
+                //  WebkitScrollbar : { display: 'none' }
                }}>
             {testimonials.map((testimonial, index) => (
               <div

@@ -8,40 +8,29 @@ export const sportsRouter = createTRPCRouter({
   getAllWithCategories: publicProcedure
     .query(async () => {
       try {
-        const sports = await db.sports.findMany({
+        const sportsWithCategories = await db.sports.findMany({
           where: { is_active: true },
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            main_players_count: true,
-            max_substitutes: true,
-            created_at: true,
-            updated_at: true,
+          include: {
+            sport_gender_categories: {
+              select: {
+                gender_category: true,
+              },
+            },
           },
-          orderBy: { name: 'asc' }
-        })
+          orderBy: { name: 'asc' },
+        });
 
-        // Get gender categories for each sport
-        const sportsWithCategories = await Promise.all(
-          sports.map(async (sport) => {
-            const genderCategories = await db.sport_gender_categories.findMany({
-              where: { sport_id: sport.id },
-              select: { gender_category: true }
-            })
-
-            return {
-              ...sport,
-              gender_categories: genderCategories.map(gc => gc.gender_category),
-              // Helper fields for UI
-              supports_men: genderCategories.some(gc => gc.gender_category === 'men'),
-              supports_women: genderCategories.some(gc => gc.gender_category === 'women'),
-              supports_mixed: genderCategories.some(gc => gc.gender_category === 'mixed'),
-            }
-          })
-        )
-
-        return sportsWithCategories
+        return sportsWithCategories.map((sport) => {
+          const genderCategories = sport.sport_gender_categories.map(gc => gc.gender_category);
+          const { sport_gender_categories, ...rest } = sport;
+          return {
+            ...rest,
+            gender_categories: genderCategories,
+            supports_men: genderCategories.includes('men'),
+            supports_women: genderCategories.includes('women'),
+            supports_mixed: genderCategories.includes('mixed'),
+          };
+        });
       } catch (error) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
