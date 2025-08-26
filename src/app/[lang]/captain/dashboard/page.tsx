@@ -25,27 +25,6 @@ import {
   UserRound
 } from "lucide-react";
 
-interface TeamData {
-  id: string;
-  name: string;
-  sportId: string;
-  captainName: string;
-  captainPhone: string;
-  panchayat: string;
-  district: string;
-  state: string;
-  players: number;
-  maxPlayers: number;
-  currentPlayers: number;
-  status: string;
-  submittedAt: string;
-  createdAt: string;
-  gender: string;
-  eventId: string;
-  sportName: string;
-}
-
-
 export default function CaptainDashboard() {
   const router = useRouter();
   const { lang } = useParams();
@@ -81,10 +60,10 @@ export default function CaptainDashboard() {
   // Get teams data from tRPC query
   const teams = teamsQuery.data?.teams || [];
   
-  // Calculate player counts for the first team
+  // Player counts are now directly available from the API
   const team = teams[0];
-  const mainPlayersCount = team?.team_players?.filter(player => player.position === 'main').length || 0;
-  const substitutePlayersCount = team?.team_players?.filter(player => player.position === 'substitute').length || 0;
+  const mainPlayersCount = team?.mainPlayersCount || 0;
+  const substitutePlayersCount = team?.substitutePlayersCount || 0;
   const totalPlayersCount = mainPlayersCount + substitutePlayersCount;
  
   if (authLoading || teamsQuery.isLoading) {

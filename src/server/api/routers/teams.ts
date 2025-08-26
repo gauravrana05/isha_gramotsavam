@@ -200,7 +200,7 @@ export const teamsRouter = createTRPCRouter({
 
       const dbSortBy = sortByMapping[sortBy] || 'created_at';
 
-      const [teams, total] = await Promise.all([
+      const [teamsFromDb, total] = await Promise.all([
         db.teams.findMany({
           where,
           include: {
@@ -225,11 +225,6 @@ export const teamsRouter = createTRPCRouter({
                 status: true,
               },
             },
-            _count: {
-              select: {
-                team_players: true,
-              },
-            },
             team_players: {
               select: {
                 position: true,
@@ -241,7 +236,20 @@ export const teamsRouter = createTRPCRouter({
           orderBy: { [dbSortBy]: sortOrder },
         }),
         db.teams.count({ where }),
-      ])
+      ]);
+
+      const teams = teamsFromDb.map(team => {
+        const mainPlayersCount = team.team_players.filter(p => p.position === 'main').length;
+        const substitutePlayersCount = team.team_players.filter(p => p.position === 'substitute').length;
+        
+        const { team_players, ...restOfTeam } = team;
+
+        return {
+          ...restOfTeam,
+          mainPlayersCount,
+          substitutePlayersCount,
+        };
+      });
 
       return {
         teams,
@@ -344,6 +352,128 @@ export const teamsRouter = createTRPCRouter({
     }),
 
   // Protected procedures
+  getMyTeam: protectedProcedure.query(async ({ ctx }) => {
+    const captainId = ctx.user.id;
+
+    const team = await db.teams.findFirst({
+      where: { captain_id: captainId },
+      include: {
+        sports: true,
+        users_teams_captain_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            phone: true,
+          },
+        },
+        events: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+        team_photos: true,
+        team_players: {
+          select: {
+            id: true,
+            user_id: true,
+            team_id: true,
+            first_name: true,
+            last_name: true,
+            phone: true,
+            whatsapp_number: true,
+            date_of_birth: true,
+            age: true,
+            gender: true,
+            position: true,
+            verification_status: true,
+            panchayat: true,
+            taluk: true,
+            district: true,
+            state: true,
+            pincode: true,
+            added_by: true,
+            created_at: true,
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                phone: true,
+                role: true,
+                profile_complete: true,
+                user_profile_images_user_profile_images_user_idTousers: {
+                  select: {
+                    user_id: true,
+                    profile_photo_path: true,
+                    aadhaar_front_path: true,
+                    aadhaar_back_path: true,
+                    all_images_uploaded: true,
+                    verified_by: true,
+                    verified_at: true,
+                    created_at: true,
+                    updated_at: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: [{ position: 'asc' }, { created_at: 'asc' }],
+        },
+        team_venue_assignments: {
+          include: {
+            events: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings: {
+              include: {
+                venues: {
+                  select: {
+                    id: true,
+                    name: true,
+                    district: true,
+                    state: true,
+                  },
+                },
+              },
+            },
+            venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings: {
+              include: {
+                venues: {
+                  select: {
+                    id: true,
+                    name: true,
+                    district: true,
+                    state: true,
+                  },
+                },
+              },
+            },
+            venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings: {
+              include: {
+                venues: {
+                  select: {
+                    id: true,
+                    name: true,
+                    district: true,
+                    state: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return team;
+  }),
+
   create: protectedProcedure
     .input(createTeamSchema)
     .mutation(async ({ input }) => {
@@ -773,17 +903,15 @@ export const teamsRouter = createTRPCRouter({
             },
           },
         })
-        console.log("before team update");
-        // Update team player counts - these fields might not exist in schema, removing for now
-        // await db.teams.update({
-        //   where: { id: input.teamId },
-        //   data: {
-        //     ...(input.position === 'main'
-        //       ? { current_players: { increment: 1 } }
-        //       : { current_substitutes: { increment: 1 } }),
-        //   },
-        // })
-        console.log("error in teams udpate");
+        // Update team player counts
+        await db.teams.update({
+          where: { id: input.teamId },
+          data: {
+            ...(input.position === 'main'
+              ? { current_players: { increment: 1 } }
+              : { current_substitutes: { increment: 1 } }),
+          },
+        });
         return player
       } catch (error) {
         if (error instanceof TRPCError) throw error
@@ -1041,5 +1169,143 @@ export const teamsRouter = createTRPCRouter({
           message: 'Team not found',
         })
       }
+    }),
+
+  getPlayerTeamById: protectedProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input, ctx }) => {
+      const { id } = input;
+      const userId = ctx.user.id;
+
+      const team = await db.teams.findUnique({
+        where: { id },
+        include: {
+          sports: true,
+          users_teams_captain_idTousers: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              phone: true,
+            },
+          },
+          team_players: {
+            where: { user_id: userId }, // Ensure the logged-in user is a player in this team
+            select: {
+              id: true,
+              user_id: true,
+              team_id: true,
+              first_name: true,
+              last_name: true,
+              phone: true,
+              whatsapp_number: true,
+              date_of_birth: true,
+              age: true,
+              gender: true,
+              position: true,
+              verification_status: true,
+              panchayat: true,
+              taluk: true,
+              district: true,
+              state: true,
+              pincode: true,
+              added_by: true,
+              created_at: true,
+              users: {
+                select: {
+                  id: true,
+                  first_name: true,
+                  last_name: true,
+                  phone: true,
+                  role: true,
+                  profile_complete: true,
+                  user_profile_images_user_profile_images_user_idTousers: {
+                    select: {
+                      user_id: true,
+                      profile_photo_path: true,
+                      aadhaar_front_path: true,
+                      aadhaar_back_path: true,
+                      all_images_uploaded: true,
+                      verified_by: true,
+                      verified_at: true,
+                      created_at: true,
+                      updated_at: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          team_venue_assignments: {
+            orderBy: { assigned_at: 'desc' },
+            take: 1,
+            include: {
+              venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings: {
+                include: {
+                  venues: true,
+                },
+              },
+              venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings: {
+                include: {
+                  venues: true,
+                },
+              },
+              venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings: {
+                include: {
+                  venues: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!team || team.team_players.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Team not found or you are not a player in this team',
+        });
+      }
+
+      // Extract the specific player data for the current user
+      const currentPlayerData = team.team_players[0];
+
+      // Transform the team object to match the TeamMembership interface expected by the frontend
+      const transformedTeam = {
+        teamId: team.id,
+        name: team.name,
+        sportName: team.sports.name,
+        sportId: team.sport_id,
+        captainProfile: {
+          name: team.users_teams_captain_idTousers.first_name + ' ' + team.users_teams_captain_idTousers.last_name,
+          phone: team.users_teams_captain_idTousers.phone,
+          userId: team.users_teams_captain_idTousers.id,
+        },
+        position: currentPlayerData.position,
+        status: team.status,
+        verificationStatus: currentPlayerData.verification_status,
+        joinedAt: currentPlayerData.created_at.toISOString(),
+        panchayat: team.panchayat,
+        district: team.district,
+        state: team.state,
+        genderCategory: team.gender_category,
+        maxPlayers: team.sports.main_players_count + team.sports.max_substitutes,
+        currentPlayers: team.current_players + team.current_substitutes,
+        assignedVenue: team.team_venue_assignments[0] ? {
+          venueId: team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings?.venues?.id ||
+                   team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings?.venues?.id ||
+                   team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings?.venues?.id,
+          venueName: team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings?.venues?.name ||
+                     team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings?.venues?.name ||
+                     team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings?.venues?.name,
+          assignmentLevel: team.team_venue_assignments[0].level,
+        } : undefined,
+        checkedIn: false, // Placeholder, as this is not directly in Prisma team model
+        checkedInAt: null, // Placeholder
+        checkedInVenue: null, // Placeholder
+        matchDayStatus: team.status, // Using team status as a proxy
+      };
+
+      return transformedTeam;
     }),
 })
