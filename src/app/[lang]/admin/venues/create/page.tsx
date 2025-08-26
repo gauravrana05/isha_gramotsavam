@@ -11,6 +11,7 @@ import Button from '@/components/ui/Button';
 import { ArrowLeft, Save, Loader2, MapPin, Plus, Trash2 } from 'lucide-react';
 import VenueVolunteerAssignmentModal from './VenueVolunteerAssignmentModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
+import { PageLoader } from '@/components/ui';
 
 interface Volunteer {
   id: string;
@@ -643,10 +644,7 @@ export default function CreateVenuePage() {
           <div className="bg-white rounded-lg border p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Supported Sports</h3>
             {loadingSports ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin text-[#3A7F3F]" />
-                <span className="ml-2">Loading sports...</span>
-              </div>
+               <PageLoader title="Loading sports..." variant="minimal" />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {availableSports.map((sport) => (

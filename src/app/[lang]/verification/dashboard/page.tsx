@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase/config";
-import { collection, query, getDocs, orderBy } from "firebase/firestore";
 import Image from "next/image";
 import { Users, Loader2, AlertCircle, Search, Filter, CheckCircle, Clock, X, Eye } from "lucide-react";
+import { api } from "@/server/trpc/react";
 
 interface TeamData {
   id: string;
@@ -27,103 +25,28 @@ interface TeamData {
 }
 
 export default function VerificationDashboardPage() {
-  const [teams, setTeams] = useState<TeamData[]>([]);
-  const [filteredTeams, setFilteredTeams] = useState<TeamData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const router = useRouter();
   const { lang } = useParams();
-  const { user, userProfile, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    if (authLoading) return;
+  const { data: userProfile, isLoading: userProfileLoading, error: userProfileError } = api.users.getVerificationProfile.useQuery();
 
-    loadTeams();
-  }, [user, userProfile, authLoading, router, lang]);
-
-  const loadTeams = async () => {
-    try {
-      const teamsQuery = query(
-        collection(db, "teams"), 
-        orderBy("submittedAt", "desc")
-      );
-      
-      const querySnapshot = await getDocs(teamsQuery);
-      const teamsData: TeamData[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        // Only include teams submitted for verification
-        if (data.status === 'submitted' || data.status === 'pending' || data.status === 'verified' || data.status === 'rejected' || data.status === 'partial_verification') {
-          teamsData.push({
-            id: doc.id,
-            name: data.name || '',
-            sportName: data.sportName || '',
-            captainProfile: {
-              name: data.captainProfile?.name || '',
-              phone: data.captainProfile?.phone || ''
-            },
-            panchayat: data.panchayat || '',
-            district: data.district || '',
-            state: data.state || '',
-            currentPlayers: data.currentPlayers || 0,
-            maxPlayers: data.maxPlayers || 12,
-            status: data.status || 'pending',
-            submittedAt: data.submittedAt,
-            genderCategory: data.genderCategory || 'mixed'
-          });
-        }
-      });
-
-      setTeams(teamsData);
-      setFilteredTeams(teamsData);
-    } catch (err: any) {
-      // Error handling removed
-      setError("Failed to load teams data");
-    } finally {
-      setLoading(false);
+  const { data: teamsData, isLoading: teamsLoading, error: teamsError } = api.teams.getForVerification.useQuery(
+    {
+      searchTerm,
+      statusFilter,
+    },
+    {
+      enabled: !!userProfile, // Only fetch teams if user profile is loaded
     }
-  };
+  );
 
-  // Filter teams based on search and status
-  useEffect(() => {
-    let filtered = teams;
-
-    // Apply search filter
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(team => 
-        team.name.toLowerCase().includes(searchLower) ||
-        team.captainProfile.name.toLowerCase().includes(searchLower) ||
-        team.panchayat.toLowerCase().includes(searchLower) ||
-        team.district.toLowerCase().includes(searchLower) ||
-        team.sportName.toLowerCase().includes(searchLower)
-      );
-    }
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      switch (statusFilter) {
-        case 'pending':
-          filtered = filtered.filter(t => t.status === 'submitted' || t.status === 'pending');
-          break;
-        case 'verified':
-          filtered = filtered.filter(t => t.status === 'verified');
-          break;
-        case 'rejected':
-          filtered = filtered.filter(t => t.status === 'rejected');
-          break;
-        case 'partial':
-          filtered = filtered.filter(t => t.status === 'partial_verification');
-          break;
-      }
-    }
-
-    setFilteredTeams(filtered);
-  }, [teams, searchTerm, statusFilter]);
+  const teams = teamsData?.teams || [];
+  const filteredTeams = teamsData?.filteredTeams || [];
+  const loading = userProfileLoading || teamsLoading;
+  const error = userProfileError || teamsError;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -153,7 +76,7 @@ export default function VerificationDashboardPage() {
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'Unknown';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = new Date(timestamp); // Assuming timestamp is already a valid date string or number
     return date.toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -161,7 +84,7 @@ export default function VerificationDashboardPage() {
     });
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#CE4520]" />
@@ -169,14 +92,14 @@ export default function VerificationDashboardPage() {
     );
   }
 
-  if (error || !user || !userProfile) {
+  if (error || !userProfile) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-4">
-            {error || "You don't have permission to access this page."}
+            {error?.message || "You don't have permission to access this page."}
           </p>
           <button 
             onClick={() => router.push(`/${lang}/player/dashboard`)}

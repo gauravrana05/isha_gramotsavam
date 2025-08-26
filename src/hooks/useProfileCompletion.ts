@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { api } from '@/server/trpc/react'
 
 interface UseProfileCompletionOptions {
   lang: string
@@ -12,30 +13,36 @@ interface UseProfileCompletionOptions {
 
 export const useProfileCompletion = (options: UseProfileCompletionOptions) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const { user, userProfile, loading } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
 
+  // Fetch profile completion data using the new API
+  const profileDataQuery = api.profile.checkCompletion.useQuery(
+    { userId: user?.id || '' },
+    { enabled: !!user?.id }
+  )
+
   const checkProfileCompletion = useCallback(() => {
-    // Don't check if still loading auth
-    if (loading) return { canProceed: false, needsAuth: true }
+    // Don't check if still loading auth or profile data
+    if (loading || profileDataQuery.isLoading) return { canProceed: false, needsAuth: true }
     
     // Check if user is authenticated
     if (!user) {
       return { canProceed: false, needsAuth: true }
     }
 
-    // Check if user profile exists
-    if (!userProfile) {
+    // Check if profile data exists
+    if (!profileDataQuery.data) {
       return { canProceed: false, needsAuth: false, needsProfile: true }
     }
 
-    // Check if profile is complete
-    if (!userProfile.isProfileComplete) {
+    // Check if profile is complete using the new API data
+    if (!profileDataQuery.data.profileComplete) {
       return { canProceed: false, needsAuth: false, needsProfile: false, needsCompletion: true }
     }
 
     return { canProceed: true }
-  }, [user, userProfile, loading])
+  }, [user, loading, profileDataQuery.isLoading, profileDataQuery.data])
 
   const handleAction = useCallback((targetUrl?: string) => {
     const result = checkProfileCompletion()
@@ -72,8 +79,8 @@ export const useProfileCompletion = (options: UseProfileCompletionOptions) => {
     closeModal,
     handleAction,
     checkProfileCompletion,
-    isProfileComplete: userProfile?.isProfileComplete || false,
+    isProfileComplete: profileDataQuery.data?.profileComplete || false,
     isAuthenticated: !!user,
-    loading
+    loading: loading || profileDataQuery.isLoading
   }
 }

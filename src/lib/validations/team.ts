@@ -46,9 +46,8 @@ export const verifyTeamSchema = z.object({
 // Team player schemas
 export const addTeamPlayerSchema = z.object({
   teamId: uuidSchema,
-  userId: uuidSchema,
   position: playerPositionSchema,
-  // Player snapshot data
+  // Player data
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
   phone: phoneSchema,
@@ -61,7 +60,7 @@ export const addTeamPlayerSchema = z.object({
   district: z.string().min(1).max(100),
   state: z.string().min(1).max(100),
   pincode: z.string().min(1).max(10),
-  addedBy: z.string().max(50), // 'self' or user_id
+  verificationStatus: verificationStatusSchema.optional(),
 })
 
 export const removeTeamPlayerSchema = z.object({

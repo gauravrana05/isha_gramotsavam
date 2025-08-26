@@ -1,11 +1,11 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { User } from "@prisma/client";
+import { users } from "@prisma/client";
 
 interface AuthContextType {
-  user: User | null;
-  userProfile: User | null; // Keep backward compatibility 
+  user: users | null;
+  userProfile: users | null; // Keep backward compatibility 
   loading: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
@@ -17,7 +17,7 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<users | null>(null);
   const [loading, setLoading] = useState(true);
 
   const login = useCallback(async () => {
@@ -111,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const mockUser = urlParams.get('mockUser');
 
         // Handle mock authentication for testing
-        if (mockUser && (mockUser === 'admin' || mockUser === 'public')) {
+        if (mockUser && (mockUser === 'admin' || mockUser === 'public' || mockUser ==='captain')) {
           try {
             const response = await fetch(`/api/auth/mock?role=${mockUser}`, {
               method: 'GET',

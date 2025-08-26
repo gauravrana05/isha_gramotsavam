@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/server/trpc/react';
-import { LoadingSpinner } from '@/components/ui/loaders';
+import { LoadingSpinner, PageLoader } from '@/components/ui/loaders';
 import { AlertCircle } from 'lucide-react';
 import RegistrationButton from '@/components/common/RegistrationButton';
 
@@ -20,13 +20,19 @@ export default function SportsOverviewPage({ params }: SportsOverviewPageProps) 
   const { user } = useAuth()
   const resolvedParams = React.use(params)
   const { lang } = resolvedParams
+
+  // Fetch profile completion data for gender validation
+  const profileDataQuery = api.profile.checkCompletion.useQuery(
+    { userId: user?.id || '' },
+    { enabled: !!user?.id }
+  )
+  const userGender = profileDataQuery.data?.gender || user?.gender || null
   
   // Fetch sports from database
   const sportsQuery = api.sports.getAllWithCategories.useQuery()
   
   // Transform database data to display format with gender validation
   const transformSportData = (sport: any) => {
-    const userGender = user?.gender || null
     let can_register = true
     let registration_message = ''
     
@@ -58,12 +64,11 @@ export default function SportsOverviewPage({ params }: SportsOverviewPageProps) 
   // Handle loading and error states
   if (sportsQuery.isLoading) {
     return (
-      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="mt-4 text-[#4A2F1D]">Loading sports...</p>
-        </div>
-      </div>
+      <PageLoader
+        title="Loading Sports..."
+        variant="brand"
+        size="lg"
+      />
     )
   }
   

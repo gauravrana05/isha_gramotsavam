@@ -22,110 +22,89 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from "@/context/AuthContext";
 import { AlertModal } from '@/components/ui/Modal';
 import { useAlert } from '@/hooks/useAlert';
-import { db } from "@/lib/firebase/config";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, orderBy } from "firebase/firestore";
-import { addPlayerToTeam } from "@/lib/actions/captain/addPlayerToTeam";
-import { removePlayerFromTeam } from "@/lib/actions/captain/removePlayerFromTeam";
-import { submitTeamForVerification } from "@/lib/actions/captain/submitTeam";
+import { api } from '@/server/trpc/react';
 import Image from "next/image";
 import { PlayerDocumentUpload } from "@/components/players";
-import { checkAndUpdateProfileCompletion } from "@/lib/actions/profile/checkProfileCompletion";
 import DocumentPreview from "@/components/documents/DocumentPreview";
 
 interface TeamPlayer {
-  playerId: string;
-  userId: string;
-  teamId: string;
-  name: string;
+  id: string;
+  user_id: string;
+  team_id: string;
+  first_name: string;
+  last_name: string;
   phone: string;
-  dob: string;
+  whatsapp_number: string | null;
+  date_of_birth: Date;
   age: number;
   gender: string;
   position: 'main' | 'substitute';
-  addedAt: Date;
-  addedBy: string;
-  isProfileComplete: boolean;
-  profileData: {
-    firstName: string;
-    lastName: string;
-    whatsappNumber: string;
-    village: string;
-    panchayat: string;
-    taluk: string;
-    district: string;
-    state: string;
-    pincode: string;
-  };
-  documents: {
-    profilePhoto: {
-      storagePath: string;
-      url?: string | null;
-      verified: boolean;
-      uploadedAt?: Date | null;
-      uploadedBy?: string | null;
-    };
-    aadhaarFront: {
-      storagePath: string;
-      url?: string | null;
-      verified: boolean;
-      uploadedAt?: Date | null;
-      uploadedBy?: string | null;
-    };
-    aadhaarBack: {
-      storagePath: string;
-      url?: string | null;
-      verified: boolean;
-      uploadedAt?: Date | null;
-      uploadedBy?: string | null;
-    };
-  };
-  verificationStatus: 'pending' | 'verified' | 'rejected';
-  verificationComments?: string[];
-}
-
-interface TeamData {
-  teamId: string;
-  name: string;
-  sportName: string;
-  sportId: string;
-  minPlayers: number;
-  maxPlayers: number;
-  maxSubstitutes: number;
-  pincode: string;
+  verification_status: 'pending' | 'verified' | 'rejected';
   panchayat: string;
   taluk: string;
   district: string;
   state: string;
-  captainId: string;
-  captainProfile: {
+  pincode: string;
+  added_by: string;
+  created_at: Date;
+  users?: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    phone: string;
+    role: string;
+    user_profile_images: {
+      user_id: string;
+      profile_photo_path: string | null;
+      aadhaar_front_path: string | null;
+      aadhaar_back_path: string | null;
+      all_images_uploaded: boolean;
+      verified_by: string | null;
+      verified_at: Date | null;
+      created_at: Date;
+      updated_at: Date;
+    } | null;
+  };
+}
+
+interface TeamData {
+  id: string;
+  name: string;
+  sport_id: string;
+  captain_id: string;
+  captain_name: string;
+  gender_category: string;
+  status: string;
+  panchayat: string;
+  taluk: string;
+  district: string;
+  state: string;
+  pincode: string | null;
+  current_players: number;
+  current_substitutes: number;
+  created_at: Date;
+  updated_at: Date;
+  sports: {
+    id: string;
     name: string;
+    main_players_count: number;
+    max_substitutes: number;
+  };
+  users_teams_captain_idTousers: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
     phone: string;
   };
-  players: TeamPlayer[];
-  status: string;
-  currentPlayers: number;
-  currentSubstitutes: number;
+  team_players: TeamPlayer[];
 }
-
-interface SportData {
-  id: string;
-  displayName: string;
-  minPlayers: number;
-  maxPlayers: number;
-  maxSubstitutes: number;
-  genderCategories: string[];
-  isActive: boolean;
-}
-
 
 export default function CaptainPlayerManagement() {
   const router = useRouter();
   const { lang, teamId } = useParams();
-  const { user, userProfile } = useAuth();
+  const { user } = useAuth();
   
   const [teamData, setTeamData] = useState<TeamData | null>(null);
-  const [sportData, setSportData] = useState<SportData | null>(null);
-  const [players, setPlayers] = useState<TeamPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
@@ -153,239 +132,82 @@ export default function CaptainPlayerManagement() {
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
   const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
+  
   if (!teamId || (Array.isArray(teamId) && teamId.length === 0)) {
     throw new Error("Team ID is missing or invalid");
   }
-  const teamIdStr :string = Array.isArray(teamId) ? teamId[0] : teamId;
+  const teamIdStr: string = Array.isArray(teamId) ? teamId[0] : teamId;
 
-  const loadTeamData = useCallback(async () => {
-    if (!teamIdStr) {
-      setError("Team ID is missing");
+  // tRPC queries
+  const teamQuery = api.teams.getById.useQuery(
+    { 
+      id: teamIdStr,
+      includePhotos: false,
+      includePlayers: true,
+      includeVenueAssignments: false
+    },
+    { enabled: !!teamIdStr }
+  );
+
+  const addPlayerMutation = api.teams.addPlayer.useMutation();
+  const removePlayerMutation = api.teams.removePlayer.useMutation();
+  const submitTeamMutation = api.teams.verify.useMutation();
+
+  // Handle tRPC query results
+  useEffect(() => {
+    if (teamQuery.isLoading) {
+      setLoading(true);
+      setError("");
       return;
     }
-    
-    try {
-      setLoading(true);
-      
-      // Load team data
-      const teamRef = doc(db, "teams", teamIdStr);
-      const teamSnap = await getDoc(teamRef);
 
-      if (!teamSnap.exists()) {
-        setError("Team not found");
-        return;
-      }
-
-      const team = teamSnap.data();
-      
-      // Verify team ownership
-      if (team.captainId !== user?.uid) {
-        setError("You are not authorized to manage this team");
-        return;
-      }
-
-      // Load sport data from database
-      let sport: SportData | null = null;
-      if (team.sportId) {
-        try {
-          const sportRef = doc(db, "sports", team.sportId);
-          const sportSnap = await getDoc(sportRef);
-          if (sportSnap.exists()) {
-            const sportData = sportSnap.data();
-            // Sport data loaded successfully
-            sport = {
-              id: sportSnap.id,
-              displayName: sportData.displayName || sportData.name || team.sportName || 'Unknown Sport',
-              minPlayers: sportData.teamConfig?.minPlayers || sportData.maxPlayers || team.maxPlayers || 6,
-              maxPlayers: sportData.teamConfig?.maxPlayers || sportData.maxPlayers || team.maxPlayers || 6,
-              maxSubstitutes: sportData.teamConfig?.maxSubstitutes || sportData.maxSubstitutes || team.maxSubstitutes || 6,
-              genderCategories: sportData.genderCategories || ['mixed'],
-              isActive: sportData.isActive !== false
-            };
-          }
-        } catch (sportError) {
-          // Failed to load sport data
-        }
-      }
-      
-      // Fallback if sport not found in database
-      if (!sport) {
-        // Use sport-specific defaults
-        const defaults = team.sportName === 'Throwball' ? 
-          { minPlayers: 7, maxPlayers: 7, maxSubstitutes: 2 } :
-          { minPlayers: 6, maxPlayers: 6, maxSubstitutes: 6 };
-          
-        sport = {
-          id: team.sportId || 'unknown',
-          displayName: team.sportName || 'Unknown Sport',
-          minPlayers: team.maxPlayers || defaults.minPlayers,
-          maxPlayers: team.maxPlayers || defaults.maxPlayers,
-          maxSubstitutes: team.maxSubstitutes || defaults.maxSubstitutes,
-          genderCategories: team.genderCategory ? [team.genderCategory] : ['mixed'],
-          isActive: true
-        };
-      }
-
-      setSportData(sport);
-      
-      // Create team data structure using actual database values
-      const actualTeamData: TeamData = {
-        teamId: teamIdStr,
-        name: team.name || '',
-        sportName: sport.displayName,
-        sportId: team.sportId || '',
-        minPlayers: sport.minPlayers,
-        maxPlayers: sport.maxPlayers,
-        maxSubstitutes: sport.maxSubstitutes,
-        pincode: team.pincode || '',
-        panchayat: team.panchayat || '',
-        taluk: team.taluk || '',
-        district: team.district || '',
-        state: team.state || '',
-        captainId: team.captainId || '',
-        captainProfile: {
-          name: team.captainProfile?.name || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim(),
-          phone: team.captainProfile?.phone || userProfile?.phoneNumber || ''
-        },
-        players: [],
-        status: team.status || 'draft',
-        currentPlayers: team.currentPlayers || 0,
-        currentSubstitutes: team.currentSubstitutes || 0
-      };
-
-      setTeamData(actualTeamData);
-
-      // Load players from subcollection (excluding deleted players)
-      const playersCollection = collection(db, "teams", teamIdStr, "players");
-      const playersQuery = query(playersCollection, orderBy("addedAt", "asc"));
-      const playersSnapshot = await getDocs(playersQuery);
-      
-      const loadedPlayers: TeamPlayer[] = [];
-      
-      for (const playerDoc of playersSnapshot.docs) {
-        const playerData = playerDoc.data();
-        
-        // Skip deleted players
-        if (playerData.isDeleted) {
-          continue;
-        }
-        
-        // Load latest document information from users collection if userId exists
-        let userDocuments = playerData.documents;
-        let actualProfileComplete = playerData.isProfileComplete || false;
-        
-        if (playerData.userId) {
-          try {
-            const userDocRef = doc(db, "users", playerData.userId);
-            const userDoc = await getDoc(userDocRef);
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              if (userData.documents) {
-                userDocuments = userData.documents;
-                
-                // Recalculate profile completion based on current documents
-                actualProfileComplete = !!(
-                  userDocuments.profilePhoto?.url &&
-                  userDocuments.aadhaarFront?.url &&
-                  userDocuments.aadhaarBack?.url
-                );
-              }
-            }
-          } catch (error) {
-            // Could not load user documents
-          }
-        }
-        
-        const player: TeamPlayer = {
-          playerId: playerDoc.id,
-          userId: playerData.userId || '',
-          teamId: teamIdStr,
-          name: playerData.name || '',
-          phone: playerData.phone || '',
-          dob: playerData.dateOfBirth || playerData.dob || '',
-          age: playerData.age || 0,
-          gender: playerData.gender || 'M',
-          position: playerData.position || 'main',
-          addedAt: playerData.addedAt?.toDate() || new Date(),
-          addedBy: playerData.addedBy || '',
-          isProfileComplete: actualProfileComplete,
-          profileData: {
-            firstName: playerData.profileData?.firstName || '',
-            lastName: playerData.profileData?.lastName || '',
-            whatsappNumber: playerData.profileData?.whatsappNumber || '',
-            village: playerData.profileData?.village || '',
-            panchayat: playerData.profileData?.panchayat || '',
-            taluk: playerData.profileData?.taluk || '',
-            district: playerData.profileData?.district || '',
-            state: playerData.profileData?.state || '',
-            pincode: playerData.profileData?.pincode || ''
-          },
-          documents: {
-            profilePhoto: {
-              storagePath: userDocuments?.profilePhoto?.storagePath || '',
-              url: userDocuments?.profilePhoto?.url || null,
-              verified: userDocuments?.profilePhoto?.verified || false,
-              uploadedAt: userDocuments?.profilePhoto?.uploadedAt?.toDate ? userDocuments.profilePhoto.uploadedAt.toDate() : null,
-              uploadedBy: userDocuments?.profilePhoto?.uploadedBy || null
-            },
-            aadhaarFront: {
-              storagePath: userDocuments?.aadhaarFront?.storagePath || '',
-              url: userDocuments?.aadhaarFront?.url || null,
-              verified: userDocuments?.aadhaarFront?.verified || false,
-              uploadedAt: userDocuments?.aadhaarFront?.uploadedAt?.toDate ? userDocuments.aadhaarFront.uploadedAt.toDate() : null,
-              uploadedBy: userDocuments?.aadhaarFront?.uploadedBy || null
-            },
-            aadhaarBack: {
-              storagePath: userDocuments?.aadhaarBack?.storagePath || '',
-              url: userDocuments?.aadhaarBack?.url || null,
-              verified: userDocuments?.aadhaarBack?.verified || false,
-              uploadedAt: userDocuments?.aadhaarBack?.uploadedAt?.toDate ? userDocuments.aadhaarBack.uploadedAt.toDate() : null,
-              uploadedBy: userDocuments?.aadhaarBack?.uploadedBy || null
-            }
-          },
-          verificationStatus: playerData.verificationStatus || 'pending',
-          verificationComments: playerData.verificationComments || []
-        };
-        
-        loadedPlayers.push(player);
-     }
-      
-      // Players loaded from subcollection
-      setPlayers(loadedPlayers);
-      
-    } catch (err: any) {
+    if (teamQuery.error) {
       setError("Failed to load team data");
-    } finally {
       setLoading(false);
+      return;
     }
-  }, [teamIdStr, user, userProfile]);
 
-  useEffect(() => {
-    if (user && userProfile && teamIdStr) {
-      loadTeamData();
+    if (!teamQuery.data) {
+      setError("Team not found");
+      setLoading(false);
+      return;
     }
-  }, [user, userProfile, teamIdStr, loadTeamData]);
+
+    const team = teamQuery.data;
+
+    // Verify team ownership
+    if (team.captain_id !== user?.id) {
+      setError("You are not authorized to manage this team");
+      setLoading(false);
+      return;
+    }
+
+    // Set team data
+    setTeamData(team as TeamData);
+    setLoading(false);
+  }, [teamQuery.isLoading, teamQuery.error, teamQuery.data, user?.id]);
 
   // Keep selectedPlayer in sync with players array changes
   useEffect(() => {
-    if (selectedPlayer) {
-      const updatedPlayer = players.find(p => p.playerId === selectedPlayer.playerId);
+    if (selectedPlayer && teamData?.team_players) {
+      const updatedPlayer = teamData.team_players.find(p => p.id === selectedPlayer.id);
       if (updatedPlayer) {
         setSelectedPlayer(updatedPlayer);
       }
     }
-  }, [players, selectedPlayer]);
+  }, [teamData?.team_players, selectedPlayer]);
 
-  const sportConfig = sportData || { maxPlayers: 6, maxSubstitutes: 6 };
-  const totalSlotsNeeded = sportConfig.maxPlayers + sportConfig.maxSubstitutes;
+  const players = teamData?.team_players || [];
+  const sportConfig = teamData?.sports || { main_players_count: 6, max_substitutes: 6 };
+  const totalSlotsNeeded = sportConfig.main_players_count + sportConfig.max_substitutes;
   const currentPlayers = players.length;
   const mainPlayers = players.filter(p => p.position === 'main').length;
   const substitutes = players.filter(p => p.position === 'substitute').length;
 
   const isReadOnly = teamData?.status && teamData.status !== 'draft';
   const canAddPlayer = currentPlayers < totalSlotsNeeded && !isReadOnly;
-  const canAddMain = mainPlayers < sportConfig.maxPlayers && !isReadOnly;
-  const canAddSubstitute = substitutes < sportConfig.maxSubstitutes && !isReadOnly;
+  const canAddMain = mainPlayers < sportConfig.main_players_count && !isReadOnly;
+  const canAddSubstitute = substitutes < sportConfig.max_substitutes && !isReadOnly;
 
   const handlePhoneSearch = async (phone: string) => {
     setPlayerFormData(prev => ({ ...prev, phone }));
@@ -393,65 +215,46 @@ export default function CaptainPlayerManagement() {
     if (phone.length === 10) {
       setIsSearching(true);
       try {
-        // Search in Firestore users collection with different possible phone number formats
-        const usersRef = collection(db, "users");
+        // Search for existing user by phone number
+        const normalizedPhone = normalizePhone(phone);
+        const response = await fetch(`/api/trpc/users.getByPhone?input=${encodeURIComponent(JSON.stringify({ phone: normalizedPhone }))}`);
+        const data = await response.json();
         
-        // Try multiple queries since phone numbers might be stored in different formats
-        const queries = [
-          query(usersRef, where("phoneNumber", "==", phone)),
-          query(usersRef, where("phoneNumber", "==", `+91${phone}`)),
-          query(usersRef, where("phoneNumber", "==", parseInt(phone))),
-        ];
-
-        let existingUser = null;
-        
-        for (const q of queries) {
-          try {
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-              existingUser = querySnapshot.docs[0].data();
-              break;
-            }
-          } catch (queryError) {
-            // Query failed, trying next format
-            continue;
-          }
-        }
-        
-        if (existingUser) {
+        if (data.result?.data) {
+          // User exists - pre-fill form with user data
+          const user = data.result.data;
           setPlayerExists(true);
           setPlayerFormData(prev => ({
             ...prev,
-            firstName: existingUser.firstName || '',
-            lastName: existingUser.lastName || '',
-            dob: existingUser.dob || '',
-            whatsappNumber: existingUser.whatsappNumber || phone,
-            village: existingUser.village || teamData?.panchayat.replace(' Panchayat', '') || ''
+            firstName: user.first_name || '',
+            lastName: user.last_name || '',
+            dob: user.date_of_birth ? user.date_of_birth.split('T')[0] : '',
+            whatsappNumber: phone,
+            village: user.village || teamData?.panchayat || ''
           }));
-          // User found in system
         } else {
+          // User doesn't exist - clear form for new user entry
           setPlayerExists(false);
-          // Pre-fill with team's location data
           setPlayerFormData(prev => ({
             ...prev,
             firstName: '',
             lastName: '',
             dob: '',
             whatsappNumber: phone,
-            village: teamData?.panchayat.replace(' Panchayat', '') || ''
+            village: teamData?.panchayat || ''
           }));
-          // User not found, creating new player entry
         }
       } catch (error) {
+        console.error('User search error:', error);
         setPlayerExists(false);
-        // Pre-fill with team's location data - fallback
+        // Pre-fill with team's location data - fallback for new user
         setPlayerFormData(prev => ({
           ...prev,
           firstName: '',
           lastName: '',
           dob: '',
           whatsappNumber: phone,
-          village: teamData?.panchayat.replace(' Panchayat', '') || ''
+          village: teamData?.panchayat || ''
         }));
       } finally {
         setIsSearching(false);
@@ -516,48 +319,16 @@ export default function CaptainPlayerManagement() {
     return obj;
   };
 
-  // Handle document upload success - refresh player data
+  // Handle document upload success - refresh team data
   const handleDocumentUploadSuccess = async (playerId: string, documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack', url: string) => {
-    // Update local state immediately (optimistic update)
-    setPlayers(prev => prev.map(p => 
-      p.playerId === playerId 
-        ? {
-            ...p,
-            documents: {
-              ...p.documents,
-              [documentType]: {
-                ...p.documents[documentType],
-                url: url,
-                verified: false,
-                uploadedAt: new Date(),
-                uploadedBy: user?.uid || null
-              }
-            }
-          }
-        : p
-    ));
-
-    // Then check and update profile completion using the server action
-    const player = players.find(p => p.playerId === playerId);
-    if (player?.userId) {
-      const result = await checkAndUpdateProfileCompletion(player.userId);
-      
-      // Update profile completion status
-      setPlayers(prev => prev.map(p => 
-        p.playerId === playerId 
-          ? { ...p, isProfileComplete: result.isComplete || false }
-          : p
-      ));
-    }
+    // Refetch team data to get updated player information
+    await teamQuery.refetch();
   };
 
   // Handle profile completion status change
   const handleProfileComplete = (playerId: string, isComplete: boolean) => {
-    setPlayers(prev => prev.map(p => 
-      p.playerId === playerId 
-        ? { ...p, isProfileComplete: isComplete }
-        : p
-    ));
+    // Refetch team data to get updated player information
+    teamQuery.refetch();
   };
 
 
@@ -620,37 +391,11 @@ export default function CaptainPlayerManagement() {
         return;
       }
       
-      // Check if player is already in another team for this event
-      if (playerExists) {
-        // Check for player participation across all teams
-        const teamsRef = collection(db, "teams");
-        const eventTeamsQuery = query(teamsRef);
-        const eventTeamsSnapshot = await getDocs(eventTeamsQuery);
-        
-        let playerInOtherTeam = false;
-        eventTeamsSnapshot.forEach((teamDoc) => {
-          if (teamDoc.id !== teamData.teamId) { // Don't check current team
-            const teamPlayers = teamDoc.data().players || [];
-            const foundInTeam = teamPlayers.find((p: any) => p.phone === playerFormData.phone);
-            if (foundInTeam) {
-              playerInOtherTeam = true;
-            }
-          }
-        });
-        
-        if (playerInOtherTeam) {
-          showInfo(`This player is already registered in another team for this event.`);
-          setIsSubmitting(false);
-          return;
-        }
-      }
-      
       // Auto-select correct position based on availability
       let playerPosition = playerFormData.position;
       if (playerPosition === 'main' && !canAddMain) {
         if (canAddSubstitute) {
           playerPosition = 'substitute';
-          // Main slots full, automatically assigned as substitute
         } else {
           showInfo('No available positions. Team is full.');
           setIsSubmitting(false);
@@ -659,7 +404,6 @@ export default function CaptainPlayerManagement() {
       } else if (playerPosition === 'substitute' && !canAddSubstitute) {
         if (canAddMain) {
           playerPosition = 'main';
-          // Substitute slots full, automatically assigned as main
         } else {
           showInfo('No available positions. Team is full.');
           setIsSubmitting(false);
@@ -667,10 +411,9 @@ export default function CaptainPlayerManagement() {
         }
       }
       
-      // Use the server action to add player to team
-      
+      // Use tRPC mutation to add player
       try {
-        // Validate phone number format before sending to server
+        // Validate phone number format
         let normalizedPhone: string;
         try {
           normalizedPhone = normalizePhone(playerFormData.phone);
@@ -678,81 +421,36 @@ export default function CaptainPlayerManagement() {
           throw new Error(phoneError instanceof Error ? phoneError.message : 'Invalid phone number format');
         }
 
-        const result = await addPlayerToTeam({
-          teamId: teamData.teamId,
-          playerData: {
-            name: `${playerFormData.firstName} ${playerFormData.lastName}`,
-            firstName: playerFormData.firstName,
-            lastName: playerFormData.lastName,
-            phone: normalizedPhone,
-            dateOfBirth: playerFormData.dob,
-            gender: sportData?.genderCategories[0] === 'women' ? 'F' : 'M',
-            whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
-            pincode: teamData.pincode,
-            village: playerFormData.village,
-            panchayat: teamData.panchayat,
-            taluk: teamData.taluk,
-            district: teamData.district,
-            state: teamData.state,
-            position: playerPosition
-          },
-          captainId: user!.uid
+        const result = await addPlayerMutation.mutateAsync({
+          teamId: teamData.id,
+          firstName: playerFormData.firstName,
+          lastName: playerFormData.lastName,
+          phone: normalizedPhone,
+          whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
+          dateOfBirth: playerFormData.dob,
+          age: calculateAge(playerFormData.dob),
+          gender: teamData.gender_category === 'women' ? 'F' : 'M',
+          position: playerPosition,
+          panchayat: teamData.panchayat,
+          taluk: teamData.taluk,
+          district: teamData.district,
+          state: teamData.state,
+          pincode: teamData.pincode || '',
+          verificationStatus: 'pending'
         });
         
-        // Server action completed
-
-        if (!result.success) {
-          // Handle different types of error responses
-          let errorMsg = 'Failed to add player to team';
-          
-          const error = (result as any).error;
-          if (error && typeof error === 'object') {
-            if ('message' in error && typeof error.message === 'string') {
-              errorMsg = error.message;
-            } else if ('code' in error) {
-              switch (error.code) {
-                case 'invalid-phone':
-                  errorMsg = 'Invalid phone number format. Please enter a valid 10-digit mobile number.';
-                  break;
-                case 'player-exists':
-                  errorMsg = 'This player is already in the team.';
-                  break;
-                case 'invalid-age':
-                  errorMsg = 'Player age must be between 14 and 60 years.';
-                  break;
-                case 'invalid-argument':
-                  errorMsg = 'Missing required player information. Please fill all fields.';
-                  break;
-                case 'permission-denied':
-                  errorMsg = 'You are not authorized to add players to this team.';
-                  break;
-                case 'team-not-found':
-                  errorMsg = 'Team not found. Please refresh the page and try again.';
-                  break;
-                default:
-                  errorMsg = `Error: ${error.code}`;
-              }
-            }
-          } else if (typeof error === 'string') {
-            errorMsg = error;
-          }
-          
-          throw new Error(errorMsg);
-        }
-
-        // Player added successfully
-        // Reload team data to get updated player list
-        await loadTeamData();
-        
+        // Player added successfully - refetch team data
+        await teamQuery.refetch();
+        showSuccess('Player added successfully!');
         setShowAddPlayerModal(false);
         resetPlayerForm();
       } catch (error) {
+        console.error('Add player error:', error);
         showError(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      } finally {
-        setIsSubmitting(false);
       }
     } catch (error) {
       showError(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -767,21 +465,17 @@ export default function CaptainPlayerManagement() {
     try {
       setLoading(true);
       
-      // Use the server action instead of direct Firestore calls
-      const result = await removePlayerFromTeam({
-        teamId: teamData.teamId,
-        playerId: playerId,
-        captainId: user.uid
+      // Use tRPC mutation to remove player
+      await removePlayerMutation.mutateAsync({
+        teamId: teamData.id,
+        userId: playerId
       });
       
-      if (result.success) {
-        // Reload team data to reflect changes
-        await loadTeamData();
-        // Player removed successfully
-      } else {
-        showError(result.error || 'Failed to remove player');
-      }
+      // Refetch team data to reflect changes
+      await teamQuery.refetch();
+      showSuccess('Player removed successfully!');
     } catch (error) {
+      console.error('Remove player error:', error);
       showError('Failed to remove player. Please try again.');
     } finally {
       setLoading(false);
@@ -791,73 +485,74 @@ export default function CaptainPlayerManagement() {
   
 
   const getPlayerStatusColor = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return 'text-[#3A7F3F] bg-green-50';
-    if (player.verificationStatus === 'rejected') return 'text-red-600 bg-red-50';
-    if (player.isProfileComplete) return 'text-[#C79016] bg-yellow-50';
+    if (player.verification_status === 'verified') return 'text-[#3A7F3F] bg-green-50';
+    if (player.verification_status === 'rejected') return 'text-red-600 bg-red-50';
+    // TODO: Add profile completion check when document system is implemented
     return 'text-gray-600 bg-gray-50';
   };
 
   const getPlayerStatusIcon = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return <CheckCircle className="w-4 h-4" />;
-    if (player.verificationStatus === 'rejected') return <X className="w-4 h-4" />;
-    if (player.isProfileComplete) return <Clock className="w-4 h-4" />;
+    if (player.verification_status === 'verified') return <CheckCircle className="w-4 h-4" />;
+    if (player.verification_status === 'rejected') return <X className="w-4 h-4" />;
+    // TODO: Add profile completion check when document system is implemented
     return <AlertCircle className="w-4 h-4" />;
   };
 
   const getPlayerStatusText = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return 'Verified';
-    if (player.verificationStatus === 'rejected') return 'Rejected';
-    if (player.isProfileComplete) return 'Pending Review';
-    return 'Docs Incomplete';
+    if (player.verification_status === 'verified') return 'Verified';
+    if (player.verification_status === 'rejected') return 'Rejected';
+    // TODO: Add profile completion check when document system is implemented
+    return 'Pending';
   };
 
   const filteredPlayers = players.filter(player =>
-    player.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `${player.first_name} ${player.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     player.phone.includes(searchTerm)
   );
 
   const handleSubmitTeam = async () => {
-    if (!teamData || !sportData) {
+    if (!teamData) {
       showError('Team data is not loaded. Please refresh and try again.');
       return;
     }
 
-    if (!user || !userProfile) {
+    if (!user) {
       showError('User authentication required. Please log in again.');
       return;
     }
 
     const validationErrors = [];
+    const sport = teamData.sports;
 
-    if (mainPlayers < sportData.minPlayers) {
-      validationErrors.push(`Need at least ${sportData.minPlayers} main players (currently have ${mainPlayers})`);
+    if (mainPlayers < sport.main_players_count) {
+      validationErrors.push(`Need at least ${sport.main_players_count} main players (currently have ${mainPlayers})`);
     }
 
     if (players.length === 0) {
       validationErrors.push('Team must have at least one player');
     }
 
-    const playersWithInvalidIds = players.filter(p => !p.userId);
+    const playersWithInvalidIds = players.filter(p => !p.user_id);
     if (playersWithInvalidIds.length > 0) {
       validationErrors.push(`${playersWithInvalidIds.length} player(s) have missing user IDs. Please remove and re-add them.`);
     }
 
-    const playersWithIncompleteDocuments = players.filter(player => !player.isProfileComplete);
-    if (playersWithIncompleteDocuments.length > 0) {
-        validationErrors.push(`${playersWithIncompleteDocuments.length} player(s) have incomplete documents. Please ensure all documents are uploaded.`);
-    }
+    // TODO: Add document validation when document system is implemented
+    // const playersWithIncompleteDocuments = players.filter(player => !player.isProfileComplete);
+    // if (playersWithIncompleteDocuments.length > 0) {
+    //     validationErrors.push(`${playersWithIncompleteDocuments.length} player(s) have incomplete documents. Please ensure all documents are uploaded.`);
+    // }
 
-    if (sportData.genderCategories && sportData.genderCategories.length > 0) {
-      const requiredGender = sportData.genderCategories[0];
-      if (requiredGender === 'women') {
+    if (teamData.gender_category) {
+      if (teamData.gender_category === 'women') {
         const malePlayersCount = players.filter(p => p.gender === 'M').length;
         if (malePlayersCount > 0) {
-          validationErrors.push(`${sportData.displayName} is only for women. Found ${malePlayersCount} male player(s).`);
+          validationErrors.push(`${sport.name} is only for women. Found ${malePlayersCount} male player(s).`);
         }
-      } else if (requiredGender === 'men') {
+      } else if (teamData.gender_category === 'men') {
         const femalePlayersCount = players.filter(p => p.gender === 'F').length;
         if (femalePlayersCount > 0) {
-          validationErrors.push(`${sportData.displayName} is only for men. Found ${femalePlayersCount} female player(s).`);
+          validationErrors.push(`${sport.name} is only for men. Found ${femalePlayersCount} female player(s).`);
         }
       }
     }
@@ -871,33 +566,21 @@ export default function CaptainPlayerManagement() {
   };
 
   const confirmSubmitTeam = async () => {
-    if (!teamData || !sportData || !user) return;
-
-    const playersWithIncompleteDocuments = players.filter(player => !player.isProfileComplete);
+    if (!teamData || !user) return;
 
     try {
       setIsSubmittingTeam(true);
-      // Submitting team for verification
-
-      const result = await submitTeamForVerification({ 
-        teamId: teamData.teamId,
-        captainId: user.uid,
-        validation: {
-          playerCount: mainPlayers,
-          requiredPlayers: sportData.minPlayers,
-          documentsComplete: playersWithIncompleteDocuments.length === 0,
-          sportGenderCategory: sportData.genderCategories?.[0] || 'mixed'
-        }
+      
+      // Use tRPC mutation to submit team for verification
+      const result = await submitTeamMutation.mutateAsync({
+        teamId: teamData.id
       });
       
-      if (result.success) {
-        setShowSubmissionModal(false);
-        showSuccess(`Team "${teamData.name}" submitted for verification successfully!\n\nYou will be notified once the review is complete.`);
-        router.push(`/${lang}/captain/dashboard`);
-      } else {
-        throw new Error(result.error || 'Failed to submit team');
-      }
+      setShowSubmissionModal(false);
+      showSuccess(`Team "${teamData.name}" submitted for verification successfully!\n\nYou will be notified once the review is complete.`);
+      router.push(`/${lang}/captain/dashboard`);
     } catch (error) {
+      console.error('Submit team error:', error);
       showError(`Failed to submit team: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again or contact support.`);
     } finally {
       setIsSubmittingTeam(false);
@@ -1006,7 +689,7 @@ export default function CaptainPlayerManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Main Players</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{mainPlayers}/{sportConfig.maxPlayers}</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{mainPlayers}/{sportConfig.main_players_count}</p>
               </div>
               <Users className="w-8 h-8 text-[#3A7F3F]" />
             </div>
@@ -1016,7 +699,7 @@ export default function CaptainPlayerManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Substitutes</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{substitutes}/{sportConfig.maxSubstitutes}</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{substitutes}/{sportConfig.max_substitutes}</p>
               </div>
               <Users className="w-8 h-8 text-[#C79016]" />
             </div>
@@ -1027,7 +710,7 @@ export default function CaptainPlayerManagement() {
               <div>
                 <p className="text-gray-600 text-sm">Profiles Complete</p>
                 <p className="text-2xl font-bold text-[#4A2F1D]">
-                  {players.filter(p => p.isProfileComplete).length}
+                  {players.filter(p => p.verification_status === 'verified').length}
                 </p>
               </div>
               <CheckCircle className="w-8 h-8 text-[#3A7F3F]" />
@@ -1049,10 +732,10 @@ export default function CaptainPlayerManagement() {
             
             <div className="text-xs sm:text-sm text-gray-600 flex flex-col sm:flex-row gap-1 sm:gap-2">
               <div className="bg-[#3A7F3F] text-white px-2 py-1 rounded text-xs">
-                {sportConfig.maxPlayers - mainPlayers} main slots left
+                {sportConfig.main_players_count - mainPlayers} main slots left
               </div>
               <div className="bg-[#C79016] text-white px-2 py-1 rounded text-xs">
-                {sportConfig.maxSubstitutes - substitutes} sub slots left
+                {sportConfig.max_substitutes - substitutes} sub slots left
               </div>
             </div>
           </div>
@@ -1093,12 +776,12 @@ export default function CaptainPlayerManagement() {
               <div className="block sm:hidden">
                 <div className="max-h-96 overflow-y-auto">
                   {filteredPlayers.map((player) => (
-                    <div key={player.playerId} className="border-b border-gray-200 p-4">
+                    <div key={player.id} className="border-b border-gray-200 p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex-1">
                           <div className="font-semibold text-[#4A2F1D] text-sm">
-                            {player.name}
-                            {player.playerId === teamData.captainId && (
+                            {player.first_name} {player.last_name}
+                            {player.user_id === teamData.captain_id && (
                               <span className="ml-2 text-xs bg-[#F28C38] text-white px-2 py-1 rounded">Captain</span>
                             )}
                           </div>
@@ -1111,9 +794,9 @@ export default function CaptainPlayerManagement() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {player.playerId !== teamData.captainId && (
+                          {player.id !== teamData.captain_id && (
                             <button
-                              onClick={() => removePlayer(player.playerId)}
+                              onClick={() => removePlayer(player.id)}
                               className="text-red-600 p-1"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1134,9 +817,9 @@ export default function CaptainPlayerManagement() {
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="flex space-x-1">
-                            <div className={`w-2 h-2 rounded-full ${player.documents.profilePhoto.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Profile"></div>
-                            <div className={`w-2 h-2 rounded-full ${player.documents.aadhaarFront.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
-                            <div className={`w-2 h-2 rounded-full ${player.documents.aadhaarBack.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.users?.profileImages?.profile_photo_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Profile"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.users?.profileImages?.aadhaar_front_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.users?.profileImages?.aadhaar_back_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
                           </div>
                           <div className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold rounded-full ${getPlayerStatusColor(player)}`}>
                             {getPlayerStatusIcon(player)}
@@ -1164,12 +847,12 @@ export default function CaptainPlayerManagement() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredPlayers.map((player) => (
-                        <tr key={player.playerId} className="hover:bg-gray-50">
+                        <tr key={player.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
                               <div className="text-sm font-semibold text-[#4A2F1D] flex items-center">
-                                {player.name}
-                                {player.playerId === teamData.captainId && (
+                                {player.first_name} {player.last_name}
+                                {player.user_id === teamData.captain_id && (
                                   <span className="ml-2 text-xs bg-[#F28C38] text-white px-2 py-1 rounded">Captain</span>
                                 )}
                               </div>
@@ -1190,17 +873,17 @@ export default function CaptainPlayerManagement() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex space-x-1">
-                              {player.documents.profilePhoto.url ? (
+                              {player.users?.profileImages?.profile_photo_path ? (
                                 <CheckCircle className="w-4 h-4 text-[#3A7F3F]"  />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-300" title="Profile Photo Missing"></div>
                               )}
-                              {player.documents.aadhaarFront.url ? (
+                              {player.users?.profileImages?.aadhaar_front_path ? (
                                 <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Front Missing"></div>
                               )}
-                              {player.documents.aadhaarBack.url ? (
+                              {player.users?.profileImages?.aadhaar_back_path ? (
                                 <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Back Missing"></div>
@@ -1222,9 +905,9 @@ export default function CaptainPlayerManagement() {
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
-                              {player.playerId !==  teamData.captainId && (
+                              {player.id !==  teamData.captain_id && (
                                 <button
-                                  onClick={() => removePlayer(player.playerId)}
+                                  onClick={() => removePlayer(player.id)}
                                   className="text-red-600 hover:text-red-800 transition-colors"
                                   title="Remove Player"
                                 >
@@ -1244,16 +927,16 @@ export default function CaptainPlayerManagement() {
         </div>
 
         {/* Submit Section */}
-        {!isReadOnly && sportData && mainPlayers >= sportData.minPlayers && (
+        {!isReadOnly && teamData?.sports && mainPlayers >= teamData.sports.main_players_count && (
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex flex-col sm:flex-row items-center justify-between">
               
               <div>
                 <h3 className="text-lg font-bold text-[#4A2F1D] mb-2">Ready to Submit?</h3>
                 <p className="text-gray-600">
-                  {mainPlayers >= sportData.minPlayers 
+                  {mainPlayers >= teamData.sports.main_players_count 
                     ? `You have ${mainPlayers} main players. Submit your team for verification.`
-                    : `Add at least ${sportData.minPlayers} main players to submit.`}
+                    : `Add at least ${teamData.sports.main_players_count} main players to submit.`}
                 </p>
               </div>
               <button
@@ -1422,7 +1105,7 @@ export default function CaptainPlayerManagement() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.name}</h2>
+                  <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.first_name} {selectedPlayer.last_name}</h2>
                   <p className="text-gray-600">{selectedPlayer.phone}</p>
                 </div>
                 <button
@@ -1453,22 +1136,22 @@ export default function CaptainPlayerManagement() {
                     
                     <div>
                       <label className="text-sm text-gray-600">WhatsApp Number</label>
-                      <p className="font-semibold">{selectedPlayer.profileData.whatsappNumber}</p>
+                      <p className="font-semibold">{selectedPlayer.whatsapp_number}</p>
                     </div>
                     
                     <div>
                       <label className="text-sm text-gray-600">Village</label>
-                      <p className="font-semibold">{selectedPlayer.profileData.village}</p>
+                      <p className="font-semibold">{selectedPlayer.panchayat}</p>
                     </div>
                     
                     <div>
                       <label className="text-sm text-gray-600">Panchayat</label>
-                      <p className="font-semibold">{selectedPlayer.profileData.panchayat}</p>
+                      <p className="font-semibold">{selectedPlayer.panchayat}</p>
                     </div>
                     
                     <div>
                       <label className="text-sm text-gray-600">District</label>
-                      <p className="font-semibold">{selectedPlayer.profileData.district}</p>
+                      <p className="font-semibold">{selectedPlayer.district}</p>
                     </div>
                   </div>
                 </div>
@@ -1482,26 +1165,26 @@ export default function CaptainPlayerManagement() {
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Profile Photo</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.documents.profilePhoto.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.profileImages?.profile_photo_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.documents.profilePhoto.url && isReadOnly ? (
+                      {selectedPlayer.users?.profileImages?.profile_photo_path && isReadOnly ? (
                         <DocumentPreview
                           type="profilePhoto"
-                          url={selectedPlayer.documents.profilePhoto.url}
+                          url={selectedPlayer.user.profileImages.profile_photo_path}
                           label="Profile Photo"
-                          verified={selectedPlayer.documents.profilePhoto.verified}
+                          verified={!!selectedPlayer.user.profileImages.verifiedAt}
                           showActions={false}
                           size="md"
                         />
                       ) : (
                         <PlayerDocumentUpload
-                          playerId={selectedPlayer.playerId}
-                          playerUserId={selectedPlayer.userId}
+                          playerId={selectedPlayer.id}
+                          playerUserId={selectedPlayer.user_id}
                           documentType="profilePhoto"
                           label="Profile Photo"
-                          currentUrl={selectedPlayer.documents.profilePhoto.url}
-                          onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.playerId, 'profilePhoto', url)}
-                          onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.playerId, isComplete)}
+                          currentUrl={selectedPlayer.users?.profileImages?.profile_photo_path || null}
+                          onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'profilePhoto', url)}
+                          onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.id, isComplete)}
                           variant="card"
                           disabled={isReadOnly === true}
                         />
@@ -1512,26 +1195,26 @@ export default function CaptainPlayerManagement() {
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Aadhaar Front</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.documents.aadhaarFront.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.profileImages?.aadhaar_front_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.documents.aadhaarFront.url && isReadOnly ? (
+                      {selectedPlayer.users?.profileImages?.aadhaar_front_path && isReadOnly ? (
                         <DocumentPreview
                           type="aadhaarFront"
-                          url={selectedPlayer.documents.aadhaarFront.url}
+                          url={selectedPlayer.user.profileImages.aadhaar_front_path}
                           label="Aadhaar Front"
-                          verified={selectedPlayer.documents.aadhaarFront.verified}
+                          verified={!!selectedPlayer.user.profileImages.verifiedAt}
                           showActions={false}
                           size="md"
                         />
                       ) : (
                         <PlayerDocumentUpload
-                          playerId={selectedPlayer.playerId}
-                          playerUserId={selectedPlayer.userId}
+                          playerId={selectedPlayer.id}
+                          playerUserId={selectedPlayer.user_id}
                           documentType="aadhaarFront"
                           label="Aadhaar Front"
-                          currentUrl={selectedPlayer.documents.aadhaarFront.url}
-                          onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.playerId, 'aadhaarFront', url)}
-                          onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.playerId, isComplete)}
+                          currentUrl={selectedPlayer.users?.profileImages?.aadhaar_front_path || null}
+                          onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'aadhaarFront', url)}
+                          onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.id, isComplete)}
                           variant="card"
                           disabled={isReadOnly === true}
                         />
@@ -1542,28 +1225,28 @@ export default function CaptainPlayerManagement() {
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Aadhaar Back</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.documents.aadhaarBack.url ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.profileImages?.aadhaar_back_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.documents.aadhaarBack.url && isReadOnly ? (
+                      {selectedPlayer.users?.profileImages?.aadhaar_back_path && isReadOnly ? (
                         <DocumentPreview
                           type="aadhaarBack"
-                          url={selectedPlayer.documents.aadhaarBack.url}
+                          url={selectedPlayer.user.profileImages.aadhaar_back_path}
                           label="Aadhaar Back"
-                          verified={selectedPlayer.documents.aadhaarBack.verified}
+                          verified={!!selectedPlayer.user.profileImages.verifiedAt}
                           showActions={false}
                           size="md"
                         />
                       ) : (
                         <PlayerDocumentUpload
-                          playerId={selectedPlayer.playerId}
-                          playerUserId={selectedPlayer.userId}
+                          playerId={selectedPlayer.id}
+                          playerUserId={selectedPlayer.user_id}
                           documentType="aadhaarBack"
                           label="Aadhaar Back"
-                          currentUrl={selectedPlayer.documents.aadhaarBack.url}
-                          onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.playerId, 'aadhaarBack', url)}
-                          onProfileComplete={(isComplete: boolean | undefined) => handleProfileComplete(selectedPlayer.playerId, isComplete === true)}
+                          currentUrl={selectedPlayer.users?.profileImages?.aadhaar_back_path || null}
+                          onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'aadhaarBack', url)}
+                          onProfileComplete={(isComplete: boolean | undefined) => handleProfileComplete(selectedPlayer.id, isComplete === true)}
                           variant="card"
-                          disabled={isReadOnly == true}
+                          disabled={isReadOnly === true}
                         />
                       )}
                     </div>
@@ -1579,10 +1262,10 @@ export default function CaptainPlayerManagement() {
                   Close
                 </button>
                 {/* Remove Player button - disabled for captain */}
-                {!selectedPlayer.playerId.startsWith('captain_') && !isReadOnly ? (
+                {selectedPlayer.user_id !== teamData.captain_id && !isReadOnly ? (
                   <button
                     onClick={() => {
-                      removePlayer(selectedPlayer.playerId);
+                      removePlayer(selectedPlayer.id);
                       setSelectedPlayer(null);
                     }}
                     className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
@@ -1605,7 +1288,7 @@ export default function CaptainPlayerManagement() {
       )}
 
       {/* Team Submission Confirmation Modal */}
-      {showSubmissionModal && teamData && sportData && (
+      {showSubmissionModal && teamData && teamData.sports && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full">
             <div className="p-6 border-b border-gray-200">
@@ -1631,7 +1314,7 @@ export default function CaptainPlayerManagement() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Sport:</span>
-                      <span className="font-medium">{sportData.displayName}</span>
+                      <span className="font-medium">{teamData.sports.name}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Total Players:</span>
@@ -1648,7 +1331,7 @@ export default function CaptainPlayerManagement() {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Documents:</span>
                       <span className="font-medium text-[#3A7F3F]">
-                        {players.filter(p => p.isProfileComplete).length === players.length ? 'Complete' : 'Incomplete'}
+                        {players.filter(p => p.users?.profileImages?.allImagesUploaded).length === players.length ? 'Complete' : 'Incomplete'}
                       </span>
                     </div>
                   </div>

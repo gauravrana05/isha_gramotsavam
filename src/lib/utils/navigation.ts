@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import { User } from "@prisma/client";
+import { users } from "@prisma/client";
 
 export const ALL_ROLES = ["admin", "captain", "player", "volunteer", "technical_volunteer", "verification", "public"];
 
@@ -27,7 +27,7 @@ export const getDashboardRoute = (role: string | null | undefined, lang: string)
   }
 };
 
-export const handleRedirect = async (user: User, lang: string, router: AppRouterInstance) => {
+export const handleRedirect = async (user: users, lang: string, router: AppRouterInstance) => {
   if (!user) {
     router.push(`/${lang}/login`);
     return;

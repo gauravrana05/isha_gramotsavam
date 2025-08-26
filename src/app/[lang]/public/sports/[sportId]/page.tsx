@@ -16,7 +16,7 @@ import PrizeDisplay from '@/components/public/PrizeDisplay'
 import RegistrationButton from '@/components/common/RegistrationButton'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/server/trpc/react'
-import { LoadingSpinner } from '@/components/ui/loaders'
+import { LoadingSpinner, PageLoader } from '@/components/ui/loaders'
 import { AlertCircle } from 'lucide-react'
 
 // Helper function to get sport images
@@ -67,11 +67,18 @@ export default function SportPage() {
   const lang = params.lang as string
   const sportId = params.sportId as string
 
+  // Fetch profile completion data for gender validation
+  const profileDataQuery = api.profile.checkCompletion.useQuery(
+    { userId: user?.id || '' },
+    { enabled: !!user?.id }
+  )
+  const userGender = profileDataQuery.data?.gender || user?.gender || null
+
   // Fetch sport data with gender validation
   const sportQuery = api.sports.getByIdOrName.useQuery(
     { 
       identifier: sportId, 
-      userGender: user?.gender as 'M' | 'F' | 'O' | undefined 
+      userGender: userGender as 'M' | 'F' | 'O' | undefined 
     },
     { 
       enabled: !!sportId,
@@ -80,21 +87,20 @@ export default function SportPage() {
     }
   )
 
-  // Refetch sport data when user becomes available to update gender validation
+  // Refetch sport data when profile data becomes available to update gender validation
   useEffect(() => {
-    if (user?.gender && sportQuery.data) {
+    if (profileDataQuery.data?.gender && sportQuery.data) {
       sportQuery.refetch()
     }
-  }, [user?.gender, sportQuery])
+  }, [profileDataQuery.data?.gender, sportQuery])
 
   if (sportQuery.isLoading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <LoadingSpinner size="lg" />
-          <p className="mt-4 text-[#4A2F1D]">Loading sport details...</p>
-        </div>
-      </main>
+      <PageLoader
+        title="Loading Sport Details..."
+        variant="brand"
+        size="lg"
+      />
     )
   }
 

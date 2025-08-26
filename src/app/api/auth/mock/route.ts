@@ -8,14 +8,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
 
-    if (!role || !['admin', 'public'].includes(role)) {
+    if (!role || !['admin', 'public', 'captain'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
     // Fetch real user from database based on role
     const user = await prisma.users.findFirst({
       where: { 
-        role: role === 'admin' ? 'admin' : 'public'
+        role: role === 'admin' ? 'admin' : role === 'captain' ?  'captain' : 'public'
       }
     });
 

@@ -32,8 +32,18 @@ export default function TeamRegistrationPage() {
 
   const router = useRouter();
   const { lang, sport } = useParams();
-  const { user, userProfile, loading: authLoading } = useAuth();
   const { t } = useTranslation();
+  const { user } = useAuth();
+
+  // Fetch profile completion data using the new API
+  const profileDataQuery = api.profile.checkCompletion.useQuery(
+    { userId: user?.id || '' },
+    { enabled: !!user?.id }
+  );
+  
+  const userProfileData = profileDataQuery.data;
+  const userProfileLoading = profileDataQuery.isLoading;
+  const userProfile = profileDataQuery.data; // For backward compatibility with existing code
   
   // tRPC mutations
   const createTeamMutation = api.teams.createAndPromoteCaptain.useMutation();
@@ -45,31 +55,27 @@ export default function TeamRegistrationPage() {
   const sportQuery = api.sports.getByIdOrName.useQuery(
     { 
       identifier: sportName, 
-      userGender: user?.gender as 'M' | 'F' | 'O' | undefined 
+      userGender: userProfileData?.gender as 'M' | 'F' | 'O' | undefined 
     },
-    { enabled: !!sportName && !!user }
+    { enabled: !!sportName && !!userProfileData }
   );
   
-  // Fetch user profile completion status
-  const profileDataQuery = api.profile.checkCompletion.useQuery(
-    { userId: user?.id || '' },
-    { enabled: !!user?.id }
-  );
+  // This is now redundant since we're already fetching profile data above
+  // const profileDataQuery = api.profile.checkCompletion.useQuery(
+  //   { userId: user?.id || '' },
+  //   { enabled: !!user?.id }
+  // );
   
   useEffect(() => {
-    if (authLoading) return;
+    if (userProfileLoading) return;
     
     // Redirect if not authenticated
-    if (!user) {
+    if (!userProfileData) {
       router.push(`/${lang}/login`);
       return;
     }
-    if(!userProfile){
-      router.push(`/${lang}/public`);
-      return;
-    }
-    // Check profile completion using tRPC data instead of AuthContext
-    if (profileDataQuery.data && !profileDataQuery.data.profileComplete) {
+    // Check profile completion using tRPC data
+    if (userProfileData && !userProfileData.profileComplete) {
       // Add redirect parameter so user comes back to team registration after profile completion
       const returnUrl = encodeURIComponent(`/${lang}/public/register/team/${sportName}`);
       router.push(`/${lang}/profile/complete?returnTo=${returnUrl}`);
@@ -88,16 +94,16 @@ export default function TeamRegistrationPage() {
     }
 
     // Pre-fill form with user data
-    if (userProfile) {
+    if (userProfileData) {
       setFormData(prev => ({
         ...prev,
-        panchayat: userProfile.panchayat || "",
-        taluk: userProfile.taluk || "",
-        district: userProfile.district || "",
-        state: userProfile.state || "",
+        panchayat: userProfileData.panchayat || "",
+        taluk: userProfileData.taluk || "",
+        district: userProfileData.district || "",
+        state: userProfileData.state || "",
       }));
     }
-  }, [user, userProfile, authLoading, router, lang, sportName]);
+  }, [userProfileData, userProfileLoading, router, lang, sportName]);
 
   const handleInputChange = (field: keyof TeamFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -116,7 +122,7 @@ export default function TeamRegistrationPage() {
   };
 
   const handleSubmit = async () => {
-    if (!user || !userProfile || !sportQuery.data) return;
+    if (!userProfileData || !sportQuery.data) return;
 
     // Check if user can register for this sport
     if (!sportQuery.data.can_register) {
@@ -143,13 +149,13 @@ export default function TeamRegistrationPage() {
         taluk: formData.taluk,
         district: formData.district,
         state: formData.state,
-        genderCategory: userProfile.gender as 'M' | 'F' | 'mixed',
+        genderCategory: userProfile?.gender as 'M' | 'F' | 'mixed',
       };
       
       // Use tRPC mutation
       const result = await createTeamMutation.mutateAsync({ 
         teamData, 
-        captainId: user.id 
+        captainId: user?.id 
       });
       
       // Navigate to team invite page
@@ -163,7 +169,7 @@ export default function TeamRegistrationPage() {
     }
   };
 
-  if (authLoading) {
+  if (userProfileLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#CE4520]" />
@@ -266,7 +272,7 @@ export default function TeamRegistrationPage() {
 
           <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <p className="text-green-700 text-xs sm:text-sm font-fira">
-              <strong>Captain Details:</strong> You ({userProfile?.firstName} {userProfile?.lastName}) will automatically be set as the team captain. 
+              <strong>Captain Details:</strong> You ({userProfile?.first_name} {userProfile?.last_name}) will automatically be set as the team captain. 
               After team creation, you can add other players to your team.
             </p>
           </div>

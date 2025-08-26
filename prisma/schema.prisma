@@ -57,6 +57,7 @@ model events {
   taluk_cluster_mappings    taluk_cluster_mappings[]
   team_venue_assignments    team_venue_assignments[]
   teams                     teams[]
+  user_roles                user_roles[]
   venue_location_mappings   venue_location_mappings[]
   volunteer_assignments     volunteer_assignments[]
 }
@@ -405,6 +406,7 @@ model users {
   teams_teams_verified_byTousers                                  teams[]                  @relation("teams_verified_byTousers")
   user_profile_images_user_profile_images_user_idTousers          user_profile_images?     @relation("user_profile_images_user_idTousers")
   user_profile_images_user_profile_images_verified_byTousers      user_profile_images[]    @relation("user_profile_images_verified_byTousers")
+  user_roles                                                      user_roles[]
   user_verifications_user_verifications_user_idTousers            user_verifications[]     @relation("user_verifications_user_idTousers")
   user_verifications_user_verifications_verified_byTousers        user_verifications[]     @relation("user_verifications_verified_byTousers")
   volunteer_assignments_volunteer_assignments_assigned_byTousers  volunteer_assignments[]  @relation("volunteer_assignments_assigned_byTousers")
@@ -586,4 +588,20 @@ enum VerificationType {
 enum VolunteerType {
   general_volunteer
   technical_volunteer
+}
+
+model user_roles {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id     String   @db.Uuid
+  event_id    String?  @db.Uuid
+  role        UserRole
+  assigned_at DateTime @default(now()) @db.Timestamptz(6)
+  assigned_by String?  @db.Uuid
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  
+  users       users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  events      events?  @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  
+  @@unique([user_id, event_id, role])
 }

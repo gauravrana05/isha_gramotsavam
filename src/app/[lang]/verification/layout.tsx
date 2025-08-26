@@ -6,16 +6,21 @@ import { useAuth } from '@/context/AuthContext';
 import { PageLoader } from '@/components/ui/loaders';
 import VerificationSidebar from '@/components/navigation/VerificationSidebar';
 
+import { api } from '@/server/trpc/react';
+import { useRouter, useParams } from 'next/navigation';
+
 export default function VerificationLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
-  useRedirect(['verification_volunteer', 'admin']);
-  const { user, loading } = useAuth();
+  const router = useRouter();
+  const { lang } = useParams();
 
-  if (loading || !user) {
+  const { data: userProfile, isLoading, error } = api.users.getVerificationProfile.useQuery();
+
+  if (isLoading) {
     return (
       <PageLoader 
         title="Loading Verification Dashboard..."
@@ -23,6 +28,12 @@ export default function VerificationLayout({
         size="lg"
       />
     );
+  }
+
+  if (error || !userProfile) {
+    // Redirect to login or an error page if not authorized or user profile not found
+    router.push(`/${lang}/login`); // Or a more specific error page
+    return null; 
   }
 
   return (

@@ -17,11 +17,29 @@ import {
   Shield
 } from "lucide-react";
 
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { useTranslation } from "@/lib/utils/i18n";
+import Image from "next/image";
+import {
+  User,
+  Phone,
+  Mail,
+  Calendar,
+  Globe,
+  Loader2,
+  UserCheck,
+  Edit3,
+  Shield
+} from "lucide-react";
+import { api } from "@/server/trpc/react";
+
 export default function VerificationProfilePage() {
-  const { user, userProfile, loading } = useAuth();
   const router = useRouter();
   const { lang } = useParams();
   const { t } = useTranslation();
+
+  const { data: userProfile, isLoading, error } = api.users.getVerificationProfile.useQuery();
 
   const languages = [
     { code: "en", name: "English" },
@@ -33,18 +51,18 @@ export default function VerificationProfilePage() {
     { code: "or", name: "Odia" },
   ];
 
-  const phoneNumber = user?.phoneNumber?.replace(/^\+91/, '') || '';
+  const phoneNumber = userProfile?.phone?.replace(/^\+91/, '') || '';
   const whatsappNumber = userProfile?.whatsappNumber?.replace(/^\+91/, '') || '';
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!isLoading && !userProfile) {
       router.push(`/${lang}/login`);
     }
-  }, [user, loading, router, lang]);
+  }, [userProfile, isLoading, router, lang]);
 
-  const isProfileComplete = userProfile?.isProfileComplete || false;
+  const isProfileComplete = userProfile?.profileComplete || false;
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
@@ -52,7 +70,7 @@ export default function VerificationProfilePage() {
     );
   }
 
-  if (!user || !userProfile) {
+  if (error || !userProfile) {
     return null;
   }
 

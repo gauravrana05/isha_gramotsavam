@@ -82,7 +82,7 @@ The public-facing pages are the first point of contact for most users. They prov
         *   **tRPC Router:** The `users.getPublicProfile` procedure (mentioned in section 2.1) will be used to get the current user's profile information.
         *   **Database Tables:** The `users` table will be used to fetch the user's profile.
         *   **Implementation:**
-            1.  In `TeamRegistrationPage`, replace the `useAuth` hook with a call to `api.users.getPublicProfile.useQuery()`.
+            1.  **COMPLETED:** In `TeamRegistrationPage`, replaced the `useAuth` hook with a call to `api.users.getPublicProfile.useQuery()`. Updated `sportQuery` to use `userProfileData?.gender` and the `useEffect` hook to use `userProfileData` instead of `user` and `userProfile`.
             2.  The user's authentication status and profile information will be retrieved from the result of the tRPC query.
             3.  The rest of the page logic, which is already using tRPC, will remain the same.
 *   **Impact:**
@@ -103,8 +103,9 @@ The public-facing pages are the first point of contact for most users. They prov
         *   **tRPC Router:** The `users.getPublicProfile` procedure will be used to get the current user's profile information.
         *   **Database Tables:** The `users` table will be used to fetch the user's profile.
         *   **Implementation:**
-            1.  In both `sports/page.tsx` and `sports/[sportId]/page.tsx`, replace the `useAuth` hook with a call to `api.users.getPublicProfile.useQuery()`.
-            2.  The user's gender will be retrieved from the result of the tRPC query and used for registration validation.
+            1.  **COMPLETED:** In `sports/page.tsx`, replaced the `useAuth` hook with a call to `api.users.getPublicProfile.useQuery()`.
+            2.  **COMPLETED:** In `sports/[sportId]/page.tsx`, replaced the `useAuth` hook with a call to `api.users.getPublicProfile.useQuery()`.
+            3.  The user's gender will be retrieved from the result of the tRPC query and used for registration validation.
 *   **Impact:**
     *   The sports pages will be fully migrated to the new stack.
     *   The authentication logic will be consistent with the rest of the application.
@@ -133,7 +134,7 @@ The verification pages are used by verification volunteers and admins to review 
         *   **Database Tables:** The `users` table will be used to fetch the user's profile and roles.
         *   **Implementation:**
             1.  Create the `users.getVerificationProfile` tRPC procedure in `src/server/api/routers/users.ts`.
-            2.  In `VerificationLayout`, replace the `useAuth` and `useRedirect` hooks with a call to `api.users.getVerificationProfile.useQuery()`.
+            2.  **COMPLETED:** In `VerificationLayout`, replaced the `useAuth` and `useRedirect` hooks with a call to `api.users.getVerificationProfile.useQuery()`.
             3.  The query will handle the redirection logic on the server-side, returning an error if the user is not authorized. The frontend will then handle this error by displaying an appropriate message or redirecting the user to the login page.
 *   **Impact:**
     *   The authentication and authorization logic will be centralized in the tRPC API.
@@ -151,7 +152,7 @@ The verification pages are used by verification volunteers and admins to review 
         *   **Database Tables:** The `teams` and `users` tables will be used.
         *   **Implementation:**
             1.  Create the `teams.getForVerification` tRPC procedure in `src/server/api/routers/teams.ts`.
-            2.  In `VerificationDashboardPage`, replace the direct Firebase queries with a call to `api.teams.getForVerification.useQuery()`.
+            2.  **COMPLETED:** In `VerificationDashboardPage`, replaced the direct Firebase queries and `useAuth` with a call to `api.teams.getForVerification.useQuery()` and `api.users.getVerificationProfile.useQuery()`.
             3.  The local state for filtering and searching will be passed as arguments to the tRPC query.
 *   **Impact:**
     *   The page will be much more performant, as the data filtering and searching will be done on the server.
@@ -168,7 +169,7 @@ The verification pages are used by verification volunteers and admins to review 
         *   **tRPC Router:** The `users.getVerificationProfile` procedure will be used.
         *   **Database Tables:** The `users` table will be used.
         *   **Implementation:**
-            1.  In `VerificationProfilePage`, replace the `useAuth` hook with a call to `api.users.getVerificationProfile.useQuery()`.
+            1.  **COMPLETED:** In `VerificationProfilePage`, replaced the `useAuth` hook with a call to `api.users.getVerificationProfile.useQuery()`.
 *   **Impact:**
     *   The page will be decoupled from the Firebase-based `AuthContext`.
 *   **Dependencies:**

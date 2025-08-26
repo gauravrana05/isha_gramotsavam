@@ -7,7 +7,7 @@ import Image from 'next/image'
 import Button from '../ui/Button'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/server/trpc/react'
-import { LoadingSpinner } from '../ui/loaders'
+import { LoadingSpinner, PageLoader } from '../ui/loaders'
 import { AlertCircle, Users, Trophy } from 'lucide-react'
 
 interface SportsPreviewProps {
@@ -93,16 +93,7 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
   }
 
   if (sportsQuery.isLoading) {
-    return (
-      <section id="sports-preview" className="bg-isha font-fira py-16 lg:py-24">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center">
-            <LoadingSpinner size="lg" />
-            <p className="mt-4 text-[#4A2F1D]">Loading sports...</p>
-          </div>
-        </div>
-      </section>
-    )
+    return <PageLoader title="Loading sports..." variant="minimal" />;
   }
 
   if (sportsQuery.error) {
