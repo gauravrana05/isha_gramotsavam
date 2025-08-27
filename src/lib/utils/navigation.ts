@@ -21,6 +21,7 @@ export const getDashboardRoute = (role: string | null | undefined, lang: string)
     case "technical_volunteer":
       return `/${lang}/volunteer/dashboard`;
     case "verification":
+    case "verification_volunteer":
       return `/${lang}/verification/dashboard`;
     default:
       return `/${lang}/public`;

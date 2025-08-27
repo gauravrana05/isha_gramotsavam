@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getAdminDashboardOverview, getTournamentOverview } from '@/lib/actions/admin/optimizedDashboardQueries';
+import { api } from '@/server/trpc/react';
 import { 
   Users, 
   Trophy, 
@@ -40,16 +40,37 @@ interface TournamentOverview {
 }
 
 export default function AdminDashboard() {
-  const [dashboardOverview, setDashboardOverview] = useState<DashboardOverview | null>(null);
-  const [tournamentOverview, setTournamentOverview] = useState<TournamentOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
-
   const { user, userProfile, loading: authLoading } = useAuth();
   const { lang } = useParams();
   const router = useRouter();
 
+  // tRPC queries
+  const {
+    data: dashboardData,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+    refetch: refetchDashboard
+  } = api.admin.getDashboardOverview.useQuery({
+    level: 'all',
+    includeDetailed: true,
+    refreshCache: false
+  }, {
+    enabled: !!user && userProfile?.role === 'admin'
+  });
+
+  const {
+    data: tournamentData,
+    isLoading: tournamentLoading,
+    error: tournamentError,
+    refetch: refetchTournament
+  } = api.admin.getTournamentOverview.useQuery({
+    level: 'all',
+    status: 'all'
+  }, {
+    enabled: !!user && userProfile?.role === 'admin'
+  });
+
+  // Auth check
   useEffect(() => {
     if (authLoading) return;
     
@@ -62,60 +83,16 @@ export default function AdminDashboard() {
       router.push(`/${lang}/player/dashboard`);
       return;
     }
-
-    loadDashboardData();
   }, [user, userProfile, authLoading, lang, router]);
 
-  const loadDashboardData = async (refresh = false) => {
-    try {
-      if (refresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      
-      if (!user?.uid) {
-        throw new Error('User not authenticated');
-      }
+  const loading = dashboardLoading || tournamentLoading;
+  const error = dashboardError?.message || tournamentError?.message || '';
+  const dashboardOverview = dashboardData?.overview;
+  const tournamentOverview = tournamentData?.tournament;
 
-      // Load optimized dashboard overview
-      const [dashboardResult, tournamentResult] = await Promise.all([
-        getAdminDashboardOverview({
-          level: 'all', // <-- Add this required property
-          includeDetailed: true,
-          refreshCache: refresh
-        }, user.uid),
-        getTournamentOverview({
-          level: 'all',
-          status: 'all'
-        }, user.uid)
-      ]);
-
-      if (!dashboardResult.success) {
-        throw new Error(dashboardResult.error);
-      }
-
-      if (!tournamentResult.success) {
-        throw new Error(tournamentResult.error);
-      }
-      if (dashboardResult?.overview) {
-        setDashboardOverview(dashboardResult.overview);
-      } else {
-        setDashboardOverview(null);
-      }
-      if (tournamentResult?.tournament) {
-        setTournamentOverview(tournamentResult.tournament);
-      } else {
-        setTournamentOverview(null);
-      }
-      
-    } catch (err: any) {
-      // Error handling removed
-      setError(err.message || 'Failed to load dashboard data. Please check your permissions.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  const handleRefresh = () => {
+    refetchDashboard();
+    refetchTournament();
   };
 
 
@@ -176,15 +153,15 @@ export default function AdminDashboard() {
               Admin Dashboard
             </h1>
             <p className="text-sm sm:text-base text-gray-600 font-fira">
-              Welcome back, {userProfile?.firstName}! Here&apos;s your system overview.
+              Welcome back, {userProfile?.first_name}! Here&apos;s your system overview.
             </p>
           </div>
           <button
-            onClick={() => loadDashboardData(true)}
-            disabled={refreshing}
+            onClick={handleRefresh}
+            disabled={loading}
             className="flex items-center px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
-            {refreshing ? (
+            {loading ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : (
               <Activity className="w-4 h-4 mr-2" />

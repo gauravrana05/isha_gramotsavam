@@ -55,7 +55,7 @@ export const sportsRouter = createTRPCRouter({
               {
                 OR: [
                   { id: input.identifier },
-                  { name: { equals: input.identifier, mode: 'insensitive' } }
+                  { name: { contains: input.identifier, mode: 'insensitive' } }
                 ]
               }
             ]

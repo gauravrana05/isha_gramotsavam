@@ -3,11 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase/config";
-import { doc, getDoc, collection, getDocs, updateDoc, writeBatch } from "firebase/firestore";
-import { auditLogService } from "@/lib/services/auditLogService";
-import { assignTeamToVenue } from "@/lib/actions/admin/teamVenueAssignment";
-import { updateTeamVerificationRecord } from "@/lib/actions/verification/verifyTeam";
+import { api } from "@/server/trpc/react";
 import Image from "next/image";
 import { ArrowLeft, Users, Phone, Calendar, MapPin, Loader2, AlertCircle, CheckCircle, X, Eye, Check, UserCheck } from "lucide-react";
 import { AlertModal } from '@/components/ui/Modal';
@@ -67,17 +63,12 @@ interface TeamData {
 }
 
 export default function TeamVerificationPage() {
-  const [teamData, setTeamData] = useState<TeamData | null>(null);
-  const [players, setPlayers] = useState<TeamPlayer[]>([]);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayer | null>(null);
   const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [selectedImageTitle, setSelectedImageTitle] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
   const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
 
   const router = useRouter();
@@ -86,405 +77,85 @@ export default function TeamVerificationPage() {
 
   const teamIdStr = Array.isArray(teamId) ? teamId[0] : teamId;
 
-  useEffect(() => {
-    if (authLoading) return; 
-    
-    loadTeamData();
-  }, [user, userProfile, authLoading, teamIdStr]);
-
-  const loadTeamData = async () => {
-    if (!teamIdStr) return;
-
-    try {
-      // Load team data
-      const teamRef = doc(db, "teams", teamIdStr);
-      const teamSnap = await getDoc(teamRef);
-
-      if (!teamSnap.exists()) {
-        setError("Team not found");
-        return;
-      }
-
-      const teamRawData = teamSnap.data();
-      const team: TeamData = {
-        id: teamSnap.id,
-        name: teamRawData.name || '',
-        sportName: teamRawData.sportName || '',
-        sportId: teamRawData.sportId || '',
-        captainProfile: {
-          name: teamRawData.captainProfile?.name || '',
-          phone: teamRawData.captainProfile?.phone || ''
-        },
-        panchayat: teamRawData.panchayat || '',
-        district: teamRawData.district || '',
-        state: teamRawData.state || '',
-        currentPlayers: teamRawData.currentPlayers || 0,
-        maxPlayers: teamRawData.maxPlayers || 12,
-        status: teamRawData.status || 'pending',
-        submittedAt: teamRawData.submittedAt,
-        genderCategory: teamRawData.genderCategory || 'mixed'
-      };
-      
-      setTeamData(team);
-      
-      // Load players from subcollection
-      const playersRef = collection(db, "teams", teamIdStr, "players");
-      const playersSnap = await getDocs(playersRef);
-      
-      const loadedPlayers: TeamPlayer[] = [];
-      
-      for (const playerDoc of playersSnap.docs) {
-        const playerData = playerDoc.data();
-        
-        // Skip deleted players
-        if (playerData.isDeleted) continue;
-        
-        // Load user data for documents
-        let userDocuments = playerData.documents || {};
-        if (playerData.userId && !playerData.userId.startsWith('user_')) {
-          try {
-            const userDoc = await getDoc(doc(db, "users", playerData.userId));
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              if (userData.documents) {
-                userDocuments = userData.documents;
-              }
-            }
-          } catch (error) {
-            // Could not load user documents
-          }
-        }
-        
-        const player: TeamPlayer = {
-          playerId: playerDoc.id,
-          userId: playerData.userId || '',
-          name: playerData.name || `${playerData.firstName || ''} ${playerData.lastName || ''}`.trim(),
-          phone: playerData.phone || '',
-          dob: playerData.dateOfBirth || playerData.dob || '',
-          age: playerData.age || 0,
-          gender: playerData.gender || 'M',
-          position: playerData.position || 'main',
-          profileData: {
-            firstName: playerData.firstName || playerData.profileData?.firstName || '',
-            lastName: playerData.lastName || playerData.profileData?.lastName || '',
-            whatsappNumber: playerData.whatsappNumber || playerData.profileData?.whatsappNumber || '',
-            village: playerData.village || playerData.profileData?.village || '',
-            panchayat: playerData.panchayat || playerData.profileData?.panchayat || team.panchayat,
-            district: playerData.district || playerData.profileData?.district || team.district,
-            state: playerData.state || playerData.profileData?.state || team.state
-          },
-          documents: {
-            profilePhoto: {
-              url: userDocuments?.profilePhoto?.url || null,
-              verified: userDocuments?.profilePhoto?.verified || false,
-              uploadedAt: userDocuments?.profilePhoto?.uploadedAt ? 
-                (userDocuments.profilePhoto.uploadedAt.toDate ? userDocuments.profilePhoto.uploadedAt.toDate() : new Date(userDocuments.profilePhoto.uploadedAt)) 
-                : null,
-              uploadedBy: userDocuments?.profilePhoto?.uploadedBy || null
-            },
-            aadhaarFront: {
-              url: userDocuments?.aadhaarFront?.url || null,
-              verified: userDocuments?.aadhaarFront?.verified || false,
-              uploadedAt: userDocuments?.aadhaarFront?.uploadedAt ? 
-                (userDocuments.aadhaarFront.uploadedAt.toDate ? userDocuments.aadhaarFront.uploadedAt.toDate() : new Date(userDocuments.aadhaarFront.uploadedAt)) 
-                : null,
-              uploadedBy: userDocuments?.aadhaarFront?.uploadedBy || null
-            },
-            aadhaarBack: {
-              url: userDocuments?.aadhaarBack?.url || null,
-              verified: userDocuments?.aadhaarBack?.verified || false,
-              uploadedAt: userDocuments?.aadhaarBack?.uploadedAt ? 
-                (userDocuments.aadhaarBack.uploadedAt.toDate ? userDocuments.aadhaarBack.uploadedAt.toDate() : new Date(userDocuments.aadhaarBack.uploadedAt)) 
-                : null,
-              uploadedBy: userDocuments?.aadhaarBack?.uploadedBy || null
-            }
-          },
-          verificationStatus: playerData.verificationStatus || 'pending',
-          verificationComments: playerData.verificationComments || []
-        };
-        
-        loadedPlayers.push(player);
-      }
-      
-      setPlayers(loadedPlayers);
-    } catch (err: any) {
-      setError("Failed to load team data");
-    } finally {
-      setLoading(false);
+  const { data: teamDetailsData, isLoading: teamLoading, error: teamError } = api.teams.getForVerificationDetail.useQuery(
+    { teamId: teamIdStr || '' },
+    { 
+      enabled: !authLoading && !!user && !!teamIdStr,
     }
+  );
+
+  const teamData = teamDetailsData?.team || null;
+  const players = teamDetailsData?.players || [];
+  const loading = authLoading || teamLoading;
+  const error = teamError?.message || '';
+
+  // Debug: Check what document URLs we're getting
+  if (players.length > 0) {
+    console.log('First player documents:', {
+      playerName: players[0]?.name,
+      profilePhoto: players[0]?.documents?.profilePhoto?.url,
+      aadhaarFront: players[0]?.documents?.aadhaarFront?.url,
+      aadhaarBack: players[0]?.documents?.aadhaarBack?.url,
+    });
+  }
+
+  // Data loading is now handled by tRPC query above
+
+  const verifyPlayerMutation = api.teams.verifyPlayer.useMutation({
+    onSuccess: () => {
+      showSuccess('Player verified successfully!');
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to verify player');
+    },
+  });
+
+  const verifyPlayersBulkMutation = api.teams.verifyPlayersBulk.useMutation({
+    onSuccess: () => {
+      showSuccess('Players verified successfully!');
+      setSelectedPlayers(new Set());
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to verify players');
+    },
+  });
+
+  const handlePlayerStatusChange = async (playerId: string, status: 'verified' | 'rejected', comments?: string) => {
+    verifyPlayerMutation.mutate({
+      playerId,
+      status,
+      comments,
+    });
   };
 
-  const handlePlayerStatusChange = async (playerId: string, status: 'approved' | 'rejected', comments?: string) => {
-    if (!teamIdStr) {
-      // Team ID is missing
-      return;
-    }
-    try {
-      setSaving(true);
-
-      // Find the player *before* updating the state to get the old status
-      const player = players.find(p => p.playerId === playerId);
-      if (!player) {
-        throw new Error("Player not found in local state.");
-      }
-
-      // Update local state first for a responsive UI
-      const updatedPlayers = players.map(p => 
-        p.playerId === playerId 
-          ? { 
-              ...p, 
-              verificationStatus: status, 
-              verificationComments: comments ? [comments] : [] 
-            } 
-          : p
-      );
-      setPlayers(updatedPlayers);
-
-      // Update in database
-      if (player.userId) {
-        const userRef = doc(db, "users", player.userId);
-        await updateDoc(userRef, {
-          [`teams.${teamIdStr}.verificationStatus`]: status,
-          [`teams.${teamIdStr}.verificationComments`]: comments ? [comments] : [],
-          [`teams.${teamIdStr}.verifiedAt`]: new Date().toISOString(),
-          [`teams.${teamIdStr}.verifiedBy`]: user?.uid,
-        });
-
-        const playerRef = doc(db, "teams", teamIdStr, "players", playerId);
-        await updateDoc(playerRef, {
-          verificationStatus: status,
-          verificationComments: comments ? [comments] : [],
-          verifiedAt: new Date().toISOString(),
-          verifiedBy: user?.uid,
-        });
-
-        // Log the verification action
-        if (teamData && user && userProfile) {
-          await auditLogService.logPlayerVerification(
-            user.uid, // volunteerId
-            `${userProfile.firstName} ${userProfile.lastName}`.trim(), // volunteerName
-            player.playerId, // playerId
-            player.name, // playerName
-            teamData.id, // teamId
-            teamData.name, // teamName
-            status, // status
-            comments || undefined // comments
-          );
-        }
-      }
-      
-      // Update team verification record using the proper server action
-      try {
-        if (teamIdStr) {
-          await updateTeamVerificationRecord(teamIdStr);
-        }
-      } catch (err) {
-        // Error updating team verification record
-      }
-      
-    } catch (error) {
-      showError('Failed to save verification. Please try again.');
-      loadTeamData(); // Reload data on error
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleBulkAction = async (action: 'approved' | 'rejected') => {
+  const handleBulkAction = async (action: 'verified' | 'rejected') => {
     if (selectedPlayers.size === 0) {
       showInfo('Please select players to perform bulk action.');
       return;
     }
     
-    const selectedPlayersList = players.filter(p => selectedPlayers.has(p.playerId));
-    const actionText = action === 'approved' ? 'approve' : 'reject';
+    const selectedPlayersList = Array.from(selectedPlayers);
+    const actionText = action === 'verified' ? 'verify' : 'reject';
     
     let reason = '';
     if (action === 'rejected') {
       reason = prompt('Reason for rejection:') || '';
       if (!reason) return;
     } else {
-      reason = 'Bulk approved by verification volunteer';
+      reason = 'Bulk verified by verification volunteer';
     }
     
     if (!confirm(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} ${selectedPlayersList.length} selected players?`)) {
       return;
     }
     
-    setSaving(true);
-    
-    try {
-      // Update local state first for responsive UI
-      const updatedPlayers = players.map(p => 
-        selectedPlayers.has(p.playerId) 
-          ? { 
-              ...p, 
-              verificationStatus: action, 
-              verificationComments: reason ? [reason] : [] 
-            } 
-          : p
-      );
-      setPlayers(updatedPlayers);
-
-      // Create Firebase batch operation
-      const batch = writeBatch(db);
-      const timestamp = new Date().toISOString();
-      
-      // Batch update all selected players
-      for (const player of selectedPlayersList) {
-        if (player.userId) {
-          // Update user document
-          const userRef = doc(db, "users", player.userId);
-          batch.update(userRef, {
-            [`teams.${teamIdStr}.verificationStatus`]: action,
-            [`teams.${teamIdStr}.verificationComments`]: reason ? [reason] : [],
-            [`teams.${teamIdStr}.verifiedAt`]: timestamp,
-            [`teams.${teamIdStr}.verifiedBy`]: user?.uid,
-          });
-
-          // Update player document in team subcollection
-          if (
-            typeof teamIdStr === "string" &&
-            typeof player.playerId === "string"
-          ) {
-            const playerRef = doc(db, "teams", teamIdStr, "players", player.playerId);
-            batch.update(playerRef, {
-              verificationStatus: action,
-              verificationComments: reason ? [reason] : [],
-              verifiedAt: timestamp,
-            verifiedBy: user?.uid,
-          });
-        }
-      }
-    }
-      // Note: Team status will be updated by updateTeamVerificationRecord() server action
-
-      // Commit the batch
-      await batch.commit();
-
-      // Log individual player verifications for audit trail
-      if (teamData && user && userProfile) {
-        for (const player of selectedPlayersList) {
-          await auditLogService.logPlayerVerification(
-            user.uid, // volunteerId
-            `${userProfile.firstName} ${userProfile.lastName}`.trim(), // volunteerName
-            player.playerId, // playerId
-            player.name, // playerName
-            teamData.id, // teamId
-            teamData.name, // teamName
-            action, // status
-            reason || undefined // comments
-          );
-        }
-
-        // Log the bulk action
-        await auditLogService.logBulkPlayerVerification(
-          { // actor
-            uid: user.uid,
-            name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-            role: userProfile.role
-          },
-          { // team
-            id: teamData.id,
-            name: teamData.name
-          },
-          selectedPlayersList.length, // playerCount
-          action, // status
-          reason // reason
-        );
-
-      }
-
-      // Update team verification record using the proper server action
-      try {
-        if (teamIdStr) {
-          await updateTeamVerificationRecord(teamIdStr);
-        }
-      } catch (err) {
-        // Error updating team verification record
-      }
-
-      // Reload team data to get updated status from server
-      await loadTeamData();
-
-      showSuccess(`Successfully ${action} ${selectedPlayersList.length} players!`);
-      setSelectedPlayers(new Set()); // Clear selection
-
-    } catch(error) {
-      showError(`Some ${actionText}s may have failed. Please check and try again.`);
-      // Reload data on error to ensure UI consistency
-      loadTeamData();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const updateTeamStatus = async (updatedPlayers: TeamPlayer[]) => {
-    if (!teamData) return;
-    if (!teamIdStr) {
-      // Team ID is missing
-      return;
-    } 
-    const approvedCount = updatedPlayers.filter(p => p.verificationStatus === 'approved').length;
-    const rejectedCount = updatedPlayers.filter(p => p.verificationStatus === 'rejected').length;
-    const totalPlayers = updatedPlayers.length;
-    
-    let newStatus = teamData.status;
-    if (rejectedCount > 0) {
-      newStatus = 'rejected';
-    } else if (approvedCount === totalPlayers) {
-      newStatus = 'verified';
-    } else if (approvedCount > 0) {
-      newStatus = 'partial_verification';
-    } else {
-      newStatus = 'pending';
-    }
-    
-    // Update team document
-    const teamRef = doc(db, "teams", teamIdStr);
-    await updateDoc(teamRef, {
-      status: newStatus,
-      verifiedAt: new Date().toISOString(),
-      verifiedBy: user?.uid,
-      updatedAt: new Date().toISOString(),
+    verifyPlayersBulkMutation.mutate({
+      playerIds: selectedPlayersList,
+      status: action,
+      comments: reason,
     });
-
-    // Trigger venue assignment when team becomes verified
-    if (newStatus === 'verified' && teamData.status !== 'verified') {
-      try {
-        const result = await assignTeamToVenue({
-          id: teamData.id,
-          name: teamData.name,
-          state: teamData.state,
-          district: teamData.district,
-          panchayat: teamData.panchayat
-        });
-        // Venue assignment completed
-      } catch (error) {
-        // Error assigning team to venue - don't fail verification
-      }
-    }
-
-    // Log team status change
-    if (teamData && user && userProfile && newStatus !== teamData.status) {
-      await auditLogService.logTeamStatusChange(
-        {
-          uid: user.uid,
-          name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-          role: userProfile.role
-        },
-        {
-          id: teamData.id,
-          name: teamData.name
-        },
-        teamData.status,
-        newStatus,
-        `Team status changed based on player verification results`
-      );
-    }
-    
-    setTeamData(prev => prev ? { ...prev, status: newStatus } : null);
   };
+
 
   const handleViewImage = (url: string, title: string) => {
     setSelectedImageUrl(url);
@@ -523,7 +194,7 @@ export default function TeamVerificationPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'approved':
+      case 'verified':
         return 'bg-green-100 text-green-800';
       case 'rejected':
         return 'bg-red-100 text-red-800';
@@ -569,7 +240,7 @@ export default function TeamVerificationPage() {
   }
 
   const stats = {
-    approved: players.filter(p => p.verificationStatus === 'approved').length,
+    approved: players.filter(p => p.verificationStatus === 'verified').length,
     rejected: players.filter(p => p.verificationStatus === 'rejected').length,
     pending: players.filter(p => p.verificationStatus === 'pending').length
   };
@@ -638,7 +309,7 @@ export default function TeamVerificationPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
-                  <div className="text-xs text-gray-600">Approved</div>
+                  <div className="text-xs text-gray-600">Verified</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
@@ -679,20 +350,20 @@ export default function TeamVerificationPage() {
               {selectedPlayers.size > 0 && (
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleBulkAction('approved')}
-                    disabled={saving}
+                    onClick={() => handleBulkAction('verified')}
+                    disabled={verifyPlayersBulkMutation.isLoading}
                     className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
                   >
                     <Check className="w-4 h-4 mr-1" />
-                    Approve ({selectedPlayers.size})
+                    Verify
                   </button>
                   <button
                     onClick={() => handleBulkAction('rejected')}
-                    disabled={saving}
+                    disabled={verifyPlayersBulkMutation.isLoading}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
                   >
                     <X className="w-4 h-4 mr-1" />
-                    Reject ({selectedPlayers.size})
+                    Reject
                   </button>
                 </div>
               )}
@@ -782,11 +453,11 @@ export default function TeamVerificationPage() {
                         {player.verificationStatus === 'pending' && (
                           <>
                             <button
-                              onClick={() => handlePlayerStatusChange(player.playerId, 'approved', 'Approved by verification volunteer')}
-                              disabled={saving}
+                              onClick={() => handlePlayerStatusChange(player.playerId, 'verified', 'Verified by verification volunteer')}
+                              disabled={verifyPlayerMutation.isLoading}
                               className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
                             >
-                              Approve
+                              Verify
                             </button>
                             <button
                               onClick={() => {
@@ -795,7 +466,7 @@ export default function TeamVerificationPage() {
                                   handlePlayerStatusChange(player.playerId, 'rejected', reason);
                                 }
                               }}
-                              disabled={saving}
+                              disabled={verifyPlayerMutation.isLoading}
                               className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
                             >
                               Reject
@@ -879,12 +550,12 @@ export default function TeamVerificationPage() {
                 {player.verificationStatus === 'pending' ? (
                   <>
                     <button
-                      onClick={() => handlePlayerStatusChange(player.playerId, 'approved', 'Approved by verification volunteer')}
-                      disabled={saving}
+                      onClick={() => handlePlayerStatusChange(player.playerId, 'verified', 'Verified by verification volunteer')}
+                      disabled={verifyPlayerMutation.isLoading}
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
                     >
                       <Check className="w-3 h-3 mr-1" />
-                      Approve
+                      Verify
                     </button>
                     <button
                       onClick={() => {
@@ -893,7 +564,7 @@ export default function TeamVerificationPage() {
                           handlePlayerStatusChange(player.playerId, 'rejected', reason);
                         }
                       }}
-                      disabled={saving}
+                      disabled={verifyPlayerMutation.isLoading}
                       className="flex-1 bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
                     >
                       <X className="w-3 h-3 mr-1" />
@@ -1043,15 +714,15 @@ export default function TeamVerificationPage() {
                   <>
                     <button
                       onClick={async () => {
-                        await handlePlayerStatusChange(selectedPlayer.playerId, 'approved', 'Approved by verification volunteer');
+                        await handlePlayerStatusChange(selectedPlayer.playerId, 'verified', 'Verified by verification volunteer');
                         setShowPlayerModal(false);
-                        showSuccess('Player approved successfully!');
+                        showSuccess('Player verified successfully!');
                       }}
-                      disabled={saving}
+                      disabled={verifyPlayerMutation.isLoading}
                       className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
                     >
                       <Check className="w-4 h-4 mr-2" />
-                      Approve Player
+                      Verify Player
                     </button>
                     
                     <button
@@ -1063,7 +734,7 @@ export default function TeamVerificationPage() {
                           showSuccess('Player rejected successfully!');
                         }
                       }}
-                      disabled={saving}
+                      disabled={verifyPlayerMutation.isLoading}
                       className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
                     >
                       <X className="w-4 h-4 mr-2" />

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getVenueTeamsForMatchDay } from '@/lib/actions/volunteer/matchDayVerification';
+import { api } from '@/server/trpc/react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useParams } from 'next/navigation';
@@ -24,40 +24,25 @@ export default function MatchDayTeamsPage() {
   const params = useParams();
   const { venueId } = params as { venueId: string; lang: string };
   const { user, loading: authLoading } = useAuth();
-  
-  const [teams, setTeams] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+
+  const { data: teamsData, isLoading: teamsLoading, error: teamsError } = api.volunteers.getVenueTeams.useQuery(
+    { venueId },
+    {
+      enabled: !authLoading && !!user && !!venueId,
+    }
+  );
+
+  const teams = teamsData?.teams || [];
+  const loading = authLoading || teamsLoading;
+  const error = teamsError?.message || '';
 
   useEffect(() => {
     if (authLoading) return;
     
     if (!user) {
-      setError('Please log in to access this page');
-      setLoading(false);
       return;
     }
-
-    loadTeams();
   }, [user, authLoading, venueId]);
-
-  const loadTeams = async () => {
-    try {
-      setLoading(true);
-      const teamsResult = await getVenueTeamsForMatchDay(venueId, user!.uid);
-      
-      if (teamsResult.success) {
-        setTeams(teamsResult.teams ?? []);
-      } else {
-        setError(teamsResult.error || 'Failed to load teams');
-      }
-    } catch (err) {
-      // Error handling removed
-      setError('Failed to load teams');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (authLoading || loading) {
     return (
@@ -77,7 +62,7 @@ export default function MatchDayTeamsPage() {
           <h1 className="text-2xl font-bold text-red-600">Error</h1>
           <p className="mt-2 text-gray-600">{error}</p>
           <button 
-            onClick={loadTeams}
+            onClick={() => window.location.reload()}
             className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
             Retry

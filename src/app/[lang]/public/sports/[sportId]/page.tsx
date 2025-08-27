@@ -188,6 +188,7 @@ export default function SportPage() {
                   <RegistrationButton 
                     lang={lang} 
                     sport={sport.name.toLowerCase().replace(/\s+/g, '-')} 
+                    sportId={sport.id}
                     size="lg" 
                     className="min-w-[200px]"
                     disabled={!sport.can_register}

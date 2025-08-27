@@ -556,6 +556,7 @@ enum TeamStatus {
   submitted
   verified
   rejected
+  checked_in
 }
 
 enum TournamentLevel {
@@ -576,6 +577,7 @@ enum UserRole {
 
 enum VerificationStatus {
   pending
+  verified
   approved
   rejected
 }

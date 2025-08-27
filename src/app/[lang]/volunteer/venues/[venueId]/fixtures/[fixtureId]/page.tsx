@@ -1,6 +1,10 @@
-import { adminDb } from '@/lib/firebase/admin';
-import { serializeFirestoreDocs } from '@/lib/utils/firestore';
+'use client';
+
+import { api } from '@/lib/trpc/react';
+import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
 import { 
   ArrowLeft,
   Trophy,
@@ -15,112 +19,69 @@ import {
   Crown
 } from 'lucide-react';
 
-interface PageProps {
-  params: Promise<{
-    venueId: string;
-    fixtureId: string;
-    lang: string;
-  }>;
-}
-
-async function getFixtureDetails(fixtureId: string) {
-  try {
-    const fixtureDoc = await adminDb.collection('fixtures').doc(fixtureId).get();
-    
-    if (!fixtureDoc.exists) {
-      return { success: false, error: 'Fixture not found' };
+export default function FixtureDetailPage() {
+  const { user, isLoading: authLoading } = useAuth();
+  const params = useParams();
+  
+  const venueId = params?.venueId as string;
+  const fixtureId = params?.fixtureId as string;
+  // Get fixture details using tRPC
+  const { data: fixture, isLoading: fixtureLoading, error: fixtureError } = api.volunteers.getFixtureDetails.useQuery(
+    { fixtureId },
+    {
+      enabled: !authLoading && !!user && !!fixtureId,
     }
+  );
+  // Get all team IDs from bracket matches and assigned teams using useMemo for optimization
+  const uniqueTeamIds = useMemo(() => {
+    if (!fixture) return [];
     
-    const fixtureData = fixtureDoc.data();
-    
-    // Serialize timestamps
-    const serializedFixture = {
-      id: fixtureDoc.id,
-      ...fixtureData,
-      createdAt: fixtureData?.createdAt?.toDate?.()?.toISOString() || null,
-      updatedAt: fixtureData?.updatedAt?.toDate?.()?.toISOString() || null
-    };
-    
-    return { success: true, fixture: serializedFixture };
-  } catch (error) {
-    // Error handling removed
-    return { success: false, error: 'Failed to fetch fixture' };
-  }
-}
+    const allTeamIds = [
+      ...(fixture.assignedTeams?.map(team => team.id) || []),
+      ...(fixture.bracket?.matches?.flatMap((match: any) => [match?.team1Id, match?.team2Id, match?.winnerId]) || [])
+    ].filter(Boolean);
 
-async function getTeamDetails(teamIds: string[]) {
-  try {
-    // Console log removed
-    const startTime = Date.now();
-    
-    const teams: Record<string, any> = {};
-    
-    if (teamIds.length > 0) {
-      // Batch query all teams at once instead of individual queries
-      const teamRefs = teamIds.map(id => adminDb.collection('teams').doc(id));
-      const teamDocs = await adminDb.getAll(...teamRefs);
-      
-      // Process teams efficiently
-      teamDocs.forEach(doc => {
-        if (doc.exists) {
-          const teamData = doc.data();
-          teams[doc.id] = {
-            id: doc.id,
-            name: teamData?.name || 'Unknown Team',
-            tournamentNumber: teamData?.tournamentNumber || null,
-            sportName: teamData?.sportName,
-            genderCategory: teamData?.genderCategory,
-            currentPlayers: teamData?.currentPlayers,
-            maxPlayers: teamData?.maxPlayers,
-            matchDayStatus: teamData?.matchDayStatus,
-            // Only include essential data for performance
-            captainProfile: teamData?.captainProfile
-          };
-        }
-      });
+    return Array.from(new Set(allTeamIds));
+  }, [fixture]);
+
+  // Get team details using tRPC
+  const { data: teams = {}, isLoading: teamsLoading } = api.volunteers.getTeamsByIds.useQuery(
+    { teamIds: uniqueTeamIds },
+    {
+      enabled: !authLoading && !!user && uniqueTeamIds.length > 0,
     }
-    
-    const endTime = Date.now();
-    
-    return teams;
-  } catch (error) {
-    // Error handling removed
-    return {};
-  }
-}
+  );
 
-async function getFixtureMatches(fixtureId: string) {
-  try {
-    const matchesSnapshot = await adminDb.collection('matches')
-      .where('fixtureId', '==', fixtureId)
-      .get();
-    
-    return serializeFirestoreDocs(matchesSnapshot.docs);
-  } catch (error) {
-    // Error handling removed
-    return [];
-  }
-}
-
-export default async function FixtureDetailPage({ params }: PageProps) {
-  const { venueId, fixtureId } = await params;
-  
-  // Console log removed
-  const pageStartTime = Date.now();
-  
-  // Load fixture details and standalone matches in parallel
-  const [fixtureResult, standaloneMatches] = await Promise.all([
-    getFixtureDetails(fixtureId),
-    getFixtureMatches(fixtureId)
-  ]);
-  
-  if (!fixtureResult.success) {
+  // Loading state
+  if (authLoading || fixtureLoading || teamsLoading) {
     return (
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-24 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+          <div className="space-y-6">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-64 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (fixtureError) {
+    return (
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="text-center py-12 bg-white rounded-lg border border-red-200">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Fixture Not Found</h3>
-          <p className="text-gray-600">{fixtureResult.error}</p>
+          <p className="text-gray-600">{fixtureError.message}</p>
           <Link href={`/en/volunteer/venues/${venueId}/fixtures`}>
             <button className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors">
               Back to Fixtures
@@ -130,22 +91,24 @@ export default async function FixtureDetailPage({ params }: PageProps) {
       </div>
     );
   }
-  
-  const { fixture } = fixtureResult;
-  
-  // Get all team IDs from bracket matches and assigned teams
-  // Defensive: fallback to empty array if assignedTeams or bracket/matches are missing
-  const allTeamIds = [
-    ...((fixture && 'assignedTeams' in fixture && Array.isArray((fixture as any).assignedTeams)) ? (fixture as any).assignedTeams : []),
-    ...((fixture && 'bracket' in fixture && fixture.bracket && 'matches' in (fixture as any).bracket && Array.isArray((fixture.bracket as any).matches))
-      ? (fixture.bracket as any).matches.flatMap((match: any) => [match?.team1Id, match?.team2Id, match?.winnerId])
-      : [])
-  ].filter(Boolean);
 
-  // Load team details with unique IDs only
-  const uniqueTeamIds = Array.from(new Set(allTeamIds));
-  const teams = await getTeamDetails(uniqueTeamIds);
-  const pageEndTime = Date.now();
+  // No fixture data
+  if (!fixture) {
+    return (
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Fixture Found</h3>
+          <p className="text-gray-600">Unable to load fixture details.</p>
+          <Link href={`/en/volunteer/venues/${venueId}/fixtures`}>
+            <button className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors">
+              Back to Fixtures
+            </button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -181,14 +144,18 @@ export default async function FixtureDetailPage({ params }: PageProps) {
   };
 
   // Group matches by round for bracket visualization
-  const matchesByRound = (fixture as any)?.bracket.matches.reduce((acc: any, match: any) => {
-    const round = match.roundName;
-    if (!acc[round]) {
-      acc[round] = [];
-    }
-    acc[round].push(match);
-    return acc;
-  }, {});
+  const matchesByRound = useMemo(() => {
+    if (!fixture?.bracket?.matches) return {};
+    
+    return fixture.bracket.matches.reduce((acc: any, match: any) => {
+      const round = match.roundName;
+      if (!acc[round]) {
+        acc[round] = [];
+      }
+      acc[round].push(match);
+      return acc;
+    }, {});
+  }, [fixture?.bracket?.matches]);
 
   // Sort rounds in tournament order
   const roundOrder = ['Round of 64', 'Round of 32', 'Round of 16', 'Quarter Final', 'Semi Final', 'Final'];
@@ -214,7 +181,7 @@ export default async function FixtureDetailPage({ params }: PageProps) {
             Back to Fixtures
           </Link>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">{(fixture as any)?.name}</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{fixture.name}</h1>
         <p className="text-gray-600 text-sm">Tournament Bracket & Match Progress</p>
       </div>
 
@@ -224,16 +191,16 @@ export default async function FixtureDetailPage({ params }: PageProps) {
           <div className="flex items-center mb-4 lg:mb-0">
             <Trophy className="w-6 h-6 text-[#F28C38] mr-3" />
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">{(fixture as any)?.name}</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{fixture.name}</h2>
               <p className="text-gray-600 text-sm">
-                {(fixture as any)?.assignedTeams?.length || 0} teams • {(fixture as any)?.level} level • {(fixture as any)?.venueName}
+                {fixture.assignedTeams?.length || 0} teams • {fixture.level} level
               </p>
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor((fixture as any)?.status)}`}>
-              {getStatusIcon((fixture as any)?.status)}
-              <span className="ml-1 capitalize">{(fixture as any)?.status.replace('_', ' ')}</span>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(fixture.status)}`}>
+              {getStatusIcon(fixture.status)}
+              <span className="ml-1 capitalize">{fixture.status.replace('_', ' ')}</span>
             </span>
             <Link href={`/en/volunteer/venues/${venueId}/matches?fixture=${fixtureId}`}>
               <button className="flex items-center px-4 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors">
@@ -251,7 +218,7 @@ export default async function FixtureDetailPage({ params }: PageProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Total Teams</p>
-              <p className="text-2xl font-bold text-gray-900">{(fixture as any)?.assignedTeams?.length || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">{fixture.assignedTeams?.length || 0}</p>
             </div>
             <Users className="w-8 h-8 text-gray-400" />
           </div>
@@ -261,7 +228,7 @@ export default async function FixtureDetailPage({ params }: PageProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Total Matches</p>
-              <p className="text-2xl font-bold text-blue-600">{(fixture as any)?.bracket.matches.length}</p>
+              <p className="text-2xl font-bold text-blue-600">{fixture.bracket?.matches?.length || 0}</p>
             </div>
             <Calendar className="w-8 h-8 text-blue-400" />
           </div>
@@ -272,7 +239,7 @@ export default async function FixtureDetailPage({ params }: PageProps) {
             <div>
               <p className="text-gray-600 text-sm">Completed</p>
               <p className="text-2xl font-bold text-green-600">
-                {(fixture as any)?.bracket.matches.filter((m: any) => m.status === 'completed').length}
+                {fixture.bracket?.matches?.filter((m: any) => m.status === 'completed').length || 0}
               </p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-400" />
@@ -426,13 +393,13 @@ export default async function FixtureDetailPage({ params }: PageProps) {
         </div>
 
         {/* Tournament Winner */}
-        {(fixture as any)?.status === 'completed' && (fixture as any)?.bracket.winners && (fixture as any)?.bracket.winners.length > 0 && (
+        {fixture.status === 'completed' && fixture.bracket?.winners && fixture.bracket.winners.length > 0 && (
           <div className="mt-8 p-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-lg">
             <div className="text-center">
               <Crown className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
               <h3 className="text-xl font-bold text-gray-900 mb-2">Tournament Complete!</h3>
               <div className="space-y-2">
-                {(fixture as any)?.bracket.winners.map((winnerId: string, index: number) => (
+                {fixture.bracket.winners.map((winnerId: string, index: number) => (
                   <div key={winnerId} className="flex items-center justify-center">
                     <Trophy className="w-5 h-5 text-yellow-500 mr-2" />
                     <span className="font-semibold text-lg">

@@ -795,7 +795,7 @@ export const teamsRouter = createTRPCRouter({
         }
 
         // Check if user already exists by phone number
-        let user = await db.users.findUnique({
+        const user = await db.users.findUnique({
           where: { phone: input.phone },
         })
 
@@ -1308,4 +1308,921 @@ export const teamsRouter = createTRPCRouter({
 
       return transformedTeam;
     }),
+
+  // Verification procedures
+  getForVerification: protectedProcedure
+    .input(z.object({
+      searchTerm: z.string().optional(),
+      statusFilter: z.string().optional(),
+    }))
+    .query(async ({ input, ctx }) => {
+      try {
+        // Check if user has verification role
+        if (!ctx.user || (ctx.user.role !== 'verification_volunteer' && ctx.user.role !== 'admin')) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to access verification functionality',
+          });
+        }
+
+        const { searchTerm = '', statusFilter = 'all' } = input;
+
+        // Build where conditions
+        const where: any = {};
+
+        // Filter by status
+        if (statusFilter && statusFilter !== 'all') {
+          switch (statusFilter) {
+            case 'pending':
+              where.status = { in: ['submitted', 'pending'] };
+              break;
+            case 'verified':
+              where.status = 'verified';
+              break;
+            case 'rejected':
+              where.status = 'rejected';
+              break;
+            case 'partial':
+              where.status = 'partial_verification';
+              break;
+            default:
+              break;
+          }
+        }
+
+        // Add search functionality
+        if (searchTerm.trim()) {
+          where.OR = [
+            { name: { contains: searchTerm, mode: 'insensitive' } },
+            { captain_name: { contains: searchTerm, mode: 'insensitive' } },
+            { panchayat: { contains: searchTerm, mode: 'insensitive' } },
+            { district: { contains: searchTerm, mode: 'insensitive' } },
+          ];
+        }
+
+        const teams = await db.teams.findMany({
+          where,
+          include: {
+            sports: {
+              select: {
+                id: true,
+                name: true,
+                main_players_count: true,
+              },
+            },
+            users_teams_captain_idTousers: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                phone: true,
+              },
+            },
+            events: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+              },
+            },
+            _count: {
+              select: {
+                team_players: true,
+              },
+            },
+          },
+          orderBy: { created_at: 'desc' },
+        });
+
+        // Transform data to match frontend expectations
+        const transformedTeams = teams.map(team => ({
+          id: team.id,
+          name: team.name,
+          sportName: team.sports?.name || 'Unknown',
+          captainProfile: {
+            name: `${team.users_teams_captain_idTousers?.first_name || ''} ${team.users_teams_captain_idTousers?.last_name || ''}`.trim(),
+            phone: team.users_teams_captain_idTousers?.phone || '',
+          },
+          panchayat: team.panchayat,
+          district: team.district,
+          state: team.state,
+          currentPlayers: team._count?.team_players || 0,
+          maxPlayers: team.sports?.main_players_count || 0,
+          status: team.status,
+          submittedAt: team.created_at,
+          genderCategory: team.gender_category,
+        }));
+
+        // Apply client-side filtering if needed
+        const filteredTeams = [...transformedTeams];
+
+        return {
+          teams: transformedTeams,
+          filteredTeams,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch teams for verification',
+        });
+      }
+    }),
+
+  getForVerificationDetail: protectedProcedure
+    .input(z.object({
+      teamId: z.string().uuid(),
+    }))
+    .query(async ({ input, ctx }) => {
+      try {
+        // Check if user has verification role
+        if (!ctx.user || (ctx.user.role !== 'verification_volunteer' && ctx.user.role !== 'admin')) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to access verification functionality',
+          });
+        }
+
+        const team = await db.teams.findUnique({
+          where: { id: input.teamId },
+          include: {
+            sports: {
+              select: {
+                id: true,
+                name: true,
+                main_players_count: true,
+                max_substitutes: true,
+              },
+            },
+            users_teams_captain_idTousers: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                phone: true,
+              },
+            },
+            events: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+              },
+            },
+            team_players: {
+              select: {
+                id: true,
+                user_id: true,
+                first_name: true,
+                last_name: true,
+                phone: true,
+                whatsapp_number: true,
+                date_of_birth: true,
+                age: true,
+                gender: true,
+                position: true,
+                verification_status: true,
+                panchayat: true,
+                taluk: true,
+                district: true,
+                state: true,
+                pincode: true,
+                created_at: true,
+                users: {
+                  select: {
+                    id: true,
+                    first_name: true,
+                    last_name: true,
+                    phone: true,
+                    user_profile_images_user_profile_images_user_idTousers: {
+                      select: {
+                        profile_photo_path: true,
+                        aadhaar_front_path: true,
+                        aadhaar_back_path: true,
+                        all_images_uploaded: true,
+                        verified_by: true,
+                        verified_at: true,
+                      },
+                    },
+                  },
+                },
+              },
+              orderBy: [
+                { position: 'asc' },
+                { created_at: 'asc' },
+              ],
+            },
+          },
+        });
+
+        if (!team) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Team not found',
+          });
+        }
+
+        // Transform team data
+        const transformedTeam = {
+          id: team.id,
+          name: team.name,
+          sportName: team.sports?.name || 'Unknown',
+          sportId: team.sport_id,
+          captainProfile: {
+            name: `${team.users_teams_captain_idTousers?.first_name || ''} ${team.users_teams_captain_idTousers?.last_name || ''}`.trim(),
+            phone: team.users_teams_captain_idTousers?.phone || '',
+          },
+          panchayat: team.panchayat,
+          district: team.district,
+          state: team.state,
+          currentPlayers: team.team_players.length,
+          maxPlayers: (team.sports?.main_players_count || 0) + (team.sports?.max_substitutes || 0),
+          status: team.status,
+          submittedAt: team.created_at,
+          genderCategory: team.gender_category,
+        };
+
+        // Transform players data
+        const transformedPlayers = team.team_players.map(player => ({
+          playerId: player.id,
+          userId: player.user_id,
+          name: `${player.first_name} ${player.last_name}`.trim(),
+          phone: player.phone,
+          dob: player.date_of_birth,
+          age: player.age,
+          gender: player.gender,
+          position: player.position,
+          profileData: {
+            firstName: player.first_name,
+            lastName: player.last_name,
+            whatsappNumber: player.whatsapp_number || '',
+            village: player.taluk || '',
+            panchayat: player.panchayat,
+            district: player.district,
+            state: player.state,
+          },
+          documents: {
+            profilePhoto: {
+              url: player.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path || null,
+              verified: !!player.users?.user_profile_images_user_profile_images_user_idTousers?.verified_by,
+              uploadedAt: null,
+              uploadedBy: null,
+            },
+            aadhaarFront: {
+              url: player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path || null,
+              verified: !!player.users?.user_profile_images_user_profile_images_user_idTousers?.verified_by,
+              uploadedAt: null,
+              uploadedBy: null,
+            },
+            aadhaarBack: {
+              url: player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path || null,
+              verified: !!player.users?.user_profile_images_user_profile_images_user_idTousers?.verified_by,
+              uploadedAt: null,
+              uploadedBy: null,
+            },
+          },
+          verificationStatus: player.verification_status || 'pending',
+          verificationComments: [], // Would need separate comments table
+        }));
+
+        return {
+          team: transformedTeam,
+          players: transformedPlayers,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch team details for verification',
+        });
+      }
+    }),
+
+  // Player verification procedures
+  verifyPlayer: protectedProcedure
+    .input(z.object({
+      playerId: z.string().uuid(),
+      status: z.enum(['verified', 'rejected']),
+      comments: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // Check if user has verification role
+        if (!ctx.user || (ctx.user.role !== 'verification_volunteer' && ctx.user.role !== 'admin')) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to verify players',
+          });
+        }
+
+        // Update player verification status
+        const updatedPlayer = await db.team_players.update({
+          where: { id: input.playerId },
+          data: {
+            verification_status: input.status,
+            // Add verification comments if needed (would need additional table)
+          },
+        });
+
+        // Get team and check if all players are verified
+        const team = await db.teams.findUnique({
+          where: { id: updatedPlayer.team_id },
+          include: {
+            team_players: {
+              select: {
+                verification_status: true,
+              },
+            },
+          },
+        });
+
+        if (team) {
+          const allPlayersVerified = team.team_players.every(
+            player => player.verification_status === 'verified'
+          );
+
+          // Update team status if all players are verified
+          if (allPlayersVerified && team.status === 'submitted') {
+            await db.teams.update({
+              where: { id: team.id },
+              data: { status: 'verified' },
+            });
+          }
+        }
+
+        return updatedPlayer;
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify player',
+        });
+      }
+    }),
+
+  verifyPlayersBulk: protectedProcedure
+    .input(z.object({
+      playerIds: z.array(z.string().uuid()),
+      status: z.enum(['verified', 'rejected']),
+      comments: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        // Check if user has verification role
+        if (!ctx.user || (ctx.user.role !== 'verification_volunteer' && ctx.user.role !== 'admin')) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to verify players',
+          });
+        }
+
+        // Update all players
+        const updatedPlayers = await db.team_players.updateMany({
+          where: { id: { in: input.playerIds } },
+          data: {
+            verification_status: input.status,
+          },
+        });
+
+        // Get all affected teams and update their status if needed
+        const affectedPlayers = await db.team_players.findMany({
+          where: { id: { in: input.playerIds } },
+          select: { team_id: true },
+        });
+
+        const uniqueTeamIds = [...new Set(affectedPlayers.map(p => p.team_id))];
+
+        // Check each team and update status if all players are verified
+        for (const teamId of uniqueTeamIds) {
+          const team = await db.teams.findUnique({
+            where: { id: teamId },
+            include: {
+              team_players: {
+                select: {
+                  verification_status: true,
+                },
+              },
+            },
+          });
+
+          if (team) {
+            const allPlayersVerified = team.team_players.every(
+              player => player.verification_status === 'verified'
+            );
+
+            if (allPlayersVerified && team.status === 'submitted') {
+              await db.teams.update({
+                where: { id: team.id },
+                data: { status: 'verified' },
+              });
+            }
+          }
+        }
+
+        return { updated: updatedPlayers.count };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify players in bulk',
+        });
+      }
+    }),
+
+  // Get fixtures for captain/player teams
+  getMyTeamFixtures: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      if (!ctx.user) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You must be logged in to view team fixtures',
+        });
+      }
+
+      // Get teams where user is captain or player
+      let teams = [];
+      
+      if (ctx.user.role === 'captain') {
+        teams = await db.teams.findMany({
+          where: { captain_id: ctx.user.id },
+          select: {
+            id: true,
+            name: true,
+            sport_id: true,
+            gender_category: true,
+            status: true,
+            team_venue_assignments: {
+              select: {
+                cluster_venue_mapping_id: true,
+                division_venue_mapping_id: true,
+                final_venue_mapping_id: true,
+              },
+            },
+          },
+        });
+      } else if (ctx.user.role === 'player') {
+        const playerTeams = await db.team_players.findMany({
+          where: { user_id: ctx.user.id },
+          include: {
+            teams: {
+              select: {
+                id: true,
+                name: true,
+                sport_id: true,
+                gender_category: true,
+                status: true,
+                team_venue_assignments: {
+                  select: {
+                    cluster_venue_mapping_id: true,
+                    division_venue_mapping_id: true,
+                    final_venue_mapping_id: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+        teams = playerTeams.map(pt => pt.teams);
+      }
+
+      if (teams.length === 0) {
+        return [];
+      }
+
+      // Get all venue location mapping IDs for these teams
+      const venueLocationMappingIds = new Set<string>();
+      
+      teams.forEach(team => {
+        team.team_venue_assignments?.forEach(assignment => {
+          if (assignment.cluster_venue_mapping_id) venueLocationMappingIds.add(assignment.cluster_venue_mapping_id);
+          if (assignment.division_venue_mapping_id) venueLocationMappingIds.add(assignment.division_venue_mapping_id);
+          if (assignment.final_venue_mapping_id) venueLocationMappingIds.add(assignment.final_venue_mapping_id);
+        });
+      });
+
+      if (venueLocationMappingIds.size === 0) {
+        return [];
+      }
+
+      // Get fixtures for these venue locations
+      const fixtures = await db.fixtures.findMany({
+        where: {
+          venue_location_mapping_id: { in: Array.from(venueLocationMappingIds) },
+        },
+        include: {
+          sports: {
+            select: {
+              id: true,
+              name: true,
+              display_name: true,
+            },
+          },
+          venue_location_mappings: {
+            include: {
+              venues: {
+                select: {
+                  id: true,
+                  name: true,
+                  address: true,
+                  district: true,
+                  state: true,
+                },
+              },
+            },
+          },
+          fixture_teams: {
+            include: {
+              teams: {
+                select: {
+                  id: true,
+                  name: true,
+                  tournament_number: true,
+                },
+              },
+            },
+          },
+          matches: {
+            select: {
+              id: true,
+              status: true,
+            },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+
+      const teamIds = teams.map(t => t.id);
+
+      // Transform fixtures for frontend
+      const transformedFixtures = fixtures.map(fixture => {
+        const assignedTeams = fixture.fixture_teams?.map(ft => ft.teams) || [];
+        const hasCaptainTeam = assignedTeams.some(team => team && teamIds.includes(team.id));
+        const captainTeamNames = assignedTeams
+          .filter(team => team && teamIds.includes(team.id))
+          .map(team => team?.name || '');
+
+        return {
+          id: fixture.id,
+          name: fixture.name,
+          sportId: fixture.sport_id,
+          sportName: fixture.sports?.display_name || fixture.sports?.name || 'Unknown',
+          genderCategory: fixture.gender_category,
+          level: fixture.level,
+          status: fixture.status,
+          venue: {
+            id: fixture.venue_location_mappings?.venues?.id,
+            name: fixture.venue_location_mappings?.venues?.name || 'Unknown Venue',
+            address: fixture.venue_location_mappings?.venues?.address || '',
+            district: fixture.venue_location_mappings?.venues?.district || '',
+            state: fixture.venue_location_mappings?.venues?.state || '',
+          },
+          assignedTeams: assignedTeams.map(team => ({
+            id: team?.id,
+            name: team?.name,
+            tournamentNumber: team?.tournament_number,
+          })),
+          hasCaptainTeam,
+          captainTeamNames,
+          totalMatches: fixture.matches?.length || 0,
+          completedMatches: fixture.matches?.filter(m => m.status === 'completed').length || 0,
+          createdAt: fixture.created_at?.toISOString(),
+          updatedAt: fixture.updated_at?.toISOString(),
+        };
+      });
+
+      return transformedFixtures;
+    } catch (error) {
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch team fixtures',
+      });
+    }
+  }),
+
+  // Get matches for captain/player teams
+  getMyTeamMatches: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      if (!ctx.user) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You must be logged in to view team matches',
+        });
+      }
+
+      // Get teams where user is captain or player
+      let teams = [];
+      
+      if (ctx.user.role === 'captain') {
+        teams = await db.teams.findMany({
+          where: { captain_id: ctx.user.id },
+          select: { id: true, name: true },
+        });
+      } else if (ctx.user.role === 'player') {
+        const playerTeams = await db.team_players.findMany({
+          where: { user_id: ctx.user.id },
+          include: {
+            teams: {
+              select: { id: true, name: true },
+            },
+          },
+        });
+        teams = playerTeams.map(pt => pt.teams);
+      }
+
+      if (teams.length === 0) {
+        return [];
+      }
+
+      const teamIds = teams.map(t => t.id);
+
+      // Get matches involving these teams
+      const matches = await db.matches.findMany({
+        where: {
+          OR: [
+            { team1_id: { in: teamIds } },
+            { team2_id: { in: teamIds } },
+          ],
+        },
+        include: {
+          teams_matches_team1_idToteams: {
+            select: {
+              id: true,
+              name: true,
+              tournament_number: true,
+            },
+          },
+          teams_matches_team2_idToteams: {
+            select: {
+              id: true,
+              name: true,
+              tournament_number: true,
+            },
+          },
+          teams_matches_winner_idToteams: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          sports: {
+            select: {
+              name: true,
+              display_name: true,
+            },
+          },
+          fixtures: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
+          venue_location_mappings: {
+            include: {
+              venues: {
+                select: {
+                  id: true,
+                  name: true,
+                  address: true,
+                  district: true,
+                  state: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+
+      // Transform matches for frontend
+      const transformedMatches = matches.map(match => {
+        const isCaptainTeam1 = match.team1_id && teamIds.includes(match.team1_id);
+        const isCaptainTeam2 = match.team2_id && teamIds.includes(match.team2_id);
+        const isCaptainInvolved = isCaptainTeam1 || isCaptainTeam2;
+        const captainTeamSide = isCaptainTeam1 ? 'team1' : isCaptainTeam2 ? 'team2' : null;
+        const isCaptainTeamWinner = match.winner_id && teamIds.includes(match.winner_id);
+
+        return {
+          matchId: match.id,
+          fixtureId: match.fixture_id,
+          fixtureName: match.fixtures?.name || 'Tournament Match',
+          sportName: match.sports?.display_name || match.sports?.name || 'Unknown',
+          genderCategory: match.gender_category,
+          roundName: match.round_name,
+          matchNumber: match.match_number,
+          status: match.status,
+          team1: match.teams_matches_team1_idToteams ? {
+            teamId: match.teams_matches_team1_idToteams.id,
+            teamName: match.teams_matches_team1_idToteams.name,
+            tournamentNumber: match.teams_matches_team1_idToteams.tournament_number,
+          } : null,
+          team2: match.teams_matches_team2_idToteams ? {
+            teamId: match.teams_matches_team2_idToteams.id,
+            teamName: match.teams_matches_team2_idToteams.name,
+            tournamentNumber: match.teams_matches_team2_idToteams.tournament_number,
+          } : null,
+          result: match.teams_matches_winner_idToteams ? {
+            winnerName: match.teams_matches_winner_idToteams.name,
+            winnerTeamId: match.teams_matches_winner_idToteams.id,
+            score: {
+              team1Score: match.team1_score || 0,
+              team2Score: match.team2_score || 0,
+            },
+          } : null,
+          venue: {
+            id: match.venue_location_mappings?.venues?.id,
+            name: match.venue_location_mappings?.venues?.name || 'Unknown Venue',
+            address: match.venue_location_mappings?.venues?.address || '',
+          },
+          isCaptainInvolved,
+          captainTeamSide,
+          isCaptainTeamWinner,
+          createdAt: match.created_at?.toISOString(),
+          updatedAt: match.updated_at?.toISOString(),
+        };
+      });
+
+      return transformedMatches;
+    } catch (error) {
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch team matches',
+      });
+    }
+  }),
+
+  // Get teams for current user (captain or player)
+  getMyTeams: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      if (!ctx.user) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You must be logged in to view teams',
+        });
+      }
+
+      let teams = [];
+
+      if (ctx.user.role === 'captain') {
+        teams = await db.teams.findMany({
+          where: { captain_id: ctx.user.id },
+          include: {
+            sports: {
+              select: {
+                name: true,
+                display_name: true,
+                main_players_count: true,
+                max_substitutes: true,
+              },
+            },
+            team_players: {
+              select: {
+                id: true,
+              },
+            },
+            team_venue_assignments: {
+              include: {
+                venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings: {
+                  include: {
+                    venues: {
+                      select: {
+                        id: true,
+                        name: true,
+                        address: true,
+                      },
+                    },
+                  },
+                },
+                venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings: {
+                  include: {
+                    venues: {
+                      select: {
+                        id: true,
+                        name: true,
+                        address: true,
+                      },
+                    },
+                  },
+                },
+                venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings: {
+                  include: {
+                    venues: {
+                      select: {
+                        id: true,
+                        name: true,
+                        address: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+      } else if (ctx.user.role === 'player') {
+        const playerTeams = await db.team_players.findMany({
+          where: { user_id: ctx.user.id },
+          include: {
+            teams: {
+              include: {
+                sports: {
+                  select: {
+                    name: true,
+                    display_name: true,
+                    main_players_count: true,
+                    max_substitutes: true,
+                  },
+                },
+                team_players: {
+                  select: {
+                    id: true,
+                  },
+                },
+                team_venue_assignments: {
+                  include: {
+                    venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings: {
+                      include: {
+                        venues: {
+                          select: {
+                            id: true,
+                            name: true,
+                            address: true,
+                          },
+                        },
+                      },
+                    },
+                    venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings: {
+                      include: {
+                        venues: {
+                          select: {
+                            id: true,
+                            name: true,
+                            address: true,
+                          },
+                        },
+                      },
+                    },
+                    venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings: {
+                      include: {
+                        venues: {
+                          select: {
+                            id: true,
+                            name: true,
+                            address: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+        teams = playerTeams.map(pt => pt.teams);
+      }
+
+      // Transform teams for frontend
+      const transformedTeams = teams.map(team => {
+        // Get venue assignment (prefer final > division > cluster)
+        const venueAssignment = 
+          team.team_venue_assignments?.find(assignment => 
+            assignment.venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings
+          )?.venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings ||
+          team.team_venue_assignments?.find(assignment => 
+            assignment.venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings
+          )?.venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings ||
+          team.team_venue_assignments?.find(assignment => 
+            assignment.venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings
+          )?.venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings;
+
+        return {
+          teamId: team.id,
+          name: team.name,
+          sportName: team.sports?.display_name || team.sports?.name || 'Unknown',
+          panchayat: team.panchayat,
+          district: team.district,
+          state: team.state,
+          status: team.status,
+          currentPlayers: team.team_players?.length || 0,
+          maxPlayers: (team.sports?.main_players_count || 0) + (team.sports?.max_substitutes || 0),
+          venue: venueAssignment?.venues ? {
+            id: venueAssignment.venues.id,
+            name: venueAssignment.venues.name,
+            address: venueAssignment.venues.address || '',
+          } : undefined,
+        };
+      });
+
+      return transformedTeams;
+    } catch (error) {
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch teams',
+      });
+    }
+  }),
 })

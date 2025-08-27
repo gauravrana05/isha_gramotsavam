@@ -261,7 +261,7 @@ export default function Header({ lang }: HeaderProps) {
                   {sportsQuery.data?.map((sport) => (
                     <Link
                       key={sport.id}
-                      href={`/${lang}/public/sports/${sport.id}`}
+                      href={`/${lang}/public/sports/${sport.name.toLowerCase().replace(/\s+/g, '-')}`}
                       className="block text-gray-300 hover:text-primary-500 transition-colors"
                       onClick={closeMobileMenu}
                     >

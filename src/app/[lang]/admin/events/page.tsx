@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { api } from '@/server/trpc/react';
 import { 
   AdvancedTable,
   StatsCard,

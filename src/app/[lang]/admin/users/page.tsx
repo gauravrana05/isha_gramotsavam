@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getAdminUsers } from '@/lib/actions/admin/optimizedUserQueries';
+import { api } from '@/server/trpc/react';
 import {
   Users,
   Eye,
@@ -51,132 +51,25 @@ export default function AdminUsersPage() {
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
 
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
-  const [users, setUsers] = useState<AdminUserRow[]>([]);
-  const [total, setTotal] = useState<number>(0);
+  // tRPC query for users
+  const {
+    data: usersData,
+    isLoading: usersLoading,
+    error: usersError
+  } = api.admin.getUsers.useQuery({
+    limit: 100,
+    offset: 0,
+    role: 'all',
+    gender: 'all',
+    isVerified: 'all',
+    isProfileComplete: 'all',
+    sortBy: 'createdAt',
+    sortOrder: 'desc'
+  }, {
+    enabled: !!user && userProfile?.role === 'admin'
+  });
 
-  // Load users when table state changes (server-side via AdvancedTable.onDataLoad)
-  const handleDataLoad = useCallback(async (params: TableParams) => {
-    // Console log removed
-    try {
-      // Guard against running when not authenticated
-      if (!user?.uid) {
-        // Console log removed
-        return;
-      }
-      // Console log removed
-      setLoading(true);
-
-      // Add a small delay to see if this is the issue
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Map filters from sidebar
-      const byKey = (key: string) => params.filters.find(f => f.key === key)?.value;
-
-      const role = (byKey('role') || 'all') as
-        | UserRole
-        | 'volunteer'
-        | 'all';
-      const gender = (byKey('gender') || 'all') as 'M' | 'F' | 'O' | 'all';
-      const district = (byKey('district') || undefined) as string | undefined;
-      const isVerifiedSel = (byKey('verification') || 'all') as 'all' | 'verified' | 'pending';
-
-      // Sorting (support first sort only for server)
-      const sort = params.sort?.[0];
-      const sortBy = sort?.key === 'name'
-        ? 'firstName'
-        : sort?.key === 'createdAt'
-          ? 'createdAt'
-          : sort?.key === 'role'
-            ? 'role'
-            : 'createdAt';
-      const sortOrder = sort?.direction || 'desc';
-
-      const result = await getAdminUsers(
-        {
-          limit: params.pageSize,
-          offset: (params.page - 1) * params.pageSize,
-          role: role,
-          gender: gender,
-          district: district,
-          isVerified: isVerifiedSel,
-          isProfileComplete: 'all',
-          searchQuery: params.search || undefined,
-          sortBy: sortBy as any,
-          sortOrder
-        },
-        user.uid
-      );
-
-      if (!result.success) {
-        // Console log removed
-        setError(result.error || 'Failed to load users');
-        setUsers([]);
-        setTotal(0);
-        return;
-      }
-
-      // Console log removed
-      setError('');
-      setUsers(result.users || []);
-      setTotal(result.pagination?.total || (result.users?.length ?? 0));
-    } catch (e: any) {
-      // Console log removed
-      // Error handling removed
-      setError(e?.message || 'Failed to load users');
-      setUsers([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.uid]);
-
-  // Load users with simple pattern like teams page
-  const loadUsers = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      if (!user?.uid) {
-        throw new Error('User not authenticated');
-      }
-
-      const result = await getAdminUsers(
-        {
-          limit: 50,
-          offset: 0,
-          role: 'all',
-          gender: 'all',
-          district: undefined,
-          isVerified: 'all',
-          isProfileComplete: 'all',
-          searchQuery: undefined,
-          sortBy: 'createdAt' as any,
-          sortOrder: 'desc'
-        },
-        user.uid
-      );
-
-      if (!result.success) {
-        setError(result.error || 'Failed to load users');
-        setUsers([]);
-        setTotal(0);
-        return;
-      }
-
-      setError('');
-      setUsers(result.users || []);
-      setTotal(result.pagination?.total || (result.users?.length ?? 0));
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load users');
-      setUsers([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.uid]);
-
-  // Auth gate and data loading like teams page
+  // Auth gate
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -187,12 +80,12 @@ export default function AdminUsersPage() {
       router.push(`/${lang}/player/dashboard`);
       return;
     }
-    
-    loadUsers();
-  }, [user, userProfile, authLoading, lang, router, loadUsers]);
+  }, [user, userProfile, authLoading, lang, router]);
 
-  // Client-side filtering handled by AdvancedTable (like teams page)
-  const filteredUsers = users;
+  const loading = usersLoading;
+  const error = usersError?.message || '';
+  const users = usersData?.users || [];
+  const total = usersData?.pagination?.total || 0;
 
   const columns: Column<AdminUserRow>[] = useMemo(() => [
     {
@@ -372,7 +265,7 @@ export default function AdminUsersPage() {
       </div>
 
       <AdvancedTable<AdminUserRow>
-        data={filteredUsers}
+        data={users}
         columns={columns}
         actions={actions}
         loading={loading}

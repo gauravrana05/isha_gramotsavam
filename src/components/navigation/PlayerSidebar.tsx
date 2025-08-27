@@ -70,7 +70,7 @@ export default function PlayerSidebar({
       icon: LayoutDashboard,
     },
     {
-      name: 'My Teams',
+      name: 'My Team',
       href: `/${lang}/player/teams`,
       icon: Users,
     },

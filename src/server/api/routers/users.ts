@@ -112,7 +112,7 @@ export const usersRouter = createTRPCRouter({
           where: { id },
           data: {
             ...profileData,
-            profileComplete: true,
+            profile_complete: true,
           },
         })
 
@@ -193,7 +193,7 @@ export const usersRouter = createTRPCRouter({
           where: { id },
           data: {
             ...updateData,
-            verifiedAt: updateData.status === 'approved' ? new Date() : null,
+            verified_at: updateData.status === 'approved' ? new Date() : null,
           },
         })
 
@@ -212,7 +212,7 @@ export const usersRouter = createTRPCRouter({
       const verifications = await db.user_verifications.findMany({
         where: { user_id: input.userId },
         include: {
-          verifier: {
+          users_user_verifications_verified_byTousers: {
             select: {
               id: true,
               first_name: true,
@@ -220,7 +220,7 @@ export const usersRouter = createTRPCRouter({
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { created_at: 'desc' },
       })
 
       return verifications
@@ -261,7 +261,7 @@ export const usersRouter = createTRPCRouter({
         db.users.findMany({
           where,
           include: {
-              user_profile_images: true,
+              user_profile_images_user_profile_images_user_idTousers: true,
           },
           skip,
           take: limit,
@@ -285,8 +285,8 @@ export const usersRouter = createTRPCRouter({
         const profileImage = await db.user_profile_images.update({
           where: { user_id: input.userId },
           data: {
-            verifiedBy: input.verifiedBy,
-            verifiedAt: input.approved ? new Date() : null,
+            verified_by: input.verifiedBy,
+            verified_at: input.approved ? new Date() : null,
           },
         })
 
@@ -295,20 +295,20 @@ export const usersRouter = createTRPCRouter({
           where: {
             user_id_verification_type: {
               user_id: input.userId,
-              verificationType: 'document_verification',
+              verification_type: 'document_verification',
             },
           },
           create: {
             user_id: input.userId,
-            verificationType: 'document_verification',
+            verification_type: 'document_verification',
             status: input.approved ? 'approved' : 'rejected',
-            verifiedBy: input.verifiedBy,
-            verifiedAt: input.approved ? new Date() : null,
+            verified_by: input.verifiedBy,
+            verified_at: input.approved ? new Date() : null,
           },
           update: {
             status: input.approved ? 'approved' : 'rejected',
-            verifiedBy: input.verifiedBy,
-            verifiedAt: input.approved ? new Date() : null,
+            verified_by: input.verifiedBy,
+            verified_at: input.approved ? new Date() : null,
           },
         })
 
@@ -345,7 +345,7 @@ export const usersRouter = createTRPCRouter({
         db.user_verifications.findMany({
           where,
           include: {
-            user: {
+            users_user_verifications_user_idTousers: {
               select: {
                 id: true,
                 first_name: true,
@@ -358,7 +358,7 @@ export const usersRouter = createTRPCRouter({
           },
           skip,
           take: limit,
-          orderBy: { createdAt: 'asc' },
+          orderBy: { created_at: 'asc' },
         }),
         db.user_verifications.count({ where }),
       ])
@@ -380,7 +380,7 @@ export const usersRouter = createTRPCRouter({
       try {
         const user = await db.users.update({
           where: { id: input.userId },
-          data: { role: input.role },
+          data: { role: input.role as any }, 
         })
 
         return user
@@ -389,6 +389,36 @@ export const usersRouter = createTRPCRouter({
           code: 'NOT_FOUND',
           message: 'User not found',
         })
+      }
+    }),
+
+  // Verification procedures
+  getVerificationProfile: protectedProcedure
+    .query(async ({ ctx }) => {
+      try {
+        const user = ctx.user;
+        
+        // Check if user has verification role
+        if (!user || (user.role !== 'verification_volunteer' && user.role !== 'admin')) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to access verification functionality',
+          });
+        }
+
+        return {
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          role: user.role,
+          email: user.email,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to get verification profile',
+        });
       }
     }),
 })

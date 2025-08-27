@@ -263,132 +263,66 @@ export default function PlayerDashboard() {
         
 
 
-        {/* Teams Section */}
-        {teams.length === 0 ? (
-          <div className="bg-white rounded-lg border p-8 text-center">
-            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Team Memberships</h3>
-            <p className="text-gray-600">You haven&apos;t joined any teams yet. Contact team captains to get added to teams.</p>
-          </div>
-        ) : (
+        {/* Team Specifications */}
+        {teams.length > 0 ? (
           <div className="space-y-6">
-            {teams.map((team) => (
-              <div key={team.teamId} className="bg-white rounded-lg border overflow-hidden">
-                {/* Team Header */}
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">{team.name}</h2>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm text-gray-600">
-                        <span className="flex items-center gap-1">
-                          <Trophy className="w-4 h-4" />
-                          {team.sportName}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-4 h-4" />
-                          {team.panchayat}, {team.district}
-                        </span>
-                        <span className="capitalize">{team.genderCategory === 'F' ? 'Women' : team.genderCategory === 'M' ? 'Men' : 'Mixed'}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(team)}`}>
-                        {getTeamDisplayStatus(team)}
-                      </div>
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${getVerificationStatusColor(team.verificationStatus)}`}>
-                        Your Status: {getVerificationStatusText(team.verificationStatus)}
-                      </div>
-                    </div>
+            {/* Team Header */}
+            <div className="bg-white rounded-lg border p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">{teams[0].name}</h2>
+                  <div className="flex flex-col sm:flex-row  sm:items-center gap-4 text-sm text-gray-600">
+                  <span className="flex capitalize items-center gap-1">
+                  {teams[0].genderCategory === 'F' ? <User className='w-4 h-4'/> : teams[0].genderCategory === 'M' ? <UserRound className='w-4 h-4'/> : <Users className='w-4 h-4'/>}
+                    {teams[0].genderCategory === 'F' ? t('women', 'Women') : teams[0].genderCategory === 'M' ? t('men', 'Men') : t('mixed', 'Mixed')}
+                  </span>
+                    
+                    <span className="flex  items-center gap-1">
+                      <Trophy className="w-4 h-4" />
+                      {teams[0].sportName}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      {teams[0].panchayat}, {teams[0].district}
+                    </span>
+                    
                   </div>
                 </div>
-
-                {/* Venue Assignment Info */}
-                {team.assignedVenue && (
-                  <div className="px-6 py-4 bg-green-50 border-t border-green-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <MapPin className="w-5 h-5 text-green-600" />
-                        <div>
-                          <p className="font-semibold text-green-800">Venue Assigned</p>
-                          <p className="text-green-700">{team.assignedVenue.venueName}</p>
-                        </div>
-                      </div>
-                      <div className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
-                        {team.assignedVenue.assignmentLevel}
-                      </div>
-                    </div>
-                    {team.checkedIn && team.checkedInAt && (
-                      <div className="mt-2 text-sm text-green-600">
-                        Checked in on {new Date(team.checkedInAt).toLocaleDateString()} at {new Date(team.checkedInAt).toLocaleTimeString()}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Team Details */}
-                <div className="p-6">
-                  <div className="grid md:grid-cols-2 gap-8">
-                    {/* Captain Information */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-[#4A2F1D] mb-4 flex items-center">
-                        <UserCheck className="w-5 h-5 mr-2" />
-                        Team Captain
-                      </h3>
-                      <div className="space-y-3">
-                        <div>
-                          <div className="text-sm font-medium text-gray-700 mb-1">Name</div>
-                          <div className="text-gray-900">{team.captainProfile.name || 'Not Available'}</div>
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                            <Phone className="w-4 h-4 mr-1" />
-                            Phone Number
-                          </div>
-                          <div className="text-gray-900">+91 {team.captainProfile.phone || 'Not Available'}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Team Statistics */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-[#4A2F1D] mb-4 flex items-center">
-                        <Users className="w-5 h-5 mr-2" />
-                        Team Statistics
-                      </h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-2xl font-bold text-blue-600">{team.currentPlayers}</div>
-                          <div className="text-sm text-gray-600">Current Players</div>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-2xl font-bold text-purple-600">{team.maxPlayers}</div>
-                          <div className="text-sm text-gray-600">Max Players</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Your Position */}
-                  <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-semibold text-blue-900">Your Position in Team</h4>
-                        <p className="text-blue-700 capitalize">{team.position} Player</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-blue-600">Joined On</p>
-                        <p className="font-medium text-blue-900">
-                          {team.joinedAt ? 
-                            new Date(team.joinedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 
-                            'Unknown'
-                          }
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  teams[0].status === 'verified' ? 'bg-green-100 text-green-800' :
+                  teams[0].status === 'submitted' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {teams[0].status.charAt(0).toUpperCase() + teams[0].status.slice(1)}
                 </div>
               </div>
-            ))}
+            </div>
+
+            {/* Team Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-lg border p-4 text-center">
+                <div className="text-2xl font-bold text-blue-600">{teams[0].position === 'main' ? 'Main' : 'Substitute'}</div>
+                <div className="text-sm text-gray-600">{t('your_position', 'Your Position')}</div>
+              </div>
+              <div className="bg-white rounded-lg border p-4 text-center">
+                <div className="text-2xl font-bold text-purple-600">{teams[0].maxPlayers}</div>
+                <div className="text-sm text-gray-600">{t('main_players', 'Main Players')}</div>
+              </div>
+              <div className="bg-white rounded-lg border p-4 text-center">
+                <div className="text-2xl font-bold text-orange-600">{Math.max(0, teams[0].currentPlayers - teams[0].maxPlayers)}</div>
+                <div className="text-sm text-gray-600">{t('substitutes', 'Substitutes')}</div>
+              </div>
+              <div className="bg-white rounded-lg border p-4 text-center">
+                <div className="text-2xl font-bold text-green-600">📅</div>
+                <div className="text-sm text-gray-600">{t('fixtures_soon', 'Fixtures Soon')}</div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg border p-8 text-center">
+            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('no_team_found', 'No Team Found')}</h3>
+            <p className="text-gray-600">{t('no_team_registered_message', "You don't have any team registered yet.")}</p>
           </div>
         )}
       </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getTeamForMatchDayVerification, verifyPlayerMatchDay } from '@/lib/actions/volunteer/matchDayVerification';
+import { api } from '@/server/trpc/react';
 import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
 import DocumentPreview from '@/components/documents/DocumentPreview';
 import PlayerDocumentUpload from '@/components/players/PlayerDocumentUpload';
@@ -71,79 +71,71 @@ export default function TeamMatchDayVerificationPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   
-  const [team, setTeam] = useState<TeamData | null>(null);
-  const [players, setPlayers] = useState<PlayerData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
 
+  const { data: teamData, isLoading: teamLoading, error: teamError, refetch: refetchTeamData } = api.volunteers.getTeamForMatchDay.useQuery(
+    { teamId },
+    {
+      enabled: !authLoading && !!user && !!teamId,
+    }
+  );
+
+  const verifyPlayerMutation = api.volunteers.verifyPlayerForMatchDay.useMutation({
+    onSuccess: async (result) => {
+      await refetchTeamData();
+      if (result.teamAutoCheckedIn) {
+        showSuccess(`Player verification successful! Team has been automatically checked in as all players are now approved.`);
+      } else {
+        showSuccess(`Player verification successful!`);
+      }
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to verify player');
+    },
+  });
+
+  const verifyPlayersBulkMutation = api.volunteers.verifyPlayersForMatchDayBulk.useMutation({
+    onSuccess: async (result) => {
+      await refetchTeamData();
+      setSelectedPlayers(new Set());
+      if (result.teamAutoCheckedIn) {
+        showSuccess(`Players verified successfully! Team has been automatically checked in as all players are now approved.`);
+      } else {
+        showSuccess(`Players verified successfully!`);
+      }
+    },
+    onError: (error) => {
+      showError(error.message || 'Failed to verify players in bulk');
+    },
+  });
+
+  const team = teamData?.team || null;
+  const players = teamData?.players || [];
+  const loading = authLoading || teamLoading;
+  const error = teamError?.message || '';
+
   useEffect(() => {
     if (authLoading) return;
     
     if (!user) {
-      setError('Please log in to access this page');
-      setLoading(false);
       return;
     }
-
-    loadTeamData();
   }, [user, authLoading, teamId]);
 
-  const loadTeamData = async () => {
-    try {
-      setLoading(true);
-      const result = await getTeamForMatchDayVerification(teamId, user!.uid);
-      
-      if (result.success) {
-        setTeam(result.team ?? null);
-        setPlayers(result.players ?? []);
-      } else {
-        setError(result.error || 'Failed to load team data');
-      }
-    } catch (err) {
-      // Error handling removed
-      setError('Failed to load team data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handlePlayerVerification = async (playerId: string, status: 'verified' | 'rejected', comments?: string) => {
-    try {
-      setSubmitting(true);
-      
-      const result = await verifyPlayerMatchDay({
-        playerId,
-        status,
-        comments: comments || '',
-        verifiedBy: user!.uid,
-        verificationIssues: status === 'rejected' ? ['Match day verification failed'] : [],
-        teamId: teamId, // Pass teamId for direct access
-        venueId: venueId // Pass venueId for auto check-in
-      });
-
-      if (result.success) {
-        // Reload team data to get updated verification status
-        await loadTeamData();
-        
-        if (result.teamAutoCheckedIn) {
-          showSuccess(`Player ${status} successfully! Team has been automatically checked in as all players are now verified.`);
-        } else {
-          showSuccess(`Player ${status} successfully!`);
-        }
-      } else {
-        showError(`Error: ${result.error}`);
-      }
-    } catch (error) {
-      // Error handling removed
-      showError('Failed to verify player. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+    // Update status from 'verified' to 'approved' for match day verification
+    const matchDayStatus = status === 'verified' ? 'approved' : 'rejected';
+    
+    verifyPlayerMutation.mutate({
+      playerId,
+      status: matchDayStatus,
+      comments: comments || '',
+      teamId,
+      venueId,
+    });
   };
 
   const handleBulkAction = async (action: 'verified' | 'rejected') => {
@@ -154,7 +146,7 @@ export default function TeamMatchDayVerificationPage() {
     
     const selectedPlayersList = players.filter(p => selectedPlayers.has(p.id));
     const eligiblePlayers = selectedPlayersList.filter(p => 
-      p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected'
+      p.matchDayVerificationStatus !== 'approved' && p.matchDayVerificationStatus !== 'rejected'
     );
     
     if (eligiblePlayers.length === 0) {
@@ -162,71 +154,35 @@ export default function TeamMatchDayVerificationPage() {
       return;
     }
     
-    const actionText = action === 'verified' ? 'verify' : 'reject';
+    const actionText = action === 'verified' ? 'approve' : 'reject';
     
     let reason = '';
     if (action === 'rejected') {
       reason = prompt('Reason for rejection:') || '';
       if (!reason) return;
     } else {
-      reason = 'Bulk verified by match day volunteer';
+      reason = 'Bulk approved by match day volunteer';
     }
     
     if (!confirm(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} ${eligiblePlayers.length} selected players?`)) {
       return;
     }
     
-    setSubmitting(true);
+    // Update status from 'verified' to 'approved' for match day verification
+    const matchDayStatus = action === 'verified' ? 'approved' : 'rejected';
     
-    try {
-      let successCount = 0;
-      let errorCount = 0;
-      
-      for (const player of eligiblePlayers) {
-        try {
-          const result = await verifyPlayerMatchDay({
-            playerId: player.id,
-            status: action,
-            comments: reason,
-            verifiedBy: user!.uid,
-            verificationIssues: action === 'rejected' ? ['Bulk rejection by match day volunteer'] : [],
-            teamId: teamId,
-            venueId: venueId
-          });
-
-          if (result.success) {
-            successCount++;
-          } else {
-            errorCount++;
-            // Error handling removed
-          }
-        } catch (error) {
-          errorCount++;
-          // Error handling removed
-        }
-      }
-
-      // Reload data after bulk operation
-      await loadTeamData();
-      
-      if (errorCount === 0) {
-        showSuccess(`Successfully ${action} ${successCount} players!`);
-      } else {
-        showInfo(`Completed bulk ${actionText}: ${successCount} successful, ${errorCount} failed. Please check and retry failed players individually.`);
-      }
-      
-      setSelectedPlayers(new Set()); // Clear selection
-    } catch (error) {
-      // Error handling removed
-      showError(`Bulk ${actionText} failed. Please try again.`);
-    } finally {
-      setSubmitting(false);
-    }
+    verifyPlayersBulkMutation.mutate({
+      playerIds: eligiblePlayers.map(p => p.id),
+      status: matchDayStatus,
+      comments: reason,
+      teamId,
+      venueId,
+    });
   };
 
   const handleSelectAll = () => {
     const unverifiedPlayers = players.filter(p => 
-      p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected'
+      p.matchDayVerificationStatus !== 'approved' && p.matchDayVerificationStatus !== 'rejected'
     );
     if (selectedPlayers.size === unverifiedPlayers.length) {
       setSelectedPlayers(new Set());
@@ -247,7 +203,7 @@ export default function TeamMatchDayVerificationPage() {
 
   const getPlayerStatusColor = (player: PlayerData) => {
     switch (player.matchDayVerificationStatus) {
-      case 'verified': return 'bg-green-100 text-green-800 border-green-200';
+      case 'approved': return 'bg-green-100 text-green-800 border-green-200';
       case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
       default: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     }
@@ -255,7 +211,7 @@ export default function TeamMatchDayVerificationPage() {
 
   const getPlayerStatusIcon = (player: PlayerData) => {
     switch (player.matchDayVerificationStatus) {
-      case 'verified': return <CheckCircle className="w-4 h-4" />;
+      case 'approved': return <CheckCircle className="w-4 h-4" />;
       case 'rejected': return <XCircle className="w-4 h-4" />;
       default: return <AlertCircle className="w-4 h-4" />;
     }
@@ -290,7 +246,7 @@ export default function TeamMatchDayVerificationPage() {
           <h1 className="text-2xl font-bold text-red-600">Error</h1>
           <p className="mt-2 text-gray-600">{error}</p>
           <button 
-            onClick={loadTeamData}
+            onClick={() => window.location.reload()}
             className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
             Retry
@@ -311,10 +267,10 @@ export default function TeamMatchDayVerificationPage() {
     );
   }
 
-  const verifiedCount = players.filter(p => p.matchDayVerificationStatus === 'verified').length;
+  const approvedCount = players.filter(p => p.matchDayVerificationStatus === 'approved').length;
   const rejectedCount = players.filter(p => p.matchDayVerificationStatus === 'rejected').length;
-  const pendingCount = players.length - verifiedCount - rejectedCount;
-  const allVerified = verifiedCount === players.length;
+  const pendingCount = players.length - approvedCount - rejectedCount;
+  const allApproved = approvedCount === players.length;
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -405,8 +361,8 @@ export default function TeamMatchDayVerificationPage() {
         <div className="bg-white rounded-lg p-4 shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm">Verified</p>
-              <p className="text-2xl font-bold text-green-600">{verifiedCount}</p>
+              <p className="text-gray-600 text-sm">Approved</p>
+              <p className="text-2xl font-bold text-green-600">{approvedCount}</p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-400" />
           </div>
@@ -444,19 +400,19 @@ export default function TeamMatchDayVerificationPage() {
       ) : (
         <>
           {/* Bulk Actions */}
-          {players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length > 0 && (
+          {players.filter(p => p.matchDayVerificationStatus !== 'approved' && p.matchDayVerificationStatus !== 'rejected').length > 0 && (
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <label className="flex items-center">
                     <input
                       type="checkbox"
-                      checked={selectedPlayers.size === players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length && players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length > 0}
+                      checked={selectedPlayers.size === players.filter(p => p.matchDayVerificationStatus !== 'approved' && p.matchDayVerificationStatus !== 'rejected').length && players.filter(p => p.matchDayVerificationStatus !== 'approved' && p.matchDayVerificationStatus !== 'rejected').length > 0}
                       onChange={handleSelectAll}
                       className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
                     />
                     <span className="ml-2 text-sm font-medium text-gray-700">
-                      Select All Unverified ({players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length})
+                      Select All Unverified ({players.filter(p => p.matchDayVerificationStatus !== 'approved' && p.matchDayVerificationStatus !== 'rejected').length})
                     </span>
                   </label>
                   {selectedPlayers.size > 0 && (
@@ -470,19 +426,19 @@ export default function TeamMatchDayVerificationPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleBulkAction('verified')}
-                      disabled={submitting}
+                      disabled={verifyPlayersBulkMutation.isLoading}
                       className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
                     >
                       <Check className="w-4 h-4 mr-1" />
-                      Verify ({selectedPlayers.size})
+                      Approve
                     </button>
                     <button
                       onClick={() => handleBulkAction('rejected')}
-                      disabled={submitting}
+                      disabled={verifyPlayersBulkMutation.isLoading}
                       className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
                     >
                       <X className="w-4 h-4 mr-1" />
-                      Reject ({selectedPlayers.size})
+                      Reject
                     </button>
                   </div>
                 )}
@@ -499,7 +455,7 @@ export default function TeamMatchDayVerificationPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       <input
                         type="checkbox"
-                        checked={selectedPlayers.size === players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length && players.filter(p => p.matchDayVerificationStatus !== 'verified' && p.matchDayVerificationStatus !== 'rejected').length > 0}
+                        checked={selectedPlayers.size === players.filter(p => p.matchDayVerificationStatus !== 'approved' && p.matchDayVerificationStatus !== 'rejected').length && players.filter(p => p.matchDayVerificationStatus !== 'approved' && p.matchDayVerificationStatus !== 'rejected').length > 0}
                         onChange={handleSelectAll}
                         className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
                       />
@@ -517,7 +473,7 @@ export default function TeamMatchDayVerificationPage() {
                     return (
                       <tr key={player.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          {player.matchDayVerificationStatus !== 'verified' && player.matchDayVerificationStatus !== 'rejected' && (
+                          {player.matchDayVerificationStatus !== 'approved' && player.matchDayVerificationStatus !== 'rejected' && (
                             <input
                               type="checkbox"
                               checked={selectedPlayers.has(player.id)}
@@ -554,18 +510,18 @@ export default function TeamMatchDayVerificationPage() {
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            {player.matchDayVerificationStatus !== 'verified' && player.matchDayVerificationStatus !== 'rejected' && (
+                            {player.matchDayVerificationStatus !== 'approved' && player.matchDayVerificationStatus !== 'rejected' && (
                               <>
                                 <button
                                   onClick={() => handlePlayerVerification(player.id, 'verified')}
-                                  disabled={submitting || docStatus.status === 'incomplete'}
+                                  disabled={verifyPlayerMutation.isLoading || docStatus.status === 'incomplete'}
                                   className="text-green-600 hover:text-green-900 disabled:opacity-50"
                                 >
                                   <CheckCircle className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handlePlayerVerification(player.id, 'rejected', 'Match day verification failed')}
-                                  disabled={submitting}
+                                  disabled={verifyPlayerMutation.isLoading}
                                   className="text-red-600 hover:text-red-900"
                                 >
                                   <XCircle className="w-4 h-4" />
@@ -591,7 +547,7 @@ export default function TeamMatchDayVerificationPage() {
                 <div key={player.id} className="bg-white rounded-lg border p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center flex-1">
-                      {player.matchDayVerificationStatus !== 'verified' && player.matchDayVerificationStatus !== 'rejected' && (
+                      {player.matchDayVerificationStatus !== 'approved' && player.matchDayVerificationStatus !== 'rejected' && (
                         <input
                           type="checkbox"
                           checked={selectedPlayers.has(player.id)}
@@ -646,18 +602,18 @@ export default function TeamMatchDayVerificationPage() {
                       <Eye className="w-4 h-4 mr-1" />
                       View Details
                     </button>
-                    {player.matchDayVerificationStatus !== 'verified' && player.matchDayVerificationStatus !== 'rejected' && (
+                    {player.matchDayVerificationStatus !== 'approved' && player.matchDayVerificationStatus !== 'rejected' && (
                       <>
                         <button
                           onClick={() => handlePlayerVerification(player.id, 'verified')}
-                          disabled={submitting || docStatus.status === 'incomplete'}
+                          disabled={verifyPlayerMutation.isLoading || docStatus.status === 'incomplete'}
                           className="flex items-center justify-center px-3 py-2 text-sm text-green-600 hover:text-green-900 hover:bg-green-50 rounded-md border border-green-200 disabled:opacity-50"
                         >
                           <CheckCircle className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handlePlayerVerification(player.id, 'rejected', 'Match day verification failed')}
-                          disabled={submitting}
+                          disabled={verifyPlayerMutation.isLoading}
                           className="flex items-center justify-center px-3 py-2 text-sm text-red-600 hover:text-red-900 hover:bg-red-50 rounded-md border border-red-200"
                         >
                           <XCircle className="w-4 h-4" />
@@ -736,7 +692,7 @@ export default function TeamMatchDayVerificationPage() {
                     currentUrl={selectedPlayer.documents.profilePhoto?.url}
                     onSuccess={(url) => {
                       // Reload team data to update the document URL
-                      loadTeamData();
+                      refetchTeamData();
                     }}
                     onError={(error) => {
                       showError(`Upload failed: ${error}`);
@@ -751,7 +707,7 @@ export default function TeamMatchDayVerificationPage() {
                     currentUrl={selectedPlayer.documents.aadhaarFront?.url}
                     onSuccess={(url) => {
                       // Reload team data to update the document URL
-                      loadTeamData();
+                      refetchTeamData();
                     }}
                     onError={(error) => {
                       showError(`Upload failed: ${error}`);
@@ -766,7 +722,7 @@ export default function TeamMatchDayVerificationPage() {
                     currentUrl={selectedPlayer.documents.aadhaarBack?.url}
                     onSuccess={(url) => {
                       // Reload team data to update the document URL
-                      loadTeamData();
+                      refetchTeamData();
                     }}
                     onError={(error) => {
                       showError(`Upload failed: ${error}`);
@@ -787,25 +743,25 @@ export default function TeamMatchDayVerificationPage() {
               )}
 
               {/* Action Buttons */}
-              {selectedPlayer.matchDayVerificationStatus !== 'verified' && (
+              {selectedPlayer.matchDayVerificationStatus !== 'approved' && (
                 <div className="flex space-x-3">
                   <Button
                     onClick={() => {
                       handlePlayerVerification(selectedPlayer.id, 'verified');
                       setSelectedPlayer(null);
                     }}
-                    disabled={submitting}
+                    disabled={verifyPlayerMutation.isLoading}
                     className="flex-1 bg-green-600 hover:bg-green-700"
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    Verify Player
+                    Approve Player
                   </Button>
                   <Button
                     onClick={() => {
                       handlePlayerVerification(selectedPlayer.id, 'rejected', 'Rejected during detailed review');
                       setSelectedPlayer(null);
                     }}
-                    disabled={submitting}
+                    disabled={verifyPlayerMutation.isLoading}
                     variant="outline"
                     className="flex-1 text-red-600 border-red-300 hover:bg-red-50"
                   >
@@ -837,8 +793,8 @@ export default function TeamMatchDayVerificationPage() {
               <TeamPhotoUpload
                 teamId={teamId}
                 currentUrl={team?.teamImageUrl}
-                onSuccess={(url) => {
-                  setTeam(prev => prev ? { ...prev, teamImageUrl: url } : null);
+                onSuccess={async (url) => {
+                  await refetchTeamData();
                   setShowImageUpload(false);
                 }}
                 onError={(error) => {

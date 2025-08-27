@@ -3,10 +3,12 @@ import React from 'react'
 import { Button } from '@/components/ui/Button'
 import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import ProfileCompletionModal from './ProfileCompletionModal'
+import { PageLoader } from '@/components/ui/loaders'
 
 interface RegistrationButtonProps {
   lang: string
   sport: string
+  sportId:string
   size?: 'sm' | 'base' | 'lg' | 'xl'
   className?: string
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success'
@@ -18,6 +20,7 @@ interface RegistrationButtonProps {
 export default function RegistrationButton({
   lang,
   sport,
+  sportId,
   size = 'lg',
   className = '',
   variant = 'primary',
@@ -25,7 +28,7 @@ export default function RegistrationButton({
   disabled = false,
   disabledMessage = ''
 }: RegistrationButtonProps) {
-  const { isModalOpen, closeModal, handleAction } = useProfileCompletion({
+  const { isModalOpen, closeModal, handleAction, loading } = useProfileCompletion({
     lang,
     actionType: 'register',
     sportName: sport.charAt(0).toUpperCase() + sport.slice(1)
@@ -33,8 +36,19 @@ export default function RegistrationButton({
 
   const handleClick = () => {
     if (disabled) return
-    const targetUrl = `/${lang}/public/register/team/${sport}`
+    const targetUrl = `/${lang}/public/register/team/${sportId}`
     handleAction(targetUrl)
+  }
+
+  // Show page loader when checking profile completion
+  if (loading) {
+    return (
+      <PageLoader
+        title="Checking profile..."
+        variant="brand"
+        size="sm"
+      />
+    )
   }
 
   return (

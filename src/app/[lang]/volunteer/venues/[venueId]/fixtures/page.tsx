@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getVenueCheckedInTeams, getVenueFixtures } from '@/lib/actions/tournament/fixtureManagement';
+import { api } from '@/server/trpc/react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -30,40 +30,30 @@ export default function FixturesPage() {
   const { user, loading: authLoading } = useAuth();
   const eventId = 'isha_gramotsavam_2025';
 
-  const [checkedInTeamsResult, setCheckedInTeamsResult] = useState<any>(null);
-  const [fixtures, setFixtures] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { data: checkedInTeamsResult, isLoading: teamsLoading, error: teamsError } = api.volunteers.getVenueCheckedInTeams.useQuery(
+    { venueId, eventId },
+    {
+      enabled: !authLoading && !!user && !!venueId,
+    }
+  );
+
+  const { data: fixtures, isLoading: fixturesLoading, error: fixturesError } = api.volunteers.getVenueFixtures.useQuery(
+    { venueId },
+    {
+      enabled: !authLoading && !!user && !!venueId,
+    }
+  );
+
+  const loading = authLoading || teamsLoading || fixturesLoading;
+  const error = teamsError?.message || fixturesError?.message || '';
 
   useEffect(() => {
     if (authLoading) return;
     
     if (!user) {
-      setError('Please log in to access this page');
-      setLoading(false);
       return;
     }
-
-    loadData();
   }, [user, authLoading, venueId]);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [teamsResult, fixturesResult] = await Promise.all([
-        getVenueCheckedInTeams(venueId, eventId),
-        getVenueFixtures(venueId)
-      ]);
-      
-      setCheckedInTeamsResult(teamsResult);
-      setFixtures(fixturesResult || []);
-    } catch (err) {
-      // Error handling removed
-      setError('Failed to load fixtures data');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getFixtureColumns = (): Column<any>[] => [
     {
@@ -163,7 +153,7 @@ export default function FixturesPage() {
       type: 'select' as const,
       options: [
         { label: 'All Levels', value: '' },
-        ...Array.from(new Set(fixtures.map(f => f.level))).map(level => ({
+        ...Array.from(new Set((fixtures || []).map(f => f.level))).map(level => ({
           label: level,
           value: level
         }))
@@ -189,7 +179,7 @@ export default function FixturesPage() {
           <h1 className="text-2xl font-bold text-red-600">Error</h1>
           <p className="mt-2 text-gray-600">{error}</p>
           <button 
-            onClick={loadData}
+            onClick={() => window.location.reload()}
             className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
             Retry
@@ -199,7 +189,7 @@ export default function FixturesPage() {
     );
   }
 
-  const checkedInTeams = checkedInTeamsResult?.success ? checkedInTeamsResult.teams : [];
+  const checkedInTeams = checkedInTeamsResult?.teams || [];
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -233,7 +223,7 @@ export default function FixturesPage() {
             <div>
               <p className="text-gray-600 text-sm">Active Tournaments</p>
               <p className="text-2xl font-bold text-blue-600">
-                {fixtures.filter(f => f.status === 'in_progress').length}
+                {(fixtures || []).filter(f => f.status === 'in_progress').length}
               </p>
             </div>
             <Trophy className="w-8 h-8 text-blue-400" />
@@ -245,7 +235,7 @@ export default function FixturesPage() {
             <div>
               <p className="text-gray-600 text-sm">Completed</p>
               <p className="text-2xl font-bold text-gray-600">
-                {fixtures.filter(f => f.status === 'completed').length}
+                {(fixtures || []).filter(f => f.status === 'completed').length}
               </p>
             </div>
             <CheckCircle className="w-8 h-8 text-gray-400" />
@@ -254,13 +244,13 @@ export default function FixturesPage() {
       </div>
 
       {/* Create New Tournaments */}
-      {checkedInTeamsResult.success && Object.keys(checkedInTeamsResult.teamsBySport).length > 0 && (
+      {checkedInTeamsResult?.success && checkedInTeamsResult.teamsBySport && Object.keys(checkedInTeamsResult.teamsBySport).length > 0 && (
         <div className="bg-white rounded-lg border shadow-sm p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Create New Tournament</h2>
           <div className="space-y-3">
             {Object.entries(checkedInTeamsResult.teamsBySport).map(([sportKey, sportTeams]) => {
               const [sportId, genderCategory] = sportKey.split('_');
-              const existingFixture = fixtures.find(f => 
+              const existingFixture = (fixtures || []).find(f => 
                 f.sportId === sportId && f.genderCategory === genderCategory
               );
               
@@ -310,7 +300,7 @@ export default function FixturesPage() {
 
       {/* Active Fixtures */}
       <AdvancedTable
-        data={fixtures}
+        data={fixtures || []}
         columns={getFixtureColumns()}
         searchable
         searchPlaceholder="Search tournaments..."

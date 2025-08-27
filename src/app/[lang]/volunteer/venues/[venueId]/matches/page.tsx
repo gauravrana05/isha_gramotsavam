@@ -1,6 +1,9 @@
-import { adminDb } from '@/lib/firebase/admin';
-import { serializeFirestoreDocs } from '@/lib/utils/firestore';
+'use client';
+
+import { api } from '@/lib/trpc/react';
+import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import { useParams, useSearchParams } from 'next/navigation';
 import { 
   ArrowLeft,
   Trophy,
@@ -15,64 +18,61 @@ import {
   Edit
 } from 'lucide-react';
 
-interface PageProps {
-  params: Promise<{
-    venueId: string;
-    lang: string;
-  }>;
-  searchParams: Promise<{
-    fixture?: string;
-  }>;
-}
+export default function MatchesPage() {
+  const { user, isLoading: authLoading } = useAuth();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  
+  const venueId = params?.venueId as string;
+  const fixtureId = searchParams?.get('fixture') || undefined;
 
-async function getVenueMatches(venueId: string, fixtureId?: string) {
-  try {
-    let query = adminDb.collection('matches').where('venueId', '==', venueId);
-    
-    if (fixtureId) {
-      query = query.where('fixtureId', '==', fixtureId);
+  // Get matches using tRPC
+  const { data: matches = [], isLoading: matchesLoading, error: matchesError } = api.volunteers.getVenueMatches.useQuery(
+    { venueId, fixtureId },
+    {
+      enabled: !authLoading && !!user && !!venueId,
     }
-    
-    const matchesSnapshot = await query.get();
-    
-    // Sort in memory to avoid index requirement
-    const docs = matchesSnapshot.docs.sort((a, b) => {
-      const aTime = a.data().createdAt?.toDate?.() || new Date(0);
-      const bTime = b.data().createdAt?.toDate?.() || new Date(0);
-      return bTime.getTime() - aTime.getTime();
-    });
-    
-    return serializeFirestoreDocs(docs);
-  } catch (error) {
-    // Error handling removed
-    return [];
+  );
+
+  // Get fixture details if fixtureId is provided
+  const { data: fixture, isLoading: fixtureLoading, error: fixtureError } = api.volunteers.getFixtureDetails.useQuery(
+    { fixtureId: fixtureId! },
+    {
+      enabled: !authLoading && !!user && !!fixtureId,
+    }
+  );
+
+  // Loading state
+  if (authLoading || matchesLoading || (fixtureId && fixtureLoading)) {
+    return (
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-24 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
-}
 
-async function getFixtureInfo(fixtureId: string) {
-  try {
-    const fixtureDoc = await adminDb.collection('fixtures').doc(fixtureId).get();
-    if (!fixtureDoc.exists) return null;
-    
-    const data = fixtureDoc.data();
-    return {
-      id: fixtureDoc.id,
-      ...data,
-      createdAt: data?.createdAt?.toDate?.()?.toISOString() || null,
-      updatedAt: data?.updatedAt?.toDate?.()?.toISOString() || null
-    };
-  } catch (error) {
-    // Error handling removed
-    return null;
+  // Error state
+  if (matchesError || (fixtureId && fixtureError)) {
+    return (
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="text-center py-12 bg-white rounded-lg border border-red-200">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Matches</h3>
+          <p className="text-gray-600">
+            {matchesError?.message || fixtureError?.message || 'Unable to load match data. Please try again.'}
+          </p>
+        </div>
+      </div>
+    );
   }
-}
-
-export default async function MatchesPage({ params, searchParams }: PageProps) {
-  const { venueId } = await params;
-  const { fixture: fixtureId } = await searchParams;
-
-  const matches = await getVenueMatches(venueId, fixtureId);
-  const fixture = fixtureId ? await getFixtureInfo(fixtureId) : null;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -95,7 +95,7 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
   };
 
   // Group matches by round
-  const matchesByRound = matches.reduce((acc, match) => {
+  const matchesByRound = (matches || []).reduce((acc, match) => {
     const round = match.roundName;
     if (!acc[round]) {
       acc[round] = [];
@@ -129,7 +129,7 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
           </Link>
         </div>
         <h1 className="text-2xl font-bold text-gray-900">
-          {fixture ? `${(fixture as any)?.name} - Matches` : 'Tournament Matches'}
+          {fixture ? `${fixture.name} - Matches` : 'Tournament Matches'}
         </h1>
         <p className="text-gray-600 text-sm">
           {fixture ? 'Manage results for tournament matches' : 'All venue matches'}
@@ -143,15 +143,15 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
             <div className="flex items-center">
               <Trophy className="w-6 h-6 text-[#F28C38] mr-3" />
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{(fixture as any)?.name}</h2>
+                <h2 className="text-lg font-semibold text-gray-900">{fixture.name}</h2>
                 <p className="text-gray-600 text-sm">
-                  {(fixture as any)?.assignedTeams?.length || 0} teams • Level: {(fixture as any)?.level}
+                  {fixture.assignedTeams?.length || 0} teams • Level: {fixture.level}
                 </p>
               </div>
             </div>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor((fixture as any)?.status)}`}>
-              {getStatusIcon((fixture as any)?.status)}
-              <span className="ml-1 capitalize">{(fixture as any)?.status.replace('_', ' ')}</span>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(fixture.status)}`}>
+              {getStatusIcon(fixture.status)}
+              <span className="ml-1 capitalize">{fixture.status.replace('_', ' ')}</span>
             </span>
           </div>
         </div>
@@ -163,7 +163,7 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Total Matches</p>
-              <p className="text-2xl font-bold text-gray-900">{matches.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{matches?.length || 0}</p>
             </div>
             <Calendar className="w-8 h-8 text-gray-400" />
           </div>
@@ -174,7 +174,7 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
             <div>
               <p className="text-gray-600 text-sm">Ready to Play</p>
               <p className="text-2xl font-bold text-yellow-600">
-                {matches.filter(m => m.status === 'ready').length}
+                {matches?.filter(m => m.status === 'ready').length || 0}
               </p>
             </div>
             <Clock className="w-8 h-8 text-yellow-400" />
@@ -186,7 +186,7 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
             <div>
               <p className="text-gray-600 text-sm">In Progress</p>
               <p className="text-2xl font-bold text-blue-600">
-                {matches.filter(m => m.status === 'in_progress').length}
+                {matches?.filter(m => m.status === 'in_progress').length || 0}
               </p>
             </div>
             <Play className="w-8 h-8 text-blue-400" />
@@ -198,7 +198,7 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
             <div>
               <p className="text-gray-600 text-sm">Completed</p>
               <p className="text-2xl font-bold text-green-600">
-                {matches.filter(m => m.status === 'completed').length}
+                {matches?.filter(m => m.status === 'completed').length || 0}
               </p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-400" />
@@ -207,7 +207,7 @@ export default async function MatchesPage({ params, searchParams }: PageProps) {
       </div>
 
       {/* Matches by Round */}
-      {matches.length > 0 ? (
+      {matches && matches.length > 0 ? (
         <div className="space-y-6">
           {sortedRounds.map(roundName => (
             <div key={roundName} className="bg-white rounded-lg border shadow-sm p-6">

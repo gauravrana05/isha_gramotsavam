@@ -4,35 +4,19 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/utils/i18n";
-import Image from "next/image";
-import {
-  User,
-  Phone,
-  Mail,
-  Calendar,
-  Globe,
-  Loader2,
-  UserCheck,
-  Edit3,
-  Shield
-} from "lucide-react";
-
-import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { useTranslation } from "@/lib/utils/i18n";
-import Image from "next/image";
-import {
-  User,
-  Phone,
-  Mail,
-  Calendar,
-  Globe,
-  Loader2,
-  UserCheck,
-  Edit3,
-  Shield
-} from "lucide-react";
 import { api } from "@/server/trpc/react";
+import Image from "next/image";
+import {
+  User,
+  Phone,
+  Mail,
+  Calendar,
+  Globe,
+  Loader2,
+  UserCheck,
+  Edit3,
+  Shield
+} from "lucide-react";
 
 export default function VerificationProfilePage() {
   const router = useRouter();

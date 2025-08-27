@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { api } from '@/server/trpc/react';
 import { AdvancedTable, type AdvancedTableConfig } from '@/components/ui/AdvancedTable';
 import type { Column } from '@/components/ui/Table';
 import type { FilterField } from '@/components/ui/FilterSidebar';

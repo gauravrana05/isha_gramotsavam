@@ -73,7 +73,7 @@ export default function AdminTeamsPage() {
 
   const router = useRouter();
   const { lang } = useParams();
-  const { user, loading: authLoading } = useAuth();
+  const { user, userProfile, loading: authLoading } = useAuth();
 
   // Build filters object
   const filters = useMemo(() => ({
@@ -91,15 +91,15 @@ export default function AdminTeamsPage() {
     data: teamsData, 
     isLoading: teamsLoading, 
     error: teamsError 
-  } = api.teams.getAdminTeams.useQuery(filters, {
-    enabled: !!user && user.role === 'admin'
+  } = api.admin.getAdminTeams.useQuery(filters, {
+    enabled: !!user && userProfile?.role === 'admin'
   });
 
   const { 
     data: statsData, 
     isLoading: statsLoading 
-  } = api.teams.getAdminTeamStats.useQuery({}, {
-    enabled: !!user && user.role === 'admin'
+  } = api.admin.getAdminTeamStats.useQuery({}, {
+    enabled: !!user && userProfile?.role === 'admin'
   });
 
   // Auth check
@@ -112,7 +112,7 @@ export default function AdminTeamsPage() {
     return null;
   }
 
-  if (user.role !== 'admin') {
+  if (userProfile?.role !== 'admin') {
     router.push(`/${lang}/player/dashboard`);
     return null;
   }

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getVolunteerAssignments } from '@/lib/actions/admin/volunteerAssignment';
+import { api } from '@/server/trpc/react';
 import { 
   MapPin, 
   Users, 
@@ -36,13 +36,20 @@ interface VenueAssignment {
 }
 
 export default function VolunteerDashboard() {
-  const [assignments, setAssignments] = useState<VenueAssignment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
   const { user, userProfile, loading: authLoading } = useAuth();
   const router = useRouter();
   const { lang } = useParams();
+
+  const { data: assignmentsData, isLoading: assignmentsLoading, error: assignmentsError } = api.volunteers.getMyAssignments.useQuery(
+    undefined,
+    {
+      enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(userProfile?.role || ''),
+    }
+  );
+
+  const assignments = assignmentsData?.assignments || [];
+  const loading = authLoading || assignmentsLoading;
+  const error = assignmentsError?.message || '';
 
   useEffect(() => {
     if (authLoading) return;
@@ -56,36 +63,7 @@ export default function VolunteerDashboard() {
       router.push(`/${lang}/player/dashboard`);
       return;
     }
-
-    loadVenueAssignments();
   }, [user, userProfile, authLoading, lang, router]);
-
-  const loadVenueAssignments = async () => {
-    try {
-      setLoading(true);
-      
-      if (!user?.uid) {
-        setAssignments([]);
-        return;
-      }
-
-      const result = await getVolunteerAssignments(user.uid);
-      
-      if (result.success) {
-        setAssignments(result.assignments || []);
-        setError('');
-      } else {
-        setError(result.error || 'Failed to load venue assignments');
-        setAssignments([]);
-      }
-    } catch (err) {
-      // Error handling removed
-      setError('Failed to load venue assignments');
-      setAssignments([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (authLoading || loading) {
     return (

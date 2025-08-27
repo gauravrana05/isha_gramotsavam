@@ -252,6 +252,23 @@ Verification Dashboard → Pending Verifications
     └── Verification Success Rates
 ```
 
+#### Status Flow Management
+
+**Team Status Flow:**
+```
+submitted (team created) → verified (all players verified) → checked-in (all players approved on match day)
+```
+
+**Player Verification Status Flow:**
+```
+pending (team created) → verified (by verification volunteer) → approved (on match day by technical volunteer)
+```
+
+**Automatic Status Updates:**
+- When all players in a team are verified, the team status automatically updates from "submitted" to "verified"
+- Team status progression ensures proper workflow management and tournament readiness
+- Each status change triggers audit logs and notifications for transparency
+
 ### 7. Public/Guest User Journey
 
 #### Information Access Flow

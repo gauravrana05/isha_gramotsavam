@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, arrayUnion } from 'firebase/firestore';
+import { api } from '@/server/trpc/react';
 import { 
   Container,
   AdvancedTable,
@@ -73,23 +72,30 @@ interface SimplifiedVenue {
 }
 
 export default function VenuesManagement() {
-  const [venues, setVenues] = useState<SimplifiedVenue[]>([]);
-  const [sportsData, setSportsData] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [deletingVenue, setDeletingVenue] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{
     isOpen: boolean;
-    venue: SimplifiedVenue | null;
+    venue: any | null;
   }>({ isOpen: false, venue: null });
   const [volunteerModal, setVolunteerModal] = useState<{
     isOpen: boolean;
-    venue: SimplifiedVenue | null;
+    venue: any | null;
   }>({ isOpen: false, venue: null });
 
   const { lang } = useParams();
   const router = useRouter();
   const { user, userProfile, loading: authLoading } = useAuth();
+
+  // tRPC queries
+  const {
+    data: venuesData,
+    isLoading: venuesLoading,
+    error: venuesError
+  } = api.admin.getVenues.useQuery({
+    limit: 100,
+    status: 'all'
+  }, {
+    enabled: !!user && userProfile?.role === 'admin'
+  });
 
   useEffect(() => {
     if (authLoading) return;
