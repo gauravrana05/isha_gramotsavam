@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { api } from '@/server/trpc/react';
 import { 
   AdvancedTable,
-  StatsCard,
+  SingleStatCard,
   PageLoader,
   Button
 } from '@/components/ui';
@@ -157,7 +157,7 @@ export default function AdminSportsPage() {
       icon: Trash2,
       onClick: (sport) => handleDeleteSport(sport.id),
       variant: 'danger',
-      loading: (sport) => deletingSport === sport.sportId,
+      disabled: (sport) => deleteSportMutation.isPending,
     },
   ];
 
@@ -188,6 +188,36 @@ export default function AdminSportsPage() {
         </Button>
       </div>
 
+      {/* Stats Cards */}
+      {sports.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <SingleStatCard
+            stat={{
+              label: "Total Sports",
+              value: sports.length.toString(),
+              icon: Trophy,
+              color: "info"
+            }}
+          />
+          <SingleStatCard
+            stat={{
+              label: "Total Teams",
+              value: sports.reduce((sum, sport) => sum + (sport.teamCount || 0), 0).toString(),
+              icon: Users,
+              color: "success"
+            }}
+          />
+          <SingleStatCard
+            stat={{
+              label: "Avg Teams/Sport",
+              value: (sports.reduce((sum, sport) => sum + (sport.teamCount || 0), 0) / sports.length).toFixed(1),
+              icon: Clock,
+              color: "primary"
+            }}
+          />
+        </div>
+      )}
+
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -196,7 +226,7 @@ export default function AdminSportsPage() {
       )}
 
       {/* AdvancedTable */}
-      <AdvancedTable<SimplifiedSport>
+      <AdvancedTable<SportData>
         data={sports}
         columns={columns}
         actions={actions}
@@ -205,48 +235,13 @@ export default function AdminSportsPage() {
         searchPlaceholder="Search sports..."
         filterable={false}
         sortable={true}
-        defaultSort={[{ key: 'name', direction: 'asc' }]}
-        pagination={{ enabled: false }}
+        keyExtractor={(sport) => sport.id}
         emptyState={{
           icon: Trophy,
           title: 'No sports found',
-          description: 'Create your first sport to get started.',
-          action: {
-            label: 'Add Sport',
-            onClick: () => router.push(`/${lang}/admin/sports/create`),
-          },
+          description: 'No sports have been added yet.'
         }}
-        keyExtractor={(sport) => sport.sportId}
-        stickyHeader={true}
       />
-
-      {/* Stats Cards */}
-      {sports.length > 0 && (
-        <div className="mt-8">
-          <StatsCard 
-            stats={[
-              {
-                label: 'Active',
-                value: sports.filter(s => s.isActive).length,
-                color: 'success' as const,
-              },
-              {
-                label: 'Team Sports',
-                value: sports.filter(s => s.category === 'team').length,
-                color: 'info' as const,
-              },
-              {
-                label: 'Inactive',
-                value: sports.filter(s => !s.isActive).length,
-                color: 'error' as const,
-              },
-            ]}
-            columns={3}
-            size="base"
-            showBorder
-          />
-        </div>
-      )}
     </div>
   );
 }

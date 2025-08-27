@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase/config";
-import { collection, query, where, getDocs, doc, getDoc, orderBy, limit } from "firebase/firestore";
+import { api } from '@/lib/trpc/react';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import type { Column } from '@/components/ui/Table';
 import type { FilterField } from '@/components/ui/FilterSidebar';
@@ -24,18 +23,21 @@ import {
   Star
 } from "lucide-react";
 
-interface TeamMembership {
+interface PlayerTeam {
   teamId: string;
   name: string;
   sportName: string;
   panchayat: string;
   district: string;
   state: string;
-  venueId?: string;
   venue?: {
+    id: string;
     name: string;
     address: string;
   };
+  status: string;
+  currentPlayers: number;
+  maxPlayers: number;
 }
 
 interface PlayerFixture {
@@ -44,32 +46,51 @@ interface PlayerFixture {
   sportId: string;
   sportName?: string;
   genderCategory: string;
-  venueId: string;
-  venue?: {
+  venue: {
+    id: string;
     name: string;
     address: string;
+    district: string;
+    state: string;
   };
   status: string;
   level: string;
-  assignedTeams: any[];
-  bracket?: {
-    matches?: any[];
-    winners?: any[];
-  };
-  createdAt: any;
+  assignedTeams: Array<{
+    id: string;
+    name: string;
+    tournamentNumber?: number;
+  }>;
+  totalMatches: number;
+  completedMatches: number;
+  createdAt: string;
+  updatedAt: string;
   hasPlayerTeam?: boolean;
   playerTeamNames?: string[];
 }
 
 export default function PlayerFixturesPage() {
-  const [teams, setTeams] = useState<TeamMembership[]>([]);
-  const [fixtures, setFixtures] = useState<PlayerFixture[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
+
+  // Get teams using tRPC
+  const { data: teams = [], isLoading: teamsLoading, error: teamsError } = api.teams.getMyTeams.useQuery(
+    undefined,
+    {
+      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'player',
+    }
+  );
+
+  // Get fixtures using tRPC
+  const { data: fixtures = [], isLoading: fixturesLoading, error: fixturesError } = api.teams.getMyTeamFixtures.useQuery(
+    undefined,
+    {
+      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'player',
+    }
+  );
+
+  const loading = authLoading || teamsLoading || fixturesLoading;
+  const error = teamsError?.message || fixturesError?.message;
 
   useEffect(() => {
     if (authLoading) return;
@@ -83,172 +104,7 @@ export default function PlayerFixturesPage() {
       router.push(`/${lang}/profile/complete`);
       return;
     }
-
-    loadPlayerFixtures();
   }, [user, userProfile, authLoading, router, lang]);
-
-  const loadPlayerFixtures = async () => {
-    if (!user) return;
-
-    try {
-      // First, load teams where current user is a player
-      const teamsQuery = query(collection(db, "teams"));
-      const querySnapshot = await getDocs(teamsQuery);
-      
-      const playerTeams: TeamMembership[] = [];
-      const venueIds = new Set<string>();
-      const playerTeamIds = new Set<string>();
-      
-      for (const docSnapshot of querySnapshot.docs) {
-        const teamData = docSnapshot.data();
-        
-        // Load players from subcollection
-        const playersCollection = collection(db, "teams", docSnapshot.id, "players");
-        const playersSnapshot = await getDocs(playersCollection);
-        
-        let playerData = null;
-        playersSnapshot.forEach((playerDoc) => {
-          const player = playerDoc.data();
-          if (!player.isDeleted && player.userId === user.uid) {
-            playerData = player;
-          }
-        });
-        
-        // Load venue assignments from teamVenueAssignment collection (get ALL assignments)
-        let venueAssignment: { venueId: string; venueName: string; assignmentLevel: string } | null = null;
-        
-        if (playerData) {
-          try {
-            const venueAssignmentQuery = query(
-              collection(db, "teamVenueAssignment"),
-              where("teamId", "==", docSnapshot.id)
-            );
-            const venueAssignmentSnapshot = await getDocs(venueAssignmentQuery);
-            
-            // Process all venue assignments for this team
-            venueAssignmentSnapshot.docs.forEach(assignDoc => {
-              const assignmentData = assignDoc.data();
-              const venueId = assignmentData.venueId || assignmentData.clusterVenueId || assignmentData.divisionVenueId;
-              const venueName = assignmentData.venueName || assignmentData.clusterVenueName || assignmentData.divisionVenueName || 'Unknown Venue';
-              
-              if (venueId) {
-                venueIds.add(venueId);
-                
-                // Use the first valid venue assignment for the team display
-                if (!venueAssignment) {
-                  venueAssignment = {
-                    venueId: venueId,
-                    venueName: venueName,
-                    assignmentLevel: assignmentData.assignmentLevel || assignmentData.currentLevel || 'cluster'
-                  };
-                }
-              }
-            });
-          } catch (venueError) {
-            console.error('Error loading venue assignments:', venueError);
-          }
-          
-          const team: TeamMembership = {
-            teamId: docSnapshot.id,
-            name: teamData.teamName || teamData.name || '',
-            sportName: teamData.sportName || teamData.sportId || '',
-            panchayat: teamData.panchayat || '',
-            district: teamData.district || '',
-            state: teamData.state || '',
-            venueId: (venueAssignment as { venueId: string; venueName: string; assignmentLevel: string } | null)?.venueId,
-            venue: venueAssignment ? {
-              name: (venueAssignment as any).venueName,
-              address: ''
-            } : undefined
-          };
-          
-          playerTeamIds.add(docSnapshot.id);
-          
-          playerTeams.push(team);
-        }
-      }
-
-      setTeams(playerTeams);
-
-      // Load fixtures for the venues where player's teams are assigned
-      if (venueIds.size > 0) {
-        const fixturesPromises = Array.from(venueIds).map(async (venueId) => {
-          const fixturesQuery = query(
-            collection(db, "fixtures"),
-            where("venueId", "==", venueId)
-          );
-          const fixturesSnapshot = await getDocs(fixturesQuery);
-          
-          const venueFixtures: PlayerFixture[] = [];
-          
-          for (const fixtureDoc of fixturesSnapshot.docs) {
-            const fixtureData = fixtureDoc.data();
-            
-            // Load venue details
-            let venue = null;
-            if (fixtureData.venueId) {
-              try {
-                const venueDoc = await getDoc(doc(db, "venues", fixtureData.venueId));
-                if (venueDoc.exists()) {
-                  const venueData = venueDoc.data();
-                  venue = {
-                    name: venueData.name || 'Unknown Venue',
-                    address: venueData.address || ''
-                  };
-                }
-              } catch (error) {
-                // Warning removed
-              }
-            }
-            
-            // Check if any player teams are in this fixture
-            const assignedTeams = fixtureData.assignedTeams || [];
-            const hasPlayerTeam = assignedTeams.some((team: any) => playerTeamIds.has(team.teamId));
-            const playerTeamNames = assignedTeams
-              .filter((team: any) => playerTeamIds.has(team.teamId))
-              .map((team: any) => team.teamName || team.name);
-            
-            venueFixtures.push({
-              id: fixtureDoc.id,
-              name: fixtureData.name || `${fixtureData.sportId} Tournament`,
-              sportId: fixtureData.sportId || '',
-              sportName: fixtureData.sportName || fixtureData.sportId || '',
-              genderCategory: fixtureData.genderCategory || '',
-              venueId: fixtureData.venueId || '',
-              venue: venue ?? undefined,
-              status: fixtureData.status || 'scheduled',
-              level: fixtureData.level || 'Panchayat',
-              assignedTeams: assignedTeams,
-              bracket: fixtureData.bracket || {},
-              createdAt: fixtureData.createdAt || null,
-              hasPlayerTeam,
-              playerTeamNames
-            });
-          }
-          
-          return venueFixtures;
-        });
-
-        const allFixtures = await Promise.all(fixturesPromises);
-        const flatFixtures = allFixtures.flat();
-        
-        // Sort fixtures by creation date
-        flatFixtures.sort((a, b) => {
-          const aTime = a.createdAt?.toDate?.() || new Date(0);
-          const bTime = b.createdAt?.toDate?.() || new Date(0);
-          return bTime.getTime() - aTime.getTime();
-        });
-        
-        setFixtures(flatFixtures);
-      }
-
-    } catch (err: any) {
-      // Error handling removed
-      setError("Failed to load fixtures data");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -265,6 +121,16 @@ export default function PlayerFixturesPage() {
       case 'in_progress': return <Play className="w-4 h-4" />;
       case 'scheduled': return <Clock className="w-4 h-4" />;
       default: return <AlertCircle className="w-4 h-4" />;
+    }
+  };
+
+  const getTeamStatusColor = (status: string) => {
+    switch (status) {
+      case 'verified': return 'bg-green-100 text-green-800';
+      case 'submitted': return 'bg-blue-100 text-blue-800';
+      case 'draft': return 'bg-yellow-100 text-yellow-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -362,6 +228,24 @@ export default function PlayerFixturesPage() {
         );
       },
       sortable: true
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (value, item, index) => {
+        if (!item) return null;
+        return (
+          <div className="flex space-x-2">
+            <button
+              onClick={() => router.push(`/${lang}/player/fixtures/${item.id}`)}
+              className="text-[#F28C38] hover:text-[#E67A26] flex items-center text-sm"
+            >
+              <Eye className="w-4 h-4 mr-1" />
+              View Details
+            </button>
+          </div>
+        );
+      }
     }
   ];
 
@@ -471,7 +355,12 @@ export default function PlayerFixturesPage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {teams.map((team) => (
                 <div key={team.teamId} className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-900 mb-2">{team.name}</h3>
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-gray-900">{team.name}</h3>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTeamStatusColor(team.status)}`}>
+                      {team.status.charAt(0).toUpperCase() + team.status.slice(1)}
+                    </span>
+                  </div>
                   <div className="space-y-1 text-sm text-gray-600">
                     <div className="flex items-center">
                       <Trophy className="w-4 h-4 mr-1" />
@@ -480,6 +369,10 @@ export default function PlayerFixturesPage() {
                     <div className="flex items-center">
                       <MapPin className="w-4 h-4 mr-1" />
                       {team.panchayat}, {team.district}
+                    </div>
+                    <div className="flex items-center">
+                      <Users className="w-4 h-4 mr-1" />
+                      {team.currentPlayers}/{team.maxPlayers} players
                     </div>
                     {team.venue && (
                       <div className="text-xs text-blue-600 mt-2">

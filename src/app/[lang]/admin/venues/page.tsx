@@ -1,91 +1,44 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/server/trpc/react';
 import { 
-  Container,
   AdvancedTable,
-  StatsCard,
-  StatusBadge,
-  ConfirmationModal,
-  Button,
+  SingleStatCard,
   PageLoader,
+  Button,
   type Column,
   type ActionButton,
-  type FilterField,
-  type ExportConfig
 } from '@/components/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { 
   Plus, 
   MapPin,
   Users,
-  UserPlus,
   Edit,
   Eye,
-  Trash2,
-  Loader2,
-  Download
+  Loader2
 } from 'lucide-react';
-import { getVenueStatus } from '@/components/ui/StatusBadge';
 
-interface SimplifiedVenue {
-  venueId: string;
+interface VenueData {
+  id: string;
   name: string;
-  shortName: string;
-  type: 'cluster' | 'division' | 'final';
   address: string;
-  pincode: string;
   district: string;
   state: string;
-  coordinates: {
-    latitude: number;
-    longitude: number;
-  };
-  supportedSports: Array<{
-    sportId: string;
-    sportName: string;
-    courtCount?: number;
-    courtSpecifications?: string;
-  }> | string[]; // Array of sport objects or sport IDs
-  primaryContact: {
-    name: string;
-    phone: string;
-    email?: string;
-    role: string;
-  };
-  assignedVolunteers: string[];
-  officials: {
-    coordinatorId?: string;
-    referees: string[];
-    medicalOfficer?: string;
-  };
-  isActive: boolean;
-  currentStatus: 'available' | 'in_use' | 'maintenance' | 'unavailable';
-  totalMatchesHosted: number;
-  upcomingMatches: number;
-  utilizationRate: number;
-  createdAt: any;
-  updatedAt: any;
+  capacity: number | null;
+  status: string;
+  assignedTeams: number;
+  createdAt: string | null;
 }
 
 export default function VenuesManagement() {
-  const [confirmDelete, setConfirmDelete] = useState<{
-    isOpen: boolean;
-    venue: any | null;
-  }>({ isOpen: false, venue: null });
-  const [volunteerModal, setVolunteerModal] = useState<{
-    isOpen: boolean;
-    venue: any | null;
-  }>({ isOpen: false, venue: null });
-
-  const { lang } = useParams();
   const router = useRouter();
+  const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
 
-  // tRPC queries
+  // tRPC query
   const {
     data: venuesData,
     isLoading: venuesLoading,
@@ -109,139 +62,25 @@ export default function VenuesManagement() {
       router.push(`/${lang}/player/dashboard`);
       return;
     }
-
-    loadVenues();
   }, [user, userProfile, authLoading, lang, router]);
 
-  const loadVenues = async () => {
-    try {
-      setLoading(true);
-      
-      // Load venues and sports data in parallel
-      const [venuesSnapshot, sportsSnapshot] = await Promise.all([
-        getDocs(query(collection(db, 'venues'), orderBy('createdAt', 'desc'))),
-        getDocs(collection(db, 'sports'))
-      ]);
-      
-      // Process sports data
-      const sportsMap: Record<string, any> = {};
-      sportsSnapshot.docs.forEach(doc => {
-        sportsMap[doc.id] = doc.data();
-      });
-      setSportsData(sportsMap);
-      
-      const venuesData: SimplifiedVenue[] = venuesSnapshot.docs.map(doc => ({
-        venueId: doc.id,
-        ...doc.data()
-      })) as SimplifiedVenue[];
-      
-      setVenues(venuesData);
-    } catch (err: any) {
-      // Error handling removed
-      setError('Failed to load venues. Please check your permissions.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = venuesLoading;
+  const error = venuesError?.message || '';
+  const venues = venuesData?.venues || [];
 
-  const handleDeleteClick = (venue: SimplifiedVenue) => {
-    setConfirmDelete({ isOpen: true, venue });
-  };
-
-  const handleVolunteerAssignClick = (venue: SimplifiedVenue) => {
-    setVolunteerModal({ isOpen: true, venue });
-  };
-
-  const handleVolunteerAssign = async (assignment: any) => {
-    if (!volunteerModal.venue) return;
-    
-    try {
-      // Update venue's assigned volunteers
-      const venueDoc = doc(db, 'venues', volunteerModal.venue.venueId);
-      await updateDoc(venueDoc, {
-        assignedVolunteers: arrayUnion(assignment.volunteerId),
-        updatedAt: new Date()
-      });
-
-      // If technical role selected, update volunteer's role in users collection
-      if (assignment.volunteerType === 'technical') {
-        const userDoc = doc(db, 'users', assignment.volunteerId);
-        await updateDoc(userDoc, {
-          role: 'technical_volunteer',
-          updatedAt: new Date()
-        });
-      }
-      
-      // Update local state
-      setVenues(prevVenues => 
-        prevVenues.map(venue => 
-          venue.venueId === volunteerModal.venue!.venueId 
-            ? { ...venue, assignedVolunteers: [...(venue.assignedVolunteers || []), assignment.volunteerId] }
-            : venue
-        )
-      );
-      
-      setVolunteerModal({ isOpen: false, venue: null });
-    } catch (err: any) {
-      // Error handling removed
-      setError('Failed to assign volunteer. Please try again.');
-    }
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!confirmDelete.venue) return;
-
-    const venueId = confirmDelete.venue.venueId;
-    setDeletingVenue(venueId);
-    
-    try {
-      const venueDoc = doc(db, 'venues', venueId);
-      await deleteDoc(venueDoc);
-      
-      // Update local state - remove venue from list
-      setVenues(prevVenues => 
-        prevVenues.filter(venue => venue.venueId !== venueId)
-      );
-      
-    } catch (err: any) {
-      // Error handling removed
-      setError('Failed to delete venue. Please try again.');
-    } finally {
-      setDeletingVenue(null);
-      setConfirmDelete({ isOpen: false, venue: null });
-    }
-  };
-
-  // Define table columns for AdvancedTable (venue, type, location, actions)
-  const columns: Column<SimplifiedVenue>[] = [
+  // Define table columns for AdvancedTable
+  const columns: Column<VenueData>[] = useMemo(() => [
     {
       key: 'name',
-      header: 'Venue',
+      header: 'Venue Name',
       accessor: 'name',
       sortable: true,
-      priority: 'high',
-      width: '180px',
-      minWidth: '160px',
+      minWidth: 200,
       render: (_, venue) => (
         <div>
           <div className="text-sm font-medium text-gray-900">{venue.name}</div>
-          <div className="text-xs text-gray-500">{venue.shortName}</div>
+          <div className="text-sm text-gray-500">{venue.address}</div>
         </div>
-      ),
-    },
-    {
-      key: 'type',
-      header: 'Type',
-      accessor: 'type',
-      sortable: true,
-      priority: 'high',
-      width: '100px',
-      render: (_, venue) => (
-        <StatusBadge 
-          status={venue.type === 'cluster' ? 'info' : venue.type === 'division' ? 'success' : 'warning'}
-          customLabel={venue.type}
-          variant="soft"
-        />
       ),
     },
     {
@@ -249,168 +88,82 @@ export default function VenuesManagement() {
       header: 'Location',
       accessor: 'district',
       sortable: true,
-      priority: 'high',
+      minWidth: 150,
       render: (_, venue) => (
         <div>
-          <div className="text-sm text-gray-900">{venue.district}, {venue.state}</div>
-          <div className="text-xs text-gray-500">{venue.pincode}</div>
+          <div className="text-sm text-gray-900">{venue.district}</div>
+          <div className="text-sm text-gray-500">{venue.state}</div>
         </div>
       ),
     },
     {
-      key: 'supportedSports',
-      header: 'Sports',
-      accessor: 'supportedSports',
-      sortable: false,
-      priority: 'medium',
-      width: '180px',
-      render: (_, venue) => {
-        const sports = venue.supportedSports || [];
-        if (sports.length === 0) {
-          return <span className="text-xs text-gray-400">No sports</span>;
-        }
-        
-        // Handle both object format and string format
-        const displaySports = sports.slice(0, 2).map((sport: any) => {
-          if (typeof sport === 'string') {
-            // Sport ID format - look up in sportsData
-            return sportsData[sport]?.displayName || sportsData[sport]?.name || sport;
-          } else {
-            // Sport object format - use sportName or sportId
-            return sport.sportName || sportsData[sport.sportId]?.displayName || sportsData[sport.sportId]?.name || sport.sportId;
-          }
-        });
-        
-        return (
-          <div className="flex flex-wrap gap-1">
-            {displaySports.map((sportName: string, index: number) => (
-              <span 
-                key={index}
-                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-              >
-                {sportName}
-              </span>
-            ))}
-            {sports.length > 2 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                +{sports.length - 2}
-              </span>
-            )}
-          </div>
-        );
-      },
+      key: 'capacity',
+      header: 'Capacity',
+      accessor: 'capacity',
+      sortable: true,
+      minWidth: 100,
+      render: (_, venue) => (
+        <span className="text-sm text-gray-900">
+          {venue.capacity ? venue.capacity.toLocaleString() : 'N/A'}
+        </span>
+      ),
     },
-  ];
+    {
+      key: 'assignedTeams',
+      header: 'Teams Assigned',
+      accessor: 'assignedTeams',
+      sortable: true,
+      minWidth: 120,
+      render: (_, venue) => (
+        <div className="flex items-center space-x-1">
+          <Users className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-900">{venue.assignedTeams}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      accessor: 'status',
+      sortable: true,
+      minWidth: 100,
+      render: (_, venue) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          venue.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+        }`}>
+          {venue.status === 'active' ? 'Active' : 'Inactive'}
+        </span>
+      ),
+    },
+    {
+      key: 'createdAt',
+      header: 'Created',
+      accessor: 'createdAt',
+      sortable: true,
+      minWidth: 120,
+      render: (_, venue) => (
+        <span className="text-sm text-gray-500">
+          {venue.createdAt ? new Date(venue.createdAt).toLocaleDateString() : 'N/A'}
+        </span>
+      ),
+    }
+  ], []);
 
   // Define action buttons for AdvancedTable
-  const actions: ActionButton<SimplifiedVenue>[] = [
+  const actions: ActionButton<VenueData>[] = useMemo(() => [
     {
       label: 'View',
       icon: Eye,
-      onClick: (venue) => router.push(`/${lang}/admin/venues/${venue.venueId}`),
+      onClick: (venue) => router.push(`/${lang}/admin/venues/${venue.id}`),
       variant: 'primary',
-      tooltip: 'View venue details'
     },
     {
       label: 'Edit',
       icon: Edit,
-      onClick: (venue) => router.push(`/${lang}/admin/venues/${venue.venueId}/edit`),
+      onClick: (venue) => router.push(`/${lang}/admin/venues/${venue.id}/edit`),
       variant: 'secondary',
-      tooltip: 'Edit venue information'
-    },
-    {
-      label: 'Volunteers',
-      icon: UserPlus,
-      onClick: handleVolunteerAssignClick,
-      variant: 'success',
-      tooltip: 'Assign volunteers to this venue'
-    },
-    {
-      label: 'Delete',
-      icon: Trash2,
-      onClick: handleDeleteClick,
-      variant: 'danger',
-      loading: (venue) => deletingVenue === venue.venueId,
-      tooltip: 'Permanently delete this venue'
-    },
-  ];
-
-  // Define filters specific to venues (only district and venue type)
-  const venueFilters: FilterField[] = [
-    {
-      key: 'type',
-      label: 'Venue Type',
-      type: 'select',
-      options: [
-        { label: 'Cluster', value: 'cluster' },
-        { label: 'Division', value: 'division' },
-        { label: 'Final', value: 'final' },
-      ],
-    },
-    {
-      key: 'district',
-      label: 'District',
-      type: 'text',
-      placeholder: 'Enter district name',
-    },
-  ];
-
-  // Define export options specific to venues
-  const exportOptions: ExportConfig[] = [
-    {
-      label: 'Export CSV',
-      format: 'csv',
-      onExport: () => {
-        const csvContent = [
-          ['Venue Name', 'Short Name', 'Type', 'District', 'State', 'Pincode', 'Sports Count', 'Status', 'Contact Name', 'Contact Phone'].join(','),
-          ...venues.map(venue => [
-            venue.name,
-            venue.shortName,
-            venue.type,
-            venue.district,
-            venue.state,
-            venue.pincode,
-            venue.supportedSports?.length || 0,
-            venue.currentStatus,
-            venue.primaryContact?.name || '',
-            venue.primaryContact?.phone || ''
-          ].join(','))
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `venues_export_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      },
-    },
-  ];
-
-  // Define stats for StatsCard
-  const statsData = venues.length > 0 ? [
-    {
-      label: 'Active',
-      value: venues.filter(v => v.isActive).length,
-      color: 'success' as const,
-    },
-    {
-      label: 'Available',
-      value: venues.filter(v => v.currentStatus === 'available').length,
-      color: 'info' as const,
-    },
-    {
-      label: 'Maintenance',
-      value: venues.filter(v => v.currentStatus === 'maintenance').length,
-      color: 'warning' as const,
-    },
-    {
-      label: 'Inactive',
-      value: venues.filter(v => !v.isActive).length,
-      color: 'error' as const,
-    },
-  ] : [];
+    }
+  ], [router, lang]);
 
   if (authLoading || loading) {
     return <PageLoader title="Loading venues..." variant="minimal" />;
@@ -425,8 +178,8 @@ export default function VenuesManagement() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-fira">Venues Management</h1>
-          <p className="text-gray-600 text-sm font-fira">Manage sports venues and facilities</p>
+          <h1 className="text-2xl font-bold text-gray-900">Venues Management</h1>
+          <p className="text-gray-600 text-sm">Manage tournament venues and locations</p>
         </div>
         
         <Button
@@ -439,275 +192,60 @@ export default function VenuesManagement() {
         </Button>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-600 font-fira">{error}</p>
-        </div>
-      )}
-
-        {/* Advanced Table with all features */}
-        <AdvancedTable
-          data={venues}
-          columns={columns}
-          actions={actions}
-          loading={loading}
-          
-          // Search functionality
-          searchable={true}
-          searchPlaceholder="Search venues by name, location, or contact..."
-          
-          // Filter functionality
-          filterable={true}
-          filters={venueFilters}
-          
-          // Sort functionality
-          sortable={true}
-          multiSort={true}
-          defaultSort={[{ key: 'name', direction: 'asc' }]}
-          
-          // Pagination
-          pagination={{
-            enabled: true,
-            pageSize: 25,
-            pageSizeOptions: [10, 25, 50, 100]
-          }}
-          
-          // Export options
-          exportOptions={exportOptions}
-          
-          // Selection (for future bulk actions)
-          selectable={false}
-          
-          // State persistence in URL
-          persistState={true}
-          stateKey="venues"
-          
-          // Empty state
-          emptyState={{
-            icon: MapPin,
-            title: 'No venues found',
-            description: 'Create your first venue to get started.',
-            action: {
-              label: 'Add Venue',
-              onClick: () => router.push(`/${lang}/admin/venues/create`),
-            },
-          }}
-          
-          keyExtractor={(venue) => venue.venueId}
-          stickyHeader={true}
-        />
-
       {/* Stats Cards */}
-      {statsData.length > 0 && (
-        <div className="mt-8">
-          <StatsCard 
-            stats={statsData}
-            columns={4}
-            size="base"
-            showBorder
+      {venues.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <SingleStatCard
+            stat={{
+              label: "Total Venues",
+              value: venues.length.toString(),
+              icon: MapPin,
+              color: "info"
+            }}
+          />
+          <SingleStatCard
+            stat={{
+              label: "Active Venues",
+              value: venues.filter((v) => v.status === 'active').length.toString(),
+              icon: MapPin,
+              color: "success"
+            }}
+          />
+          <SingleStatCard
+            stat={{
+              label: "Total Team Assignments",
+              value: venues.reduce((sum, venue) => sum + venue.assignedTeams, 0).toString(),
+              icon: Users,
+              color: "primary"
+            }}
           />
         </div>
       )}
 
-      {/* Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={confirmDelete.isOpen}
-        onClose={() => setConfirmDelete({ isOpen: false, venue: null })}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Venue"
-        description={`Are you sure you want to permanently delete "${confirmDelete.venue?.name}"? This action cannot be undone and will remove all venue data including assigned volunteers and bookings.`}
-        confirmLabel="Delete Venue"
-        confirmVariant="danger"
-        loading={deletingVenue !== null}
-      />
-
-      {/* Volunteer Assignment Modal */}
-      {volunteerModal.isOpen && (
-        <VenueVolunteerAssignmentModal
-          isOpen={volunteerModal.isOpen}
-          onClose={() => setVolunteerModal({ isOpen: false, venue: null })}
-          onAssign={handleVolunteerAssign}
-          currentAssignments={[]}
-          venueName={volunteerModal.venue?.name || ''}
-        />
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-600">{error}</p>
+        </div>
       )}
+
+      {/* AdvancedTable */}
+      <AdvancedTable<VenueData>
+        data={venues}
+        columns={columns}
+        actions={actions}
+        loading={loading}
+        searchable={true}
+        searchPlaceholder="Search venues..."
+        filterable={false}
+        sortable={true}
+        keyExtractor={(venue) => venue.id}
+        emptyState={{
+          icon: MapPin,
+          title: 'No venues found',
+          description: 'No venues have been added yet.'
+        }}
+      />
     </div>
   );
 }
-
-// Inline Volunteer Assignment Modal Component
-const VenueVolunteerAssignmentModal = ({
-  isOpen,
-  onClose,
-  onAssign,
-  currentAssignments,
-  venueName
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onAssign: (assignment: any) => void;
-  currentAssignments: any[];
-  venueName: string;
-}) => {
-  const [volunteers, setVolunteers] = useState<any[]>([]);
-  const [selectedVolunteer, setSelectedVolunteer] = useState('');
-  const [volunteerType, setVolunteerType] = useState<'general' | 'technical'>('general');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loadingVolunteers, setLoadingVolunteers] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (isOpen) {
-      loadVolunteers();
-    }
-  }, [isOpen]);
-
-  const loadVolunteers = async () => {
-    try {
-      setLoadingVolunteers(true);
-      const usersCollection = collection(db, 'users');
-      const volunteersSnapshot = await getDocs(usersCollection);
-      const volunteersData = volunteersSnapshot.docs
-        .map(doc => {
-          const data = doc.data() as { role?: string; isActive?: boolean };
-          return { id: doc.id, ...data };
-        })
-        .filter(user => user.role === 'general_volunteer' && user.isActive !== false);
-
-      setVolunteers(volunteersData);
-    } catch (err: any) {
-      setError('Failed to load volunteers.');
-    } finally {
-      setLoadingVolunteers(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedVolunteer) {
-      setError('Please select a volunteer');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const volunteer = volunteers.find(v => v.id === selectedVolunteer);
-      if (!volunteer) {
-        setError('Selected volunteer not found');
-        return;
-      }
-
-      const assignment = {
-        volunteerId: selectedVolunteer,
-        volunteerName: `${volunteer.firstName} ${volunteer.lastName}`,
-        volunteerEmail: volunteer.email,
-        volunteerType: volunteerType
-      };
-
-      await onAssign(assignment);
-      setSelectedVolunteer('');
-      setVolunteerType('general');
-    } catch (err: any) {
-      setError('Failed to assign volunteer.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Assign Volunteer</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            ×
-          </button>
-        </div>
-        
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Venue</label>
-            <input
-              type="text"
-              value={venueName}
-              disabled
-              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Volunteer</label>
-            {loadingVolunteers ? (
-              <div className="flex items-center justify-center py-3">
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                Loading volunteers...
-              </div>
-            ) : (
-              <Select 
-                value={selectedVolunteer}
-                onValueChange={(value) => setSelectedVolunteer(value)}
-                required
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select Volunteer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {volunteers.map(volunteer => (
-                    <SelectItem key={volunteer.id} value={volunteer.id}>
-                      {volunteer.firstName} {volunteer.lastName} - {volunteer.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-2">Volunteer Type</label>
-            <Select 
-              value={volunteerType}
-              onValueChange={(value) => setVolunteerType(value as 'general' | 'technical')}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select Volunteer Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="general">General</SelectItem>
-                <SelectItem value="technical">Technical</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || !selectedVolunteer}
-              className="flex-1 bg-[#3A7F3F] hover:bg-green-700"
-            >
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Assign
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};

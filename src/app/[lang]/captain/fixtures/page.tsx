@@ -72,14 +72,28 @@ interface CaptainFixture {
 }
 
 export default function CaptainFixturesPage() {
-  const [teams, setTeams] = useState<CaptainTeam[]>([]);
-  const [fixtures, setFixtures] = useState<CaptainFixture[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
+
+  // Get teams using tRPC
+  const { data: teams = [], isLoading: teamsLoading, error: teamsError } = api.teams.getMyTeams.useQuery(
+    undefined,
+    {
+      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'captain',
+    }
+  );
+
+  // Get fixtures using tRPC
+  const { data: fixtures = [], isLoading: fixturesLoading, error: fixturesError } = api.teams.getMyTeamFixtures.useQuery(
+    undefined,
+    {
+      enabled: !authLoading && !!user && userProfile?.profile_complete && (user.role === 'captain' || user.role === 'player'),
+    }
+  );
+
+  const loading = authLoading || teamsLoading || fixturesLoading;
+  const error = teamsError?.message || fixturesError?.message;
 
   useEffect(() => {
     if (authLoading) return;
@@ -93,168 +107,8 @@ export default function CaptainFixturesPage() {
       router.push(`/${lang}/profile/complete`);
       return;
     }
-
-    loadCaptainFixtures();
   }, [user, userProfile, authLoading, router, lang]);
 
-  const loadCaptainFixtures = async () => {
-    if (!user) return;
-
-    try {
-      // First, load teams where current user is captain
-      const teamsQuery = query(
-        collection(db, "teams"),
-        where("captainId", "==", user.uid)
-      );
-      const querySnapshot = await getDocs(teamsQuery);
-      
-      const captainTeams: CaptainTeam[] = [];
-      const venueIds = new Set<string>();
-      const captainTeamIds = new Set<string>();
-      
-      for (const docSnapshot of querySnapshot.docs) {
-        const teamData = docSnapshot.data();
-        
-        // Load players count from subcollection
-        const playersCollection = collection(db, "teams", docSnapshot.id, "players");
-        const playersSnapshot = await getDocs(playersCollection);
-        const currentPlayers = playersSnapshot.docs.filter(doc => !doc.data().isDeleted).length;
-        
-        // Load venue assignments from teamVenueAssignment collection (get ALL assignments)
-        let venueAssignment: any = null;
-        try {
-          const venueAssignmentQuery = query(
-            collection(db, "teamVenueAssignment"),
-            where("teamId", "==", docSnapshot.id)
-          );
-          const venueAssignmentSnapshot = await getDocs(venueAssignmentQuery);
-          
-          // Process all venue assignments for this team
-          venueAssignmentSnapshot.docs.forEach(assignDoc => {
-            const assignmentData = assignDoc.data();
-            const venueId = assignmentData.venueId || assignmentData.clusterVenueId || assignmentData.divisionVenueId;
-            const venueName = assignmentData.venueName || assignmentData.clusterVenueName || assignmentData.divisionVenueName || 'Unknown Venue';
-            
-            if (venueId) {
-              venueIds.add(venueId);
-              
-              // Use the first valid venue assignment for the team display
-              if (!venueAssignment) {
-                venueAssignment = {
-                  venueId: venueId,
-                  venueName: venueName,
-                  assignmentLevel: assignmentData.assignmentLevel || assignmentData.currentLevel || 'cluster'
-                };
-              }
-            }
-          });
-        } catch (venueError) {
-          console.error('Error loading venue assignments:', venueError);
-        }
-        
-        const team: CaptainTeam = {
-          teamId: docSnapshot.id,
-          name: teamData.teamName || teamData.name || '',
-          sportName: teamData.sportName || teamData.sportId || '',
-          panchayat: teamData.panchayat || '',
-          district: teamData.district || '',
-          state: teamData.state || '',
-          venueId: venueAssignment?.venueId,
-          venue: venueAssignment ? {
-            name: venueAssignment.venueName,
-            address: ''
-          } : undefined,
-          status: teamData.status || 'draft',
-          currentPlayers,
-          maxPlayers: teamData.maxPlayers || 12
-        };
-        
-        captainTeamIds.add(docSnapshot.id);
-        
-        captainTeams.push(team);
-      }
-
-      setTeams(captainTeams);
-
-      // Load fixtures for the venues where captain's teams are assigned
-      if (venueIds.size > 0) {
-        const fixturesPromises = Array.from(venueIds).map(async (venueId) => {
-          const fixturesQuery = query(
-            collection(db, "fixtures"),
-            where("venueId", "==", venueId)
-          );
-          const fixturesSnapshot = await getDocs(fixturesQuery);
-          
-          const venueFixtures: CaptainFixture[] = [];
-          
-          for (const fixtureDoc of fixturesSnapshot.docs) {
-            const fixtureData = fixtureDoc.data();
-            
-            // Load venue details
-            let venue = null;
-            if (fixtureData.venueId) {
-              try {
-                const venueDoc = await getDoc(doc(db, "venues", fixtureData.venueId));
-                if (venueDoc.exists()) {
-                  const venueData = venueDoc.data();
-                  venue = {
-                    name: venueData.name || 'Unknown Venue',
-                    address: venueData.address || ''
-                  };
-                }
-              } catch (error) {
-                // Warning removed
-              }
-            }
-            
-            // Check if any captain teams are in this fixture
-            const assignedTeams = fixtureData.assignedTeams || [];
-            const hasCaptainTeam = assignedTeams.some((team: any) => captainTeamIds.has(team.teamId));
-            const captainTeamNames = assignedTeams
-              .filter((team: any) => captainTeamIds.has(team.teamId))
-              .map((team: any) => team.teamName || team.name);
-            
-            venueFixtures.push({
-              id: fixtureDoc.id,
-              name: fixtureData.name || `${fixtureData.sportId} Tournament`,
-              sportId: fixtureData.sportId || '',
-              sportName: fixtureData.sportName || fixtureData.sportId || '',
-              genderCategory: fixtureData.genderCategory || '',
-              venueId: fixtureData.venueId || '',
-              venue: venue ?? undefined,
-              status: fixtureData.status || 'scheduled',
-              level: fixtureData.level || 'Panchayat',
-              assignedTeams: assignedTeams,
-              bracket: fixtureData.bracket || {},
-              createdAt: fixtureData.createdAt || null,
-              hasCaptainTeam,
-              captainTeamNames
-            });
-          }
-          
-          return venueFixtures;
-        });
-
-        const allFixtures = await Promise.all(fixturesPromises);
-        const flatFixtures = allFixtures.flat();
-        
-        // Sort fixtures by creation date
-        flatFixtures.sort((a, b) => {
-          const aTime = a.createdAt?.toDate?.() || new Date(0);
-          const bTime = b.createdAt?.toDate?.() || new Date(0);
-          return bTime.getTime() - aTime.getTime();
-        });
-        
-        setFixtures(flatFixtures);
-      }
-
-    } catch (err: any) {
-      // Error handling removed
-      setError("Failed to load fixtures data");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -355,11 +209,9 @@ export default function CaptainFixturesPage() {
       header: 'Progress',
       render: (value, item, index) => {
         if (!item) return null;
-        const completed = item.bracket?.matches?.filter(m => m.status === 'completed').length || 0;
-        const total = item.bracket?.matches?.length || 0;
         return (
           <div>
-            <div className="text-sm text-gray-900">{completed} / {total}</div>
+            <div className="text-sm text-gray-900">{item.completedMatches} / {item.totalMatches}</div>
             <div className="text-xs text-gray-500">matches completed</div>
           </div>
         );
@@ -387,8 +239,15 @@ export default function CaptainFixturesPage() {
         return (
           <div className="flex space-x-2">
             <button
-              onClick={() => router.push(`/${lang}/captain/teams`)}
+              onClick={() => router.push(`/${lang}/captain/fixtures/${item.id}`)}
               className="text-[#F28C38] hover:text-[#E67A26] flex items-center text-sm"
+            >
+              <Eye className="w-4 h-4 mr-1" />
+              View Details
+            </button>
+            <button
+              onClick={() => router.push(`/${lang}/captain/teams`)}
+              className="text-gray-600 hover:text-gray-800 flex items-center text-sm"
             >
               <UserCheck className="w-4 h-4 mr-1" />
               Manage Teams
