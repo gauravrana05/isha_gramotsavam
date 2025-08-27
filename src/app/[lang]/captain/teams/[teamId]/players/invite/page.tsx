@@ -29,8 +29,8 @@ import DocumentPreview from "@/components/documents/DocumentPreview";
 
 interface TeamPlayer {
   id: string;
-  user_id: string;
-  team_id: string;
+  userId: string;
+  teamId: string;
   first_name: string;
   last_name: string;
   phone: string;
@@ -46,7 +46,7 @@ interface TeamPlayer {
   state: string;
   pincode: string;
   added_by: string;
-  created_at: Date;
+  createdAt: Date;
   users?: {
     id: string;
     first_name: string | null;
@@ -55,15 +55,15 @@ interface TeamPlayer {
     role: string;
     profile_complete: boolean,
     user_profile_images_user_profile_images_user_idTousers: {
-      user_id: string;
+      userId: string;
       profile_photo_path: string | null;
       aadhaar_front_path: string | null;
       aadhaar_back_path: string | null;
       all_images_uploaded: boolean;
       verified_by: string | null;
       verified_at: Date | null;
-      created_at: Date;
-      updated_at: Date;
+      createdAt: Date;
+      updatedAt: Date;
     } | null;
   };
 }
@@ -83,8 +83,8 @@ interface TeamData {
   pincode: string | null;
   current_players: number;
   current_substitutes: number;
-  created_at: Date;
-  updated_at: Date;
+  createdAt: Date;
+  updatedAt: Date;
   sports: {
     id: string;
     name: string;
@@ -528,7 +528,7 @@ export default function CaptainPlayerManagement() {
       validationErrors.push('Team must have at least one player');
     }
 
-    const playersWithInvalidIds = players.filter(p => !p.user_id);
+    const playersWithInvalidIds = players.filter(p => !p.userId);
     if (playersWithInvalidIds.length > 0) {
       validationErrors.push(`${playersWithInvalidIds.length} player(s) have missing user IDs. Please remove and re-add them.`);
     }
@@ -779,7 +779,7 @@ export default function CaptainPlayerManagement() {
                         <div className="flex-1">
                           <div className="font-semibold text-[#4A2F1D] text-sm">
                             {player.first_name} {player.last_name}
-                            {player.user_id === teamData.captain_id && (
+                            {player.userId === teamData.captain_id && (
                               <span className="ml-2 text-xs bg-[#F28C38] text-white px-2 py-1 rounded">Captain</span>
                             )}
                           </div>
@@ -792,7 +792,7 @@ export default function CaptainPlayerManagement() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {player.user_id !== teamData.captain_id && (
+                          {player.userId !== teamData.captain_id && (
                             <button
                               onClick={() => removePlayer(player.id)}
                               className="text-red-600 p-1"
@@ -849,7 +849,7 @@ export default function CaptainPlayerManagement() {
                             <div>
                               <div className="text-sm font-semibold text-[#4A2F1D] flex items-center">
                                 {player.first_name} {player.last_name}
-                                {player.user_id === teamData.captain_id && (
+                                {player.userId === teamData.captain_id && (
                                   <span className="ml-2 text-xs bg-[#F28C38] text-white px-2 py-1 rounded">Captain</span>
                                 )}
                               </div>
@@ -901,7 +901,7 @@ export default function CaptainPlayerManagement() {
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
-                              {player.user_id !== teamData.captain_id && (
+                              {player.userId !== teamData.captain_id && (
                                 <button
                                   onClick={() => removePlayer(player.id)}
                                   className="text-red-600 hover:text-red-800 transition-colors"
@@ -1196,7 +1196,7 @@ export default function CaptainPlayerManagement() {
                       ) : (
                         <PlayerDocumentUpload
                           playerId={selectedPlayer.id}
-                          playerUserId={selectedPlayer.user_id}
+                          playerUserId={selectedPlayer.userId}
                           documentType="profilePhoto"
                           label="Profile Photo"
                           currentUrl={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path || null}
@@ -1226,7 +1226,7 @@ export default function CaptainPlayerManagement() {
                       ) : (
                         <PlayerDocumentUpload
                           playerId={selectedPlayer.id}
-                          playerUserId={selectedPlayer.user_id}
+                          playerUserId={selectedPlayer.userId}
                           documentType="aadhaarFront"
                           label="Aadhaar Front"
                           currentUrl={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path || null}
@@ -1256,7 +1256,7 @@ export default function CaptainPlayerManagement() {
                       ) : (
                         <PlayerDocumentUpload
                           playerId={selectedPlayer.id}
-                          playerUserId={selectedPlayer.user_id}
+                          playerUserId={selectedPlayer.userId}
                           documentType="aadhaarBack"
                           label="Aadhaar Back"
                           currentUrl={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path || null}
@@ -1279,7 +1279,7 @@ export default function CaptainPlayerManagement() {
                     Close
                   </button>
                   {/* Remove Player button - disabled for captain */}
-                  {selectedPlayer.user_id !== teamData.captain_id && !isReadOnly ? (
+                  {selectedPlayer.userId !== teamData.captain_id && !isReadOnly ? (
                     <button
                       onClick={() => {
                         removePlayer(selectedPlayer.id);

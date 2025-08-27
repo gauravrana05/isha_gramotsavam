@@ -54,7 +54,7 @@ export const profileRouter = createTRPCRouter({
 
         // Check user profile images
         const userProfileImages = await db.user_profile_images.findUnique({
-          where: { user_id: input.userId },
+          where: { userId: input.userId },
           select: {
             all_images_uploaded: true,
             profile_photo_path: true,
@@ -134,9 +134,9 @@ export const profileRouter = createTRPCRouter({
 
         // Upsert the user profile images record
         const userProfileImages = await db.user_profile_images.upsert({
-          where: { user_id: userId },
+          where: { userId: userId },
           create: {
-            user_id: userId,
+            userId: userId,
             [fieldName]: imagePath,
           },
           update: {
@@ -153,7 +153,7 @@ export const profileRouter = createTRPCRouter({
 
         // Update the all_images_uploaded flag
         await db.user_profile_images.update({
-          where: { user_id: userId },
+          where: { userId: userId },
           data: { all_images_uploaded: allImagesUploaded },
         })
 

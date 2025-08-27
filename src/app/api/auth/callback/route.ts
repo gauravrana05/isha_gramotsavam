@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         data: {
           ...userData,
           role: existingUser.role, // Preserve existing role
-          updated_at: new Date(),
+          updatedAt: new Date(),
         }
       });
     } else {

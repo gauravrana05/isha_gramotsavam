@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
         profile_complete: true,
         role: true,
         language_preference: true,
-        created_at: true,
-        updated_at: true,
+        createdAt: true,
+        updatedAt: true,
       }
     });
 

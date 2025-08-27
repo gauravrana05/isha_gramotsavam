@@ -18,21 +18,21 @@ export const adminRouter = createTRPCRouter({
 
       // Teams stats
       const [totalTeams, verifiedTeams, rejectedTeams, draftTeams] = await Promise.all([
-        db.teams.count(),
-        db.teams.count({ where: { status: 'verified' } }),
-        db.teams.count({ where: { status: 'rejected' } }),
-        db.teams.count({ where: { status: 'draft' } }),
+        db.team.count(),
+        db.team.count({ where: { status: 'verified' } }),
+        db.team.count({ where: { status: 'rejected' } }),
+        db.team.count({ where: { status: 'draft' } }),
       ]);
 
       // Players stats  
       const [totalPlayers, verifiedPlayers, pendingPlayers] = await Promise.all([
-        db.team_players.count(),
-        db.team_players.count({ where: { verification_status: 'verified' } }),
-        db.team_players.count({ where: { verification_status: 'pending' } }),
+        db.teamPlayer.count(),
+        db.teamPlayer.count({ where: { verificationStatus: 'verified' } }),
+        db.teamPlayer.count({ where: { verificationStatus: 'pending' } }),
       ]);
 
       // Average age calculation
-      const playersWithAge = await db.team_players.findMany({
+      const playersWithAge = await db.teamPlayer.findMany({
         where: { age: { not: null } },
         select: { age: true }
       });
@@ -42,16 +42,16 @@ export const adminRouter = createTRPCRouter({
 
       // Venues stats
       const [totalVenues, activeVenues] = await Promise.all([
-        db.venues.count(),
-        db.venues.count({ where: { status: 'active' } }),
+        db.venue.count(),
+        db.venue.count({ where: { isActive: true } }),
       ]);
 
       // Matches stats
       const [totalMatches, completedMatches, inProgressMatches, scheduledMatches] = await Promise.all([
-        db.matches.count(),
-        db.matches.count({ where: { status: 'completed' } }),
-        db.matches.count({ where: { status: 'in_progress' } }),
-        db.matches.count({ where: { status: 'scheduled' } }),
+        db.match.count(),
+        db.match.count({ where: { status: 'completed' } }),
+        db.match.count({ where: { status: 'in_progress' } }),
+        db.match.count({ where: { status: 'scheduled' } }),
       ]);
 
       // System health calculation
@@ -137,24 +137,25 @@ export const adminRouter = createTRPCRouter({
       }
 
       const [totalFixtures, activeFixtures, completedFixtures] = await Promise.all([
-        db.fixtures.count(),
-        db.fixtures.count({ where: { status: 'active' } }),
-        db.fixtures.count({ where: { status: 'completed' } }),
+        db.fixture.count(),
+        db.fixture.count({ where: { status: 'teams_assigned' } }),
+        db.fixture.count({ where: { status: 'completed' } }),
       ]);
 
       const [totalMatches, completedMatches, inProgressMatches, scheduledMatches] = await Promise.all([
-        db.matches.count(),
-        db.matches.count({ where: { status: 'completed' } }),
-        db.matches.count({ where: { status: 'in_progress' } }),
-        db.matches.count({ where: { status: 'scheduled' } }),
+        db.match.count(),
+        db.match.count({ where: { status: 'completed' } }),
+        db.match.count({ where: { status: 'in_progress' } }),
+        db.match.count({ where: { status: 'scheduled' } }),
       ]);
 
       // Teams progression stats
-      const clusterToDiv = await db.teams.count({
-        where: { current_level: 'division' }
+      // Teams progression stats - Using TeamVenueAssignment for progression tracking
+      const clusterToDiv = await db.teamVenueAssignment.count({
+        where: { divisionQualified: true }
       });
-      const divToFinal = await db.teams.count({
-        where: { current_level: 'final' }
+      const divToFinal = await db.teamVenueAssignment.count({
+        where: { finalQualified: true }
       });
 
       const overallProgress = totalFixtures > 0 ? (completedFixtures / totalFixtures) * 100 : 0;
@@ -201,7 +202,7 @@ export const adminRouter = createTRPCRouter({
       isVerified: z.enum(['all', 'verified', 'pending']).default('all'),
       isProfileComplete: z.enum(['all', 'complete', 'incomplete']).default('all'),
       searchQuery: z.string().optional(),
-      sortBy: z.enum(['firstName', 'created_at', 'role']).default('created_at'),
+      sortBy: z.enum(['firstName', 'createdAt', 'role']).default('createdAt'),
       sortOrder: z.enum(['asc', 'desc']).default('desc'),
     }))
     .query(async ({ input, ctx }) => {
@@ -235,33 +236,37 @@ export const adminRouter = createTRPCRouter({
         };
       }
 
-      // Verification filter
+      // Verification filter - using UserVerification relation
       if (input.isVerified !== 'all') {
-        where.is_verified = input.isVerified === 'verified';
+        where.userVerifications = {
+          some: {
+            status: input.isVerified === 'verified' ? 'verified' : { not: 'verified' }
+          }
+        };
       }
 
       // Profile completeness filter
       if (input.isProfileComplete !== 'all') {
-        where.is_profile_complete = input.isProfileComplete === 'complete';
+        where.profileComplete = input.isProfileComplete === 'complete';
       }
 
       // Search filter
       if (input.searchQuery) {
         where.OR = [
-          { first_name: { contains: input.searchQuery, mode: 'insensitive' } },
-          { last_name: { contains: input.searchQuery, mode: 'insensitive' } },
-          { phone_number: { contains: input.searchQuery } },
+          { firstName: { contains: input.searchQuery, mode: 'insensitive' } },
+          { lastName: { contains: input.searchQuery, mode: 'insensitive' } },
+          { phone: { contains: input.searchQuery } },
           { email: { contains: input.searchQuery, mode: 'insensitive' } },
         ];
       }
 
       const [users, total] = await Promise.all([
-        db.users.findMany({
+        db.user.findMany({
           where,
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            firstName: true,
+            lastName: true,
             phone: true,
             email: true,
             role: true,
@@ -269,17 +274,17 @@ export const adminRouter = createTRPCRouter({
             panchayat: true,
             district: true,
             state: true,
-            user_verifications_user_verifications_user_idTousers: true,
-            profile_complete: true,
-            created_at: true,
+            userVerifications: true,
+            profileComplete: true,
+            createdAt: true,
           },
           orderBy: {
-            [input.sortBy === 'firstName' ? 'first_name' : input.sortBy]: input.sortOrder
+            [input.sortBy]: input.sortOrder
           },
           skip: input.offset,
           take: input.limit,
         }),
-        db.users.count({ where }),
+        db.user.count({ where }),
       ]);
 
       return {
@@ -287,8 +292,8 @@ export const adminRouter = createTRPCRouter({
         users: users.map(user => ({
           id: user.id,
           uid: user.id,
-          firstName: user.first_name,
-          lastName: user.last_name,
+          firstName: user.firstName,
+          lastName: user.lastName,
           phoneNumber: user.phone,
           email: user.email,
           role: user.role,
@@ -296,8 +301,8 @@ export const adminRouter = createTRPCRouter({
           panchayat: user.panchayat,
           district: user.district,
           state: user.state,
-          isProfileComplete: user.profile_complete,
-          createdAt: user.created_at?.toISOString() || null,
+          isProfileComplete: user.profileComplete,
+          createdAt: user.createdAt?.toISOString() || null,
         })),
         pagination: {
           total,
@@ -331,7 +336,7 @@ export const adminRouter = createTRPCRouter({
       }
 
       if (input.sportName) {
-        where.sports = {
+        where.sport = {
           name: {
             contains: input.sportName,
             mode: 'insensitive'
@@ -347,7 +352,7 @@ export const adminRouter = createTRPCRouter({
       }
 
       if (input.genderCategory !== 'all') {
-        where.gender_category = input.genderCategory;
+        where.genderCategory = input.genderCategory;
       }
 
       if (input.searchQuery) {
@@ -359,25 +364,29 @@ export const adminRouter = createTRPCRouter({
       }
 
       const [teams, total] = await Promise.all([
-        db.teams.findMany({
+        db.team.findMany({
           where,
           include: {
-            sports: { select: { name: true } },
-            users: { select: { first_name: true, last_name: true, phone_number: true } },
-            team_players: { select: { id: true } },
-            venue_assignments: {
+            sport: { select: { name: true } },
+            captainUser: { select: { firstName: true, lastName: true, phone: true } },
+            teamPlayers: { select: { id: true } },
+            teamVenueAssignments: {
               include: {
-                venues: { select: { name: true } }
+                clusterVenueMapping: {
+                  include: {
+                    venue: { select: { name: true } }
+                  }
+                }
               },
-              orderBy: { created_at: 'desc' },
+              orderBy: { createdAt: 'desc' },
               take: 1
             }
           },
-          orderBy: { created_at: 'desc' },
+          orderBy: { createdAt: 'desc' },
           skip: input.offset,
           take: input.limit,
         }),
-        db.teams.count({ where }),
+        db.team.count({ where }),
       ]);
 
       return {
@@ -385,26 +394,26 @@ export const adminRouter = createTRPCRouter({
         teams: teams.map(team => ({
           id: team.id,
           name: team.name,
-          sportName: team.sports?.name || 'Unknown',
-          sportId: team.sport_id,
+          sportName: team.sport?.name || 'Unknown',
+          sportId: team.sportId,
           captainProfile: {
-            name: team.users ? `${team.users.first_name} ${team.users.last_name}`.trim() : 'N/A',
-            phone: team.users?.phone_number || 'N/A',
+            name: team.captainUser ? `${team.captainUser.firstName} ${team.captainUser.lastName}`.trim() : 'N/A',
+            phone: team.captainUser?.phone || 'N/A',
           },
           panchayat: team.panchayat,
           district: team.district,
           state: team.state,
-          genderCategory: team.gender_category,
-          currentPlayers: team.team_players.length,
-          maxPlayers: team.max_players,
+          genderCategory: team.genderCategory,
+          currentPlayers: team.teamPlayers.length,
+          maxPlayers: team.currentPlayers + team.currentSubstitutes,
           status: team.status,
-          createdAt: team.created_at,
-          eventId: team.event_id,
-          currentVenueAssignment: team.venue_assignments[0] ? {
-            venueId: team.venue_assignments[0].venue_id,
-            venueName: team.venue_assignments[0].venues?.name || 'Unknown',
-            assignmentLevel: team.venue_assignments[0].assignment_level,
-            assignedAt: team.venue_assignments[0].created_at?.toISOString() || null,
+          createdAt: team.createdAt,
+          eventId: team.eventId,
+          currentVenueAssignment: team.teamVenueAssignments[0] ? {
+            venueId: team.teamVenueAssignments[0].clusterVenueMappingId,
+            venueName: team.teamVenueAssignments[0].clusterVenueMapping?.venue?.name || 'Unknown',
+            assignmentLevel: team.teamVenueAssignments[0].level,
+            assignedAt: team.teamVenueAssignments[0].createdAt?.toISOString() || null,
           } : undefined,
         })),
         pagination: {
@@ -428,10 +437,10 @@ export const adminRouter = createTRPCRouter({
         sportStats,
         districtStats
       ] = await Promise.all([
-        db.teams.count(),
+        db.team.count(),
         
         // Verification stats
-        db.teams.groupBy({
+        db.team.groupBy({
           by: ['status'],
           _count: { _all: true }
         }).then(groups => {
@@ -451,14 +460,14 @@ export const adminRouter = createTRPCRouter({
 
         // Player stats
         Promise.all([
-          db.team_players.count(),
-          db.teams.aggregate({
-            _avg: { max_players: true }
+          db.teamPlayer.count(),
+          db.team.aggregate({
+            _avg: { currentPlayers: true, currentSubstitutes: true }
           }),
-          db.teams.findMany({
-            include: { team_players: true }
+          db.team.findMany({
+            include: { teamPlayers: true }
           }).then(teams => {
-            const playersPerTeam = teams.map(t => t.team_players.length);
+            const playersPerTeam = teams.map(t => t.teamPlayers.length);
             return {
               averagePlayersPerTeam: playersPerTeam.length > 0 
                 ? playersPerTeam.reduce((a, b) => a + b, 0) / playersPerTeam.length 
@@ -467,22 +476,19 @@ export const adminRouter = createTRPCRouter({
           })
         ]).then(([totalPlayers, avgMaxPlayers, avgStats]) => ({
           totalPlayers,
-          averageMaxPlayers: avgMaxPlayers._avg.max_players || 0,
+          averageMaxPlayers: (avgMaxPlayers._avg.currentPlayers || 0) + (avgMaxPlayers._avg.currentSubstitutes || 0),
           averagePlayersPerTeam: avgStats.averagePlayersPerTeam,
         })),
 
         // By sport
-        db.teams.groupBy({
-          by: ['sport_id'],
-          _count: { _all: true },
-          include: {
-            sports: { select: { name: true } }
-          }
+        db.team.groupBy({
+          by: ['sportId'],
+          _count: { _all: true }
         }).then(async groups => {
           const bySport: Record<string, number> = {};
           for (const group of groups) {
-            const sport = await db.sports.findUnique({
-              where: { id: group.sport_id },
+            const sport = await db.sport.findUnique({
+              where: { id: group.sportId },
               select: { name: true }
             });
             if (sport) {
@@ -493,7 +499,7 @@ export const adminRouter = createTRPCRouter({
         }),
 
         // By district
-        db.teams.groupBy({
+        db.team.groupBy({
           by: ['district'],
           _count: { _all: true }
         }).then(groups => {
@@ -536,7 +542,7 @@ export const adminRouter = createTRPCRouter({
       const where: any = {};
 
       if (input.status !== 'all') {
-        where.status = input.status;
+        where.isActive = input.status === 'active';
       }
 
       if (input.district) {
@@ -554,39 +560,48 @@ export const adminRouter = createTRPCRouter({
       }
 
       const [venues, total] = await Promise.all([
-        db.venues.findMany({
+        db.venue.findMany({
           where,
           include: {
-            venue_assignments: {
-              select: { id: true },
-              distinct: ['team_id']
-            },
-            _count: {
-              select: {
-                venue_assignments: true
+            venueLocationMappings: {
+              include: {
+                _count: {
+                  select: {
+                    teamVenueAssignmentsByCluster: true,
+                    teamVenueAssignmentsByDivision: true,
+                    teamVenueAssignmentsByFinal: true
+                  }
+                }
               }
             }
           },
-          orderBy: { created_at: 'desc' },
+          orderBy: { createdAt: 'desc' },
           skip: input.offset,
           take: input.limit,
         }),
-        db.venues.count({ where }),
+        db.venue.count({ where }),
       ]);
 
       return {
         success: true,
-        venues: venues.map(venue => ({
-          id: venue.id,
-          name: venue.name,
-          address: venue.address,
-          district: venue.district,
-          state: venue.state,
-          capacity: venue.capacity,
-          status: venue.status,
-          assignedTeams: venue._count.venue_assignments,
-          createdAt: venue.created_at?.toISOString() || null,
-        })),
+        venues: venues.map(venue => {
+          const totalAssignments = venue.venueLocationMappings.reduce((sum, mapping) => 
+            sum + (mapping._count?.teamVenueAssignmentsByCluster || 0) +
+            (mapping._count?.teamVenueAssignmentsByDivision || 0) +
+            (mapping._count?.teamVenueAssignmentsByFinal || 0), 0
+          );
+          return {
+            id: venue.id,
+            name: venue.name,
+            address: `${venue.panchayat || ''} ${venue.taluk || ''}`.trim(),
+            district: venue.district,
+            state: venue.state,
+            capacity: venue.capacity,
+            status: venue.isActive ? 'active' : 'inactive',
+            assignedTeams: totalAssignments,
+            createdAt: venue.createdAt?.toISOString() || null,
+          };
+        }),
         pagination: {
           total,
           hasMore: input.offset + input.limit < total,
@@ -604,7 +619,7 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const sports = await db.sports.findMany({
+      const sports = await db.sport.findMany({
         include: input.includeTeamCounts ? {
           _count: {
             select: {
@@ -621,9 +636,9 @@ export const adminRouter = createTRPCRouter({
           id: sport.id,
           name: sport.name,
           description: sport.description,
-          maxPlayers: sport.max_players,
+          maxPlayers: sport.mainPlayersCount + sport.maxSubstitutes,
           teamCount: input.includeTeamCounts ? sport._count?.teams || 0 : undefined,
-          createdAt: sport.created_at?.toISOString() || null,
+          createdAt: sport.createdAt?.toISOString() || null,
         }))
       };
     }),
@@ -639,11 +654,12 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const sport = await db.sports.create({
+      const sport = await db.sport.create({
         data: {
           name: input.name,
           description: input.description,
-          max_players: input.maxPlayers,
+          mainPlayersCount: input.maxPlayers,
+          maxSubstitutes: 0,
         }
       });
 
@@ -653,7 +669,7 @@ export const adminRouter = createTRPCRouter({
           id: sport.id,
           name: sport.name,
           description: sport.description,
-          maxPlayers: sport.max_players,
+          maxPlayers: sport.mainPlayersCount + sport.maxSubstitutes,
         }
       };
     }),
@@ -673,9 +689,9 @@ export const adminRouter = createTRPCRouter({
       const updateData: any = {};
       if (input.name) updateData.name = input.name;
       if (input.description !== undefined) updateData.description = input.description;
-      if (input.maxPlayers) updateData.max_players = input.maxPlayers;
+      if (input.maxPlayers) updateData.mainPlayersCount = input.maxPlayers;
 
-      const sport = await db.sports.update({
+      const sport = await db.sport.update({
         where: { id: input.id },
         data: updateData
       });
@@ -686,7 +702,7 @@ export const adminRouter = createTRPCRouter({
           id: sport.id,
           name: sport.name,
           description: sport.description,
-          maxPlayers: sport.max_players,
+          maxPlayers: sport.mainPlayersCount + sport.maxSubstitutes,
         }
       };
     }),
@@ -701,8 +717,8 @@ export const adminRouter = createTRPCRouter({
       }
 
       // Check if sport has teams
-      const teamCount = await db.teams.count({
-        where: { sport_id: input.id }
+      const teamCount = await db.team.count({
+        where: { sportId: input.id }
       });
 
       if (teamCount > 0) {
@@ -712,7 +728,7 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
-      await db.sports.delete({
+      await db.sport.delete({
         where: { id: input.id }
       });
 
@@ -762,7 +778,7 @@ export const adminRouter = createTRPCRouter({
               }
             }
           },
-          orderBy: { created_at: 'desc' },
+          orderBy: { createdAt: 'desc' },
           skip: input.offset,
           take: input.limit,
         }),
@@ -781,7 +797,7 @@ export const adminRouter = createTRPCRouter({
           startDate: fixture.start_date?.toISOString() || null,
           endDate: fixture.end_date?.toISOString() || null,
           matchCount: fixture._count.matches,
-          createdAt: fixture.created_at?.toISOString() || null,
+          createdAt: fixture.createdAt?.toISOString() || null,
         })),
         pagination: {
           total,
@@ -819,7 +835,7 @@ export const adminRouter = createTRPCRouter({
               }
             }
           },
-          orderBy: { created_at: 'desc' },
+          orderBy: { createdAt: 'desc' },
           skip: input.offset,
           take: input.limit,
         }),
@@ -838,7 +854,7 @@ export const adminRouter = createTRPCRouter({
           registrationDeadline: event.registration_deadline?.toISOString() || null,
           teamCount: event._count.teams,
           fixtureCount: event._count.fixtures,
-          createdAt: event.created_at?.toISOString() || null,
+          createdAt: event.createdAt?.toISOString() || null,
         })),
         pagination: {
           total,

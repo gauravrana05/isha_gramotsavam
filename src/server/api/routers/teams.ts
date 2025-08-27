@@ -48,8 +48,8 @@ export const teamsRouter = createTRPCRouter({
           team_players: includePlayers ? {
             select: {
               id: true,
-              user_id: true,
-              team_id: true,
+              userId: true,
+              teamId: true,
               first_name: true,
               last_name: true,
               phone: true,
@@ -65,7 +65,7 @@ export const teamsRouter = createTRPCRouter({
               state: true,
               pincode: true,
               added_by: true,
-              created_at: true,
+              createdAt: true,
               users: {
                 select: {
                   id: true,
@@ -76,15 +76,15 @@ export const teamsRouter = createTRPCRouter({
                   profile_complete: true,
                   user_profile_images_user_profile_images_user_idTousers: {
                     select: {
-                      user_id: true,
+                      userId: true,
                       profile_photo_path: true,
                       aadhaar_front_path: true,
                       aadhaar_back_path: true,
                       all_images_uploaded: true,
                       verified_by: true,
                       verified_at: true,
-                      created_at: true,
-                      updated_at: true,
+                      createdAt: true,
+                      updatedAt: true,
                     },
                   },
                 },
@@ -92,7 +92,7 @@ export const teamsRouter = createTRPCRouter({
             },
             orderBy: [
               { position: 'asc' },
-              { created_at: 'asc' },
+              { createdAt: 'asc' },
             ],
           } : false,
           team_venue_assignments: includeVenueAssignments ? {
@@ -192,13 +192,13 @@ export const teamsRouter = createTRPCRouter({
 
       // Map sortBy values to database field names
       const sortByMapping: Record<string, string> = {
-        'createdAt': 'created_at',
+        'createdAt': 'createdAt',
         'name': 'name',
         'status': 'status',
         'tournamentNumber': 'tournament_number'
       };
 
-      const dbSortBy = sortByMapping[sortBy] || 'created_at';
+      const dbSortBy = sortByMapping[sortBy] || 'createdAt';
 
       const [teamsFromDb, total] = await Promise.all([
         db.teams.findMany({
@@ -378,8 +378,8 @@ export const teamsRouter = createTRPCRouter({
         team_players: {
           select: {
             id: true,
-            user_id: true,
-            team_id: true,
+            userId: true,
+            teamId: true,
             first_name: true,
             last_name: true,
             phone: true,
@@ -395,7 +395,7 @@ export const teamsRouter = createTRPCRouter({
             state: true,
             pincode: true,
             added_by: true,
-            created_at: true,
+            createdAt: true,
             users: {
               select: {
                 id: true,
@@ -406,21 +406,21 @@ export const teamsRouter = createTRPCRouter({
                 profile_complete: true,
                 user_profile_images_user_profile_images_user_idTousers: {
                   select: {
-                    user_id: true,
+                    userId: true,
                     profile_photo_path: true,
                     aadhaar_front_path: true,
                     aadhaar_back_path: true,
                     all_images_uploaded: true,
                     verified_by: true,
                     verified_at: true,
-                    created_at: true,
-                    updated_at: true,
+                    createdAt: true,
+                    updatedAt: true,
                   },
                 },
               },
             },
           },
-          orderBy: [{ position: 'asc' }, { created_at: 'asc' }],
+          orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
         },
         team_venue_assignments: {
           include: {
@@ -483,7 +483,7 @@ export const teamsRouter = createTRPCRouter({
           where: {
             captain_id: input.captainId,
             sport_id: input.sportId,
-            event_id: input.eventId,
+            eventId: input.eventId,
             status: { not: 'rejected' },
           },
         })
@@ -507,7 +507,7 @@ export const teamsRouter = createTRPCRouter({
             district: input.district,
             state: input.state,
             description: input.description,
-            event_id: input.eventId,
+            eventId: input.eventId,
             pincode: input.pincode,
           },
           include: {
@@ -703,8 +703,8 @@ export const teamsRouter = createTRPCRouter({
           // Add captain as team member
           await tx.team_players.create({
             data: {
-              team_id: team.id,
-              user_id: captainId,
+              teamId: team.id,
+              userId: captainId,
               position: 'main',
               verification_status: 'pending',
               first_name: userProfile.first_name || '',
@@ -732,8 +732,8 @@ export const teamsRouter = createTRPCRouter({
           // Create user role entry for tracking
           await tx.user_roles.create({
             data: {
-              user_id: captainId,
-              event_id: null, // Global captain role for now, can be event-specific later
+              userId: captainId,
+              eventId: null, // Global captain role for now, can be event-specific later
               role: 'captain',
               assigned_by: null, // Self-assigned through team creation
             }
@@ -829,8 +829,8 @@ export const teamsRouter = createTRPCRouter({
         const existingPlayer = await db.team_players.findUnique({
           where: {
             team_id_user_id: {
-              team_id: input.teamId,
-              user_id: userId,
+              teamId: input.teamId,
+              userId: userId,
             },
           },
         })
@@ -845,14 +845,14 @@ export const teamsRouter = createTRPCRouter({
         // Check current player counts
         const currentMainPlayers = await db.team_players.count({
           where: {
-            team_id: input.teamId,
+            teamId: input.teamId,
             position: 'main',
           },
         })
 
         const currentSubstitutes = await db.team_players.count({
           where: {
-            team_id: input.teamId,
+            teamId: input.teamId,
             position: 'substitute',
           },
         })
@@ -874,8 +874,8 @@ export const teamsRouter = createTRPCRouter({
         // Create team player record
         const player = await db.team_players.create({
           data: {
-            team_id: input.teamId,
-            user_id: userId,
+            teamId: input.teamId,
+            userId: userId,
             first_name: input.firstName,
             last_name: input.lastName,
             phone: input.phone,
@@ -942,7 +942,7 @@ export const teamsRouter = createTRPCRouter({
         }
 
         // Verify the player belongs to the correct team
-        if (player.team_id !== input.teamId) {
+        if (player.teamId !== input.teamId) {
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'Player does not belong to this team',
@@ -958,10 +958,10 @@ export const teamsRouter = createTRPCRouter({
         // Update team player counts
         const [mainCount, subCount] = await Promise.all([
           db.team_players.count({
-            where: { team_id: input.teamId, position: 'main' },
+            where: { teamId: input.teamId, position: 'main' },
           }),
           db.team_players.count({
-            where: { team_id: input.teamId, position: 'substitute' },
+            where: { teamId: input.teamId, position: 'substitute' },
           }),
         ])
 
@@ -1005,7 +1005,7 @@ export const teamsRouter = createTRPCRouter({
         },
         orderBy: [
           { position: 'asc' },
-          { created_at: 'asc' },
+          { createdAt: 'asc' },
         ],
       })
 
@@ -1018,9 +1018,9 @@ export const teamsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       try {
         const photo = await db.team_photos.upsert({
-          where: { team_id: input.teamId },
+          where: { teamId: input.teamId },
           create: {
-            team_id: input.teamId,
+            teamId: input.teamId,
             photo_path: input.photoPath,
             uploaded_by: input.uploadedBy,
           },
@@ -1047,8 +1047,8 @@ export const teamsRouter = createTRPCRouter({
       try {
         const assignment = await db.team_venue_assignments.create({
           data: {
-            team_id: input.teamId,
-            event_id: input.eventId,
+            teamId: input.teamId,
+            eventId: input.eventId,
             cluster_venue_mapping_id: input.clusterVenueMappingId,
             assigned_by: input.assignedBy,
           },
@@ -1130,7 +1130,7 @@ export const teamsRouter = createTRPCRouter({
 
   assignTournamentNumber: adminProcedure
     .input(z.object({
-      team_id: z.string().uuid(),
+      teamId: z.string().uuid(),
       tournamentNumber: z.number().min(1),
       venueMappingId: z.string().uuid(),
     }))
@@ -1141,7 +1141,7 @@ export const teamsRouter = createTRPCRouter({
           where: {
             tournament_number: input.tournamentNumber,
             tournament_number_venue_mapping_id: input.venueMappingId,
-            id: { not: input.team_id },
+            id: { not: input.teamId },
           },
         })
 
@@ -1153,7 +1153,7 @@ export const teamsRouter = createTRPCRouter({
         }
 
         const team = await db.teams.update({
-          where: { id: input.team_id },
+          where: { id: input.teamId },
           data: {
             tournament_number: input.tournamentNumber,
             tournament_number_assigned_at: new Date(),
@@ -1190,11 +1190,11 @@ export const teamsRouter = createTRPCRouter({
             },
           },
           team_players: {
-            where: { user_id: userId }, // Ensure the logged-in user is a player in this team
+            where: { userId: userId }, // Ensure the logged-in user is a player in this team
             select: {
               id: true,
-              user_id: true,
-              team_id: true,
+              userId: true,
+              teamId: true,
               first_name: true,
               last_name: true,
               phone: true,
@@ -1210,7 +1210,7 @@ export const teamsRouter = createTRPCRouter({
               state: true,
               pincode: true,
               added_by: true,
-              created_at: true,
+              createdAt: true,
               users: {
                 select: {
                   id: true,
@@ -1221,15 +1221,15 @@ export const teamsRouter = createTRPCRouter({
                   profile_complete: true,
                   user_profile_images_user_profile_images_user_idTousers: {
                     select: {
-                      user_id: true,
+                      userId: true,
                       profile_photo_path: true,
                       aadhaar_front_path: true,
                       aadhaar_back_path: true,
                       all_images_uploaded: true,
                       verified_by: true,
                       verified_at: true,
-                      created_at: true,
-                      updated_at: true,
+                      createdAt: true,
+                      updatedAt: true,
                     },
                   },
                 },
@@ -1284,7 +1284,7 @@ export const teamsRouter = createTRPCRouter({
         position: currentPlayerData.position,
         status: team.status,
         verificationStatus: currentPlayerData.verification_status,
-        joinedAt: currentPlayerData.created_at.toISOString(),
+        joinedAt: currentPlayerData.createdAt.toISOString(),
         panchayat: team.panchayat,
         district: team.district,
         state: team.state,
@@ -1391,7 +1391,7 @@ export const teamsRouter = createTRPCRouter({
               },
             },
           },
-          orderBy: { created_at: 'desc' },
+          orderBy: { createdAt: 'desc' },
         });
 
         // Transform data to match frontend expectations
@@ -1409,7 +1409,7 @@ export const teamsRouter = createTRPCRouter({
           currentPlayers: team._count?.team_players || 0,
           maxPlayers: team.sports?.main_players_count || 0,
           status: team.status,
-          submittedAt: team.created_at,
+          submittedAt: team.createdAt,
           genderCategory: team.gender_category,
         }));
 
@@ -1472,7 +1472,7 @@ export const teamsRouter = createTRPCRouter({
             team_players: {
               select: {
                 id: true,
-                user_id: true,
+                userId: true,
                 first_name: true,
                 last_name: true,
                 phone: true,
@@ -1487,7 +1487,7 @@ export const teamsRouter = createTRPCRouter({
                 district: true,
                 state: true,
                 pincode: true,
-                created_at: true,
+                createdAt: true,
                 users: {
                   select: {
                     id: true,
@@ -1509,7 +1509,7 @@ export const teamsRouter = createTRPCRouter({
               },
               orderBy: [
                 { position: 'asc' },
-                { created_at: 'asc' },
+                { createdAt: 'asc' },
               ],
             },
           },
@@ -1538,14 +1538,14 @@ export const teamsRouter = createTRPCRouter({
           currentPlayers: team.team_players.length,
           maxPlayers: (team.sports?.main_players_count || 0) + (team.sports?.max_substitutes || 0),
           status: team.status,
-          submittedAt: team.created_at,
+          submittedAt: team.createdAt,
           genderCategory: team.gender_category,
         };
 
         // Transform players data
         const transformedPlayers = team.team_players.map(player => ({
           playerId: player.id,
-          userId: player.user_id,
+          userId: player.userId,
           name: `${player.first_name} ${player.last_name}`.trim(),
           phone: player.phone,
           dob: player.date_of_birth,
@@ -1626,7 +1626,7 @@ export const teamsRouter = createTRPCRouter({
 
         // Get team and check if all players are verified
         const team = await db.teams.findUnique({
-          where: { id: updatedPlayer.team_id },
+          where: { id: updatedPlayer.teamId },
           include: {
             team_players: {
               select: {
@@ -1687,10 +1687,10 @@ export const teamsRouter = createTRPCRouter({
         // Get all affected teams and update their status if needed
         const affectedPlayers = await db.team_players.findMany({
           where: { id: { in: input.playerIds } },
-          select: { team_id: true },
+          select: { teamId: true },
         });
 
-        const uniqueTeamIds = [...new Set(affectedPlayers.map(p => p.team_id))];
+        const uniqueTeamIds = [...new Set(affectedPlayers.map(p => p.teamId))];
 
         // Check each team and update status if all players are verified
         for (const teamId of uniqueTeamIds) {
@@ -1762,7 +1762,7 @@ export const teamsRouter = createTRPCRouter({
         });
       } else if (ctx.user.role === 'player') {
         const playerTeams = await db.team_players.findMany({
-          where: { user_id: ctx.user.id },
+          where: { userId: ctx.user.id },
           include: {
             teams: {
               select: {
@@ -1848,7 +1848,7 @@ export const teamsRouter = createTRPCRouter({
             },
           },
         },
-        orderBy: { created_at: 'desc' },
+        orderBy: { createdAt: 'desc' },
       });
 
       const teamIds = teams.map(t => t.id);
@@ -1885,8 +1885,8 @@ export const teamsRouter = createTRPCRouter({
           captainTeamNames,
           totalMatches: fixture.matches?.length || 0,
           completedMatches: fixture.matches?.filter(m => m.status === 'completed').length || 0,
-          createdAt: fixture.created_at?.toISOString(),
-          updatedAt: fixture.updated_at?.toISOString(),
+          createdAt: fixture.createdAt?.toISOString(),
+          updatedAt: fixture.updatedAt?.toISOString(),
         };
       });
 
@@ -1920,7 +1920,7 @@ export const teamsRouter = createTRPCRouter({
         });
       } else if (ctx.user.role === 'player') {
         const playerTeams = await db.team_players.findMany({
-          where: { user_id: ctx.user.id },
+          where: { userId: ctx.user.id },
           include: {
             teams: {
               select: { id: true, name: true },
@@ -1992,7 +1992,7 @@ export const teamsRouter = createTRPCRouter({
             },
           },
         },
-        orderBy: { created_at: 'desc' },
+        orderBy: { createdAt: 'desc' },
       });
 
       // Transform matches for frontend
@@ -2038,8 +2038,8 @@ export const teamsRouter = createTRPCRouter({
           isCaptainInvolved,
           captainTeamSide,
           isCaptainTeamWinner,
-          createdAt: match.created_at?.toISOString(),
-          updatedAt: match.updated_at?.toISOString(),
+          createdAt: match.createdAt?.toISOString(),
+          updatedAt: match.updatedAt?.toISOString(),
         };
       });
 
@@ -2123,7 +2123,7 @@ export const teamsRouter = createTRPCRouter({
         });
       } else if (ctx.user.role === 'player') {
         const playerTeams = await db.team_players.findMany({
-          where: { user_id: ctx.user.id },
+          where: { userId: ctx.user.id },
           include: {
             teams: {
               include: {

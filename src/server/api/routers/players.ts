@@ -9,7 +9,7 @@ export const playersRouter = createTRPCRouter({
 
     // 1. Fetch all team memberships for the current user
     const teamPlayers = await db.team_players.findMany({
-      where: { user_id: userId },
+      where: { userId: userId },
       include: {
         teams: {
           include: {
@@ -82,7 +82,7 @@ export const playersRouter = createTRPCRouter({
         position: tp.position,
         status: team.status,
         verificationStatus: tp.verification_status,
-        joinedAt: tp.created_at,
+        joinedAt: tp.createdAt,
         panchayat: team.panchayat,
         district: team.district,
         state: team.state,
@@ -100,7 +100,7 @@ export const playersRouter = createTRPCRouter({
 
     // 2. Fetch user's document completeness status
     const userProfileImages = await db.user_profile_images.findUnique({
-      where: { user_id: userId },
+      where: { userId: userId },
       select: {
         profile_photo_path: true,
         aadhaar_front_path: true,

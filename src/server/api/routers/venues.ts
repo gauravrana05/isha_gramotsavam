@@ -375,7 +375,7 @@ export const venuesRouter = createTRPCRouter({
         // Check if mapping already exists
         const existing = await db.venue_location_mappings.findFirst({
           where: {
-            event_id: input.eventId,
+            eventId: input.eventId,
             venue_id: input.venueId,
             tournamentLevel: input.tournamentLevel,
           },
@@ -475,7 +475,7 @@ export const venuesRouter = createTRPCRouter({
         // Check if mapping already exists
         const existing = await db.taluk_cluster_mappings.findFirst({
           where: {
-            event_id: input.eventId,
+            eventId: input.eventId,
             district: input.district,
             taluk: input.taluk,
           },
@@ -524,7 +524,7 @@ export const venuesRouter = createTRPCRouter({
         // Check if mapping already exists
         const existing = await db.cluster_division_mappings.findFirst({
           where: {
-            event_id: input.eventId,
+            eventId: input.eventId,
             clusterVenueMappingId: input.clusterVenueMappingId,
           },
         })
@@ -579,7 +579,7 @@ export const venuesRouter = createTRPCRouter({
   // Bulk operations for venue mappings
   bulkCreateTalukMappings: adminProcedure
     .input(z.object({
-      event_id: z.string().uuid(),
+      eventId: z.string().uuid(),
       clusterVenueMappingId: z.string().uuid(),
       taluks: z.array(z.object({
         district: z.string(),
@@ -593,7 +593,7 @@ export const venuesRouter = createTRPCRouter({
           input.taluks.map((taluk) =>
             db.taluk_cluster_mappings.create({
               data: {
-                event_id: input.eventId,
+                eventId: input.eventId,
                 clusterVenueMappingId: input.clusterVenueMappingId,
                 ...taluk,
               },

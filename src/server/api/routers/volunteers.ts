@@ -230,7 +230,7 @@ export const volunteersRouter = createTRPCRouter({
             team_players: {
               select: {
                 id: true,
-                user_id: true,
+                userId: true,
                 first_name: true,
                 last_name: true,
                 phone: true,
@@ -255,7 +255,7 @@ export const volunteersRouter = createTRPCRouter({
               },
               orderBy: [
                 { position: 'asc' },
-                { created_at: 'asc' },
+                { createdAt: 'asc' },
               ],
             },
             team_photos: {
@@ -296,7 +296,7 @@ export const volunteersRouter = createTRPCRouter({
         // Transform players data
         const transformedPlayers = team.team_players?.map(player => ({
           id: player.id,
-          userId: player.user_id,
+          userId: player.userId,
           name: `${player.first_name} ${player.last_name}`.trim(),
           phone: player.phone,
           age: player.age,
@@ -643,7 +643,7 @@ export const volunteersRouter = createTRPCRouter({
               },
             },
           },
-          orderBy: { created_at: 'desc' },
+          orderBy: { createdAt: 'desc' },
         });
 
         // Transform fixtures for frontend
@@ -665,8 +665,8 @@ export const volunteersRouter = createTRPCRouter({
               status: match.status,
             })) || [],
           },
-          createdAt: fixture.created_at?.toISOString(),
-          updatedAt: fixture.updated_at?.toISOString(),
+          createdAt: fixture.createdAt?.toISOString(),
+          updatedAt: fixture.updatedAt?.toISOString(),
         }));
 
         return transformedFixtures;
@@ -751,7 +751,7 @@ export const volunteersRouter = createTRPCRouter({
               },
             },
           },
-          orderBy: { created_at: 'desc' },
+          orderBy: { createdAt: 'desc' },
         });
 
         // Transform matches for frontend
@@ -781,8 +781,8 @@ export const volunteersRouter = createTRPCRouter({
           fixtureId: match.fixture_id,
           fixtureName: match.fixtures?.name,
           sportName: match.sports?.display_name || match.sports?.name,
-          createdAt: match.created_at?.toISOString(),
-          updatedAt: match.updated_at?.toISOString(),
+          createdAt: match.createdAt?.toISOString(),
+          updatedAt: match.updatedAt?.toISOString(),
         }));
 
         return transformedMatches;
@@ -866,7 +866,7 @@ export const volunteersRouter = createTRPCRouter({
               },
             },
           },
-          orderBy: { created_at: 'asc' },
+          orderBy: { createdAt: 'asc' },
         });
 
         // Transform matches for bracket structure
@@ -911,8 +911,8 @@ export const volunteersRouter = createTRPCRouter({
             matches: bracketMatches,
             winners: winners,
           },
-          createdAt: fixture.created_at?.toISOString(),
-          updatedAt: fixture.updated_at?.toISOString(),
+          createdAt: fixture.createdAt?.toISOString(),
+          updatedAt: fixture.updatedAt?.toISOString(),
         };
       } catch (error) {
         if (error instanceof TRPCError) throw error;

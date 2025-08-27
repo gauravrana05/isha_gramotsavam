@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase/config";
-import { collection, query, where, getDocs, doc, getDoc, orderBy, limit } from "firebase/firestore";
+import { api } from '@/lib/trpc/react';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import type { Column } from '@/components/ui/Table';
 import type { FilterField } from '@/components/ui/FilterSidebar';
@@ -34,8 +33,8 @@ interface CaptainTeam {
   panchayat: string;
   district: string;
   state: string;
-  venueId?: string;
   venue?: {
+    id: string;
     name: string;
     address: string;
   };
@@ -50,19 +49,24 @@ interface CaptainFixture {
   sportId: string;
   sportName?: string;
   genderCategory: string;
-  venueId: string;
-  venue?: {
+  venue: {
+    id: string;
     name: string;
     address: string;
+    district: string;
+    state: string;
   };
   status: string;
   level: string;
-  assignedTeams: any[];
-  bracket?: {
-    matches?: any[];
-    winners?: any[];
-  };
-  createdAt: any;
+  assignedTeams: Array<{
+    id: string;
+    name: string;
+    tournamentNumber?: number;
+  }>;
+  totalMatches: number;
+  completedMatches: number;
+  createdAt: string;
+  updatedAt: string;
   hasCaptainTeam?: boolean;
   captainTeamNames?: string[];
 }

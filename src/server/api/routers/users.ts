@@ -131,9 +131,9 @@ export const usersRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       try {
         const profileImage = await db.user_profile_images.upsert({
-          where: { user_id: input.userId },
+          where: { userId: input.userId },
           create: {
-            user_id: input.userId,
+            userId: input.userId,
             profile_photo_path: input.profilePhotoPath,
             aadhaar_front_path: input.aadhaarFrontPath,
             aadhaar_back_path: input.aadhaarBackPath,
@@ -210,7 +210,7 @@ export const usersRouter = createTRPCRouter({
     .input(getUserVerificationsSchema)
     .query(async ({ input }) => {
       const verifications = await db.user_verifications.findMany({
-        where: { user_id: input.userId },
+        where: { userId: input.userId },
         include: {
           users_user_verifications_verified_byTousers: {
             select: {
@@ -220,7 +220,7 @@ export const usersRouter = createTRPCRouter({
             },
           },
         },
-        orderBy: { created_at: 'desc' },
+        orderBy: { createdAt: 'desc' },
       })
 
       return verifications
@@ -283,7 +283,7 @@ export const usersRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       try {
         const profileImage = await db.user_profile_images.update({
-          where: { user_id: input.userId },
+          where: { userId: input.userId },
           data: {
             verified_by: input.verifiedBy,
             verified_at: input.approved ? new Date() : null,
@@ -294,12 +294,12 @@ export const usersRouter = createTRPCRouter({
         await db.user_verifications.upsert({
           where: {
             user_id_verification_type: {
-              user_id: input.userId,
+              userId: input.userId,
               verification_type: 'document_verification',
             },
           },
           create: {
-            user_id: input.userId,
+            userId: input.userId,
             verification_type: 'document_verification',
             status: input.approved ? 'approved' : 'rejected',
             verified_by: input.verifiedBy,
@@ -358,7 +358,7 @@ export const usersRouter = createTRPCRouter({
           },
           skip,
           take: limit,
-          orderBy: { created_at: 'asc' },
+          orderBy: { createdAt: 'asc' },
         }),
         db.user_verifications.count({ where }),
       ])

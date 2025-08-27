@@ -27,8 +27,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 // Keep the detailed interfaces from the reference file
 interface TeamPlayer {
   id: string;
-  user_id: string;
-  team_id: string;
+  userId: string;
+  teamId: string;
   first_name: string;
   last_name: string;
   phone: string;
@@ -44,7 +44,7 @@ interface TeamPlayer {
   state: string;
   pincode: string;
   added_by: string;
-  created_at: Date;
+  createdAt: Date;
   users?: {
     id: string;
     first_name: string | null;
@@ -53,15 +53,15 @@ interface TeamPlayer {
     role: string;
     profile_complete: boolean;
     user_profile_images_user_profile_images_user_idTousers: {
-      user_id: string;
+      userId: string;
       profile_photo_path: string | null;
       aadhaar_front_path: string | null;
       aadhaar_back_path: string | null;
       all_images_uploaded: boolean;
       verified_by: string | null;
       verified_at: Date | null;
-      created_at: Date;
-      updated_at: Date;
+      createdAt: Date;
+      updatedAt: Date;
     } | null;
   };
 }
@@ -81,8 +81,8 @@ interface TeamData {
   pincode: string | null;
   current_players: number;
   current_substitutes: number;
-  created_at: Date;
-  updated_at: Date;
+  createdAt: Date;
+  updatedAt: Date;
   sports: {
     id: string;
     name: string;
@@ -341,7 +341,7 @@ export default function MyTeamPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                          <div className="flex space-x-2">
                             <button onClick={() => setSelectedPlayer(player)} className="text-[#F28C38] hover:text-[#E67A26]"><Eye className="w-5 h-5" /></button>
-                            {player.user_id !== teamData.captain_id && !isReadOnly && (
+                            {player.userId !== teamData.captain_id && !isReadOnly && (
                                 <button onClick={() => handleRemovePlayer(player.id)} className="text-red-600 hover:text-red-800"><Trash2 className="w-5 h-5" /></button>
                             )}
                          </div>
@@ -392,7 +392,7 @@ export default function MyTeamPage() {
                 </div>
                 <div className="mt-8 flex justify-end space-x-4">
                     <button onClick={() => setSelectedPlayer(null)} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Close</button>
-                    {selectedPlayer.user_id !== teamData.captain_id && !isReadOnly && (
+                    {selectedPlayer.userId !== teamData.captain_id && !isReadOnly && (
                         <button onClick={() => handleRemovePlayer(selectedPlayer.id)} className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Remove Player</button>
                     )}
                 </div>
