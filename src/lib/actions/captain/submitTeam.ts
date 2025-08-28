@@ -123,6 +123,23 @@ export async function submitTeamForVerification(request: SubmitTeamRequest) {
       updatedAt: FieldValue.serverTimestamp()
     });
 
+    // Trigger venue assignment for submitted team
+    const teamForVenueAssignment = {
+      id: teamId,
+      name: team.name,
+      state: team.state,
+      district: team.district,
+      panchayat: team.panchayat
+    };
+
+    try {
+      const venueAssignmentResult = await assignTeamToVenue(teamForVenueAssignment);
+      console.log(`Venue assignment result for team ${teamId}:`, venueAssignmentResult);
+    } catch (venueError) {
+      // Log venue assignment error but don't fail the submission
+      console.error(`Venue assignment failed for team ${teamId}:`, venueError);
+    }
+
     // Create notification for verification volunteers
     await adminDb.collection("notifications").add({
       type: "team_submitted_for_verification",

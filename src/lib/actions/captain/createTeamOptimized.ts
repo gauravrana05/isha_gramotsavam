@@ -3,6 +3,7 @@
 import { adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { revalidatePath } from "next/cache";
+import { assignTeamToVenue } from "@/lib/actions/admin/teamVenueAssignment";
 
 interface CreateTeamRequest {
   teamData: {
@@ -226,6 +227,26 @@ export async function createTeamAndPromoteCaptain(request: CreateTeamRequest) {
 
     // Promote to captain role
     await promoteUserToCaptain(captainId, teamId);
+
+    // Assign team to venue immediately after creation
+    try {
+      const teamForVenueAssignment = {
+        id: teamId,
+        name: teamData.name,
+        state: teamData.state,
+        district: teamData.district,
+        panchayat: teamData.panchayat
+      };
+
+      const venueAssignmentResult = await assignTeamToVenue(teamForVenueAssignment);
+      
+      // Log venue assignment result but don't fail team creation if venue assignment fails
+      console.log('Venue assignment result:', venueAssignmentResult);
+    } catch (venueError) {
+      console.error('Venue assignment failed during team creation:', venueError);
+      // Continue with team creation even if venue assignment fails
+      // Team will be queued for manual assignment
+    }
 
     // Revalidate captain views
     revalidatePath("/captain/teams");

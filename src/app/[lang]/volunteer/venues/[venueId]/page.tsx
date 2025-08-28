@@ -138,6 +138,8 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
   const totalTeams = teams.length;
   const checkedInCount = teams.filter(team => team.matchDayStatus === 'checked_in').length;
   const verifiedCount = teams.filter(team => team.matchDayStatus === 'verified').length;
+  // Teams assigned to venue should already be verified, so pending here means match-day verification pending
+  const pendingCount = teams.filter(team => team.matchDayStatus === 'pending' || !team.matchDayStatus).length;
   
   // Also get counts from checked-in teams for sports overview
   const checkedInSportsCount = checkedInTeamsResult.success ? checkedInTeamsResult.totalTeams : 0;
@@ -150,7 +152,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
           {venue?.name || 'Match Day Venue'}
         </h1>
         <p className="text-sm sm:text-base text-gray-600 font-fira">
-          {venue?.address || venue?.location || 'Technical Volunteer Station'} - Match Day Operations
+          {venue?.address || venue?.location || 'Technical Volunteer Station'} - Match Day Check-in & Verification
         </p>
       </div>
 
@@ -179,7 +181,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
         <div className="bg-white rounded-lg p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm">Verified</p>
+              <p className="text-gray-600 text-sm">Confirmed</p>
               <p className="text-2xl font-bold text-blue-600">{verifiedCount}</p>
             </div>
             <UserCheck className="w-8 h-8 text-blue-400" />
@@ -189,10 +191,10 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
         <div className="bg-white rounded-lg p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm">Fixtures</p>
-              <p className="text-2xl font-bold text-purple-600">{fixtures.length}</p>
+              <p className="text-gray-600 text-sm">Unconfirmed</p>
+              <p className="text-2xl font-bold text-orange-600">{pendingCount}</p>
             </div>
-            <Trophy className="w-8 h-8 text-purple-400" />
+            <AlertCircle className="w-8 h-8 text-orange-400" />
           </div>
         </div>
       </div>

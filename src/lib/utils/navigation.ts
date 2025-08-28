@@ -5,13 +5,20 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase/config";
 import { doc, getDoc } from "firebase/firestore";
+import { getVolunteerAssignments } from "@/lib/actions/admin/volunteerAssignment";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
 export const ALL_ROLES = ["admin", "captain", "player", "general_volunteer", "technical_volunteer", "verification_volunteer", "guest"];
 
 
-export const getDashboardRoute = (role: string | null | undefined, lang: string): string => {
+export const getDashboardRoute = async (role: string | null | undefined, lang: string, userId?: string): Promise<string> => {
   const userRole = role || "public";
+  
+  // Ensure lang is a string and not undefined
+  if (!lang || typeof lang !== 'string') {
+    lang = 'en'; // fallback to English
+  }
+  
   switch (userRole) {
     case "admin":
       return `/${lang}/admin/dashboard`;
@@ -21,11 +28,27 @@ export const getDashboardRoute = (role: string | null | undefined, lang: string)
       return `/${lang}/player/dashboard`;
     case "general_volunteer":
     case "technical_volunteer":
+      if (userId) {
+        try {
+          const assignments = await getVolunteerAssignments(userId);
+          if (assignments.success && assignments.assignments && assignments.assignments.length > 0) {
+            const firstVenue = assignments.assignments[0];
+            // Ensure venueId is defined before using it
+            if (firstVenue && firstVenue.venueId) {
+              return `/${lang}/volunteer/venues/${firstVenue.venueId}`;
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch volunteer assignments:', error);
+        }
+      }
       return `/${lang}/volunteer/dashboard`;
     case "verification_volunteer":
       return `/${lang}/verification/dashboard`;
     case "guest":
       return `/${lang}/guest/dashboard`;
+    case "public":
+      return `/${lang}/public`;
     default:
       return `/${lang}/public`;
   }
@@ -94,7 +117,7 @@ export const handleRedirect = async (user: any, lang: string, router: AppRouterI
       const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
 
       if (isProfileComplete || specialRole) {
-        const dashboardRoute = getDashboardRoute(role, lang as string);
+        const dashboardRoute = await getDashboardRoute(role, lang as string, user.uid);
         router.push(dashboardRoute);
       } else {
         router.push(`/${lang}/profile/complete`);
@@ -147,7 +170,7 @@ export const useRedirect = (allowedRoles?: string[]) => {
       }
       
       if (allowedRoles && !allowedRoles.includes(userData.role)) {
-        const dashboardRoute = getDashboardRoute(userData.role, lang as string);
+        const dashboardRoute = await getDashboardRoute(userData.role, lang as string, user.uid);
         router.push(dashboardRoute);
       }
     }

@@ -8,7 +8,7 @@ import { serializeFirestoreData } from '@/lib/utils/firestore';
 import { auditLogService } from '@/lib/services/auditLogService';
 interface MatchDayPlayerVerification {
   playerId: string;
-  status: 'verified' | 'rejected';
+  status: 'pending' | 'verified' | 'approved' | 'rejected';
   comments?: string;
   verifiedBy: string;
   verificationIssues?: string[];
@@ -49,10 +49,9 @@ interface MatchDayPlayerData {
     aadhaarBack: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
   };
   verificationStatus: string;
-  matchDayVerificationStatus?: 'pending' | 'verified' | 'rejected';
-  matchDayVerifiedBy?: string;
-  matchDayVerifiedAt?: any;
-  matchDayComments?: string;
+  verifiedBy?: string;
+  verifiedAt?: any;
+  verificationComments?: string;
 }
 
 
@@ -119,7 +118,7 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
 
       const activePlayers = playersSnapshot.docs.filter(doc => doc.data().isDeleted !== true);
       const verifiedPlayersCount = activePlayers.filter(doc =>
-        doc.data().matchDayVerificationStatus === 'verified'
+        doc.data().verificationStatus === 'approved'
       ).length;
 
       return {
@@ -229,10 +228,9 @@ export async function getTeamForMatchDayVerification(teamId: string, volunteerId
           aadhaarBack: userDocuments?.aadhaarBack || { url: null, verified: false, storagePath: null, uploadedBy: null, uploadedAt: null }
         }),
         verificationStatus: playerData.verificationStatus || 'pending',
-        matchDayVerificationStatus: playerData.matchDayVerificationStatus || 'pending',
-        matchDayVerifiedBy: playerData.matchDayVerifiedBy,
-        matchDayVerifiedAt: serializeFirestoreData(playerData.matchDayVerifiedAt) || null,
-        matchDayComments: playerData.matchDayComments || ''
+        verifiedBy: playerData.verifiedBy,
+        verifiedAt: serializeFirestoreData(playerData.verifiedAt) || null,
+        verificationComments: playerData.verificationComments || ''
       });
     }
 
@@ -272,7 +270,7 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
   try {
     const { playerId, status, comments, verifiedBy, verificationIssues, teamId, venueId } = request;
 
-    if (!playerId || !status || !['verified', 'rejected'].includes(status)) {
+    if (!playerId || !status || !['pending', 'verified', 'approved', 'rejected'].includes(status)) {
       return { success: false, error: "Invalid player verification data" };
     }
 
@@ -318,73 +316,119 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
       }
     }
 
-    // Update player match day verification status
+    // Update player verification status
     await playerDocRef.update({
-      matchDayVerificationStatus: status,
-      matchDayVerifiedBy: verifiedBy,
-      matchDayVerifiedAt: FieldValue.serverTimestamp(),
-      matchDayComments: comments || '',
-      matchDayVerificationIssues: verificationIssues || [],
+      verificationStatus: status,
+      verifiedBy: verifiedBy,
+      verifiedAt: FieldValue.serverTimestamp(),
+      verificationComments: comments || '',
+      verificationIssues: verificationIssues || [],
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    // Check if all players in the team are now verified
+    // Get current team status and all players to determine new team status
     if (!finalTeamId) {
       return { success: false, error: "Could not determine team for player" };
     }
-    const allPlayersQuery = await adminDb
-      .collection('teams').doc(finalTeamId as string)
-      .collection('players')
-      .get();
+    
+    const [teamDoc, allPlayersQuery] = await Promise.all([
+      adminDb.collection('teams').doc(finalTeamId).get(),
+      adminDb.collection('teams').doc(finalTeamId as string).collection('players').get()
+    ]);
 
-    // Filter out deleted players manually and count verified players
+    const teamData = teamDoc.data();
     const activePlayers = allPlayersQuery.docs.filter(doc => doc.data().isDeleted !== true);
-    const verifiedPlayers = activePlayers.filter(doc => 
-      doc.data().matchDayVerificationStatus === 'verified'
-    );
+    
+    // Count players by status
+    const playersByStatus = {
+      pending: 0,
+      verified: 0,
+      approved: 0,
+      rejected: 0
+    };
+    
+    activePlayers.forEach(doc => {
+      const playerStatus = doc.data().verificationStatus || 'pending';
+      if (playerStatus in playersByStatus) {
+        playersByStatus[playerStatus as keyof typeof playersByStatus]++;
+      }
+    });
 
     const totalPlayers = activePlayers.length;
-    const allPlayersVerified = verifiedPlayers.length === totalPlayers;
+    const hasRejectedPlayers = playersByStatus.rejected > 0;
+    const hasPendingPlayers = playersByStatus.pending > 0;
+    const allPlayersVerified = playersByStatus.verified === totalPlayers;
+    const allPlayersApproved = playersByStatus.approved === totalPlayers;
 
-    // If all players are verified, auto-check in the team
-    if (allPlayersVerified) {
-      // Get venue from teamVenueAssignment if not provided
-      let teamVenueId = venueId;
-      if (!teamVenueId) {
-        const venueAssignmentQuery = await adminDb
-          .collection('teamVenueAssignment')
-          .where('teamId', '==', finalTeamId)
-          .limit(1)
-          .get();
-        
-        if (!venueAssignmentQuery.empty) {
-          teamVenueId = venueAssignmentQuery.docs[0].data().venueId;
+    // Determine new team status
+    let newTeamStatus = teamData?.status || 'submitted';
+    let shouldUpdateTeam = false;
+
+    if (hasRejectedPlayers) {
+      // Any rejected player → team becomes rejected
+      newTeamStatus = 'rejected';
+      shouldUpdateTeam = true;
+    } else if (hasPendingPlayers && (teamData?.status === 'verified' || teamData?.status === 'checked_in')) {
+      // Any pending player when team was verified/checked-in → revert to submitted  
+      newTeamStatus = 'submitted';
+      shouldUpdateTeam = true;
+    } else if (allPlayersApproved && teamData?.status !== 'checked_in') {
+      // All players approved → team becomes checked-in
+      newTeamStatus = 'checked_in';
+      shouldUpdateTeam = true;
+    } else if (allPlayersVerified && teamData?.status === 'submitted') {
+      // All players verified → team becomes verified
+      newTeamStatus = 'verified';  
+      shouldUpdateTeam = true;
+    }
+
+    // Update team status if needed
+    if (shouldUpdateTeam) {
+      const updateData: any = {
+        status: newTeamStatus,
+        updatedAt: FieldValue.serverTimestamp()
+      };
+
+      if (newTeamStatus === 'checked_in') {
+        // Auto-check in the team when all players are approved
+        let teamVenueId = venueId;
+        if (!teamVenueId) {
+          const venueAssignmentQuery = await adminDb
+            .collection('teamVenueAssignment')
+            .where('teamId', '==', finalTeamId)
+            .limit(1)
+            .get();
+          
+          if (!venueAssignmentQuery.empty) {
+            teamVenueId = venueAssignmentQuery.docs[0].data().venueId;
+          }
         }
+
+        const teamEventId = teamData?.eventId || 'isha_gramotsavam_2025';
+
+        updateData.checkedIn = true;
+        updateData.checkedInVenue = teamVenueId;
+        updateData.eventId = teamEventId;
+        updateData.checkedInAt = FieldValue.serverTimestamp();
+        updateData.checkedInBy = 'auto_system';
+        updateData.autoCheckedIn = true;
+      } else if (newTeamStatus === 'submitted' || newTeamStatus === 'rejected') {
+        // Reset check-in status when rolling back
+        updateData.checkedIn = false;
+        updateData.checkedInVenue = null;
+        updateData.checkedInAt = null;
+        updateData.checkedInBy = null;
+        updateData.autoCheckedIn = false;
       }
 
-      // Get the team's eventId to ensure consistency
-      const teamDoc = await adminDb.collection('teams').doc(finalTeamId).get();
-      const teamData = teamDoc.data();
-      const teamEventId = teamData?.eventId || 'isha_gramotsavam_2025';
-
-      await adminDb.collection('teams').doc(finalTeamId).update({
-        matchDayStatus: 'checked_in',
-        checkedIn: true, // Also set the main checkedIn field
-        checkedInVenue: teamVenueId, // Set the venue where team is checked in
-        eventId: teamEventId, // Ensure eventId is set
-        checkedInAt: FieldValue.serverTimestamp(),
-        checkedInBy: 'auto_system',
-        autoCheckedIn: true,
-        updatedAt: FieldValue.serverTimestamp()
-      });
+      await adminDb.collection('teams').doc(finalTeamId).update(updateData);
 
       // Revalidate relevant pages
-      if (teamVenueId) {
-        revalidatePath(`/volunteer/venues/${teamVenueId}`);
-        revalidatePath(`/volunteer/venues/${teamVenueId}/teams`);
-        revalidatePath(`/volunteer/venues/${teamVenueId}/fixtures`);
+      if (venueId) {
+        revalidatePath(`/volunteer/venues/${venueId}`);
+        revalidatePath(`/volunteer/venues/${venueId}/teams`);
+        revalidatePath(`/volunteer/venues/${venueId}/fixtures`);
       }
-
     }
 
     // Log audit for on-ground verification
@@ -414,8 +458,9 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
     return {
       success: true,
       message: `Player ${status} successfully`,
-      allPlayersVerified: allPlayersVerified,
-      teamAutoCheckedIn: allPlayersVerified
+      teamStatus: newTeamStatus,
+      teamStatusChanged: shouldUpdateTeam,
+      playerCounts: playersByStatus
     };
 
   } catch (error) {

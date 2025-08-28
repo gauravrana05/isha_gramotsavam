@@ -2,7 +2,6 @@
 
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { assignTeamToVenue } from '@/lib/actions/admin/teamVenueAssignment';
 
 interface VerifyTeamRequest {
   teamId: string;
@@ -50,27 +49,7 @@ export async function updateTeamVerificationRecord(teamId: string): Promise<void
       updatedAt: FieldValue.serverTimestamp()
     });
 
-    // Trigger automatic venue assignment for newly verified team
-    try {
-      const teamDoc = await adminDb.collection("teams").doc(teamId).get();
-      const teamData = teamDoc.data();
-      
-      if (teamData) {
-        const teamForVenueAssignment = {
-          id: teamId,
-          name: teamData.name || '',
-          state: teamData.state || '',
-          district: teamData.district || '',
-          panchayat: teamData.panchayat || ''
-        };
-
-        const venueAssignmentResult = await assignTeamToVenue(teamForVenueAssignment);
-        
-        // Venue assignment completed
-      }
-    } catch (venueError) {
-      // Don't fail the verification if venue assignment fails
-    }
+    // Venue assignment is now handled during team creation, not verification
   }
 }
 
@@ -125,22 +104,7 @@ export async function verifyTeam(request: VerifyTeamRequest) {
         updatedAt: FieldValue.serverTimestamp()
       });
 
-    // If team is verified, trigger automatic venue assignment
-    if (status === 'verified') {
-      try {
-        const teamForVenueAssignment = {
-          id: teamId,
-          name: teamData?.name || '',
-          state: teamData?.state || '',
-          district: teamData?.district || '',
-          panchayat: teamData?.panchayat || ''
-        };
-
-        const venueAssignmentResult = await assignTeamToVenue(teamForVenueAssignment);
-      } catch (venueError) {
-        // Don't fail the verification if venue assignment fails
-      }
-    }
+    // Venue assignment is now handled during team creation, not verification
 
     // Send notification to team captain
     await adminDb.collection("notifications").add({

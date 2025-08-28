@@ -500,7 +500,7 @@ export function Table<T>({
   return (
     <div className={cn('w-full', className)} {...rest}>
       {/* Table Container with horizontal scroll */}
-      <div className="bg-white rounded-lg border overflow-hidden">
+      <div className="bg-white sm:rounded-lg sm:border overflow-hidden">
         <div 
           className="overflow-x-auto"
           style={{ 
@@ -512,14 +512,14 @@ export function Table<T>({
           <table 
             className={cn(
               'w-full divide-y divide-gray-200',
-              compactMode ? 'text-sm' : '',
+              compactMode ? 'text-xs sm:text-sm' : 'text-sm',
             )}
-            style={{ minWidth: '500px' }} // Ensures horizontal scroll on mobile
+            style={{ minWidth: '600px' }} // Ensures horizontal scroll on mobile
           >
             {/* Table Header */}
             <thead 
               className={cn(
-                'bg-gray-50',
+                'bg-gray-50 border-b border-gray-200',
                 stickyHeader && 'sticky top-0 z-20'
               )}
             >
@@ -552,7 +552,7 @@ export function Table<T>({
                       'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
                       column.headerClassName,
                       column.sortable && 'cursor-pointer select-none hover:bg-gray-100',
-                      compactMode && 'px-4 py-2'
+                      compactMode && 'px-2 py-2 text-xs sm:px-4 sm:py-2'
                     )}
                     style={{
                       width: column.width,
@@ -577,7 +577,7 @@ export function Table<T>({
                 {actions && actions.length > 0 && (
                   <th className={cn(
                     'px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider',
-                    compactMode && 'px-4 py-2'
+                    compactMode && 'px-2 py-2 text-xs sm:px-4 sm:py-2'
                   )}>
                     Actions
                   </th>
@@ -644,7 +644,7 @@ export function Table<T>({
                           className={cn(
                             'px-6 py-4 whitespace-nowrap text-sm text-gray-900',
                             column.className,
-                            compactMode && 'px-4 py-3 text-xs'
+                            compactMode && 'px-2 py-2 text-xs sm:px-3 sm:py-2'
                           )}
                           style={{
                             width: column.width,
@@ -660,7 +660,7 @@ export function Table<T>({
                     {actions && actions.length > 0 && (
                       <td className={cn(
                         'px-6 py-4 whitespace-nowrap text-center',
-                        compactMode && 'px-4 py-3'
+                        compactMode && 'px-2 py-2 sm:px-3 sm:py-2'
                       )}>
                         <div className="flex items-center justify-center gap-1">
                           {actions.map((action, actionIndex) => (

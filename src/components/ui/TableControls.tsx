@@ -384,7 +384,7 @@ export const TableControls: React.FC<TableControlsProps> = ({
   return (
     <div 
       className={cn(
-        'bg-white border-b border-gray-200',
+        'border-b border-gray-200',
         compact ? 'p-3' : 'p-4',
         className
       )}

@@ -51,6 +51,9 @@ export interface AdvancedTableConfig<T = any> {
   // Selection
   selectable?: boolean;
   
+  // Row interaction
+  onRowClick?: (item: T, index: number) => void;
+  
   // URL state persistence
   persistState?: boolean;
   stateKey?: string; // Unique key for URL state
@@ -68,6 +71,7 @@ export interface AdvancedTableConfig<T = any> {
   
   // Styling
   compact?: boolean;
+  compactMode?: boolean;
   stickyHeader?: boolean;
   emptyMessage?: string;
 }
@@ -195,6 +199,9 @@ export const AdvancedTable = <T,>({
   // Selection props
   selectable = false,
   
+  // Row interaction
+  onRowClick,
+  
   // State persistence
   persistState = false,
   stateKey = 'table',
@@ -202,6 +209,7 @@ export const AdvancedTable = <T,>({
   // Other props
   emptyState,
   compact = false,
+  compactMode = false,
   stickyHeader = false,
   title,
   subtitle,
@@ -636,8 +644,9 @@ export const AdvancedTable = <T,>({
           onSelectionChange={handleSelectionChange}
           
           stickyHeader={stickyHeader}
-          compactMode={compact}
+          compactMode={compact || compactMode}
           keyExtractor={keyExtractor}
+          onRowClick={onRowClick}
           
           emptyState={emptyState}
           // Virtualization

@@ -90,8 +90,13 @@ export default function CompleteProfilePage() {
 
     if (userProfile?.isProfileComplete) {
       const role = userProfile.role || "public";
-      const dashboardRoute = getDashboardRoute(role, lang as string);
-      router.push(dashboardRoute);
+      getDashboardRoute(role, lang as string, user.uid).then(dashboardRoute => {
+        router.push(dashboardRoute);
+      }).catch(error => {
+        console.error('Error getting dashboard route:', error);
+        // Fallback to public route
+        router.push(`/${lang}/public`);
+      });
     }
 
     if (userProfile && Object.values(formData).every(value => !value)) {
@@ -327,8 +332,13 @@ export default function CompleteProfilePage() {
       }
 
       const role = userProfile?.role || "public";
-      const dashboardRoute = getDashboardRoute(role, lang as string);
-      router.push(dashboardRoute);
+      getDashboardRoute(role, lang as string, user.uid).then(dashboardRoute => {
+        router.push(dashboardRoute);
+      }).catch(error => {
+        console.error('Error getting dashboard route:', error);
+        // Fallback to public route
+        router.push(`/${lang}/public`);
+      });
     } catch (err: any) {
       // Error handling removed
       setError(
