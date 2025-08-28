@@ -44,9 +44,9 @@ const getSportImages = (sportName: string) => {
 // Helper function to format category display
 const formatCategory = (sport: any): string => {
   const categories = []
-  if (sport.supports_men) categories.push('Men')
-  if (sport.supports_women) categories.push('Women')
-  if (sport.supports_mixed) categories.push('Mixed')
+  if (sport.supportsMen) categories.push('Men')
+  if (sport.supportsWomen) categories.push('Women')
+  if (sport.supportsMixed) categories.push('Mixed')
   
   if (categories.length === 1) {
     return `(For ${categories[0]})`
@@ -191,8 +191,8 @@ export default function SportPage() {
                     sportId={sport.id}
                     size="lg" 
                     className="min-w-[200px]"
-                    disabled={!sport.can_register}
-                    disabledMessage={sport.registration_message}
+                    disabled={!sport.canRegister}
+                    disabledMessage={sport.registrationMessage}
                   />
                 </div>
               </div>

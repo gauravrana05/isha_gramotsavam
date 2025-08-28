@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, query, orderBy, where, limit, startAfter, DocumentSnapshot, doc, getDoc } from 'firebase/firestore';
+
 import { AdvancedTable, type AdvancedTableConfig } from '@/components/ui/AdvancedTable';
 import type { Column } from '@/components/ui/Table';
 import type { FilterField } from '@/components/ui/FilterSidebar';
@@ -77,13 +76,17 @@ export default function AuditLogsPage() {
   const loadAuditLogs = async () => {
     try {
       setLoading(true);
-      const auditQuery = query(
-        collection(db, 'auditLogs'),
-        orderBy('timestamp', 'desc'),
-        limit(100)
-      );
+      import { api } from '../../../../utils/api';
 
-      const auditSnapshot = await getDocs(auditQuery);
+// ... (rest of the file)
+
+const { data: auditLogsData, isLoading, error } = api.admin.getAuditLogs.useQuery({
+  limit: 100,
+  sortBy: 'createdAt',
+  sortOrder: 'desc',
+});
+
+const auditLogs = auditLogsData?.auditLogs || [];
       
       if (!auditSnapshot.empty) {
         // Get all logs and filter for valid audit logs

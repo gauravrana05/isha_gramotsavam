@@ -36,7 +36,7 @@ export const handleRedirect = async (user: users, lang: string, router: AppRoute
 
   try {
     const role = user.role;
-    const isProfileComplete = user.profile_complete;
+    const isProfileComplete = user.profileComplete;
     
     // Special roles that can skip profile completion
     const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
@@ -72,7 +72,7 @@ export const useRedirect = (allowedRoles?: string[]) => {
 
     const checkUser = async () => {
       const role = user.role;
-      const isProfileComplete = user.profile_complete;
+      const isProfileComplete = user.profileComplete;
 
       const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
       if (!isProfileComplete && !specialRole) {

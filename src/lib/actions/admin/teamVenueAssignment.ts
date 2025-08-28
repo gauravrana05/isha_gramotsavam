@@ -1,7 +1,6 @@
 'use server'
 
-import { adminDb } from '@/lib/firebase/admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { db } from '@/lib/db';
 
 interface TeamData {
   id: string;
@@ -15,13 +14,12 @@ export async function assignTeamToVenue(teamData: TeamData) {
   try {
 
     // Check if team is already assigned
-    const existingAssignment = await adminDb
-      .collection('teamVenueAssignment')
-      .where('teamId', '==', teamData.id)
-      .limit(1)
-      .get();
+    const existingAssignment = await db.teamVenueAssignment
+      .findFirst({
+        where: { teamId: teamData.id }
+      });
 
-    if (!existingAssignment.empty) {
+    if (existingAssignment) {
       return { success: true, message: 'Team already assigned' };
     }
 
@@ -35,13 +33,14 @@ export async function assignTeamToVenue(teamData: TeamData) {
     }
 
     // Check venue capacity
-    const currentAssignments = await adminDb
-      .collection('teamVenueAssignment')
-      .where('venueId', '==', venue.venueId)
-      .where('status', 'in', ['assigned', 'confirmed'])
-      .get();
+    const currentAssignments = await db.teamVenueAssignment.findMany({
+      where: {
+        venueId: venue.venueId,
+        status: { in: ['assigned', 'confirmed'] }
+      }
+    });
 
-    if (currentAssignments.size >= venue.maxTeams) {
+    if (currentAssignments.length >= venue.maxTeams) {
       await queueForManualAssignment(teamData, '', 'Venue at capacity');
       return { success: true, message: 'Venue at capacity, queued for manual assignment', requiresManualAssignment: true };
     }
@@ -54,7 +53,7 @@ export async function assignTeamToVenue(teamData: TeamData) {
       venueName: venue.venueName,
       clusterVenueId: venue.venueId,        // Add for volunteer queries
       clusterVenueName: venue.venueName,    // Add for volunteer queries
-      assignmentLevel: 'cluster',
+      level: 'cluster',
       status: 'assigned',
       assignedAt: FieldValue.serverTimestamp(),
       assignedBy: 'system_auto',

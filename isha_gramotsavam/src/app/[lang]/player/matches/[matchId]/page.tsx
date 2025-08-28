@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { api } from '@/server/trpc/react';
+import { api } from '@/lib/trpc/react';
 import Link from "next/link";
 import Image from "next/image";
 import { 
@@ -23,7 +23,7 @@ import {
   Award
 } from "lucide-react";
 
-interface CaptainMatchDetail {
+interface PlayerMatchDetail {
   matchId: string;
   fixtureId: string;
   fixtureName: string;
@@ -57,12 +57,12 @@ interface CaptainMatchDetail {
   } | null;
   createdAt: string;
   updatedAt: string;
-  isCaptainInvolved?: boolean;
-  captainTeamSide?: 'team1' | 'team2' | null;
-  isCaptainTeamWinner?: boolean;
+  isPlayerInvolved?: boolean;
+  playerTeamSide?: 'team1' | 'team2' | null;
+  isPlayerTeamWinner?: boolean;
 }
 
-export default function CaptainMatchDetailPage() {
+export default function PlayerMatchDetailPage() {
   const router = useRouter();
   const { lang, matchId } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
@@ -71,8 +71,8 @@ export default function CaptainMatchDetailPage() {
   const { data: match, isLoading: matchLoading, error: matchError } = api.teams.getMyTeamMatches.useQuery(
     undefined,
     {
-      enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'captain',
-      select: (matches) => matches.find(m => m.matchId === matchId) as CaptainMatchDetail | undefined
+      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'player',
+      select: (matches) => matches.find(m => m.matchId === matchId) as PlayerMatchDetail | undefined
     }
   );
 
@@ -87,7 +87,7 @@ export default function CaptainMatchDetailPage() {
       return;
     }
 
-    if (!userProfile?.profileComplete) {
+    if (!userProfile?.profile_complete) {
       router.push(`/${lang}/profile/complete`);
       return;
     }
@@ -147,7 +147,7 @@ export default function CaptainMatchDetailPage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Match Not Found</h1>
           <p className="text-gray-600 mb-4">The match you're looking for doesn't exist or you don't have access to it.</p>
           <Link
-            href={`/${lang}/captain/matches`}
+            href={`/${lang}/player/matches`}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors inline-flex items-center"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -165,7 +165,7 @@ export default function CaptainMatchDetailPage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
             <Link
-              href={`/${lang}/captain/matches`}
+              href={`/${lang}/player/matches`}
               className="mr-4 p-2 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />
@@ -183,7 +183,7 @@ export default function CaptainMatchDetailPage() {
                   <div className="flex items-center">
                     <Hash className="w-5 h-5 text-gray-400 mr-1" />
                     <h1 className="text-2xl font-bold text-[#4A2F1D]">Match {match.matchNumber}</h1>
-                    {match.isCaptainInvolved && (
+                    {match.isPlayerInvolved && (
                       <Star className="w-5 h-5 text-yellow-500 ml-2" />
                     )}
                   </div>
@@ -205,6 +205,21 @@ export default function CaptainMatchDetailPage() {
           </span>
         </div>
 
+        {/* Player Participation Notice */}
+        {match.isPlayerInvolved && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
+            <div className="flex items-center">
+              <Star className="w-5 h-5 text-blue-600 mr-2" />
+              <div>
+                <h3 className="text-blue-800 font-semibold">You're playing in this match!</h3>
+                <p className="text-blue-600 text-sm mt-1">
+                  Your team is {match.playerTeamSide === 'team1' ? match.team1?.teamName : match.team2?.teamName}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Match Overview */}
         <div className="bg-white rounded-lg shadow-sm border p-8 mb-8">
           <div className="text-center mb-6">
@@ -214,11 +229,11 @@ export default function CaptainMatchDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
               {/* Team 1 */}
               <div className={`p-6 rounded-lg border-2 ${
-                match.captainTeamSide === 'team1' ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'
+                match.playerTeamSide === 'team1' ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'
               }`}>
                 <div className="text-center">
                   <div className={`text-lg font-bold mb-2 ${
-                    match.captainTeamSide === 'team1' ? 'text-blue-600' : 'text-gray-900'
+                    match.playerTeamSide === 'team1' ? 'text-blue-600' : 'text-gray-900'
                   }`}>
                     {match.team1?.teamName || 'TBD'}
                   </div>
@@ -227,7 +242,7 @@ export default function CaptainMatchDetailPage() {
                       Tournament #{match.team1.tournamentNumber}
                     </div>
                   )}
-                  {match.captainTeamSide === 'team1' && (
+                  {match.playerTeamSide === 'team1' && (
                     <div className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
                       <Star className="w-4 h-4 mr-1" />
                       Your Team
@@ -265,11 +280,11 @@ export default function CaptainMatchDetailPage() {
 
               {/* Team 2 */}
               <div className={`p-6 rounded-lg border-2 ${
-                match.captainTeamSide === 'team2' ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-gray-50'
+                match.playerTeamSide === 'team2' ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-gray-50'
               }`}>
                 <div className="text-center">
                   <div className={`text-lg font-bold mb-2 ${
-                    match.captainTeamSide === 'team2' ? 'text-red-600' : 'text-gray-900'
+                    match.playerTeamSide === 'team2' ? 'text-red-600' : 'text-gray-900'
                   }`}>
                     {match.team2?.teamName || 'TBD'}
                   </div>
@@ -278,7 +293,7 @@ export default function CaptainMatchDetailPage() {
                       Tournament #{match.team2.tournamentNumber}
                     </div>
                   )}
-                  {match.captainTeamSide === 'team2' && (
+                  {match.playerTeamSide === 'team2' && (
                     <div className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full">
                       <Star className="w-4 h-4 mr-1" />
                       Your Team
@@ -294,21 +309,26 @@ export default function CaptainMatchDetailPage() {
               </div>
             </div>
 
-            {/* Result Message for Captain */}
-            {match.result && match.isCaptainInvolved && (
+            {/* Result Message for Player */}
+            {match.result && match.isPlayerInvolved && (
               <div className={`mt-6 p-4 rounded-lg ${
-                match.isCaptainTeamWinner ? 'bg-green-100 border border-green-200' : 'bg-red-100 border border-red-200'
+                match.isPlayerTeamWinner ? 'bg-green-100 border border-green-200' : 'bg-red-100 border border-red-200'
               }`}>
                 <div className={`text-lg font-bold ${
-                  match.isCaptainTeamWinner ? 'text-green-800' : 'text-red-800'
+                  match.isPlayerTeamWinner ? 'text-green-800' : 'text-red-800'
                 }`}>
-                  {match.isCaptainTeamWinner ? '🎉 Congratulations! Your team won!' : '😔 Your team lost this match.'}
+                  {match.isPlayerTeamWinner ? '🎉 Congratulations! Your team won!' : '😔 Your team lost this match.'}
                 </div>
                 <div className={`text-sm mt-1 ${
-                  match.isCaptainTeamWinner ? 'text-green-600' : 'text-red-600'
+                  match.isPlayerTeamWinner ? 'text-green-600' : 'text-red-600'
                 }`}>
                   Winner: {match.result.winnerName}
                 </div>
+                {match.isPlayerTeamWinner && (
+                  <div className="text-sm text-green-600 mt-1">
+                    Keep up the great work! Good luck in the next rounds.
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -347,18 +367,18 @@ export default function CaptainMatchDetailPage() {
         {/* Action Buttons */}
         <div className="flex justify-center space-x-4">
           <Link
-            href={`/${lang}/captain/fixtures/${match.fixtureId}`}
+            href={`/${lang}/player/fixtures/${match.fixtureId}`}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors inline-flex items-center"
           >
             <Trophy className="w-4 h-4 mr-2" />
             View Tournament
           </Link>
           <Link
-            href={`/${lang}/captain/teams`}
+            href={`/${lang}/player/teams`}
             className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors inline-flex items-center"
           >
             <Users className="w-4 h-4 mr-2" />
-            Manage Teams
+            View Teams
           </Link>
         </div>
       </div>

@@ -77,7 +77,7 @@ export default function PlayerFixturesPage() {
   const { data: teams = [], isLoading: teamsLoading, error: teamsError } = api.teams.getMyTeams.useQuery(
     undefined,
     {
-      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'player',
+      enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'player',
     }
   );
 
@@ -85,7 +85,7 @@ export default function PlayerFixturesPage() {
   const { data: fixtures = [], isLoading: fixturesLoading, error: fixturesError } = api.teams.getMyTeamFixtures.useQuery(
     undefined,
     {
-      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'player',
+      enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'player',
     }
   );
 
@@ -100,7 +100,7 @@ export default function PlayerFixturesPage() {
       return;
     }
 
-    if (!userProfile?.profile_complete) {
+    if (!userProfile?.profileComplete) {
       router.push(`/${lang}/profile/complete`);
       return;
     }

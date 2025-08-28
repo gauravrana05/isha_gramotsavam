@@ -287,7 +287,7 @@ export default function PlayerTeamsListPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="text-center p-4 bg-gray-50 rounded-lg">
                           <div className="text-2xl font-bold text-blue-600">{team.currentPlayers}</div>
-                          <div className="text-sm text-gray-600">{t('current_players', 'Current Players')}</div>
+                          <div className="text-sm text-gray-600">{t('currentPlayers', 'Current Players')}</div>
                         </div>
                         <div className="text-center p-4 bg-gray-50 rounded-lg">
                           <div className="text-2xl font-bold text-purple-600">{team.maxPlayers}</div>

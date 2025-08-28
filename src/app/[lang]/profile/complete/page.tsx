@@ -86,10 +86,10 @@ export default function CompleteProfilePage() {
     if (userProfile && Object.values(formData).every(value => !value)) {
       setFormData(prev => ({
         ...prev,
-        firstName: userProfile.first_name || "",
-        lastName: userProfile.last_name || "",
+        firstName: userProfile.firstName || "",
+        lastName: userProfile.lastName || "",
         whatsappNumber: whatsappNumber || phoneNumber,
-        dob: userProfile.date_of_birth ? new Date(userProfile.date_of_birth).toISOString().split('T')[0] : "",
+        dob: userProfile.dateOfBirth ? new Date(userProfile.dateOfBirth).toISOString().split('T')[0] : "",
         gender: userProfile.gender || "",
         pincode: userProfile.pincode || "",
         state: userProfile.state || "",
@@ -378,14 +378,14 @@ export default function CompleteProfilePage() {
             <DocumentUpload
               type="profilePhoto"
               label="Profile Photo"
-              currentUrl={profileDataQuery.data?.userProfileImages?.profile_photo_path}
+              currentUrl={profileDataQuery.data?.userProfileImages?.profilePhotoPath}
               variant="profile"
               className="flex flex-col justify-center items-center"
               onSuccess={async () => {
                 setError("");
                 const { data: updatedData } = await profileDataQuery.refetch();
                 // Refresh user data if profile completion status changed
-                if (updatedData?.profileComplete !== user?.profile_complete) {
+                if (updatedData?.profileComplete !== user?.profileComplete) {
                   await refreshUser();
                 }
               }}
@@ -686,13 +686,13 @@ export default function CompleteProfilePage() {
             <DocumentUpload
               type="aadhaarFront"
               label="Aadhaar Card (Front)"
-              currentUrl={profileDataQuery.data?.userProfileImages?.aadhaar_front_path}
+              currentUrl={profileDataQuery.data?.userProfileImages?.aadhaarFrontPath}
               variant="card"
               onSuccess={async () => {
                 setError("");
                 const { data: updatedData } = await profileDataQuery.refetch();
                 // Refresh user data if profile completion status changed
-                if (updatedData?.profileComplete !== user?.profile_complete) {
+                if (updatedData?.profileComplete !== user?.profileComplete) {
                   await refreshUser();
                 }
               }}
@@ -702,13 +702,13 @@ export default function CompleteProfilePage() {
             <DocumentUpload
               type="aadhaarBack"
               label="Aadhaar Card (Back)"
-              currentUrl={profileDataQuery.data?.userProfileImages?.aadhaar_back_path}
+              currentUrl={profileDataQuery.data?.userProfileImages?.aadhaarBackPath}
               variant="card"
               onSuccess={async () => {
                 setError("");
                 const { data: updatedData } = await profileDataQuery.refetch();
                 // Refresh user data if profile completion status changed
-                if (updatedData?.profileComplete !== user?.profile_complete) {
+                if (updatedData?.profileComplete !== user?.profileComplete) {
                   await refreshUser();
                 }
               }}

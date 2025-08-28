@@ -50,7 +50,7 @@ export default function CaptainDashboard() {
       return;
     }
 
-    if (!userProfile?.profile_complete) {
+    if (!userProfile?.profileComplete) {
       console.log("Thisis user profile" , userProfile);
       router.push(`/${lang}/profile/complete`);
       return;
@@ -113,7 +113,7 @@ export default function CaptainDashboard() {
             {t('captain_dashboard', 'Captain Dashboard')}
           </h1>
           <p className="text-gray-600">
-            {t('welcome_back_captain', 'Welcome back, {name}! Manage your teams and players.').replace('{name}', userProfile?.first_name || 'Captain')}
+            {t('welcome_back_captain', 'Welcome back, {name}! Manage your teams and players.').replace('{name}', userProfile?.firstName || 'Captain')}
           </p>
         </div>
 
@@ -127,8 +127,8 @@ export default function CaptainDashboard() {
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">{teams[0].name}</h2>
                   <div className="flex flex-col sm:flex-row  sm:items-center gap-4 text-sm text-gray-600">
                   <span className="flex capitalize items-center gap-1">
-                  {teams[0].gender_category === 'women' ? <UserRound className='w-4 h-4'/> : <User className='w-4 h-4'/>} 
-                    {teams[0].gender_category === 'women' ? t('women', 'Women') : t('men', 'Men')}</span>
+                  {teams[0].genderCategory === 'women' ? <UserRound className='w-4 h-4'/> : <User className='w-4 h-4'/>} 
+                    {teams[0].genderCategory === 'women' ? t('women', 'Women') : t('men', 'Men')}</span>
                     
                     <span className="flex  items-center gap-1">
                       <Trophy className="w-4 h-4" />

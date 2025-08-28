@@ -29,15 +29,15 @@ interface TeamPlayer {
   id: string;
   userId: string;
   teamId: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   phone: string;
   whatsapp_number: string | null;
-  date_of_birth: Date;
+  dateOfBirth: Date;
   age: number;
   gender: string;
   position: 'main' | 'substitute';
-  verification_status: 'pending' | 'verified' | 'rejected';
+  verificationStatus: 'pending' | 'verified' | 'rejected';
   panchayat: string;
   taluk: string;
   district: string;
@@ -47,16 +47,16 @@ interface TeamPlayer {
   createdAt: Date;
   users?: {
     id: string;
-    first_name: string | null;
-    last_name: string | null;
+    firstName: string | null;
+    lastName: string | null;
     phone: string;
     role: string;
-    profile_complete: boolean;
-    user_profile_images_user_profile_images_user_idTousers: {
+    profileComplete: boolean;
+    profileImages: {
       userId: string;
-      profile_photo_path: string | null;
-      aadhaar_front_path: string | null;
-      aadhaar_back_path: string | null;
+      profilePhotoPath: string | null;
+      aadhaarFrontPath: string | null;
+      aadhaarBackPath: string | null;
       all_images_uploaded: boolean;
       verified_by: string | null;
       verified_at: Date | null;
@@ -72,30 +72,30 @@ interface TeamData {
   sport_id: string;
   captain_id: string;
   captain_name: string;
-  gender_category: string;
+  genderCategory: string;
   status: string;
   panchayat: string;
   taluk: string;
   district: string;
   state: string;
   pincode: string | null;
-  current_players: number;
-  current_substitutes: number;
+  currentPlayers: number;
+  currentSubstitutes: number;
   createdAt: Date;
   updatedAt: Date;
   sports: {
     id: string;
     name: string;
-    main_players_count: number;
-    max_substitutes: number;
+    mainPlayersCount: number;
+    maxSubstitutes: number;
   };
-  users_teams_captain_idTousers: {
+  captainUser: {
     id: string;
-    first_name: string | null;
-    last_name: string | null;
+    firstName: string | null;
+    lastName: string | null;
     phone: string;
   };
-  team_players: TeamPlayer[];
+  teamPlayers: TeamPlayer[];
 }
 
 export default function MyTeamPage() {
@@ -131,37 +131,37 @@ export default function MyTeamPage() {
     }
   };
 
-  const players = teamData?.team_players || [];
-  const sportConfig = teamData?.sports || { main_players_count: 0, max_substitutes: 0 };
-  const totalSlotsNeeded = sportConfig.main_players_count + sportConfig.max_substitutes;
+  const players = teamData?.teamPlayers || [];
+  const sportConfig = teamData?.sports || { mainPlayersCount: 0, maxSubstitutes: 0 };
+  const totalSlotsNeeded = sportConfig.mainPlayersCount + sportConfig.maxSubstitutes;
   const mainPlayersCount = players.filter(p => p.position === 'main').length;
   const substitutesCount = players.filter(p => p.position === 'substitute').length;
 
   const isReadOnly = teamData?.status && teamData.status !== 'draft';
 
   const getPlayerStatusColor = (player: TeamPlayer) => {
-    if (player.verification_status === 'verified') return 'text-[#3A7F3F] bg-green-50';
-    if (player.verification_status === 'rejected') return 'text-red-600 bg-red-50';
-    if (player.users?.profile_complete) return 'text-[#C79016] bg-yellow-50';
+    if (player.verificationStatus === 'verified') return 'text-[#3A7F3F] bg-green-50';
+    if (player.verificationStatus === 'rejected') return 'text-red-600 bg-red-50';
+    if (player.users?.profileComplete) return 'text-[#C79016] bg-yellow-50';
     return 'text-gray-600 bg-gray-50';
   };
 
   const getPlayerStatusIcon = (player: TeamPlayer) => {
-    if (player.verification_status === 'verified') return <CheckCircle className="w-4 h-4" />;
-    if (player.verification_status === 'rejected') return <X className="w-4 h-4" />;
-    if (player.users?.profile_complete) return <Clock className="w-4 h-4" />;
+    if (player.verificationStatus === 'verified') return <CheckCircle className="w-4 h-4" />;
+    if (player.verificationStatus === 'rejected') return <X className="w-4 h-4" />;
+    if (player.users?.profileComplete) return <Clock className="w-4 h-4" />;
     return <AlertCircle className="w-4 h-4" />;
   };
 
   const getPlayerStatusText = (player: TeamPlayer) => {
-    if (player.verification_status === 'verified') return 'Verified';
-    if (player.verification_status === 'rejected') return 'Rejected';
-    if (player.users?.profile_complete) return 'Pending Review';
+    if (player.verificationStatus === 'verified') return 'Verified';
+    if (player.verificationStatus === 'rejected') return 'Rejected';
+    if (player.users?.profileComplete) return 'Pending Review';
     return 'Docs Incomplete';
   };
 
   const filteredPlayers = players.filter(player =>
-    `${player.first_name} ${player.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     player.phone.includes(searchTerm)
   );
 
@@ -258,15 +258,15 @@ export default function MyTeamPage() {
             </div>
             <div className="bg-white rounded-lg p-6 shadow-lg">
                 <p className="text-gray-600 text-sm">Main Players</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{mainPlayersCount}/{sportConfig.main_players_count}</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{mainPlayersCount}/{sportConfig.mainPlayersCount}</p>
             </div>
             <div className="bg-white rounded-lg p-6 shadow-lg">
                 <p className="text-gray-600 text-sm">Substitutes</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{substitutesCount}/{sportConfig.max_substitutes}</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{substitutesCount}/{sportConfig.maxSubstitutes}</p>
             </div>
             <div className="bg-white rounded-lg p-6 shadow-lg">
                 <p className="text-gray-600 text-sm">Profiles Complete</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{players.filter(p => p.users?.profile_complete).length}</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{players.filter(p => p.users?.profileComplete).length}</p>
             </div>
         </div>
 
@@ -316,7 +316,7 @@ export default function MyTeamPage() {
                   {filteredPlayers.map((player) => (
                     <tr key={player.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-semibold text-[#4A2F1D]">{player.first_name} {player.last_name}</div>
+                        <div className="font-semibold text-[#4A2F1D]">{player.firstName} {player.lastName}</div>
                         <div className="text-sm text-gray-500">{player.phone}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -327,9 +327,9 @@ export default function MyTeamPage() {
                       <td className="px-6 py-4 whitespace-nowrap">{player.age}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex space-x-1">
-                          <div className={`w-4 h-4 rounded-full ${player.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path ? 'bg-green-500' : 'bg-gray-300'}`} title="Profile"></div>
-                          <div className={`w-4 h-4 rounded-full ${player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path ? 'bg-green-500' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
-                          <div className={`w-4 h-4 rounded-full ${player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path ? 'bg-green-500' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
+                          <div className={`w-4 h-4 rounded-full ${player.users?.profileImages?.profilePhotoPath ? 'bg-green-500' : 'bg-gray-300'}`} title="Profile"></div>
+                          <div className={`w-4 h-4 rounded-full ${player.users?.profileImages?.aadhaarFrontPath ? 'bg-green-500' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
+                          <div className={`w-4 h-4 rounded-full ${player.users?.profileImages?.aadhaarBackPath ? 'bg-green-500' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -362,7 +362,7 @@ export default function MyTeamPage() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.first_name} {selectedPlayer.last_name}</h2>
+                  <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.firstName} {selectedPlayer.lastName}</h2>
                   <p className="text-gray-600">{selectedPlayer.phone}</p>
                 </div>
                 <button onClick={() => setSelectedPlayer(null)} className="text-gray-500 hover:text-gray-700">

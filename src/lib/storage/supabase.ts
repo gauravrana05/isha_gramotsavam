@@ -72,7 +72,7 @@ export const STORAGE_BUCKETS = {
 
 // Helper function to generate file paths
 export const generateStoragePath = {
-  profileImage: (userId: string, fileName: string) => 
+  profileImages: (userId: string, fileName: string) => 
     `${userId}/profile/${fileName}`,
   
   aadhaarDocument: (userId: string, type: 'front' | 'back', fileName: string) =>

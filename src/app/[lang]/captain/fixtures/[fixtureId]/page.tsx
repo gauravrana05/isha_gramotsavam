@@ -88,8 +88,8 @@ export default function CaptainFixtureDetailPage() {
   const { data: fixture, isLoading: fixtureLoading, error: fixtureError } = api.teams.getMyTeamFixtures.useQuery(
     undefined,
     {
-      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'captain',
-      select: (fixtures) => fixtures.find(f => f.id === fixtureId) as CaptainFixtureDetail | undefined
+      enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'captain',
+      select: (fixture : any) => fixture.find((f : any) => f.id === fixtureId) as CaptainFixtureDetail | undefined
     }
   );
 
@@ -112,7 +112,7 @@ export default function CaptainFixtureDetailPage() {
       return;
     }
 
-    if (!userProfile?.profile_complete) {
+    if (!userProfile?.profileComplete) {
       router.push(`/${lang}/profile/complete`);
       return;
     }

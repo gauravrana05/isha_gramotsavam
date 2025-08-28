@@ -63,20 +63,20 @@ export async function GET(request: NextRequest) {
     const userData = {
       email: userInfo.email,
       phone: userInfo.phone_number || null,
-      first_name: userInfo.given_name || null,
-      last_name: userInfo.family_name || null,
-      date_of_birth: userInfo.birthdate ? new Date(userInfo.birthdate) : null,
+      firstName: userInfo.given_name || null,
+      lastName: userInfo.family_name || null,
+      dateOfBirth: userInfo.birthdate ? new Date(userInfo.birthdate) : null,
       gender: userInfo.gender || null,
-      whatsapp_number: userInfo.whatsapp_number || null,
-      instagram_handle: userInfo.instagram_handle || null,
+      whatsappNumber: userInfo.whatsapp_number || null,
+      instagramHandle: userInfo.instagram_handle || null,
       panchayat: userInfo.address?.panchayat || null,
       taluk: userInfo.address?.taluk || null,
       district: userInfo.address?.locality || null,
       state: userInfo.address?.region || null,
       pincode: userInfo.address?.postal_code || null,
-      profile_complete: false, // Will be updated based on completeness check
+      profileComplete: false, // Will be updated based on completeness check
       role: 'public', // Default role
-      language_preference: 'en', // Default language
+      languagePreference: 'en', // Default language
     };
 
     // Create or update user in database (search by phone instead of email)
@@ -87,13 +87,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Phone number is required for authentication' }, { status: 400 });
     }
 
-    const existingUser = await prisma.users.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { phone: phone }
     });
 
     if (existingUser) {
       // Update existing user
-      user = await prisma.users.update({
+      user = await prisma.user.update({
         where: { phone: phone },
         data: {
           ...userData,
@@ -103,29 +103,36 @@ export async function GET(request: NextRequest) {
       });
     } else {
       // Create new user
-      user = await prisma.users.create({
+      user = await prisma.user.create({
         data: userData
       });
     }
 
     // Check profile completeness
-    const requiredFields = ['first_name', 'last_name', 'phone', 'date_of_birth', 'gender', 'district', 'state'];
+    const requiredFields = ['firstName', 'lastName', 'phone', 'dateOfBirth', 'gender', 'district', 'state'];
     const isProfileComplete = requiredFields.every(field => user[field as keyof typeof user]);
     
-    if (user.profile_complete !== isProfileComplete) {
-      user = await prisma.users.update({
+    if (user.profileComplete !== isProfileComplete) {
+      user = await prisma.user.update({
         where: { id: user.id },
-        data: { profile_complete: isProfileComplete }
+        data: { profileComplete: isProfileComplete }
       });
     }
 
-    // Create session/JWT or set cookies as needed
-    // For now, we'll redirect to the frontend with user info
+    // Create session by setting userId cookie
     const redirectUrl = new URL('/en', request.url);
     redirectUrl.searchParams.set('auth', 'success');
-    redirectUrl.searchParams.set('userId', user.id);
 
-    return NextResponse.redirect(redirectUrl);
+    const response = NextResponse.redirect(redirectUrl);
+    response.cookies.set('userId', user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30 // 30 days
+    });
+
+    return response;
 
   } catch (error) {
     console.error('OIDC callback error:', error);

@@ -25,64 +25,64 @@ export const teamsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { id, includePhotos, includePlayers, includeVenueAssignments } = input
 
-      const team = await db.teams.findUnique({
+      const team = await db.team.findUnique({
         where: { id },
         include: {
-          sports: true,
-          users_teams_captain_idTousers: {
+          sport: true,
+          captainUser: {
             select: {
               id: true,
-              first_name: true,
-              last_name: true,
+              firstName: true,
+              lastName: true,
               phone: true,
             },
           },
-          events: {
+          event: {
             select: {
               id: true,
               name: true,
               status: true,
             },
           },
-          team_photos: includePhotos,
-          team_players: includePlayers ? {
+          teamPhoto: includePhotos,
+          teamPlayers: includePlayers ? {
             select: {
               id: true,
               userId: true,
               teamId: true,
-              first_name: true,
-              last_name: true,
+              firstName: true,
+              lastName: true,
               phone: true,
-              whatsapp_number: true,
-              date_of_birth: true,
+              whatsappNumber: true,
+              dateOfBirth: true,
               age: true,
               gender: true,
               position: true,
-              verification_status: true,
+              verificationStatus: true,
               panchayat: true,
               taluk: true,
               district: true,
               state: true,
               pincode: true,
-              added_by: true,
+              addedBy: true,
               createdAt: true,
-              users: {
+              user: {
                 select: {
                   id: true,
-                  first_name: true,
-                  last_name: true,
+                  firstName: true,
+                  lastName: true,
                   phone: true,
                   role: true,
-                  profile_complete: true,
-                  user_profile_images_user_profile_images_user_idTousers: {
+                  profileComplete: true,
+                  profileImages: {
                     select: {
                       userId: true,
-                      profile_photo_path: true,
-                      aadhaar_front_path: true,
-                      aadhaar_back_path: true,
-                      all_images_uploaded: true,
-                      verified_by: true,
-                      verified_at: true,
+                      profilePhotoPath: true,
+                      aadhaarFrontPath: true,
+                      aadhaarBackPath: true,
+                      allImagesUploaded: true,
+                      verifiedBy: true,
+                      verifiedAt: true,
                       createdAt: true,
                       updatedAt: true,
                     },
@@ -95,17 +95,17 @@ export const teamsRouter = createTRPCRouter({
               { createdAt: 'asc' },
             ],
           } : false,
-          team_venue_assignments: includeVenueAssignments ? {
+          teamVenueAssignments: includeVenueAssignments ? {
             include: {
-              events: {
+              event: {
                 select: {
                   id: true,
                   name: true,
                 },
               },
-              venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings: {
+              clusterVenueMapping: {
                 include: {
-                  venues: {
+                  venue: {
                     select: {
                       id: true,
                       name: true,
@@ -115,9 +115,9 @@ export const teamsRouter = createTRPCRouter({
                   },
                 },
               },
-              venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings: {
+              divisionVenueMapping: {
                 include: {
-                  venues: {
+                  venue: {
                     select: {
                       id: true,
                       name: true,
@@ -127,9 +127,9 @@ export const teamsRouter = createTRPCRouter({
                   },
                 },
               },
-              venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings: {
+              finalVenueMapping: {
                 include: {
-                  venues: {
+                  venue: {
                     select: {
                       id: true,
                       name: true,
@@ -176,11 +176,11 @@ export const teamsRouter = createTRPCRouter({
 
       const where: any = {}
 
-      if (sportId) where.sport_id = sportId
+      if (sportId) where.sportId = sportId
       if (eventId) where.eventId = eventId
       if (genderCategory) where.genderCategory = genderCategory
       if (status) where.status = status
-      if (captainId) where.captain_id = captainId
+      if (captainId) where.captainId = captainId
       if (district) where.district = district
       if (state) where.state = state
       if (search) {
@@ -195,37 +195,37 @@ export const teamsRouter = createTRPCRouter({
         'createdAt': 'createdAt',
         'name': 'name',
         'status': 'status',
-        'tournamentNumber': 'tournament_number'
+        'tournamentNumber': 'tournamentNumber'
       };
 
       const dbSortBy = sortByMapping[sortBy] || 'createdAt';
 
       const [teamsFromDb, total] = await Promise.all([
-        db.teams.findMany({
+        db.team.findMany({
           where,
           include: {
-            sports: {
+            sport: {
               select: {
                 id: true,
                 name: true,
               },
             },
-            users_teams_captain_idTousers: {
+            captainUser: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
               },
             },
-            events: {
+            event: {
               select: {
                 id: true,
                 name: true,
                 status: true,
               },
             },
-            team_players: {
+            teamPlayers: {
               select: {
                 position: true,
               },
@@ -235,14 +235,14 @@ export const teamsRouter = createTRPCRouter({
           take: limit,
           orderBy: { [dbSortBy]: sortOrder },
         }),
-        db.teams.count({ where }),
+        db.team.count({ where }),
       ]);
 
       const teams = teamsFromDb.map(team => {
-        const mainPlayersCount = team.team_players.filter(p => p.position === 'main').length;
-        const substitutePlayersCount = team.team_players.filter(p => p.position === 'substitute').length;
+        const mainPlayersCount = team.teamPlayers.filter(p => p.position === 'main').length;
+        const substitutePlayersCount = team.teamPlayers.filter(p => p.position === 'substitute').length;
         
-        const { team_players, ...restOfTeam } = team;
+        const { teamPlayers, ...restOfTeam } = team;
 
         return {
           ...restOfTeam,
@@ -270,29 +270,29 @@ export const teamsRouter = createTRPCRouter({
       }
 
       if (taluk) where.taluk = taluk
-      if (sportId) where.sport_id = sportId
+      if (sportId) where.sportId = sportId
       if (genderCategory) where.genderCategory = genderCategory
 
-      const teams = await db.teams.findMany({
+      const teams = await db.team.findMany({
         where,
         include: {
-          sports: {
+          sport: {
             select: {
               id: true,
               name: true,
             },
           },
-          users_teams_captain_idTousers: {
+          captainUser: {
             select: {
               id: true,
-              first_name: true,
-              last_name: true,
+              firstName: true,
+              lastName: true,
               phone: true,
             },
           },
           _count: {
             select: {
-              team_players: true,
+              teamPlayers: true,
             },
           },
         },
@@ -319,29 +319,29 @@ export const teamsRouter = createTRPCRouter({
         },
       }
 
-      if (sportId) where.sport_id = sportId
+      if (sportId) where.sportId = sportId
       if (genderCategory) where.genderCategory = genderCategory
 
-      const teams = await db.teams.findMany({
+      const teams = await db.team.findMany({
         where,
         include: {
-          sports: {
+          sport: {
             select: {
               id: true,
               name: true,
             },
           },
-          users_teams_captain_idTousers: {
+          captainUser: {
             select: {
               id: true,
-              first_name: true,
-              last_name: true,
+              firstName: true,
+              lastName: true,
               phone: true,
             },
           },
           _count: {
             select: {
-              team_players: true,
+              teamPlayers: true,
             },
           },
         },
@@ -355,64 +355,64 @@ export const teamsRouter = createTRPCRouter({
   getMyTeam: protectedProcedure.query(async ({ ctx }) => {
     const captainId = ctx.user.id;
 
-    const team = await db.teams.findFirst({
-      where: { captain_id: captainId },
+    const team = await db.team.findFirst({
+      where: { captainId: captainId },
       include: {
-        sports: true,
-        users_teams_captain_idTousers: {
+        sport: true,
+        captainUser: {
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            firstName: true,
+            lastName: true,
             phone: true,
           },
         },
-        events: {
+        event: {
           select: {
             id: true,
             name: true,
             status: true,
           },
         },
-        team_photos: true,
-        team_players: {
+        teamPhoto: true,
+        teamPlayers: {
           select: {
             id: true,
             userId: true,
             teamId: true,
-            first_name: true,
-            last_name: true,
+            firstName: true,
+            lastName: true,
             phone: true,
-            whatsapp_number: true,
-            date_of_birth: true,
+            whatsappNumber: true,
+            dateOfBirth: true,
             age: true,
             gender: true,
             position: true,
-            verification_status: true,
+            verificationStatus: true,
             panchayat: true,
             taluk: true,
             district: true,
             state: true,
             pincode: true,
-            added_by: true,
+            addedBy: true,
             createdAt: true,
-            users: {
+            user: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
                 role: true,
-                profile_complete: true,
-                user_profile_images_user_profile_images_user_idTousers: {
+                profileComplete: true,
+                profileImages: {
                   select: {
                     userId: true,
-                    profile_photo_path: true,
-                    aadhaar_front_path: true,
-                    aadhaar_back_path: true,
-                    all_images_uploaded: true,
-                    verified_by: true,
-                    verified_at: true,
+                    profilePhotoPath: true,
+                    aadhaarFrontPath: true,
+                    aadhaarBackPath: true,
+                    allImagesUploaded: true,
+                    verifiedBy: true,
+                    verifiedAt: true,
                     createdAt: true,
                     updatedAt: true,
                   },
@@ -422,17 +422,17 @@ export const teamsRouter = createTRPCRouter({
           },
           orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
         },
-        team_venue_assignments: {
+        teamVenueAssignments: {
           include: {
-            events: {
+            event: {
               select: {
                 id: true,
                 name: true,
               },
             },
-            venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings: {
+            clusterVenueMapping: {
               include: {
-                venues: {
+                venue: {
                   select: {
                     id: true,
                     name: true,
@@ -442,9 +442,9 @@ export const teamsRouter = createTRPCRouter({
                 },
               },
             },
-            venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings: {
+            divisionVenueMapping: {
               include: {
-                venues: {
+                venue: {
                   select: {
                     id: true,
                     name: true,
@@ -454,9 +454,9 @@ export const teamsRouter = createTRPCRouter({
                 },
               },
             },
-            venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings: {
+            finalVenueMapping: {
               include: {
-                venues: {
+                venue: {
                   select: {
                     id: true,
                     name: true,
@@ -479,10 +479,10 @@ export const teamsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       try {
         // Check if captain exists and is not already captain of another team in same event/sport
-        const existingCaptain = await db.teams.findFirst({
+        const existingCaptain = await db.team.findFirst({
           where: {
-            captain_id: input.captainId,
-            sport_id: input.sportId,
+            captainId: input.captainId,
+            sportId: input.sportId,
             eventId: input.eventId,
             status: { not: 'rejected' },
           },
@@ -495,13 +495,13 @@ export const teamsRouter = createTRPCRouter({
           })
         }
 
-        const team = await db.teams.create({
+        const team = await db.team.create({
           data: {
             name: input.name,
-            sport_id: input.sportId,
-            captain_id: input.captainId,
-            captain_name: input.captainName,
-            gender_category: input.genderCategory,
+            sportId: input.sportId,
+            captainId: input.captainId,
+            captainName: input.captainName,
+            genderCategory: input.genderCategory,
             panchayat: input.panchayat,
             taluk: input.taluk,
             district: input.district,
@@ -511,12 +511,12 @@ export const teamsRouter = createTRPCRouter({
             pincode: input.pincode,
           },
           include: {
-            sports: true,
-            users_teams_captain_idTousers: {
+            sport: true,
+            captainUser: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
               },
             },
@@ -571,22 +571,22 @@ export const teamsRouter = createTRPCRouter({
         };
 
         // Get user profile
-        const userProfile = await db.users.findUnique({
+        const userProfile = await db.user.findUnique({
           where: { id: captainId },
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            firstName: true,
+            lastName: true,
             phone: true,
-            whatsapp_number: true,
-            date_of_birth: true,
+            whatsappNumber: true,
+            dateOfBirth: true,
             gender: true,
             panchayat: true,
             taluk: true,
             district: true,
             state: true,
             pincode: true,
-            profile_complete: true,
+            profileComplete: true,
           }
         });
 
@@ -597,7 +597,7 @@ export const teamsRouter = createTRPCRouter({
           });
         }
 
-        if (!userProfile.first_name || !userProfile.gender || !userProfile.date_of_birth) {
+        if (!userProfile.firstName || !userProfile.gender || !userProfile.dateOfBirth) {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
             message: 'Incomplete user profile. Please update your profile before creating a team.',
@@ -605,16 +605,16 @@ export const teamsRouter = createTRPCRouter({
         }
 
         // Validate sport exists and get gender requirements
-        const sport = await db.sports.findUnique({
+        const sport = await db.sport.findUnique({
           where: { id: teamData.sportId },
           include: {
-            sport_gender_categories: {
-              select: { gender_category: true }
+            sportGenderCategories: {
+              select: { genderCategory: true }
             }
           }
         });
 
-        if (!sport || !sport.is_active) {
+        if (!sport || !sport.isActive) {
           throw new TRPCError({
             code: 'NOT_FOUND',
             message: 'Sport not found or inactive',
@@ -622,7 +622,7 @@ export const teamsRouter = createTRPCRouter({
         }
 
         // Check gender eligibility
-        const supportedCategories = sport.sport_gender_categories.map(gc => gc.gender_category);
+        const supportedCategories = sport.sportGenderCategories.map(gc => gc.genderCategory);
         const userCanRegister = 
           supportedCategories.includes('mixed') || 
           (userProfile.gender === 'M' && supportedCategories.includes('men')) ||
@@ -641,11 +641,11 @@ export const teamsRouter = createTRPCRouter({
         }
 
         // Age checks
-        const captainAge = calculateAge(userProfile.date_of_birth);
+        const captainAge = calculateAge(userProfile.dateOfBirth);
 
         // Check if user is already captain of a team
-        const existingTeam = await db.teams.findFirst({
-          where: { captain_id: captainId },
+        const existingTeam = await db.team.findFirst({
+          where: { captainId: captainId },
           select: { id: true, name: true }
         });
 
@@ -658,9 +658,9 @@ export const teamsRouter = createTRPCRouter({
 
         // Check if phone number is already used as captain
         if (userProfile.phone) {
-          const existingPhoneTeam = await db.teams.findFirst({
+          const existingPhoneTeam = await db.team.findFirst({
             where: {
-              users_teams_captain_idTousers: {
+              captainUser: {
                 phone: userProfile.phone
               }
             },
@@ -676,22 +676,22 @@ export const teamsRouter = createTRPCRouter({
         }
 
         // Sport info already available from earlier validation
-        const maxPlayers = sport?.main_players_count || 6;
-        const maxSubstitutes = sport?.max_substitutes || 3;
+        const maxPlayers = sport?.mainPlayersCount || 6;
+        const maxSubstitutes = sport?.maxSubstitutes || 3;
 
         // Create team in transaction
         const result = await db.$transaction(async (tx) => {
           // Create team
-          const team = await tx.teams.create({
+          const team = await tx.team.create({
             data: {
               name: teamData.name,
               description: teamData.description || '',
-              captain_id: captainId,
-              captain_name: `${userProfile.first_name} ${userProfile.last_name}`,
-              sport_id: teamData.sportId,
-              gender_category: teamData.genderCategory === 'M' ? 'men' : teamData.genderCategory === 'F' ? 'women' : 'mixed',
-              current_players: 1,
-              current_substitutes: 0,
+              captainId: captainId,
+              captainName: `${userProfile.firstName} ${userProfile.lastName}`,
+              sportId: teamData.sportId,
+              genderCategory: teamData.genderCategory === 'M' ? 'men' : teamData.genderCategory === 'F' ? 'women' : 'mixed',
+              currentPlayers: 1,
+              currentSubstitutes: 0,
               panchayat: teamData.panchayat,
               taluk: teamData.taluk || userProfile.taluk || '',
               district: teamData.district,
@@ -701,17 +701,17 @@ export const teamsRouter = createTRPCRouter({
           });
 
           // Add captain as team member
-          await tx.team_players.create({
+          await tx.teamPlayer.create({
             data: {
               teamId: team.id,
               userId: captainId,
               position: 'main',
-              verification_status: 'pending',
-              first_name: userProfile.first_name || '',
-              last_name: userProfile.last_name || '',
+              verificationStatus: 'pending',
+              firstName: userProfile.firstName || '',
+              lastName: userProfile.lastName || '',
               phone: userProfile.phone,
-              whatsapp_number: userProfile.whatsapp_number || null,
-              date_of_birth: userProfile.date_of_birth || '',
+              whatsappNumber: userProfile.whatsappNumber || null,
+              dateOfBirth: userProfile.dateOfBirth || '',
               age: captainAge || 18,
               gender: userProfile.gender || 'M',
               panchayat: userProfile.panchayat || '',
@@ -719,23 +719,23 @@ export const teamsRouter = createTRPCRouter({
               district: userProfile.district || '',
               state: userProfile.state || '',
               pincode: userProfile.pincode || '',
-              added_by: 'captain',
+              addedBy: 'captain',
             }
           });
 
           // Promote user to captain role - update main role and create role history
-          await tx.users.update({
+          await tx.user.update({
             where: { id: captainId },
             data: { role: 'captain' }
           });
 
           // Create user role entry for tracking
-          await tx.user_roles.create({
+          await tx.userRoleAssignment.create({
             data: {
               userId: captainId,
               eventId: null, // Global captain role for now, can be event-specific later
               role: 'captain',
-              assigned_by: null, // Self-assigned through team creation
+              assignedBy: null, // Self-assigned through team creation
             }
           });
 
@@ -763,7 +763,7 @@ export const teamsRouter = createTRPCRouter({
       const { id, ...updateData } = input
 
       try {
-        const team = await db.teams.update({
+        const team = await db.team.update({
           where: { id },
           data: updateData,
         })
@@ -783,7 +783,7 @@ export const teamsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       try {
         // Get team and sport info for validation
-        const team = await db.teams.findUnique({
+        const team = await db.team.findUnique({
           where: { id: input.teamId },
           include: { sports: true },
         })
@@ -795,7 +795,7 @@ export const teamsRouter = createTRPCRouter({
         }
 
         // Check if user already exists by phone number
-        const user = await db.users.findUnique({
+        const user = await db.user.findUnique({
           where: { phone: input.phone },
         })
 
@@ -806,12 +806,12 @@ export const teamsRouter = createTRPCRouter({
           userId = user.id
         } else {
           // User doesn't exist - create new user
-          const newUser = await db.users.create({
+          const newUser = await db.user.create({
             data: {
-              first_name: input.firstName,
-              last_name: input.lastName,
+              firstName: input.firstName,
+              lastName: input.lastName,
               phone: input.phone,
-              date_of_birth: input.dateOfBirth,
+              dateOfBirth: input.dateOfBirth,
               gender: input.gender,
               panchayat: input.panchayat,
               taluk: input.taluk,
@@ -819,14 +819,14 @@ export const teamsRouter = createTRPCRouter({
               state: input.state,
               pincode: input.pincode,
               role: 'player',
-              profile_complete: false,
+              profileComplete: false,
             },
           })
           userId = newUser.id
         }
 
         // Check if user is already in this team
-        const existingPlayer = await db.team_players.findUnique({
+        const existingPlayer = await db.teamPlayer.findUnique({
           where: {
             team_id_user_id: {
               teamId: input.teamId,
@@ -843,73 +843,73 @@ export const teamsRouter = createTRPCRouter({
         }
 
         // Check current player counts
-        const currentMainPlayers = await db.team_players.count({
+        const currentMainPlayers = await db.teamPlayer.count({
           where: {
             teamId: input.teamId,
             position: 'main',
           },
         })
 
-        const currentSubstitutes = await db.team_players.count({
+        const currentSubstitutes = await db.teamPlayer.count({
           where: {
             teamId: input.teamId,
             position: 'substitute',
           },
         })
         // Validate player limits
-        if (input.position === 'main' && currentMainPlayers >= team.sports.main_players_count) {
+        if (input.position === 'main' && currentMainPlayers >= team.sport.mainPlayersCount) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: `Team already has maximum main players (${team.sports.main_players_count})`,
+            message: `Team already has maximum main players (${team.sport.mainPlayersCount})`,
           })
         }
 
-        if (input.position === 'substitute' && currentSubstitutes >= team.sports.max_substitutes) {
+        if (input.position === 'substitute' && currentSubstitutes >= team.sport.maxSubstitutes) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: `Team already has maximum substitutes (${team.sports.max_substitutes})`,
+            message: `Team already has maximum substitutes (${team.sport.maxSubstitutes})`,
           })
         }
         console.log("ctx.user:", ctx.user)
         // Create team player record
-        const player = await db.team_players.create({
+        const player = await db.teamPlayer.create({
           data: {
             teamId: input.teamId,
             userId: userId,
-            first_name: input.firstName,
-            last_name: input.lastName,
+            firstName: input.firstName,
+            lastName: input.lastName,
             phone: input.phone,
-            whatsapp_number: input.whatsappNumber,
-            date_of_birth: input.dateOfBirth,
+            whatsappNumber: input.whatsappNumber,
+            dateOfBirth: input.dateOfBirth,
             age: input.age,
             gender: input.gender,
             position: input.position,
-            verification_status: input.verificationStatus || 'pending',
+            verificationStatus: input.verificationStatus || 'pending',
             panchayat: input.panchayat,
             taluk: input.taluk,
             district: input.district,
             state: input.state,
             pincode: input.pincode,
-            added_by: ctx.user.id,
+            addedBy: ctx.user.id,
           },
           include: {
-            users: {
+            user: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
               },
             },
           },
         })
         // Update team player counts
-        await db.teams.update({
+        await db.team.update({
           where: { id: input.teamId },
           data: {
             ...(input.position === 'main'
-              ? { current_players: { increment: 1 } }
-              : { current_substitutes: { increment: 1 } }),
+              ? { currentPlayers: { increment: 1 } }
+              : { currentSubstitutes: { increment: 1 } }),
           },
         });
         return player
@@ -926,11 +926,11 @@ export const teamsRouter = createTRPCRouter({
     .input(removeTeamPlayerSchema)
     .mutation(async ({ input }) => {
       try {
-        // The userId being passed is actually the team_players.id
-        // Let's find the player by team_players.id instead
-        const player = await db.team_players.findUnique({
+        // The userId being passed is actually the teamPlayers.id
+        // Let's find the player by teamPlayers.id instead
+        const player = await db.teamPlayer.findUnique({
           where: {
-            id: input.userId, // This is actually the team_players.id
+            id: input.userId, // This is actually the teamPlayers.id
           },
         })
 
@@ -949,27 +949,27 @@ export const teamsRouter = createTRPCRouter({
           })
         }
 
-        await db.team_players.delete({
+        await db.teamPlayer.delete({
           where: {
-            id: input.userId, // This is actually the team_players.id
+            id: input.userId, // This is actually the teamPlayers.id
           },
         })
 
         // Update team player counts
         const [mainCount, subCount] = await Promise.all([
-          db.team_players.count({
+          db.teamPlayer.count({
             where: { teamId: input.teamId, position: 'main' },
           }),
-          db.team_players.count({
+          db.teamPlayer.count({
             where: { teamId: input.teamId, position: 'substitute' },
           }),
         ])
 
-        await db.teams.update({
+        await db.team.update({
           where: { id: input.teamId },
           data: {
-            current_players: mainCount,
-            current_substitutes: subCount,
+            currentPlayers: mainCount,
+            currentSubstitutes: subCount,
           },
         })
 
@@ -991,14 +991,14 @@ export const teamsRouter = createTRPCRouter({
       const where: any = { teamId }
       if (position) where.position = position
 
-      const players = await db.team_players.findMany({
+      const players = await db.teamPlayer.findMany({
         where,
         include: {
           users: {
             select: {
               id: true,
-              first_name: true,
-              last_name: true,
+              firstName: true,
+              lastName: true,
               phone: true,
             },
           },
@@ -1017,17 +1017,17 @@ export const teamsRouter = createTRPCRouter({
     .input(uploadTeamPhotoSchema)
     .mutation(async ({ input }) => {
       try {
-        const photo = await db.team_photos.upsert({
+        const photo = await db.teamPhoto.upsert({
           where: { teamId: input.teamId },
           create: {
             teamId: input.teamId,
-            photo_path: input.photoPath,
-            uploaded_by: input.uploadedBy,
+            photoPath: input.photoPath,
+            uploadedBy: input.uploadedBy,
           },
           update: {
-            photo_path: input.photoPath,
-            uploaded_by: input.uploadedBy,
-            uploaded_at: new Date(),
+            photoPath: input.photoPath,
+            uploadedBy: input.uploadedBy,
+            uploadedAt: new Date(),
           },
         })
 
@@ -1045,17 +1045,17 @@ export const teamsRouter = createTRPCRouter({
     .input(createTeamVenueAssignmentSchema)
     .mutation(async ({ input }) => {
       try {
-        const assignment = await db.team_venue_assignments.create({
+        const assignment = await db.teamVenueAssignment.create({
           data: {
             teamId: input.teamId,
             eventId: input.eventId,
-            cluster_venue_mapping_id: input.clusterVenueMappingId,
-            assigned_by: input.assignedBy,
+            clusterVenueMappingId: input.clusterVenueMappingId,
+            assignedBy: input.assignedBy,
           },
           include: {
-            venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings: {
+            clusterVenueMapping: {
               include: {
-                venues: {
+                venue: {
                   select: {
                     id: true,
                     name: true,
@@ -1083,14 +1083,14 @@ export const teamsRouter = createTRPCRouter({
       const { id, ...updateData } = input
 
       try {
-        const assignment = await db.team_venue_assignments.update({
+        const assignment = await db.teamVenueAssignment.update({
           where: { id },
           data: {
-            division_venue_mapping_id: updateData.divisionVenueMappingId,
-            final_venue_mapping_id: updateData.finalVenueMappingId,
-            cluster_qualified: updateData.clusterQualified,
-            division_qualified: updateData.divisionQualified,
-            final_qualified: updateData.finalQualified,
+            divisionVenueMappingId: updateData.divisionVenueMappingId,
+            finalVenueMappingId: updateData.finalVenueMappingId,
+            clusterQualified: updateData.clusterQualified,
+            divisionQualified: updateData.divisionQualified,
+            finalQualified: updateData.finalQualified,
           },
         });
 
@@ -1110,12 +1110,12 @@ export const teamsRouter = createTRPCRouter({
       const { id, status, verifiedBy } = input
 
       try {
-        const team = await db.teams.update({
+        const team = await db.team.update({
           where: { id },
           data: {
             status,
-            verified_by: verifiedBy,
-            verified_at: status === 'verified' ? new Date() : null,
+            verifiedBy: verifiedBy,
+            verifiedAt: status === 'verified' ? new Date() : null,
           },
         })
 
@@ -1137,10 +1137,10 @@ export const teamsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       try {
         // Check if tournament number is already taken for this venue
-        const existingTeam = await db.teams.findFirst({
+        const existingTeam = await db.team.findFirst({
           where: {
-            tournament_number: input.tournamentNumber,
-            tournament_number_venue_mapping_id: input.venueMappingId,
+            tournamentNumber: input.tournamentNumber,
+            tournamentNumberVenueMappingId: input.venueMappingId,
             id: { not: input.teamId },
           },
         })
@@ -1152,12 +1152,12 @@ export const teamsRouter = createTRPCRouter({
           })
         }
 
-        const team = await db.teams.update({
+        const team = await db.team.update({
           where: { id: input.teamId },
           data: {
-            tournament_number: input.tournamentNumber,
-            tournament_number_assigned_at: new Date(),
-            tournament_number_venue_mapping_id: input.venueMappingId,
+            tournamentNumber: input.tournamentNumber,
+            tournamentNumberAssignedAt: new Date(),
+            tournamentNumberVenueMappingId: input.venueMappingId,
           },
         })
 
@@ -1177,57 +1177,57 @@ export const teamsRouter = createTRPCRouter({
       const { id } = input;
       const userId = ctx.user.id;
 
-      const team = await db.teams.findUnique({
+      const team = await db.team.findUnique({
         where: { id },
         include: {
-          sports: true,
-          users_teams_captain_idTousers: {
+          sport: true,
+          captainUser: {
             select: {
               id: true,
-              first_name: true,
-              last_name: true,
+              firstName: true,
+              lastName: true,
               phone: true,
             },
           },
-          team_players: {
+          teamPlayers: {
             where: { userId: userId }, // Ensure the logged-in user is a player in this team
             select: {
               id: true,
               userId: true,
               teamId: true,
-              first_name: true,
-              last_name: true,
+              firstName: true,
+              lastName: true,
               phone: true,
-              whatsapp_number: true,
-              date_of_birth: true,
+              whatsappNumber: true,
+              dateOfBirth: true,
               age: true,
               gender: true,
               position: true,
-              verification_status: true,
+              verificationStatus: true,
               panchayat: true,
               taluk: true,
               district: true,
               state: true,
               pincode: true,
-              added_by: true,
+              addedBy: true,
               createdAt: true,
-              users: {
+              user: {
                 select: {
                   id: true,
-                  first_name: true,
-                  last_name: true,
+                  firstName: true,
+                  lastName: true,
                   phone: true,
                   role: true,
-                  profile_complete: true,
-                  user_profile_images_user_profile_images_user_idTousers: {
+                  profileComplete: true,
+                  profileImages: {
                     select: {
                       userId: true,
-                      profile_photo_path: true,
-                      aadhaar_front_path: true,
-                      aadhaar_back_path: true,
-                      all_images_uploaded: true,
-                      verified_by: true,
-                      verified_at: true,
+                      profilePhotoPath: true,
+                      aadhaarFrontPath: true,
+                      aadhaarBackPath: true,
+                      allImagesUploaded: true,
+                      verifiedBy: true,
+                      verifiedAt: true,
                       createdAt: true,
                       updatedAt: true,
                     },
@@ -1236,23 +1236,23 @@ export const teamsRouter = createTRPCRouter({
               },
             },
           },
-          team_venue_assignments: {
-            orderBy: { assigned_at: 'desc' },
+          teamVenueAssignments: {
+            orderBy: { assignedAt: 'desc' },
             take: 1,
             include: {
-              venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings: {
+              clusterVenueMapping: {
                 include: {
-                  venues: true,
+                  venue: true,
                 },
               },
-              venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings: {
+              divisionVenueMapping: {
                 include: {
-                  venues: true,
+                  venue: true,
                 },
               },
-              venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings: {
+              finalVenueMapping: {
                 include: {
-                  venues: true,
+                  venue: true,
                 },
               },
             },
@@ -1260,7 +1260,7 @@ export const teamsRouter = createTRPCRouter({
         },
       });
 
-      if (!team || team.team_players.length === 0) {
+      if (!team || team.teamPlayers.length === 0) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Team not found or you are not a player in this team',
@@ -1268,37 +1268,37 @@ export const teamsRouter = createTRPCRouter({
       }
 
       // Extract the specific player data for the current user
-      const currentPlayerData = team.team_players[0];
+      const currentPlayerData = team.teamPlayers[0];
 
       // Transform the team object to match the TeamMembership interface expected by the frontend
       const transformedTeam = {
         teamId: team.id,
         name: team.name,
-        sportName: team.sports.name,
-        sportId: team.sport_id,
+        sportName: team.sport.name,
+        sportId: team.sportId,
         captainProfile: {
-          name: team.users_teams_captain_idTousers.first_name + ' ' + team.users_teams_captain_idTousers.last_name,
-          phone: team.users_teams_captain_idTousers.phone,
-          userId: team.users_teams_captain_idTousers.id,
+          name: team.captainUser.firstName + ' ' + team.captainUser.lastName,
+          phone: team.captainUser.phone,
+          userId: team.captainUser.id,
         },
         position: currentPlayerData.position,
         status: team.status,
-        verificationStatus: currentPlayerData.verification_status,
+        verificationStatus: currentPlayerData.verificationStatus,
         joinedAt: currentPlayerData.createdAt.toISOString(),
         panchayat: team.panchayat,
         district: team.district,
         state: team.state,
-        genderCategory: team.gender_category,
-        maxPlayers: team.sports.main_players_count + team.sports.max_substitutes,
-        currentPlayers: team.current_players + team.current_substitutes,
-        assignedVenue: team.team_venue_assignments[0] ? {
-          venueId: team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings?.venues?.id ||
-                   team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings?.venues?.id ||
-                   team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings?.venues?.id,
-          venueName: team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings?.venues?.name ||
-                     team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings?.venues?.name ||
-                     team.team_venue_assignments[0].venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings?.venues?.name,
-          assignmentLevel: team.team_venue_assignments[0].level,
+        genderCategory: team.genderCategory,
+        maxPlayers: team.sport.mainPlayersCount + team.sport.maxSubstitutes,
+        currentPlayers: team.currentPlayers + team.currentSubstitutes,
+        assignedVenue: team.teamVenueAssignments[0] ? {
+          venueId: team.teamVenueAssignments[0].finalVenueMapping?.venue?.id ||
+                   team.teamVenueAssignments[0].divisionVenueMapping?.venue?.id ||
+                   team.teamVenueAssignments[0].clusterVenueMapping?.venue?.id,
+          venueName: team.teamVenueAssignments[0].finalVenueMapping?.venue?.name ||
+                     team.teamVenueAssignments[0].divisionVenueMapping?.venue?.name ||
+                     team.teamVenueAssignments[0].clusterVenueMapping?.venue?.name,
+          assignmentLevel: team.teamVenueAssignments[0].level,
         } : undefined,
         checkedIn: false, // Placeholder, as this is not directly in Prisma team model
         checkedInAt: null, // Placeholder
@@ -1354,31 +1354,31 @@ export const teamsRouter = createTRPCRouter({
         if (searchTerm.trim()) {
           where.OR = [
             { name: { contains: searchTerm, mode: 'insensitive' } },
-            { captain_name: { contains: searchTerm, mode: 'insensitive' } },
+            { captainName: { contains: searchTerm, mode: 'insensitive' } },
             { panchayat: { contains: searchTerm, mode: 'insensitive' } },
             { district: { contains: searchTerm, mode: 'insensitive' } },
           ];
         }
 
-        const teams = await db.teams.findMany({
+        const teams = await db.team.findMany({
           where,
           include: {
-            sports: {
+            sport: {
               select: {
                 id: true,
                 name: true,
-                main_players_count: true,
+                mainPlayersCount: true,
               },
             },
-            users_teams_captain_idTousers: {
+            captainUser: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
               },
             },
-            events: {
+            event: {
               select: {
                 id: true,
                 name: true,
@@ -1387,7 +1387,7 @@ export const teamsRouter = createTRPCRouter({
             },
             _count: {
               select: {
-                team_players: true,
+                teamPlayers: true,
               },
             },
           },
@@ -1398,19 +1398,19 @@ export const teamsRouter = createTRPCRouter({
         const transformedTeams = teams.map(team => ({
           id: team.id,
           name: team.name,
-          sportName: team.sports?.name || 'Unknown',
+          sportName: team.sport?.name || 'Unknown',
           captainProfile: {
-            name: `${team.users_teams_captain_idTousers?.first_name || ''} ${team.users_teams_captain_idTousers?.last_name || ''}`.trim(),
-            phone: team.users_teams_captain_idTousers?.phone || '',
+            name: `${team.captainUser?.firstName || ''} ${team.captainUser?.lastName || ''}`.trim(),
+            phone: team.captainUser?.phone || '',
           },
           panchayat: team.panchayat,
           district: team.district,
           state: team.state,
-          currentPlayers: team._count?.team_players || 0,
-          maxPlayers: team.sports?.main_players_count || 0,
+          currentPlayers: team._count?.teamPlayer || 0,
+          maxPlayers: team.sport?.mainPlayersCount || 0,
           status: team.status,
           submittedAt: team.createdAt,
-          genderCategory: team.gender_category,
+          genderCategory: team.genderCategory,
         }));
 
         // Apply client-side filtering if needed
@@ -1443,22 +1443,22 @@ export const teamsRouter = createTRPCRouter({
           });
         }
 
-        const team = await db.teams.findUnique({
+        const team : any = await db.team.findUnique({
           where: { id: input.teamId },
           include: {
-            sports: {
+            sport: {
               select: {
                 id: true,
                 name: true,
-                main_players_count: true,
-                max_substitutes: true,
+                mainPlayersCount: true,
+                maxSubstitutes: true,
               },
             },
-            users_teams_captain_idTousers: {
+            captainUser: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
               },
             },
@@ -1469,38 +1469,38 @@ export const teamsRouter = createTRPCRouter({
                 status: true,
               },
             },
-            team_players: {
+            teamPlayers: {
               select: {
                 id: true,
                 userId: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
-                whatsapp_number: true,
-                date_of_birth: true,
+                whatsappNumber: true,
+                dateOfBirth: true,
                 age: true,
                 gender: true,
                 position: true,
-                verification_status: true,
+                verificationStatus: true,
                 panchayat: true,
                 taluk: true,
                 district: true,
                 state: true,
                 pincode: true,
                 createdAt: true,
-                users: {
+                user: {
                   select: {
                     id: true,
-                    first_name: true,
-                    last_name: true,
+                    firstName: true,
+                    lastName: true,
                     phone: true,
-                    user_profile_images_user_profile_images_user_idTousers: {
+                    profileImages: {
                       select: {
-                        profile_photo_path: true,
-                        aadhaar_front_path: true,
-                        aadhaar_back_path: true,
+                        profilePhotoPath: true,
+                        aadhaarFrontPath: true,
+                        aadhaarBackPath: true,
                         all_images_uploaded: true,
-                        verified_by: true,
+                        verifiedBy: true,
                         verified_at: true,
                       },
                     },
@@ -1526,35 +1526,35 @@ export const teamsRouter = createTRPCRouter({
         const transformedTeam = {
           id: team.id,
           name: team.name,
-          sportName: team.sports?.name || 'Unknown',
-          sportId: team.sport_id,
+          sportName: team.sport?.name || 'Unknown',
+          sportId: team.sportId,
           captainProfile: {
-            name: `${team.users_teams_captain_idTousers?.first_name || ''} ${team.users_teams_captain_idTousers?.last_name || ''}`.trim(),
-            phone: team.users_teams_captain_idTousers?.phone || '',
+            name: `${team.captainUser?.firstName || ''} ${team.captainUser?.lastName || ''}`.trim(),
+            phone: team.captainUser?.phone || '',
           },
           panchayat: team.panchayat,
           district: team.district,
           state: team.state,
-          currentPlayers: team.team_players.length,
-          maxPlayers: (team.sports?.main_players_count || 0) + (team.sports?.max_substitutes || 0),
+          currentPlayers: team.teamPlayers.length,
+          maxPlayers: (team.sport?.mainPlayersCount || 0) + (team.sport?.maxSubstitutes || 0),
           status: team.status,
           submittedAt: team.createdAt,
-          genderCategory: team.gender_category,
+          genderCategory: team.genderCategory,
         };
 
         // Transform players data
-        const transformedPlayers = team.team_players.map(player => ({
+        const transformedPlayers = (team as any).teamPlayer?.map((player: any) => ({
           playerId: player.id,
           userId: player.userId,
-          name: `${player.first_name} ${player.last_name}`.trim(),
+          name: `${player.firstName} ${player.lastName}`.trim(),
           phone: player.phone,
-          dob: player.date_of_birth,
+          dob: player.dateOfBirth,
           age: player.age,
           gender: player.gender,
           position: player.position,
           profileData: {
-            firstName: player.first_name,
-            lastName: player.last_name,
+            firstName: player.firstName,
+            lastName: player.lastName,
             whatsappNumber: player.whatsapp_number || '',
             village: player.taluk || '',
             panchayat: player.panchayat,
@@ -1563,25 +1563,25 @@ export const teamsRouter = createTRPCRouter({
           },
           documents: {
             profilePhoto: {
-              url: player.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path || null,
-              verified: !!player.users?.user_profile_images_user_profile_images_user_idTousers?.verified_by,
+              url: player.users?.profileImages?.profilePhotoPath || null,
+              verified: !!player.users?.profileImages?.verifiedBy,
               uploadedAt: null,
               uploadedBy: null,
             },
             aadhaarFront: {
-              url: player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path || null,
-              verified: !!player.users?.user_profile_images_user_profile_images_user_idTousers?.verified_by,
+              url: player.users?.profileImages?.aadhaarFrontPath || null,
+              verified: !!player.users?.profileImages?.verifiedBy,
               uploadedAt: null,
               uploadedBy: null,
             },
             aadhaarBack: {
-              url: player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path || null,
-              verified: !!player.users?.user_profile_images_user_profile_images_user_idTousers?.verified_by,
+              url: player.users?.profileImages?.aadhaarBackPath || null,
+              verified: !!player.users?.profileImages?.verifiedBy,
               uploadedAt: null,
               uploadedBy: null,
             },
           },
-          verificationStatus: player.verification_status || 'pending',
+          verificationStatus: player.verificationStatus || 'pending',
           verificationComments: [], // Would need separate comments table
         }));
 
@@ -1616,34 +1616,34 @@ export const teamsRouter = createTRPCRouter({
         }
 
         // Update player verification status
-        const updatedPlayer = await db.team_players.update({
+        const updatedPlayer = await db.teamPlayer.update({
           where: { id: input.playerId },
           data: {
-            verification_status: input.status,
+            verificationStatus: input.status,
             // Add verification comments if needed (would need additional table)
           },
         });
 
         // Get team and check if all players are verified
-        const team = await db.teams.findUnique({
+        const team = await db.team.findUnique({
           where: { id: updatedPlayer.teamId },
           include: {
-            team_players: {
+            teamPlayers: {
               select: {
-                verification_status: true,
+                verificationStatus: true,
               },
             },
           },
         });
 
         if (team) {
-          const allPlayersVerified = team.team_players.every(
-            player => player.verification_status === 'verified'
+          const allPlayersVerified = team.teamPlayers.every(
+            player => player.verificationStatus === 'verified'
           );
 
           // Update team status if all players are verified
           if (allPlayersVerified && team.status === 'submitted') {
-            await db.teams.update({
+            await db.team.update({
               where: { id: team.id },
               data: { status: 'verified' },
             });
@@ -1677,15 +1677,15 @@ export const teamsRouter = createTRPCRouter({
         }
 
         // Update all players
-        const updatedPlayers = await db.team_players.updateMany({
+        const updatedPlayers = await db.teamPlayer.updateMany({
           where: { id: { in: input.playerIds } },
           data: {
-            verification_status: input.status,
+            verificationStatus: input.status,
           },
         });
 
         // Get all affected teams and update their status if needed
-        const affectedPlayers = await db.team_players.findMany({
+        const affectedPlayers = await db.teamPlayer.findMany({
           where: { id: { in: input.playerIds } },
           select: { teamId: true },
         });
@@ -1694,24 +1694,24 @@ export const teamsRouter = createTRPCRouter({
 
         // Check each team and update status if all players are verified
         for (const teamId of uniqueTeamIds) {
-          const team = await db.teams.findUnique({
+          const team = await db.team.findUnique({
             where: { id: teamId },
             include: {
-              team_players: {
+              teamPlayers: {
                 select: {
-                  verification_status: true,
+                  verificationStatus: true,
                 },
               },
             },
           });
 
           if (team) {
-            const allPlayersVerified = team.team_players.every(
-              player => player.verification_status === 'verified'
+            const allPlayersVerified = team.teamPlayers.every(
+              player => player.verificationStatus === 'verified'
             );
 
             if (allPlayersVerified && team.status === 'submitted') {
-              await db.teams.update({
+              await db.team.update({
                 where: { id: team.id },
                 data: { status: 'verified' },
               });
@@ -1743,46 +1743,46 @@ export const teamsRouter = createTRPCRouter({
       let teams = [];
       
       if (ctx.user.role === 'captain') {
-        teams = await db.teams.findMany({
-          where: { captain_id: ctx.user.id },
+        teams = await db.team.findMany({
+          where: { captainId: ctx.user.id },
           select: {
             id: true,
             name: true,
-            sport_id: true,
-            gender_category: true,
+            sportId: true,
+            genderCategory: true,
             status: true,
-            team_venue_assignments: {
+            teamVenueAssignments: {
               select: {
-                cluster_venue_mapping_id: true,
-                division_venue_mapping_id: true,
-                final_venue_mapping_id: true,
+                clusterVenueMappingId: true,
+                divisionVenueMappingId: true,
+                finalVenueMappingId: true,
               },
             },
           },
         });
       } else if (ctx.user.role === 'player') {
-        const playerTeams = await db.team_players.findMany({
+        const playerTeams = await db.teamPlayer.findMany({
           where: { userId: ctx.user.id },
           include: {
-            teams: {
+            team: {
               select: {
                 id: true,
                 name: true,
-                sport_id: true,
-                gender_category: true,
+                sportId: true,
+                genderCategory: true,
                 status: true,
-                team_venue_assignments: {
+                teamVenueAssignments: {
                   select: {
-                    cluster_venue_mapping_id: true,
-                    division_venue_mapping_id: true,
-                    final_venue_mapping_id: true,
+                    clusterVenueMappingId: true,
+                    divisionVenueMappingId: true,
+                    finalVenueMappingId: true,
                   },
                 },
               },
             },
           },
         });
-        teams = playerTeams.map(pt => pt.teams);
+        teams = playerTeams.map(pt => pt.team);
       }
 
       if (teams.length === 0) {
@@ -1793,7 +1793,7 @@ export const teamsRouter = createTRPCRouter({
       const venueLocationMappingIds = new Set<string>();
       
       teams.forEach(team => {
-        team.team_venue_assignments?.forEach(assignment => {
+        team.teamVenueAssignments?.forEach(assignment => {
           if (assignment.cluster_venue_mapping_id) venueLocationMappingIds.add(assignment.cluster_venue_mapping_id);
           if (assignment.division_venue_mapping_id) venueLocationMappingIds.add(assignment.division_venue_mapping_id);
           if (assignment.final_venue_mapping_id) venueLocationMappingIds.add(assignment.final_venue_mapping_id);
@@ -1805,7 +1805,7 @@ export const teamsRouter = createTRPCRouter({
       }
 
       // Get fixtures for these venue locations
-      const fixtures = await db.fixtures.findMany({
+      const fixtures = await db.fixture.findMany({
         where: {
           venue_location_mapping_id: { in: Array.from(venueLocationMappingIds) },
         },
@@ -1836,7 +1836,7 @@ export const teamsRouter = createTRPCRouter({
                 select: {
                   id: true,
                   name: true,
-                  tournament_number: true,
+                  tournamentNumber: true,
                 },
               },
             },
@@ -1864,22 +1864,22 @@ export const teamsRouter = createTRPCRouter({
         return {
           id: fixture.id,
           name: fixture.name,
-          sportId: fixture.sport_id,
-          sportName: fixture.sports?.display_name || fixture.sports?.name || 'Unknown',
-          genderCategory: fixture.gender_category,
+          sportId: fixture.sportId,
+          sportName: fixture.sport?.display_name || fixture.sport?.name || 'Unknown',
+          genderCategory: fixture.genderCategory,
           level: fixture.level,
           status: fixture.status,
           venue: {
-            id: fixture.venue_location_mappings?.venues?.id,
-            name: fixture.venue_location_mappings?.venues?.name || 'Unknown Venue',
-            address: fixture.venue_location_mappings?.venues?.address || '',
-            district: fixture.venue_location_mappings?.venues?.district || '',
-            state: fixture.venue_location_mappings?.venues?.state || '',
+            id: fixture.venueLocationMapping?.venues?.id,
+            name: fixture.venueLocationMapping?.venues?.name || 'Unknown Venue',
+            address: fixture.venueLocationMapping?.venues?.address || '',
+            district: fixture.venueLocationMapping?.venues?.district || '',
+            state: fixture.venueLocationMapping?.venues?.state || '',
           },
           assignedTeams: assignedTeams.map(team => ({
             id: team?.id,
             name: team?.name,
-            tournamentNumber: team?.tournament_number,
+            tournamentNumber: team?.tournamentNumber,
           })),
           hasCaptainTeam,
           captainTeamNames,
@@ -1914,20 +1914,20 @@ export const teamsRouter = createTRPCRouter({
       let teams = [];
       
       if (ctx.user.role === 'captain') {
-        teams = await db.teams.findMany({
-          where: { captain_id: ctx.user.id },
+        teams = await db.team.findMany({
+          where: { captainId: ctx.user.id },
           select: { id: true, name: true },
         });
       } else if (ctx.user.role === 'player') {
-        const playerTeams = await db.team_players.findMany({
+        const playerTeams = await db.teamPlayer.findMany({
           where: { userId: ctx.user.id },
           include: {
-            teams: {
+            team: {
               select: { id: true, name: true },
             },
           },
         });
-        teams = playerTeams.map(pt => pt.teams);
+        teams = playerTeams.map(pt => pt.team);
       }
 
       if (teams.length === 0) {
@@ -1937,54 +1937,52 @@ export const teamsRouter = createTRPCRouter({
       const teamIds = teams.map(t => t.id);
 
       // Get matches involving these teams
-      const matches = await db.matches.findMany({
+      const matches = await db.match.findMany({
         where: {
           OR: [
-            { team1_id: { in: teamIds } },
-            { team2_id: { in: teamIds } },
+            { team1Id: { in: teamIds } },
+            { team2Id: { in: teamIds } },
           ],
         },
         include: {
-          teams_matches_team1_idToteams: {
+          team1: {
             select: {
               id: true,
               name: true,
-              tournament_number: true,
+              tournamentNumber: true,
             },
           },
-          teams_matches_team2_idToteams: {
+          team2: {
             select: {
               id: true,
               name: true,
-              tournament_number: true,
+              tournamentNumber: true,
             },
           },
-          teams_matches_winner_idToteams: {
+          winner: {
             select: {
               id: true,
               name: true,
             },
           },
-          sports: {
+          sport: {
             select: {
               name: true,
-              display_name: true,
             },
           },
-          fixtures: {
+          fixture: {
             select: {
               id: true,
               name: true,
               status: true,
             },
           },
-          venue_location_mappings: {
+          venueLocationMapping: {
             include: {
-              venues: {
+              venue: {
                 select: {
                   id: true,
                   name: true,
-                  address: true,
                   district: true,
                   state: true,
                 },
@@ -1997,43 +1995,42 @@ export const teamsRouter = createTRPCRouter({
 
       // Transform matches for frontend
       const transformedMatches = matches.map(match => {
-        const isCaptainTeam1 = match.team1_id && teamIds.includes(match.team1_id);
-        const isCaptainTeam2 = match.team2_id && teamIds.includes(match.team2_id);
+        const isCaptainTeam1 = match.team1Id && teamIds.includes(match.team1Id);
+        const isCaptainTeam2 = match.team2Id && teamIds.includes(match.team2Id);
         const isCaptainInvolved = isCaptainTeam1 || isCaptainTeam2;
         const captainTeamSide = isCaptainTeam1 ? 'team1' : isCaptainTeam2 ? 'team2' : null;
-        const isCaptainTeamWinner = match.winner_id && teamIds.includes(match.winner_id);
+        const isCaptainTeamWinner = match.winnerId && teamIds.includes(match.winnerId);
 
         return {
           matchId: match.id,
-          fixtureId: match.fixture_id,
-          fixtureName: match.fixtures?.name || 'Tournament Match',
-          sportName: match.sports?.display_name || match.sports?.name || 'Unknown',
-          genderCategory: match.gender_category,
-          roundName: match.round_name,
-          matchNumber: match.match_number,
+          fixtureId: match.fixtureId,
+          fixtureName: match.fixture?.name || 'Tournament Match',
+          sportName: match.sport?.name || 'Unknown',
+          genderCategory: match.genderCategory,
+          roundName: match.roundName,
+          matchNumber: match.matchNumber,
           status: match.status,
-          team1: match.teams_matches_team1_idToteams ? {
-            teamId: match.teams_matches_team1_idToteams.id,
-            teamName: match.teams_matches_team1_idToteams.name,
-            tournamentNumber: match.teams_matches_team1_idToteams.tournament_number,
+          team1: match.team1 ? {
+            teamId: match.team1.id,
+            teamName: match.team1.name,
+            tournamentNumber: match.team1.tournamentNumber,
           } : null,
-          team2: match.teams_matches_team2_idToteams ? {
-            teamId: match.teams_matches_team2_idToteams.id,
-            teamName: match.teams_matches_team2_idToteams.name,
-            tournamentNumber: match.teams_matches_team2_idToteams.tournament_number,
+          team2: match.team2 ? {
+            teamId: match.team2.id,
+            teamName: match.team2.name,
+            tournamentNumber: match.team2.tournamentNumber,
           } : null,
-          result: match.teams_matches_winner_idToteams ? {
-            winnerName: match.teams_matches_winner_idToteams.name,
-            winnerTeamId: match.teams_matches_winner_idToteams.id,
+          result: match.winner ? {
+            winnerName: match.winner.name,
+            winnerTeamId: match.winner.id,
             score: {
-              team1Score: match.team1_score || 0,
-              team2Score: match.team2_score || 0,
+              team1Score: match.team1Score || 0,
+              team2Score: match.team2Score || 0,
             },
           } : null,
           venue: {
-            id: match.venue_location_mappings?.venues?.id,
-            name: match.venue_location_mappings?.venues?.name || 'Unknown Venue',
-            address: match.venue_location_mappings?.venues?.address || '',
+            id: match.venueLocationMapping?.venue?.id,
+            name: match.venueLocationMapping?.venue?.name || 'Unknown Venue'
           },
           isCaptainInvolved,
           captainTeamSide,
@@ -2066,53 +2063,50 @@ export const teamsRouter = createTRPCRouter({
       let teams = [];
 
       if (ctx.user.role === 'captain') {
-        teams = await db.teams.findMany({
-          where: { captain_id: ctx.user.id },
+        teams = await db.team.findMany({
+          where: { captainId: ctx.user.id },
           include: {
             sports: {
               select: {
                 name: true,
                 display_name: true,
-                main_players_count: true,
-                max_substitutes: true,
+                mainPlayersCount: true,
+                maxSubstitutes: true,
               },
             },
-            team_players: {
+            teamPlayers: {
               select: {
                 id: true,
               },
             },
-            team_venue_assignments: {
+            teamVenueAssignments: {
               include: {
-                venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings: {
+                clusterVenueMapping: {
                   include: {
-                    venues: {
+                    venue: {
                       select: {
                         id: true,
                         name: true,
-                        address: true,
                       },
                     },
                   },
                 },
-                venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings: {
+                divisionVenueMapping: {
                   include: {
-                    venues: {
+                    venue: {
                       select: {
                         id: true,
                         name: true,
-                        address: true,
                       },
                     },
                   },
                 },
-                venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings: {
+                finalVenueMapping: {
                   include: {
-                    venues: {
+                    venue: {
                       select: {
                         id: true,
-                        name: true,
-                        address: true,
+                        name: true
                       },
                     },
                   },
@@ -2122,55 +2116,52 @@ export const teamsRouter = createTRPCRouter({
           },
         });
       } else if (ctx.user.role === 'player') {
-        const playerTeams = await db.team_players.findMany({
+        const playerTeams = await db.teamPlayer.findMany({
           where: { userId: ctx.user.id },
           include: {
-            teams: {
+            team: {
               include: {
-                sports: {
+                sport: {
                   select: {
                     name: true,
-                    display_name: true,
-                    main_players_count: true,
-                    max_substitutes: true,
+                    mainPlayersCount: true,
+                    maxSubstitutes: true,
                   },
                 },
-                team_players: {
+                teamPlayers: {
                   select: {
                     id: true,
                   },
                 },
-                team_venue_assignments: {
+                teamVenueAssignments: {
                   include: {
-                    venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings: {
+                    clusterVenueMapping: {
                       include: {
-                        venues: {
+                        venue: {
                           select: {
                             id: true,
                             name: true,
-                            address: true,
+
                           },
                         },
                       },
                     },
-                    venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings: {
+                    divisionVenueMapping: {
                       include: {
-                        venues: {
+                        venue: {
                           select: {
                             id: true,
                             name: true,
-                            address: true,
                           },
                         },
                       },
                     },
-                    venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings: {
+                    finalVenueMapping: {
                       include: {
-                        venues: {
+                        venue: {
                           select: {
                             id: true,
                             name: true,
-                            address: true,
                           },
                         },
                       },
@@ -2181,22 +2172,22 @@ export const teamsRouter = createTRPCRouter({
             },
           },
         });
-        teams = playerTeams.map(pt => pt.teams);
+        teams = playerTeams.map(pt => pt.team);
       }
 
       // Transform teams for frontend
       const transformedTeams = teams.map(team => {
         // Get venue assignment (prefer final > division > cluster)
         const venueAssignment = 
-          team.team_venue_assignments?.find(assignment => 
-            assignment.venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings
-          )?.venue_location_mappings_team_venue_assignments_final_venue_mapping_idTovenue_location_mappings ||
-          team.team_venue_assignments?.find(assignment => 
-            assignment.venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings
-          )?.venue_location_mappings_team_venue_assignments_division_venue_mapping_idTovenue_location_mappings ||
-          team.team_venue_assignments?.find(assignment => 
-            assignment.venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings
-          )?.venue_location_mappings_team_venue_assignments_cluster_venue_mapping_idTovenue_location_mappings;
+          team.teamVenueAssignments?.find(assignment => 
+            assignment.teamVenueAssignmentsByFinal
+          )?.teamVenueAssignmentsByFinal ||
+          team.teamVenueAssignments?.find(assignment => 
+            assignment.teamVenueAssignmentsByDivision
+          )?.teamVenueAssignmentsByDivision ||
+          team.teamVenueAssignments?.find(assignment => 
+            assignment.teamVenueAssignmentsByCluster
+          )?.teamVenueAssignmentsByCluster;
 
         return {
           teamId: team.id,
@@ -2206,8 +2197,8 @@ export const teamsRouter = createTRPCRouter({
           district: team.district,
           state: team.state,
           status: team.status,
-          currentPlayers: team.team_players?.length || 0,
-          maxPlayers: (team.sports?.main_players_count || 0) + (team.sports?.max_substitutes || 0),
+          currentPlayers: team.teamPlayers?.length || 0,
+          maxPlayers: (team.sports?.mainPlayersCount || 0) + (team.sports?.maxSubstitutes || 0),
           venue: venueAssignment?.venues ? {
             id: venueAssignment.venues.id,
             name: venueAssignment.venues.name,

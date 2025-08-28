@@ -90,7 +90,7 @@ export default function PlayerMatchesPage() {
   const { data: teams = [], isLoading: teamsLoading, error: teamsError } = api.teams.getMyTeams.useQuery(
     undefined,
     {
-      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'player',
+      enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'player',
     }
   );
 
@@ -98,7 +98,7 @@ export default function PlayerMatchesPage() {
   const { data: matches = [], isLoading: matchesLoading, error: matchesError } = api.teams.getMyTeamMatches.useQuery(
     undefined,
     {
-      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'player',
+      enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'player',
     }
   );
 
@@ -113,7 +113,7 @@ export default function PlayerMatchesPage() {
       return;
     }
 
-    if (!userProfile?.profile_complete) {
+    if (!userProfile?.profileComplete) {
       router.push(`/${lang}/profile/complete`);
       return;
     }

@@ -119,10 +119,10 @@ export default function ProfilePage() {
     if (loading || !userProfile) return;
 
     setFormData({
-      firstName: userProfile.first_name || "",
-      lastName: userProfile.last_name || "",
+      firstName: userProfile.firstName || "",
+      lastName: userProfile.lastName || "",
       whatsappNumber: whatsappNumber || phoneNumber,
-      dob: userProfile.date_of_birth ? new Date(userProfile.date_of_birth).toISOString().split('T')[0] : "",
+      dob: userProfile.dateOfBirth ? new Date(userProfile.dateOfBirth).toISOString().split('T')[0] : "",
       instagramHandle: userProfile.instagram_handle || "",
       gender: userProfile.gender || "",
       pincode: userProfile.pincode || "",
@@ -380,7 +380,7 @@ export default function ProfilePage() {
     router.push(`/${lang}/profile/complete`);
   };
 
-  const isProfileComplete = userProfile?.profile_complete || false;
+  const isProfileComplete = userProfile?.profileComplete || false;
   const hasAddress = userProfile?.pincode && userProfile?.state && userProfile?.district;
   const hasAadhaar = userProfile?.documents?.aadhaarFront?.url && userProfile?.documents?.aadhaarBack?.url;
 
@@ -468,14 +468,14 @@ export default function ProfilePage() {
             <DocumentUpload
               type="profilePhoto"
               label="Profile Photo"
-              currentUrl={profileDataQuery.data?.userProfileImages?.profile_photo_path}
+              currentUrl={profileDataQuery.data?.userProfileImages?.profilePhotoPath}
               variant="profile"
               className="flex flex-col justify-center items-center"
               onSuccess={async () => {
                 setError("");
                 const { data: updatedData } = await profileDataQuery.refetch();
                 // Refresh user data if profile completion status changed
-                if (updatedData?.profileComplete !== user?.profile_complete) {
+                if (updatedData?.profileComplete !== user?.profileComplete) {
                   await refreshUser();
                 }
               }}
@@ -900,14 +900,14 @@ export default function ProfilePage() {
               <DocumentUpload
                 type="aadhaarFront"
                 label="Aadhar Card Front"
-                currentUrl={profileDataQuery.data?.userProfileImages?.aadhaar_front_path}
+                currentUrl={profileDataQuery.data?.userProfileImages?.aadhaarFrontPath}
                 variant="card"
                 className="flex flex-col justify-center items-center font-fira"
                 onSuccess={async () => {
                   setError("");
                   const { data: updatedData } = await profileDataQuery.refetch();
                   // Refresh user data if profile completion status changed
-                  if (updatedData?.profileComplete !== user?.profile_complete) {
+                  if (updatedData?.profileComplete !== user?.profileComplete) {
                     await refreshUser();
                   }
                 }}
@@ -918,14 +918,14 @@ export default function ProfilePage() {
               <DocumentUpload
                 type="aadhaarBack"
                 label="Aadhar Card Back"
-                currentUrl={profileDataQuery.data?.userProfileImages?.aadhaar_back_path}
+                currentUrl={profileDataQuery.data?.userProfileImages?.aadhaarBackPath}
                 variant="card"
                 className="flex flex-col justify-center items-center font-fira"
                 onSuccess={async () => {
                   setError("");
                   const { data: updatedData } = await profileDataQuery.refetch();
                   // Refresh user data if profile completion status changed
-                  if (updatedData?.profileComplete !== user?.profile_complete) {
+                  if (updatedData?.profileComplete !== user?.profileComplete) {
                     await refreshUser();
                   }
                 }}

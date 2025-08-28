@@ -33,31 +33,31 @@ export default function SportsOverviewPage({ params }: SportsOverviewPageProps) 
   
   // Transform database data to display format with gender validation
   const transformSportData = (sport: any) => {
-    let can_register = true
-    let registration_message = ''
+    let canRegister = true
+    let registrationMessage = ''
     
     // Check if user can register based on gender
     if (userGender) {
       const canUserRegister = 
-        sport.supports_mixed || 
-        (userGender === 'M' && sport.supports_men) ||
-        (userGender === 'F' && sport.supports_women)
+        sport.supportsMixed || 
+        (userGender === 'M' && sport.supportsMen) ||
+        (userGender === 'F' && sport.supportsWomen)
 
       if (!canUserRegister) {
-        can_register = false
+        canRegister = false
         const supportedCategories = []
-        if (sport.supports_men) supportedCategories.push('men')
-        if (sport.supports_women) supportedCategories.push('women')
-        if (sport.supports_mixed) supportedCategories.push('mixed teams')
+        if (sport.supportsMen) supportedCategories.push('men')
+        if (sport.supportsWomen) supportedCategories.push('women')
+        if (sport.supportsMixed) supportedCategories.push('mixed teams')
         
-        registration_message = `This sport is only available for ${supportedCategories.join(' and ')}`
+        registrationMessage = `This sport is only available for ${supportedCategories.join(' and ')}`
       }
     }
 
     return {
       ...sport,
-      can_register,
-      registration_message
+      canRegister,
+      registrationMessage
     }
   }
   
@@ -243,9 +243,9 @@ export default function SportsOverviewPage({ params }: SportsOverviewPageProps) 
               // Helper function to format category display
               const formatCategory = (sport: any): string => {
                 const categories = []
-                if (sport.supports_men) categories.push('Men')
-                if (sport.supports_women) categories.push('Women')
-                if (sport.supports_mixed) categories.push('Mixed')
+                if (sport.supportsMen) categories.push('Men')
+                if (sport.supportsWomen) categories.push('Women')
+                if (sport.supportsMixed) categories.push('Mixed')
                 return categories.length > 0 ? `For ${categories.join(' & ')}` : 'Category TBD'
               }
               
@@ -268,8 +268,8 @@ export default function SportsOverviewPage({ params }: SportsOverviewPageProps) 
                 <div className="mb-4">
                   <h4 className="font-semibold text-earth-brown mb-2">Key Features:</h4>
                   <ul className="list-disc list-inside text-sm text-earth-brown/80 space-y-1 font-fira">
-                    <li>{sport.main_players_count} players per team on court</li>
-                    <li>Up to {sport.max_substitutes} substitutes allowed</li>
+                    <li>{sport.mainPlayersCount} players per team on court</li>
+                    <li>Up to {sport.maxSubstitutes} substitutes allowed</li>
                     <li>{formatCategory(sport)}</li>
                     <li>Village-level tournament structure</li>
                   </ul>
@@ -303,10 +303,11 @@ export default function SportsOverviewPage({ params }: SportsOverviewPageProps) 
                   <RegistrationButton
                     lang={lang} 
                     sport={sport.name.toLowerCase().replace(/\s+/g, '-')} 
+                    sportId={sport.id}
                     size="sm" 
                     className="min-w-[200px]"
-                    disabled={!sport.can_register}
-                    disabledMessage={sport.registration_message}
+                    disabled={!sport.canRegister}
+                    disabledMessage={sport.registrationMessage}
                   />
                 </div>
               </div>

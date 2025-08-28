@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { api } from '@/lib/trpc/react';
+import { api } from '@/server/trpc/react';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import type { Column } from '@/components/ui/Table';
 import type { FilterField } from '@/components/ui/FilterSidebar';
@@ -80,7 +80,7 @@ export default function CaptainFixturesPage() {
   const { data: teams = [], isLoading: teamsLoading, error: teamsError } = api.teams.getMyTeams.useQuery(
     undefined,
     {
-      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'captain',
+      enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'captain',
     }
   );
 
@@ -88,7 +88,7 @@ export default function CaptainFixturesPage() {
   const { data: fixtures = [], isLoading: fixturesLoading, error: fixturesError } = api.teams.getMyTeamFixtures.useQuery(
     undefined,
     {
-      enabled: !authLoading && !!user && userProfile?.profile_complete && (user.role === 'captain' || user.role === 'player'),
+      enabled: !authLoading && !!user && userProfile?.profileComplete && (user.role === 'captain' || user.role === 'player'),
     }
   );
 
@@ -103,7 +103,7 @@ export default function CaptainFixturesPage() {
       return;
     }
 
-    if (!userProfile?.profile_complete) {
+    if (!userProfile?.profileComplete) {
       router.push(`/${lang}/profile/complete`);
       return;
     }

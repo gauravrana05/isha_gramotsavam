@@ -1,9 +1,17 @@
 // src/components/common/Footer.tsx
+'use client'
 import React from 'react'
 import Link from 'next/link'
 import { Phone, Mail } from 'lucide-react'
+import { api } from '@/server/trpc/react'
+import { useParams } from 'next/navigation'
 
 export default function Footer() {
+  const params = useParams()
+  const lang = (params?.lang as string) || 'en'
+  
+  // Fetch sports data for navigation
+  const sportsQuery = api.sports.getAllWithCategories.useQuery()
   return (
     <footer className="bg-secondary-900 text-white mt-auto font-fira">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -36,7 +44,7 @@ export default function Footer() {
             <ul className="space-y-2">
               <li>
                 <Link 
-                  href="/en/public/sports" 
+                  href={`/${lang}/public/sports`} 
                   className="text-gray-300 hover:text-primary-500 transition-colors"
                 >
                   Sports
@@ -44,7 +52,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link 
-                  href="/en/public/about" 
+                  href={`/${lang}/public/about`} 
                   className="text-gray-300 hover:text-primary-500 transition-colors"
                 >
                   About Us
@@ -57,22 +65,16 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-4 text-primary-600">Sports</h3>
             <ul className="space-y-2">
-              <li>
-                <Link 
-                  href="/en/public/sports/volleyball" 
-                  className="text-gray-300 hover:text-primary-500 transition-colors"
-                >
-                  Volleyball
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  href="/en/public/sports/throwball" 
-                  className="text-gray-300 hover:text-primary-500 transition-colors"
-                >
-                  Throwball
-                </Link>
-              </li>
+              {sportsQuery.data?.map((sport) => (
+                <li key={sport.id}>
+                  <Link 
+                    href={`/${lang}/public/sports/${sport.id}`} 
+                    className="text-gray-300 hover:text-primary-500 transition-colors"
+                  >
+                    {sport.name}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </div>

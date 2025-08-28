@@ -31,37 +31,37 @@ interface TeamPlayer {
   id: string;
   userId: string;
   teamId: string;
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   phone: string;
-  whatsapp_number: string | null;
-  date_of_birth: Date;
+  whatsappNumber: string | null;
+  dateOfBirth: Date;
   age: number;
   gender: string;
   position: 'main' | 'substitute';
-  verification_status: 'pending' | 'verified' | 'rejected';
+  verificationStatus: 'pending' | 'verified' | 'rejected';
   panchayat: string;
   taluk: string;
   district: string;
   state: string;
   pincode: string;
-  added_by: string;
+  addedBy: string;
   createdAt: Date;
-  users?: {
+  user?: {
     id: string;
-    first_name: string | null;
-    last_name: string | null;
+    firstName: string | null;
+    lastName: string | null;
     phone: string;
     role: string;
-    profile_complete: boolean,
-    user_profile_images_user_profile_images_user_idTousers: {
+    profileComplete: boolean,
+    profileImages: {
       userId: string;
-      profile_photo_path: string | null;
-      aadhaar_front_path: string | null;
-      aadhaar_back_path: string | null;
-      all_images_uploaded: boolean;
-      verified_by: string | null;
-      verified_at: Date | null;
+      profilePhotoPath: string | null;
+      aadhaarFrontPath: string | null;
+      aadhaarBackPath: string | null;
+      allImagesUploaded: boolean;
+      verifiedBy: string | null;
+      verifiedAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
     } | null;
@@ -71,33 +71,33 @@ interface TeamPlayer {
 interface TeamData {
   id: string;
   name: string;
-  sport_id: string;
-  captain_id: string;
-  captain_name: string;
-  gender_category: string;
+  sportId: string;
+  captainId: string;
+  captainName: string;
+  genderCategory: string;
   status: string;
   panchayat: string;
   taluk: string;
   district: string;
   state: string;
   pincode: string | null;
-  current_players: number;
-  current_substitutes: number;
+  currentPlayers: number;
+  currentSubstitutes: number;
   createdAt: Date;
   updatedAt: Date;
-  sports: {
+  sport: {
     id: string;
     name: string;
-    main_players_count: number;
-    max_substitutes: number;
+    mainPlayersCount: number;
+    maxSubstitutes: number;
   };
-  users_teams_captain_idTousers: {
+  captainUser: {
     id: string;
-    first_name: string | null;
-    last_name: string | null;
+    firstName: string | null;
+    lastName: string | null;
     phone: string;
   };
-  team_players: TeamPlayer[];
+  teamPlayers: TeamPlayer[];
 }
 
 export default function CaptainPlayerManagement() {
@@ -178,7 +178,7 @@ export default function CaptainPlayerManagement() {
     console.log(team);
 
     // Verify team ownership
-    if (team.captain_id !== user?.id) {
+    if (team.captainId !== user?.id) {
       setError("You are not authorized to manage this team");
       setLoading(false);
       return;
@@ -191,25 +191,25 @@ export default function CaptainPlayerManagement() {
 
   // Keep selectedPlayer in sync with players array changes
   useEffect(() => {
-    if (selectedPlayer && teamData?.team_players) {
-      const updatedPlayer = teamData.team_players.find(p => p.id === selectedPlayer.id);
+    if (selectedPlayer && teamData?.teamPlayers) {
+      const updatedPlayer = teamData.teamPlayers.find(p => p.id === selectedPlayer.id);
       if (updatedPlayer) {
         setSelectedPlayer(updatedPlayer);
       }
     }
-  }, [teamData?.team_players, selectedPlayer]);
+  }, [teamData?.teamPlayers, selectedPlayer]);
 
-  const players = teamData?.team_players || [];
-  const sportConfig = teamData?.sports || { main_players_count: 6, max_substitutes: 6 };
-  const totalSlotsNeeded = sportConfig.main_players_count + sportConfig.max_substitutes;
+  const players = teamData?.teamPlayers || [];
+  const sportConfig = teamData?.sport || { mainPlayersCount: 6, maxSubstitutes: 6 };
+  const totalSlotsNeeded = sportConfig.mainPlayersCount + sportConfig.maxSubstitutes;
   const currentPlayers = players.length;
   const mainPlayers = players.filter(p => p.position === 'main').length;
   const substitutes = players.filter(p => p.position === 'substitute').length;
 
   const isReadOnly = teamData?.status && teamData.status !== 'draft';
   const canAddPlayer = currentPlayers < totalSlotsNeeded && !isReadOnly;
-  const canAddMain = mainPlayers < sportConfig.main_players_count && !isReadOnly;
-  const canAddSubstitute = substitutes < sportConfig.max_substitutes && !isReadOnly;
+  const canAddMain = mainPlayers < sportConfig.mainPlayersCount && !isReadOnly;
+  const canAddSubstitute = substitutes < sportConfig.maxSubstitutes && !isReadOnly;
 
   const handlePhoneSearch = async (phone: string) => {
     setPlayerFormData(prev => ({ ...prev, phone }));
@@ -218,17 +218,32 @@ export default function CaptainPlayerManagement() {
       setIsSearching(true);
       try {
         // Search for existing user by phone number using tRPC client
+        // Try both formats: with and without +91 prefix
+        let user = null;
+        
+        // First try with +91 prefix
         const normalizedPhone = normalizePhone(phone);
-        const user = await utils.users.getByPhone.fetch({ phone: normalizedPhone });
+        console.log('Searching for phone:', normalizedPhone);
+        user = await utils.users.getByPhone.fetch({ phone: normalizedPhone });
+        console.log('User result (with prefix):', user);
+        
+        // If not found, try with just the 10-digit format
+        if (!user && phone.replace(/\D/g, '').length === 10) {
+          const digitsOnly = phone.replace(/\D/g, '');
+          console.log('Searching for phone (digits only):', digitsOnly);
+          user = await utils.users.getByPhone.fetch({ phone: digitsOnly });
+          console.log('User result (digits only):', user);
+        }
 
+        console.log('Final user result:', user);
         if (user) {
           // User exists - pre-fill form with user data
           setPlayerExists(true);
           setPlayerFormData(prev => ({
             ...prev,
-            firstName: user.first_name || '',
-            lastName: user.last_name || '',
-            dob: user.date_of_birth ? user.date_of_birth.split('T')[0] : '',
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            dob: user.dateOfBirth ? user.dateOfBirth.split('T')[0] : '',
             whatsappNumber: phone,
           }));
         } else {
@@ -425,7 +440,7 @@ export default function CaptainPlayerManagement() {
           whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
           dateOfBirth: new Date(playerFormData.dob),
           age: calculateAge(playerFormData.dob),
-          gender: teamData.gender_category === 'women' ? 'F' : 'M',
+          gender: teamData.genderCategory === 'women' ? 'F' : 'M',
           position: playerPosition,
           panchayat: teamData.panchayat,
           taluk: teamData.taluk || '',
@@ -481,28 +496,28 @@ export default function CaptainPlayerManagement() {
 
 
   const getPlayerStatusColor = (player: TeamPlayer) => {
-    if (player.verification_status === 'verified') return 'text-[#3A7F3F] bg-green-50';
-    if (player.verification_status === 'rejected') return 'text-red-600 bg-red-50';
+    if (player.verificationStatus === 'verified') return 'text-[#3A7F3F] bg-green-50';
+    if (player.verificationStatus === 'rejected') return 'text-red-600 bg-red-50';
     // TODO: Add profile completion check when document system is implemented
     return 'text-gray-600 bg-gray-50';
   };
 
   const getPlayerStatusIcon = (player: TeamPlayer) => {
-    if (player.verification_status === 'verified') return <CheckCircle className="w-4 h-4" />;
-    if (player.verification_status === 'rejected') return <X className="w-4 h-4" />;
+    if (player.verificationStatus === 'verified') return <CheckCircle className="w-4 h-4" />;
+    if (player.verificationStatus === 'rejected') return <X className="w-4 h-4" />;
     // TODO: Add profile completion check when document system is implemented
     return <AlertCircle className="w-4 h-4" />;
   };
 
   const getPlayerStatusText = (player: TeamPlayer) => {
-    if (player.verification_status === 'verified') return 'Verified';
-    if (player.verification_status === 'rejected') return 'Rejected';
+    if (player.verificationStatus === 'verified') return 'Verified';
+    if (player.verificationStatus === 'rejected') return 'Rejected';
     // TODO: Add profile completion check when document system is implemented
     return 'Pending';
   };
 
   const filteredPlayers = players.filter(player =>
-    `${player.first_name} ${player.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     player.phone.includes(searchTerm)
   );
 
@@ -518,10 +533,10 @@ export default function CaptainPlayerManagement() {
     }
 
     const validationErrors = [];
-    const sport = teamData.sports;
+    const sport = teamData.sport;
 
-    if (mainPlayers < sport.main_players_count) {
-      validationErrors.push(`Need at least ${sport.main_players_count} main players (currently have ${mainPlayers})`);
+    if (mainPlayers < sport.mainPlayersCount) {
+      validationErrors.push(`Need at least ${sport.mainPlayersCount} main players (currently have ${mainPlayers})`);
     }
 
     if (players.length === 0) {
@@ -534,18 +549,18 @@ export default function CaptainPlayerManagement() {
     }
 
     // TODO: Add document validation when document system is implemented
-    const playersWithIncompleteDocuments = players.filter(player => !player.users?.profile_complete);
+    const playersWithIncompleteDocuments = players.filter(player => !player.user?.profileComplete);
     if (playersWithIncompleteDocuments.length > 0) {
       validationErrors.push(`${playersWithIncompleteDocuments.length} player(s) have incomplete documents. Please ensure all documents are uploaded.`);
     }
 
-    if (teamData.gender_category) {
-      if (teamData.gender_category === 'women') {
+    if (teamData.genderCategory) {
+      if (teamData.genderCategory === 'women') {
         const malePlayersCount = players.filter(p => p.gender === 'M').length;
         if (malePlayersCount > 0) {
           validationErrors.push(`${sport.name} is only for women. Found ${malePlayersCount} male player(s).`);
         }
-      } else if (teamData.gender_category === 'men') {
+      } else if (teamData.genderCategory === 'men') {
         const femalePlayersCount = players.filter(p => p.gender === 'F').length;
         if (femalePlayersCount > 0) {
           validationErrors.push(`${sport.name} is only for men. Found ${femalePlayersCount} female player(s).`);
@@ -687,7 +702,7 @@ export default function CaptainPlayerManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Main Players</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{mainPlayers}/{sportConfig.main_players_count}</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{mainPlayers}/{sportConfig.mainPlayersCount}</p>
               </div>
               <Users className="w-8 h-8 text-[#3A7F3F]" />
             </div>
@@ -697,7 +712,7 @@ export default function CaptainPlayerManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Substitutes</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{substitutes}/{sportConfig.max_substitutes}</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{substitutes}/{sportConfig.maxSubstitutes}</p>
               </div>
               <Users className="w-8 h-8 text-[#C79016]" />
             </div>
@@ -708,7 +723,7 @@ export default function CaptainPlayerManagement() {
               <div>
                 <p className="text-gray-600 text-sm">Completed Profiles</p>
                 <p className="text-2xl font-bold text-[#4A2F1D]">
-                  {players.filter(p => p.users?.profile_complete).length}
+                  {players.filter(p => p.user?.profileComplete).length}
                 </p>
               </div>
               <CheckCircle className="w-8 h-8 text-[#3A7F3F]" />
@@ -730,10 +745,10 @@ export default function CaptainPlayerManagement() {
 
             <div className="text-xs sm:text-sm text-gray-600 flex flex-col sm:flex-row gap-1 sm:gap-2">
               <div className="bg-[#3A7F3F] text-white px-2 py-1 rounded text-xs">
-                {sportConfig.main_players_count - mainPlayers} main slots left
+                {sportConfig.mainPlayersCount - mainPlayers} main slots left
               </div>
               <div className="bg-[#C79016] text-white px-2 py-1 rounded text-xs">
-                {sportConfig.max_substitutes - substitutes} sub slots left
+                {sportConfig.maxSubstitutes - substitutes} sub slots left
               </div>
             </div>
           </div>
@@ -778,8 +793,8 @@ export default function CaptainPlayerManagement() {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex-1">
                           <div className="font-semibold text-[#4A2F1D] text-sm">
-                            {player.first_name} {player.last_name}
-                            {player.userId === teamData.captain_id && (
+                            {player.firstName} {player.lastName}
+                            {player.userId === teamData.captainId && (
                               <span className="ml-2 text-xs bg-[#F28C38] text-white px-2 py-1 rounded">Captain</span>
                             )}
                           </div>
@@ -792,7 +807,7 @@ export default function CaptainPlayerManagement() {
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {player.userId !== teamData.captain_id && (
+                          {player.userId !== teamData.captainId && (
                             <button
                               onClick={() => removePlayer(player.id)}
                               className="text-red-600 p-1"
@@ -814,9 +829,9 @@ export default function CaptainPlayerManagement() {
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="flex space-x-1">
-                            <div className={`w-2 h-2 rounded-full ${player.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Profile"></div>
-                            <div className={`w-2 h-2 rounded-full ${player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
-                            <div className={`w-2 h-2 rounded-full ${player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.user?.profileImages?.profilePhotoPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Profile"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.user?.profileImages?.aadhaarFrontPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
+                            <div className={`w-2 h-2 rounded-full ${player.user?.profileImages?.aadhaarBackPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
                           </div>
                           <div className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold rounded-full ${getPlayerStatusColor(player)}`}>
                             {getPlayerStatusIcon(player)}
@@ -848,8 +863,8 @@ export default function CaptainPlayerManagement() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
                               <div className="text-sm font-semibold text-[#4A2F1D] flex items-center">
-                                {player.first_name} {player.last_name}
-                                {player.userId === teamData.captain_id && (
+                                {player.firstName} {player.lastName}
+                                {player.userId === teamData.captainId && (
                                   <span className="ml-2 text-xs bg-[#F28C38] text-white px-2 py-1 rounded">Captain</span>
                                 )}
                               </div>
@@ -869,17 +884,17 @@ export default function CaptainPlayerManagement() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex space-x-1">
-                              {player.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path ? (
+                              {player.user?.profileImages?.profilePhotoPath ? (
                                 <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-300" title="Profile Photo Missing"></div>
                               )}
-                              {player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path ? (
+                              {player.user?.profileImages?.aadhaarFrontPath ? (
                                 <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Front Missing"></div>
                               )}
-                              {player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path ? (
+                              {player.user?.profileImages?.aadhaarBackPath ? (
                                 <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
                               ) : (
                                 <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Back Missing"></div>
@@ -901,7 +916,7 @@ export default function CaptainPlayerManagement() {
                               >
                                 <Eye className="w-4 h-4" />
                               </button>
-                              {player.userId !== teamData.captain_id && (
+                              {player.userId !== teamData.captainId && (
                                 <button
                                   onClick={() => removePlayer(player.id)}
                                   className="text-red-600 hover:text-red-800 transition-colors"
@@ -923,16 +938,16 @@ export default function CaptainPlayerManagement() {
         </div>
 
         {/* Submit Section */}
-        {!isReadOnly && teamData?.sports && mainPlayers >= teamData.sports.main_players_count && (
+        {!isReadOnly && teamData?.sports && mainPlayers >= teamData.sports.mainPlayersCount && (
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex flex-col sm:flex-row items-center justify-between">
 
               <div>
                 <h3 className="text-lg font-bold text-[#4A2F1D] mb-2">Ready to Submit?</h3>
                 <p className="text-gray-600">
-                  {mainPlayers >= teamData.sports.main_players_count
+                  {mainPlayers >= teamData.sports.mainPlayersCount
                     ? `You have ${mainPlayers} main players. Submit your team for verification.`
-                    : `Add at least ${teamData.sports.main_players_count} main players to submit.`}
+                    : `Add at least ${teamData.sports.mainPlayersCount} main players to submit.`}
                 </p>
               </div>
               <button
@@ -1050,7 +1065,7 @@ export default function CaptainPlayerManagement() {
                     />
                   </div>
 
-                  {teamData?.gender_category === 'mixed' && (
+                  {teamData?.genderCategory === 'mixed' && (
                     <div>
                       <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
                         Gender <span className="text-red-500">*</span>
@@ -1104,7 +1119,7 @@ export default function CaptainPlayerManagement() {
                 </button>
                 <button
                   onClick={handleAddPlayer}
-                  disabled={!playerFormData.firstName || !playerFormData.lastName || !playerFormData.dob || isSubmitting || (teamData?.gender_category === 'mixed' && !playerFormData.gender)}
+                  disabled={!playerFormData.firstName || !playerFormData.lastName || !playerFormData.dob || isSubmitting || (teamData?.genderCategory === 'mixed' && !playerFormData.gender)}
                   className="flex-1 bg-[#F28C38] hover:bg-[#E67A26] disabled:bg-gray-400 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
                 >
                   {isSubmitting ? 'Adding...' : 'Add Player'}
@@ -1122,7 +1137,7 @@ export default function CaptainPlayerManagement() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.first_name} {selectedPlayer.last_name}</h2>
+                  <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.firstName} {selectedPlayer.lastName}</h2>
                   <p className="text-gray-600">{selectedPlayer.phone}</p>
                 </div>
                 <button
@@ -1153,7 +1168,7 @@ export default function CaptainPlayerManagement() {
 
                     <div>
                       <label className="text-sm text-gray-600">WhatsApp Number</label>
-                      <p className="font-semibold">{selectedPlayer.whatsapp_number}</p>
+                      <p className="font-semibold">{selectedPlayer.whatsappNumber}</p>
                     </div>
 
                     <div>
@@ -1182,14 +1197,14 @@ export default function CaptainPlayerManagement() {
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Profile Photo</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.user?.profileImages?.profilePhotoPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path && isReadOnly ? (
+                      {selectedPlayer.user?.profileImages?.profilePhotoPath && isReadOnly ? (
                         <DocumentPreview
                           type="profilePhoto"
-                          url={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers.profile_photo_path}
+                          url={selectedPlayer.user?.profileImages.profilePhotoPath}
                           label="Profile Photo"
-                          verified={!!selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers.verified_at}
+                          verified={!!selectedPlayer.user?.profileImages.verifiedAt}
                           showActions={false}
                           size="md"
                         />
@@ -1199,7 +1214,7 @@ export default function CaptainPlayerManagement() {
                           playerUserId={selectedPlayer.userId}
                           documentType="profilePhoto"
                           label="Profile Photo"
-                          currentUrl={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path || null}
+                          currentUrl={selectedPlayer.user?.profileImages?.profilePhotoPath || null}
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'profilePhoto', url)}
                           onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.id, isComplete)}
                           variant="card"
@@ -1212,14 +1227,14 @@ export default function CaptainPlayerManagement() {
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Aadhaar Front</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.user?.profileImages?.aadhaarFrontPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path && isReadOnly ? (
+                      {selectedPlayer.user?.profileImages?.aadhaarFrontPath && isReadOnly ? (
                         <DocumentPreview
                           type="aadhaarFront"
-                          url={selectedPlayer.users.user_profile_images_user_profile_images_user_idTousers.aadhaar_front_path}
+                          url={selectedPlayer.user.profileImages.aadhaarFrontPath}
                           label="Aadhaar Front"
-                          verified={!!selectedPlayer.users.user_profile_images_user_profile_images_user_idTousers.verified_at}
+                          verified={!!selectedPlayer.user.profileImages.verifiedAt}
                           showActions={false}
                           size="md"
                         />
@@ -1229,7 +1244,7 @@ export default function CaptainPlayerManagement() {
                           playerUserId={selectedPlayer.userId}
                           documentType="aadhaarFront"
                           label="Aadhaar Front"
-                          currentUrl={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path || null}
+                          currentUrl={selectedPlayer.user?.profileImages?.aadhaarFrontPath || null}
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'aadhaarFront', url)}
                           onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.id, isComplete)}
                           variant="card"
@@ -1242,14 +1257,14 @@ export default function CaptainPlayerManagement() {
                     <div className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold">Aadhaar Back</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.user?.profileImages?.aadhaarBackPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
                       </div>
-                      {selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path && isReadOnly ? (
+                      {selectedPlayer.user?.profileImages?.aadhaarBackPath && isReadOnly ? (
                         <DocumentPreview
                           type="aadhaarBack"
-                          url={selectedPlayer.users.user_profile_images_user_profile_images_user_idTousers.aadhaar_back_path}
+                          url={selectedPlayer.user.profileImages.aadhaarBackPath}
                           label="Aadhaar Back"
-                          verified={!!selectedPlayer.users.user_profile_images_user_profile_images_user_idTousers.verified_at}
+                          verified={!!selectedPlayer.user.profileImages.verifiedAt}
                           showActions={false}
                           size="md"
                         />
@@ -1259,7 +1274,7 @@ export default function CaptainPlayerManagement() {
                           playerUserId={selectedPlayer.userId}
                           documentType="aadhaarBack"
                           label="Aadhaar Back"
-                          currentUrl={selectedPlayer.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path || null}
+                          currentUrl={selectedPlayer.user?.profileImages?.aadhaarBackPath || null}
                           onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'aadhaarBack', url)}
                           onProfileComplete={(isComplete: boolean | undefined) => handleProfileComplete(selectedPlayer.id, isComplete === true)}
                           variant="card"
@@ -1279,7 +1294,7 @@ export default function CaptainPlayerManagement() {
                     Close
                   </button>
                   {/* Remove Player button - disabled for captain */}
-                  {selectedPlayer.userId !== teamData.captain_id && !isReadOnly ? (
+                  {selectedPlayer.userId !== teamData.captainId && !isReadOnly ? (
                     <button
                       onClick={() => {
                         removePlayer(selectedPlayer.id);
@@ -1348,7 +1363,7 @@ export default function CaptainPlayerManagement() {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Documents:</span>
                       <span className="font-medium text-[#3A7F3F]">
-                        {players.filter(p => p.users?.user_profile_images_user_profile_images_user_idTousers?.all_images_uploaded).length === players.length ? 'Complete' : 'Incomplete'}
+                        {players.filter(p => p.user?.profileImages?.allImagesUploaded).length === players.length ? 'Complete' : 'Incomplete'}
                       </span>
                     </div>
                   </div>

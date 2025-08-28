@@ -58,7 +58,7 @@ export const tournamentsRouter = createTRPCRouter({
                 },
               },
               orderBy: [
-                { tournamentLevel: 'asc' },
+                { level: 'asc' },
                 { venue: { name: 'asc' } },
               ],
             } : false,
@@ -211,7 +211,7 @@ export const tournamentsRouter = createTRPCRouter({
       .mutation(async ({ input }) => {
         try {
           // Check if event has any teams
-          const teamCount = await db.teams.count({
+          const teamCount = await db.team.count({
             where: { eventId: input.id },
           })
 
@@ -244,10 +244,10 @@ export const tournamentsRouter = createTRPCRouter({
       .query(async ({ input }) => {
         const { id, includeGenderCategories } = input
 
-        const sport = await db.sports.findUnique({
+        const sport = await db.sport.findUnique({
           where: { id },
           include: {
-            genderCategories: includeGenderCategories,
+            sportGenderCategories: includeGenderCategories,
           },
         })
 
@@ -279,10 +279,10 @@ export const tournamentsRouter = createTRPCRouter({
         }
 
         const [sports, total] = await Promise.all([
-          db.sports.findMany({
+          db.sport.findMany({
             where,
             include: {
-              genderCategories: true,
+              sportGenderCategories: true,
               _count: {
                 select: {
                   teams: true,
@@ -294,7 +294,7 @@ export const tournamentsRouter = createTRPCRouter({
             take: limit,
             orderBy: { [sortBy]: sortOrder },
           }),
-          db.sports.count({ where }),
+          db.sport.count({ where }),
         ])
 
         return {
@@ -311,17 +311,17 @@ export const tournamentsRouter = createTRPCRouter({
         const { genderCategories, ...sportData } = input
 
         try {
-          const sport = await db.sports.create({
+          const sport = await db.sport.create({
             data: {
               ...sportData,
-              genderCategories: {
+              sportGenderCategories: {
                 create: genderCategories.map((category) => ({
                   genderCategory: category,
                 })),
               },
             },
             include: {
-              genderCategories: true,
+              sportGenderCategories: true,
             },
           })
 
@@ -340,7 +340,7 @@ export const tournamentsRouter = createTRPCRouter({
         const { id, ...updateData } = input
 
         try {
-          const sport = await db.sports.update({
+          const sport = await db.sport.update({
             where: { id },
             data: updateData,
           })
@@ -361,21 +361,21 @@ export const tournamentsRouter = createTRPCRouter({
 
         try {
           // Delete existing categories and create new ones
-          await db.sport_gender_categories.deleteMany({
+          await db.sportGenderCategory.deleteMany({
             where: { sportId },
           })
 
-          await db.sport_gender_categories.createMany({
+          await db.sportGenderCategory.createMany({
             data: genderCategories.map((category) => ({
               sportId,
               genderCategory: category,
             })),
           })
 
-          const sport = await db.sports.findUnique({
+          const sport = await db.sport.findUnique({
             where: { id: sportId },
             include: {
-              genderCategories: true,
+              sportGenderCategories: true,
             },
           })
 
@@ -438,7 +438,7 @@ export const tournamentsRouter = createTRPCRouter({
                     tournamentNumber: true,
                   },
                 },
-                checkedInByUser: {
+                checkedInUser: {
                   select: {
                     id: true,
                     firstName: true,
@@ -484,7 +484,7 @@ export const tournamentsRouter = createTRPCRouter({
                   },
                 },
               },
-              orderBy: { position: 'asc' },
+              orderBy: { finalPosition: 'asc' },
             } : false,
           },
         })
@@ -629,12 +629,12 @@ export const tournamentsRouter = createTRPCRouter({
 
         try {
           // Remove existing team assignments
-          await db.fixture_teams.deleteMany({
+          await db.fixtureTeam.deleteMany({
             where: { fixtureId },
           })
 
           // Add new team assignments
-          await db.fixture_teams.createMany({
+          await db.fixtureTeam.createMany({
             data: teamIds.map((teamId) => ({
               fixtureId,
               teamId,
@@ -662,7 +662,7 @@ export const tournamentsRouter = createTRPCRouter({
         const { fixtureId, teamId, checkedInBy } = input
 
         try {
-          const fixtureTeam = await db.fixture_teams.update({
+          const fixtureTeam = await db.fixtureTeam.update({
             where: {
               fixtureId_teamId: {
                 fixtureId,
@@ -957,7 +957,7 @@ export const tournamentsRouter = createTRPCRouter({
       .query(async ({ input }) => {
         const { fixtureId, includeTeams } = input
 
-        const results = await db.fixture_results.findMany({
+        const results = await db.fixtureResult.findMany({
           where: { fixtureId },
           include: {
             team: includeTeams ? {
@@ -981,7 +981,7 @@ export const tournamentsRouter = createTRPCRouter({
       .input(createFixtureResultSchema)
       .mutation(async ({ input }) => {
         try {
-          const result = await db.fixture_results.create({
+          const result = await db.fixtureResult.create({
             data: input,
             include: {
               team: {
@@ -1009,7 +1009,7 @@ export const tournamentsRouter = createTRPCRouter({
         const { id, ...updateData } = input
 
         try {
-          const result = await db.fixture_results.update({
+          const result = await db.fixtureResult.update({
             where: { id },
             data: updateData,
           })
@@ -1028,7 +1028,7 @@ export const tournamentsRouter = createTRPCRouter({
         fixtureId: z.string().uuid(),
         results: z.array(z.object({
           teamId: z.string().uuid(),
-          position: z.number().min(1),
+          finalPosition: z.number().min(1),
           qualifiesForNext: z.boolean().default(false),
         })),
       }))
@@ -1037,14 +1037,14 @@ export const tournamentsRouter = createTRPCRouter({
 
         try {
           // Delete existing results
-          await db.fixture_results.deleteMany({
+          await db.fixtureResult.deleteMany({
             where: { fixtureId },
           })
 
           // Create new results
           const createdResults = await Promise.all(
             results.map((result) =>
-              db.fixture_results.create({
+              db.fixtureResult.create({
                 data: {
                   fixtureId,
                   ...result,

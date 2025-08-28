@@ -15,9 +15,9 @@ import { AlertCircle } from 'lucide-react'
 // Helper function to format category display
 const formatCategory = (sport: any): string => {
   const categories = []
-  if (sport.supports_men) categories.push("Men's")
-  if (sport.supports_women) categories.push("Women's")
-  if (sport.supports_mixed) categories.push("Mixed")
+  if (sport.supportsMen) categories.push("Men's")
+  if (sport.supportsWomen) categories.push("Women's")
+  if (sport.supportsMixed) categories.push("Mixed")
   
   if (categories.length === 1) {
     return `(${categories[0]})`
@@ -40,7 +40,7 @@ const getTeamComposition = (sport: any) => {
     return `In one team, there should be a minimum of 7 players and 1 substitute (7+1), and a maximum of 7 players and 6 substitutes (7+6). One player can only participate in one team.`
   }
   // Generic fallback using database values
-  return `In one team, there should be a minimum of ${sport.main_players_count} players and 1 substitute (${sport.main_players_count}+1), and a maximum of ${sport.main_players_count} players and ${sport.max_substitutes} substitutes (${sport.main_players_count}+${sport.max_substitutes}). One player can only participate in one team.`
+  return `In one team, there should be a minimum of ${sport.mainPlayersCount} players and 1 substitute (${sport.mainPlayersCount}+1), and a maximum of ${sport.mainPlayersCount} players and ${sport.maxSubstitutes} substitutes (${sport.mainPlayersCount}+${sport.maxSubstitutes}). One player can only participate in one team.`
 }
 
 // Helper function to get sport-specific timing requirement  
@@ -53,7 +53,7 @@ const getTimingRequirement = (sport: any) => {
     return 'The main 7 players should arrive at the match venue and ensure their presence 30 minutes before the commencement of the match.'
   }
   // Generic fallback
-  return `The main ${sport.main_players_count} players should arrive at the match venue and ensure their presence 30 minutes before the commencement of the match.`
+  return `The main ${sport.mainPlayersCount} players should arrive at the match venue and ensure their presence 30 minutes before the commencement of the match.`
 }
 
 export default function SportRulesPage() {

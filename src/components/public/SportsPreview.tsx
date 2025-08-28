@@ -18,8 +18,8 @@ interface SportCard {
   id: string
   name: string
   description: string | null
-  main_players_count: number
-  max_substitutes: number
+  mainPlayersCount: number
+  maxSubstitutes: number
   gender_categories: string[]
   supports_men: boolean
   supports_women: boolean
@@ -157,7 +157,7 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
                 <div className="mb-4">
                   <p className="text-[#F28C38] font-semibold text-lg mb-2 flex items-center gap-2">
                     <Users className="w-5 h-5" />
-                    {formatCategory(sport)} | {formatPlayerCount(sport.main_players_count, sport.max_substitutes)}
+                    {formatCategory(sport)} | {formatPlayerCount(sport.mainPlayersCount, sport.maxSubstitutes)}
                   </p>
                   <p className="text-2xl font-bold text-[#4A2F1D] mb-1 flex items-center gap-2">
                     <Trophy className="w-6 h-6 text-yellow-500" />

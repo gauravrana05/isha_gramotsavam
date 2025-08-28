@@ -50,8 +50,8 @@ export const volunteersRouter = createTRPCRouter({
           },
           users: {
             select: {
-              first_name: true,
-              last_name: true,
+              firstName: true,
+              lastName: true,
               role: true,
             },
           },
@@ -63,7 +63,7 @@ export const volunteersRouter = createTRPCRouter({
         id: assignment.venue_location_mapping_id,
         assignmentId: assignment.id,
         volunteerId: assignment.volunteer_id,
-        volunteerName: `${assignment.users.first_name} ${assignment.users.last_name}`,
+        volunteerName: `${assignment.users.firstName} ${assignment.users.lastName}`,
         volunteerType: assignment.users.role,
         venueId: assignment.venue_location_mappings?.venues?.id,
         venueName: assignment.venue_location_mappings?.venues?.name || 'Unknown Venue',
@@ -118,7 +118,7 @@ export const volunteersRouter = createTRPCRouter({
         // Get teams assigned to this venue
         const teams = await db.teams.findMany({
           where: {
-            team_venue_assignments: {
+            teamVenueAssignments: {
               some: {
                 OR: [
                   { cluster_venue_mapping_id: venueLocationMapping.id },
@@ -133,27 +133,27 @@ export const volunteersRouter = createTRPCRouter({
               select: {
                 id: true,
                 name: true,
-                main_players_count: true,
-                max_substitutes: true,
+                mainPlayersCount: true,
+                maxSubstitutes: true,
               },
             },
-            users_teams_captain_idTousers: {
+            captainUser: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
               },
             },
-            team_players: {
+            teamPlayers: {
               select: {
                 id: true,
-                verification_status: true,
+                verificationStatus: true,
               },
             },
             team_photos: {
               select: {
-                photo_path: true,
+                photoPath: true,
               },
             },
           },
@@ -165,19 +165,19 @@ export const volunteersRouter = createTRPCRouter({
           name: team.name,
           sportName: team.sports?.name || 'Unknown',
           captainProfile: {
-            name: `${team.users_teams_captain_idTousers?.first_name || ''} ${team.users_teams_captain_idTousers?.last_name || ''}`.trim(),
-            phone: team.users_teams_captain_idTousers?.phone || '',
+            name: `${team.captainUser?.firstName || ''} ${team.captainUser?.lastName || ''}`.trim(),
+            phone: team.captainUser?.phone || '',
           },
           panchayat: team.panchayat,
           district: team.district,
           state: team.state,
-          currentPlayers: team.team_players?.length || 0,
-          maxPlayers: (team.sports?.main_players_count || 0) + (team.sports?.max_substitutes || 0),
-          verifiedPlayersCount: team.team_players?.filter(p => p.verification_status === 'approved').length || 0,
+          currentPlayers: team.teamPlayers?.length || 0,
+          maxPlayers: (team.sports?.mainPlayersCount || 0) + (team.sports?.maxSubstitutes || 0),
+          verifiedPlayersCount: team.teamPlayers?.filter(p => p.verificationStatus === 'approved').length || 0,
           status: team.status,
           matchDayStatus: team.status === 'checked_in' ? 'checked_in' : 
-                          team.team_players?.every(p => p.verification_status === 'approved') ? 'verified' : 'pending',
-          teamImageUrl: team.team_photos?.[0]?.photo_path || null,
+                          team.teamPlayers?.every(p => p.verificationStatus === 'approved') ? 'verified' : 'pending',
+          teamImageUrl: team.team_photos?.[0]?.photoPath || null,
         }));
 
         return {
@@ -215,38 +215,38 @@ export const volunteersRouter = createTRPCRouter({
               select: {
                 id: true,
                 name: true,
-                main_players_count: true,
-                max_substitutes: true,
+                mainPlayersCount: true,
+                maxSubstitutes: true,
               },
             },
-            users_teams_captain_idTousers: {
+            captainUser: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
               },
             },
-            team_players: {
+            teamPlayers: {
               select: {
                 id: true,
                 userId: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
                 age: true,
                 gender: true,
                 position: true,
-                verification_status: true,
+                verificationStatus: true,
                 users: {
                   select: {
                     id: true,
-                    user_profile_images_user_profile_images_user_idTousers: {
+                    profileImages: {
                       select: {
-                        profile_photo_path: true,
-                        aadhaar_front_path: true,
-                        aadhaar_back_path: true,
-                        verified_by: true,
+                        profilePhotoPath: true,
+                        aadhaarFrontPath: true,
+                        aadhaarBackPath: true,
+                        verifiedBy: true,
                         verified_at: true,
                       },
                     },
@@ -260,7 +260,7 @@ export const volunteersRouter = createTRPCRouter({
             },
             team_photos: {
               select: {
-                photo_path: true,
+                photoPath: true,
               },
             },
           },
@@ -279,51 +279,51 @@ export const volunteersRouter = createTRPCRouter({
           name: team.name,
           sportName: team.sports?.name || 'Unknown',
           captainProfile: {
-            name: `${team.users_teams_captain_idTousers?.first_name || ''} ${team.users_teams_captain_idTousers?.last_name || ''}`.trim(),
-            phone: team.users_teams_captain_idTousers?.phone || '',
+            name: `${team.captainUser?.firstName || ''} ${team.captainUser?.lastName || ''}`.trim(),
+            phone: team.captainUser?.phone || '',
           },
           panchayat: team.panchayat,
           district: team.district,
           state: team.state,
-          currentPlayers: team.team_players?.length || 0,
-          maxPlayers: (team.sports?.main_players_count || 0) + (team.sports?.max_substitutes || 0),
+          currentPlayers: team.teamPlayers?.length || 0,
+          maxPlayers: (team.sports?.mainPlayersCount || 0) + (team.sports?.maxSubstitutes || 0),
           status: team.status,
           matchDayStatus: team.status === 'checked_in' ? 'checked_in' : 
-                          team.team_players?.every(p => p.verification_status === 'approved') ? 'verified' : 'pending',
-          teamImageUrl: team.team_photos?.[0]?.photo_path || null,
+                          team.teamPlayers?.every(p => p.verificationStatus === 'approved') ? 'verified' : 'pending',
+          teamImageUrl: team.team_photos?.[0]?.photoPath || null,
         };
 
         // Transform players data
-        const transformedPlayers = team.team_players?.map(player => ({
+        const transformedPlayers = team.teamPlayers?.map(player => ({
           id: player.id,
           userId: player.userId,
-          name: `${player.first_name} ${player.last_name}`.trim(),
+          name: `${player.firstName} ${player.lastName}`.trim(),
           phone: player.phone,
           age: player.age,
           gender: player.gender,
           position: player.position,
           documents: {
             profilePhoto: {
-              url: player.users?.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path || null,
-              verified: !!player.users?.user_profile_images_user_profile_images_user_idTousers?.verified_by,
+              url: player.users?.profileImages?.profilePhotoPath || null,
+              verified: !!player.users?.profileImages?.verifiedBy,
               uploadedAt: null,
               uploadedBy: null,
             },
             aadhaarFront: {
-              url: player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_front_path || null,
-              verified: !!player.users?.user_profile_images_user_profile_images_user_idTousers?.verified_by,
+              url: player.users?.profileImages?.aadhaarFrontPath || null,
+              verified: !!player.users?.profileImages?.verifiedBy,
               uploadedAt: null,
               uploadedBy: null,
             },
             aadhaarBack: {
-              url: player.users?.user_profile_images_user_profile_images_user_idTousers?.aadhaar_back_path || null,
-              verified: !!player.users?.user_profile_images_user_profile_images_user_idTousers?.verified_by,
+              url: player.users?.profileImages?.aadhaarBackPath || null,
+              verified: !!player.users?.profileImages?.verifiedBy,
               uploadedAt: null,
               uploadedBy: null,
             },
           },
-          verificationStatus: player.verification_status || 'pending',
-          matchDayVerificationStatus: player.verification_status || 'pending',
+          verificationStatus: player.verificationStatus || 'pending',
+          matchDayVerificationStatus: player.verificationStatus || 'pending',
           matchDayComments: '', // Would need separate comments table
         })) || [];
 
@@ -361,10 +361,10 @@ export const volunteersRouter = createTRPCRouter({
         }
 
         // Update player verification status to approved/rejected
-        const updatedPlayer = await db.team_players.update({
+        const updatedPlayer = await db.teamPlayers.update({
           where: { id: input.playerId },
           data: {
-            verification_status: input.status,
+            verificationStatus: input.status,
             // Note: Comments would need to be stored in a separate table
           },
         });
@@ -373,9 +373,9 @@ export const volunteersRouter = createTRPCRouter({
         const team = await db.teams.findUnique({
           where: { id: input.teamId },
           include: {
-            team_players: {
+            teamPlayers: {
               select: {
-                verification_status: true,
+                verificationStatus: true,
               },
             },
           },
@@ -384,8 +384,8 @@ export const volunteersRouter = createTRPCRouter({
         let teamAutoCheckedIn = false;
 
         if (team) {
-          const allPlayersApproved = team.team_players.every(
-            player => player.verification_status === 'approved'
+          const allPlayersApproved = team.teamPlayers.every(
+            player => player.verificationStatus === 'approved'
           );
 
           // Auto check-in team if all players are approved and team was verified
@@ -432,10 +432,10 @@ export const volunteersRouter = createTRPCRouter({
         }
 
         // Update all players
-        const updatedPlayers = await db.team_players.updateMany({
+        const updatedPlayers = await db.teamPlayers.updateMany({
           where: { id: { in: input.playerIds } },
           data: {
-            verification_status: input.status,
+            verificationStatus: input.status,
           },
         });
 
@@ -443,9 +443,9 @@ export const volunteersRouter = createTRPCRouter({
         const team = await db.teams.findUnique({
           where: { id: input.teamId },
           include: {
-            team_players: {
+            teamPlayers: {
               select: {
-                verification_status: true,
+                verificationStatus: true,
               },
             },
           },
@@ -454,8 +454,8 @@ export const volunteersRouter = createTRPCRouter({
         let teamAutoCheckedIn = false;
 
         if (team) {
-          const allPlayersApproved = team.team_players.every(
-            player => player.verification_status === 'approved'
+          const allPlayersApproved = team.teamPlayers.every(
+            player => player.verificationStatus === 'approved'
           );
 
           if (allPlayersApproved && team.status === 'verified') {
@@ -513,7 +513,7 @@ export const volunteersRouter = createTRPCRouter({
         const teams = await db.teams.findMany({
           where: {
             status: 'checked_in',
-            team_venue_assignments: {
+            teamVenueAssignments: {
               some: {
                 OR: [
                   { cluster_venue_mapping_id: venueLocationMapping.id },
@@ -531,11 +531,11 @@ export const volunteersRouter = createTRPCRouter({
                 display_name: true,
               },
             },
-            users_teams_captain_idTousers: {
+            captainUser: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
               },
             },
@@ -546,7 +546,7 @@ export const volunteersRouter = createTRPCRouter({
         const teamsBySport: Record<string, any[]> = {};
         
         teams.forEach(team => {
-          const sportKey = `${team.sport_id}_${team.gender_category}`;
+          const sportKey = `${team.sport_id}_${team.genderCategory}`;
           
           if (!teamsBySport[sportKey]) {
             teamsBySport[sportKey] = [];
@@ -558,11 +558,11 @@ export const volunteersRouter = createTRPCRouter({
             sportId: team.sport_id,
             sportName: team.sports?.name || team.sports?.display_name || 'Unknown',
             displayName: team.sports?.display_name || team.sports?.name || 'Unknown',
-            genderCategory: team.gender_category,
-            tournamentNumber: team.tournament_number,
+            genderCategory: team.genderCategory,
+            tournamentNumber: team.tournamentNumber,
             captainProfile: {
-              name: `${team.users_teams_captain_idTousers?.first_name || ''} ${team.users_teams_captain_idTousers?.last_name || ''}`.trim(),
-              phone: team.users_teams_captain_idTousers?.phone || '',
+              name: `${team.captainUser?.firstName || ''} ${team.captainUser?.lastName || ''}`.trim(),
+              phone: team.captainUser?.phone || '',
             },
             panchayat: team.panchayat,
             district: team.district,
@@ -577,8 +577,8 @@ export const volunteersRouter = createTRPCRouter({
             name: team.name,
             sportId: team.sport_id,
             sportName: team.sports?.name || team.sports?.display_name || 'Unknown',
-            genderCategory: team.gender_category,
-            tournamentNumber: team.tournament_number,
+            genderCategory: team.genderCategory,
+            tournamentNumber: team.tournamentNumber,
           })),
           teamsBySport,
         };
@@ -652,7 +652,7 @@ export const volunteersRouter = createTRPCRouter({
           name: fixture.name,
           sportId: fixture.sport_id,
           sportName: fixture.sports?.display_name || fixture.sports?.name || 'Unknown',
-          genderCategory: fixture.gender_category,
+          genderCategory: fixture.genderCategory,
           level: fixture.level,
           status: fixture.status,
           assignedTeams: fixture.fixture_teams?.map(ft => ({
@@ -721,14 +721,14 @@ export const volunteersRouter = createTRPCRouter({
               select: {
                 id: true,
                 name: true,
-                tournament_number: true,
+                tournamentNumber: true,
               },
             },
             teams_matches_team2_idToteams: {
               select: {
                 id: true,
                 name: true,
-                tournament_number: true,
+                tournamentNumber: true,
               },
             },
             teams_matches_winner_idToteams: {
@@ -763,12 +763,12 @@ export const volunteersRouter = createTRPCRouter({
           team1: match.teams_matches_team1_idToteams ? {
             teamId: match.teams_matches_team1_idToteams.id,
             teamName: match.teams_matches_team1_idToteams.name,
-            tournamentNumber: match.teams_matches_team1_idToteams.tournament_number,
+            tournamentNumber: match.teams_matches_team1_idToteams.tournamentNumber,
           } : null,
           team2: match.teams_matches_team2_idToteams ? {
             teamId: match.teams_matches_team2_idToteams.id,
             teamName: match.teams_matches_team2_idToteams.name,
-            tournamentNumber: match.teams_matches_team2_idToteams.tournament_number,
+            tournamentNumber: match.teams_matches_team2_idToteams.tournamentNumber,
           } : null,
           result: match.teams_matches_winner_idToteams ? {
             winnerId: match.teams_matches_winner_idToteams.id,
@@ -826,7 +826,7 @@ export const volunteersRouter = createTRPCRouter({
                   select: {
                     id: true,
                     name: true,
-                    tournament_number: true,
+                    tournamentNumber: true,
                   },
                 },
               },
@@ -849,14 +849,14 @@ export const volunteersRouter = createTRPCRouter({
               select: {
                 id: true,
                 name: true,
-                tournament_number: true,
+                tournamentNumber: true,
               },
             },
             teams_matches_team2_idToteams: {
               select: {
                 id: true,
                 name: true,
-                tournament_number: true,
+                tournamentNumber: true,
               },
             },
             teams_matches_winner_idToteams: {
@@ -875,8 +875,8 @@ export const volunteersRouter = createTRPCRouter({
           matchNumber: match.match_number,
           roundName: match.round_name,
           status: match.status,
-          team1Id: match.team1_id,
-          team2Id: match.team2_id,
+          team1Id: match.team1Id,
+          team2Id: match.team2Id,
           winnerId: match.winner_id,
           winnerName: match.winner_name,
           team1Score: match.team1_score,
@@ -899,13 +899,13 @@ export const volunteersRouter = createTRPCRouter({
           name: fixture.name,
           sportId: fixture.sport_id,
           sportName: fixture.sports?.display_name || fixture.sports?.name || 'Unknown',
-          genderCategory: fixture.gender_category,
+          genderCategory: fixture.genderCategory,
           level: fixture.level,
           status: fixture.status,
           assignedTeams: fixture.fixture_teams?.map(ft => ({
             id: ft.teams?.id,
             name: ft.teams?.name,
-            tournamentNumber: ft.teams?.tournament_number,
+            tournamentNumber: ft.teams?.tournamentNumber,
           })) || [],
           bracket: {
             matches: bracketMatches,
@@ -949,19 +949,19 @@ export const volunteersRouter = createTRPCRouter({
           select: {
             id: true,
             name: true,
-            tournament_number: true,
+            tournamentNumber: true,
             sport_id: true,
-            gender_category: true,
+            genderCategory: true,
             status: true,
-            users_teams_captain_idTousers: {
+            captainUser: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
               },
             },
-            team_players: {
+            teamPlayers: {
               select: {
                 id: true,
               },
@@ -970,8 +970,8 @@ export const volunteersRouter = createTRPCRouter({
               select: {
                 name: true,
                 display_name: true,
-                main_players_count: true,
-                max_substitutes: true,
+                mainPlayersCount: true,
+                maxSubstitutes: true,
               },
             },
           },
@@ -984,15 +984,15 @@ export const volunteersRouter = createTRPCRouter({
           teamsById[team.id] = {
             id: team.id,
             name: team.name,
-            tournamentNumber: team.tournament_number,
+            tournamentNumber: team.tournamentNumber,
             sportName: team.sports?.display_name || team.sports?.name || 'Unknown',
-            genderCategory: team.gender_category,
-            currentPlayers: team.team_players?.length || 0,
-            maxPlayers: (team.sports?.main_players_count || 0) + (team.sports?.max_substitutes || 0),
+            genderCategory: team.genderCategory,
+            currentPlayers: team.teamPlayers?.length || 0,
+            maxPlayers: (team.sports?.mainPlayersCount || 0) + (team.sports?.maxSubstitutes || 0),
             matchDayStatus: team.status,
             captainProfile: {
-              name: `${team.users_teams_captain_idTousers?.first_name || ''} ${team.users_teams_captain_idTousers?.last_name || ''}`.trim(),
-              phone: team.users_teams_captain_idTousers?.phone || '',
+              name: `${team.captainUser?.firstName || ''} ${team.captainUser?.lastName || ''}`.trim(),
+              phone: team.captainUser?.phone || '',
             },
           };
         });

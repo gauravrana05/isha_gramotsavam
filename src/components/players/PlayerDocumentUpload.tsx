@@ -122,7 +122,7 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
 
       const result = await response.json();
 
-      // Force profile completion query to run and update profile_complete field
+      // Force profile completion query to run and update profileComplete field
       try {
         await utils.profile.checkCompletion.fetch({ userId: playerUserId });
       } catch (error) {

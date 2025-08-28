@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch real user from database based on role
-    const user = await prisma.users.findFirst({
+    const user = await prisma.user.findFirst({
       where: { 
         role: role === 'admin' ? 'admin' : 
               role === 'captain' ? 'captain' : 

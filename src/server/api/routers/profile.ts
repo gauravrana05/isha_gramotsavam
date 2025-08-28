@@ -24,24 +24,24 @@ export const profileRouter = createTRPCRouter({
     }))
     .query(async ({ input }) => {
       try {
-        const user = await db.users.findUnique({
+        const user = await db.user.findUnique({
           where: { id: input.userId },
           select: {
             id: true,
-            first_name: true,
-            last_name: true,
+            firstName: true,
+            lastName: true,
             email: true,
             phone: true,
-            date_of_birth: true,
+            dateOfBirth: true,
             gender: true,
-            whatsapp_number: true,
-            instagram_handle: true,
+            whatsappNumber: true,
+            instagramHandle: true,
             panchayat: true,
             taluk: true,
             district: true,
             state: true,
             pincode: true,
-            profile_complete: true,
+            profileComplete: true,
           },
         })
 
@@ -53,22 +53,22 @@ export const profileRouter = createTRPCRouter({
         }
 
         // Check user profile images
-        const userProfileImages = await db.user_profile_images.findUnique({
+        const userProfileImages = await db.userProfileImage.findUnique({
           where: { userId: input.userId },
           select: {
-            all_images_uploaded: true,
-            profile_photo_path: true,
-            aadhaar_front_path: true,
-            aadhaar_back_path: true,
+            allImagesUploaded: true,
+            profilePhotoPath: true,
+            aadhaarFrontPath: true,
+            aadhaarBackPath: true,
           }
         })
 
         // Check if all required fields are filled
         const requiredFields = [
-          'first_name',
-          'last_name', 
+          'firstName',
+          'lastName', 
           'phone',
-          'date_of_birth',
+          'dateOfBirth',
           'gender',
           'panchayat',
           'taluk',
@@ -83,16 +83,16 @@ export const profileRouter = createTRPCRouter({
         })
 
         // Check if all images are uploaded
-        const imagesComplete = userProfileImages?.all_images_uploaded === true
+        const imagesComplete = userProfileImages?.allImagesUploaded === true
 
         // Profile is complete only if both fields and images are complete
         const isComplete = fieldsComplete && imagesComplete
 
-        // Update profile_complete if it doesn't match current state
-        if (user.profile_complete !== isComplete) {
-          await db.users.update({
+        // Update profileComplete if it doesn't match current state
+        if (user.profileComplete !== isComplete) {
+          await db.user.update({
             where: { id: input.userId },
-            data: { profile_complete: isComplete },
+            data: { profileComplete: isComplete },
           })
         }
 
@@ -125,15 +125,15 @@ export const profileRouter = createTRPCRouter({
 
         // Map imageType to database field names
         const fieldMapping = {
-          profilePhoto: 'profile_photo_path',
-          aadhaarFront: 'aadhaar_front_path',
-          aadhaarBack: 'aadhaar_back_path',
+          profilePhoto: 'profilePhotoPath',
+          aadhaarFront: 'aadhaarFrontPath',
+          aadhaarBack: 'aadhaarBackPath',
         }
 
         const fieldName = fieldMapping[imageType]
 
         // Upsert the user profile images record
-        const userProfileImages = await db.user_profile_images.upsert({
+        const userProfileImages = await db.userProfileImage.upsert({
           where: { userId: userId },
           create: {
             userId: userId,
@@ -146,15 +146,15 @@ export const profileRouter = createTRPCRouter({
 
         // Check if all images are now uploaded
         const allImagesUploaded = !!(
-          userProfileImages.profile_photo_path &&
-          userProfileImages.aadhaar_front_path &&
-          userProfileImages.aadhaar_back_path
+          userProfileImages.profilePhotoPath &&
+          userProfileImages.aadhaarFrontPath &&
+          userProfileImages.aadhaarBackPath
         )
 
         // Update the all_images_uploaded flag
-        await db.user_profile_images.update({
+        await db.userProfileImage.update({
           where: { userId: userId },
-          data: { all_images_uploaded: allImagesUploaded },
+          data: { allImagesUploaded: allImagesUploaded },
         })
 
         return {
@@ -192,19 +192,19 @@ export const profileRouter = createTRPCRouter({
       try {
         // Convert dateOfBirth string to Date object and prepare data
         const profileData = {
-          first_name: updateData.firstName,
-          last_name: updateData.lastName,
-          whatsapp_number: updateData.whatsappNumber,
-          date_of_birth: new Date(dateOfBirth),
+          firstName: updateData.firstName,
+          lastName: updateData.lastName,
+          whatsappNumber: updateData.whatsappNumber,
+          dateOfBirth: new Date(dateOfBirth),
           gender: updateData.gender,
-          instagram_handle: updateData.instagramHandle,
+          instagramHandle: updateData.instagramHandle,
           pincode: updateData.pincode,
           panchayat: updateData.panchayat,
           taluk: updateData.taluk,
           district: updateData.district,
           state: updateData.state,
-          profile_complete: true, // Mark as complete when updating
-          language_preference: updateData.preferredLanguage || 'en',
+          profileComplete: true, // Mark as complete when updating
+          languagePreference: updateData.preferredLanguage || 'en',
         }
 
         // Remove undefined/empty fields
@@ -215,7 +215,7 @@ export const profileRouter = createTRPCRouter({
           }
         })
 
-        const user = await db.users.update({
+        const user = await db.user.update({
           where: { id: userId },
           data: profileData,
         })

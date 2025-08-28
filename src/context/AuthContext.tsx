@@ -79,11 +79,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const refreshUser = useCallback(async () => {
-    const userId = sessionStorage.getItem('userId');
-    if (!userId) return;
-
     try {
-      const response = await fetch(`/api/auth/me?userId=${userId}`, {
+      const response = await fetch('/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });

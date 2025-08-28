@@ -38,7 +38,7 @@ CREATE TYPE "public"."TeamStatus" AS ENUM ('draft', 'submitted', 'verified', 're
 CREATE TYPE "public"."TournamentLevel" AS ENUM ('cluster', 'division', 'final');
 
 -- CreateEnum
-CREATE TYPE "public"."UserRole" AS ENUM ('admin', 'captain', 'player', 'genenral_volunteer', 'technical_volunteer', 'verification_volunteer', 'public');
+CREATE TYPE "public"."UserRole" AS ENUM ('admin', 'captain', 'player', 'general_volunteer', 'technical_volunteer', 'verification_volunteer', 'public');
 
 -- CreateEnum
 CREATE TYPE "public"."VerificationStatus" AS ENUM ('pending', 'verified', 'approved', 'rejected');
@@ -51,7 +51,7 @@ CREATE TYPE "public"."VolunteerType" AS ENUM ('general_volunteer', 'technical_vo
 
 -- CreateTable
 CREATE TABLE "public"."audit_logs" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "user_id" UUID,
     "action" VARCHAR(100) NOT NULL,
     "entity_type" VARCHAR(50) NOT NULL,
@@ -69,7 +69,7 @@ CREATE TABLE "public"."audit_logs" (
 
 -- CreateTable
 CREATE TABLE "public"."cluster_division_mappings" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "event_id" UUID NOT NULL,
     "state" VARCHAR(100) NOT NULL,
     "cluster_venue_mapping_id" UUID NOT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE "public"."cluster_division_mappings" (
 
 -- CreateTable
 CREATE TABLE "public"."events" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "name" VARCHAR(200) NOT NULL,
     "description" TEXT,
     "registration_start_date" DATE NOT NULL,
@@ -102,7 +102,7 @@ CREATE TABLE "public"."events" (
 
 -- CreateTable
 CREATE TABLE "public"."fixture_results" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "fixture_id" UUID NOT NULL,
     "team_id" UUID NOT NULL,
     "finalPosition" INTEGER NOT NULL,
@@ -138,7 +138,7 @@ CREATE TABLE "public"."fixture_teams" (
 
 -- CreateTable
 CREATE TABLE "public"."fixtures" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "name" VARCHAR(200) NOT NULL,
     "event_id" UUID,
     "sport_id" UUID NOT NULL,
@@ -155,7 +155,7 @@ CREATE TABLE "public"."fixtures" (
 
 -- CreateTable
 CREATE TABLE "public"."matches" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "fixture_id" UUID NOT NULL,
     "event_id" UUID,
     "sport_id" UUID NOT NULL,
@@ -186,7 +186,7 @@ CREATE TABLE "public"."matches" (
 
 -- CreateTable
 CREATE TABLE "public"."media" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "file_name" VARCHAR(255) NOT NULL,
     "file_path" VARCHAR(500) NOT NULL,
     "file_type" VARCHAR(50) NOT NULL,
@@ -204,7 +204,7 @@ CREATE TABLE "public"."media" (
 
 -- CreateTable
 CREATE TABLE "public"."notifications" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "user_id" UUID NOT NULL,
     "title" VARCHAR(200) NOT NULL,
     "message" TEXT NOT NULL,
@@ -231,7 +231,7 @@ CREATE TABLE "public"."sport_gender_categories" (
 
 -- CreateTable
 CREATE TABLE "public"."sports" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "name" VARCHAR(100) NOT NULL,
     "description" TEXT,
     "main_players_count" INTEGER NOT NULL,
@@ -246,7 +246,7 @@ CREATE TABLE "public"."sports" (
 
 -- CreateTable
 CREATE TABLE "public"."system_config" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "key" VARCHAR(100) NOT NULL,
     "value" TEXT NOT NULL,
     "description" TEXT,
@@ -260,7 +260,7 @@ CREATE TABLE "public"."system_config" (
 
 -- CreateTable
 CREATE TABLE "public"."taluk_cluster_mappings" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "event_id" UUID NOT NULL,
     "district" VARCHAR(100) NOT NULL,
     "state" VARCHAR(100) NOT NULL,
@@ -288,7 +288,7 @@ CREATE TABLE "public"."team_photos" (
 
 -- CreateTable
 CREATE TABLE "public"."team_players" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "team_id" UUID NOT NULL,
     "user_id" UUID NOT NULL,
     "position" "public"."PlayerPosition" NOT NULL,
@@ -316,7 +316,7 @@ CREATE TABLE "public"."team_players" (
 
 -- CreateTable
 CREATE TABLE "public"."team_venue_assignments" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "team_id" UUID NOT NULL,
     "event_id" UUID NOT NULL,
     "level" "public"."TournamentLevel" NOT NULL DEFAULT 'cluster',
@@ -338,7 +338,7 @@ CREATE TABLE "public"."team_venue_assignments" (
 
 -- CreateTable
 CREATE TABLE "public"."teams" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "name" VARCHAR(200) NOT NULL,
     "description" TEXT,
     "event_id" UUID,
@@ -384,7 +384,7 @@ CREATE TABLE "public"."user_profile_images" (
 
 -- CreateTable
 CREATE TABLE "public"."users" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "phone" VARCHAR(20) NOT NULL,
     "email" VARCHAR(255),
     "role" "public"."UserRole" NOT NULL DEFAULT 'public',
@@ -410,7 +410,7 @@ CREATE TABLE "public"."users" (
 
 -- CreateTable
 CREATE TABLE "public"."user_verifications" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "user_id" UUID NOT NULL,
     "verification_type" "public"."VerificationType" NOT NULL,
     "verification_status" "public"."VerificationStatus" NOT NULL DEFAULT 'pending',
@@ -425,7 +425,7 @@ CREATE TABLE "public"."user_verifications" (
 
 -- CreateTable
 CREATE TABLE "public"."venue_location_mappings" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "event_id" UUID NOT NULL,
     "venue_id" UUID NOT NULL,
     "level" "public"."TournamentLevel" NOT NULL,
@@ -440,7 +440,7 @@ CREATE TABLE "public"."venue_location_mappings" (
 
 -- CreateTable
 CREATE TABLE "public"."venues" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "name" VARCHAR(200) NOT NULL,
     "capacity" INTEGER,
     "panchayat" VARCHAR(100),
@@ -462,7 +462,7 @@ CREATE TABLE "public"."venues" (
 
 -- CreateTable
 CREATE TABLE "public"."volunteer_assignments" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "event_id" UUID NOT NULL,
     "volunteer_id" UUID NOT NULL,
     "venue_location_mapping_id" UUID NOT NULL,
@@ -480,7 +480,7 @@ CREATE TABLE "public"."volunteer_assignments" (
 
 -- CreateTable
 CREATE TABLE "public"."user_roles" (
-    "id" UUID NOT NULL DEFAULT uuid_generate_v4(),
+    "id" UUID NOT NULL,
     "user_id" UUID NOT NULL,
     "event_id" UUID,
     "role" "public"."UserRole" NOT NULL,

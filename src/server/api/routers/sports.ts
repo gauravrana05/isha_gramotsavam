@@ -8,12 +8,12 @@ export const sportsRouter = createTRPCRouter({
   getAllWithCategories: publicProcedure
     .query(async () => {
       try {
-        const sportsWithCategories = await db.sports.findMany({
-          where: { is_active: true },
+        const sportsWithCategories = await db.sport.findMany({
+          where: { isActive: true },
           include: {
-            sport_gender_categories: {
+            sportGenderCategories: {
               select: {
-                gender_category: true,
+                genderCategory: true,
               },
             },
           },
@@ -21,8 +21,8 @@ export const sportsRouter = createTRPCRouter({
         });
 
         return sportsWithCategories.map((sport) => {
-          const genderCategories = sport.sport_gender_categories.map(gc => gc.gender_category);
-          const { sport_gender_categories, ...rest } = sport;
+          const genderCategories = sport.sportGenderCategories.map(gc => gc.genderCategory);
+          const { sportGenderCategories, ...rest } = sport;
           return {
             ...rest,
             gender_categories: genderCategories,
@@ -48,10 +48,10 @@ export const sportsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       try {
         // Try to find by ID first, then by name
-        const sport = await db.sports.findFirst({
+        const sport = await db.sport.findFirst({
           where: { 
             AND: [
-              { is_active: true },
+              { isActive: true },
               {
                 OR: [
                   { id: input.identifier },
@@ -64,8 +64,8 @@ export const sportsRouter = createTRPCRouter({
             id: true,
             name: true,
             description: true,
-            main_players_count: true,
-            max_substitutes: true,
+            mainPlayersCount: true,
+            maxSubstitutes: true,
           }
         })
 
@@ -77,12 +77,12 @@ export const sportsRouter = createTRPCRouter({
         }
 
         // Get gender categories for this sport
-        const genderCategories = await db.sport_gender_categories.findMany({
-          where: { sport_id: sport.id },
-          select: { gender_category: true }
+        const genderCategories = await db.sportGenderCategory.findMany({
+          where: { sportId: sport.id },
+          select: { genderCategory: true }
         })
 
-        const categories = genderCategories.map(gc => gc.gender_category)
+        const categories = genderCategories.map(gc => gc.genderCategory)
         
         // Determine if user can register based on gender
         let canRegister = true
@@ -111,8 +111,8 @@ export const sportsRouter = createTRPCRouter({
           supports_men: categories.includes('men'),
           supports_women: categories.includes('women'),
           supports_mixed: categories.includes('mixed'),
-          can_register: canRegister,
-          registration_message: registrationMessage,
+          canRegister: canRegister,
+          registrationMessage: registrationMessage,
         }
       } catch (error) {
         if (error instanceof TRPCError) throw error
@@ -130,23 +130,42 @@ export const sportsRouter = createTRPCRouter({
     }))
     .query(async ({ input }) => {
       try {
-        // Get sports that support the user's gender
-        const sportsQuery = `
-          SELECT DISTINCT s.id, s.name, s.description, s.main_players_count, s.max_substitutes
-          FROM sports s
-          JOIN sport_gender_categories sgc ON s.id = sgc.sport_id
-          WHERE s.is_active = true 
-          AND (
-            sgc.gender_category = 'mixed' OR
-            (sgc.gender_category = 'men' AND $1 = 'M') OR
-            (sgc.gender_category = 'women' AND $1 = 'F')
-          )
-          ORDER BY s.name
-        `
+        // Determine which gender categories to look for
+        const genderCategories = ['mixed']
+        if (input.gender === 'M') genderCategories.push('men')
+        if (input.gender === 'F') genderCategories.push('women')
 
-        const sports = await db.$queryRawUnsafe(sportsQuery, input.gender)
+        // Get sports that support the user's gender using Prisma
+        const sports = await db.sport.findMany({
+          where: {
+            isActive: true,
+            sportGenderCategories: {
+              some: {
+                genderCategory: {
+                  in: genderCategories
+                }
+              }
+            }
+          },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            mainPlayersCount: true,
+            maxSubstitutes: true,
+            sportGenderCategories: {
+              select: {
+                genderCategory: true
+              }
+            }
+          },
+          orderBy: { name: 'asc' }
+        })
 
-        return sports
+        return sports.map(sport => ({
+          ...sport,
+          gender_categories: sport.sportGenderCategories.map(gc => gc.genderCategory)
+        }))
       } catch (error) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

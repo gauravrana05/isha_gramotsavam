@@ -186,10 +186,10 @@ export default function Header({ lang }: HeaderProps) {
                 >
                   <span>Profile</span>
                   <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/20 hover:border-primary-500 transition-colors bg-gray-200 flex items-center justify-center">
-                    {profileImageQuery.data?.userProfileImages?.profile_photo_path ? (
+                    {profileImageQuery.data?.userProfileImages?.profilePhotoPath ? (
                       <Image
-                        src={profileImageQuery.data.userProfileImages.profile_photo_path}
-                        alt={`${user.first_name || 'User'} profile`}
+                        src={profileImageQuery.data.userProfileImages.profilePhotoPath}
+                        alt={`${user.firstName || 'User'} profile`}
                         width={32}
                         height={32}
                         className="w-full h-full object-cover"
@@ -261,7 +261,7 @@ export default function Header({ lang }: HeaderProps) {
                   {sportsQuery.data?.map((sport) => (
                     <Link
                       key={sport.id}
-                      href={`/${lang}/public/sports/${sport.name.toLowerCase().replace(/\s+/g, '-')}`}
+                      href={`/${lang}/public/sports/${sport.id}`}
                       className="block text-gray-300 hover:text-primary-500 transition-colors"
                       onClick={closeMobileMenu}
                     >

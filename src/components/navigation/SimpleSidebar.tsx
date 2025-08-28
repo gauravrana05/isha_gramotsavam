@@ -257,11 +257,11 @@ export default function CaptainSidebar({
               isDesktopCollapsed ? 'justify-center px-2' : 'px-4'
             }`}>
               <div className="flex items-center">
-                {userProfile.user_profile_images_user_profile_images_user_idTousers?.profile_photo_path ? (
+                {userProfile.profileImages?.profilePhotoPath ? (
                   <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
                     <Image
-                      src={userProfile.user_profile_images_user_profile_images_user_idTousers.profile_photo_path}
-                      alt={`${userProfile.first_name} ${userProfile.last_name}`}
+                      src={userProfile.profileImages.profilePhotoPath}
+                      alt={`${userProfile.firstName} ${userProfile.lastName}`}
                       width={40}
                       height={40}
                       className="object-cover w-full h-full"
@@ -270,14 +270,14 @@ export default function CaptainSidebar({
                 ) : (
                   <div className="w-10 h-10 bg-[#3A7F3F] rounded-full flex items-center justify-center flex-shrink-0">
                     <span className="text-white font-medium text-sm">
-                      {userProfile.first_name?.charAt(0)}{userProfile.last_name?.charAt(0)}
+                      {userProfile.firstName?.charAt(0)}{userProfile.lastName?.charAt(0)}
                     </span>
                   </div>
                 )}
                 {showContent && (
                   <div className="ml-3 animate-fade-in">
                     <p className="text-sm font-medium text-gray-900">
-                      {userProfile.first_name} {userProfile.last_name}
+                      {userProfile.firstName} {userProfile.lastName}
                     </p>
                     <p className="text-xs text-gray-600 capitalize">{userProfile.role}</p>
                   </div>

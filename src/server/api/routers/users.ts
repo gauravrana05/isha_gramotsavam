@@ -23,7 +23,7 @@ export const usersRouter = createTRPCRouter({
     .input(createUserSchema)
     .mutation(async ({ input }) => {
       try {
-        const existingUser = await db.users.findUnique({
+        const existingUser = await db.user.findUnique({
           where: { phone: input.phone },
         })
 
@@ -34,7 +34,7 @@ export const usersRouter = createTRPCRouter({
           })
         }
 
-        const user = await db.users.create({
+        const user = await db.user.create({
           data: input,
         })
 
@@ -51,10 +51,10 @@ export const usersRouter = createTRPCRouter({
   getByPhone: publicProcedure
     .input(getUserByPhoneSchema)
     .query(async ({ input }) => {
-      const user = await db.users.findUnique({
+      const user = await db.user.findUnique({
         where: { phone: input.phone },
         include: {
-          user_profile_images_user_profile_images_user_idTousers: true,
+          profileImages: true,
         },
       })
 
@@ -65,10 +65,10 @@ export const usersRouter = createTRPCRouter({
   getById: protectedProcedure
     .input(getUserByIdSchema)
     .query(async ({ input }) => {
-      const user = await db.users.findUnique({
+      const user = await db.user.findUnique({
         where: { id: input.id },
         include: {
-          user_profile_images_user_profile_images_user_idTousers: true,
+          profileImages: true,
         },
       })
 
@@ -88,7 +88,7 @@ export const usersRouter = createTRPCRouter({
       const { id, ...updateData } = input
 
       try {
-        const user = await db.users.update({
+        const user = await db.user.update({
           where: { id },
           data: updateData,
         })
@@ -108,11 +108,11 @@ export const usersRouter = createTRPCRouter({
       const { id, ...profileData } = input
 
       try {
-        const user = await db.users.update({
+        const user = await db.user.update({
           where: { id },
           data: {
             ...profileData,
-            profile_complete: true,
+            profileComplete: true,
           },
         })
 
@@ -130,24 +130,24 @@ export const usersRouter = createTRPCRouter({
     .input(uploadProfileImageSchema)
     .mutation(async ({ input }) => {
       try {
-        const profileImage = await db.user_profile_images.upsert({
+        const profileImages = await db.userProfileImage.upsert({
           where: { userId: input.userId },
           create: {
             userId: input.userId,
-            profile_photo_path: input.profilePhotoPath,
-            aadhaar_front_path: input.aadhaarFrontPath,
-            aadhaar_back_path: input.aadhaarBackPath,
-            all_images_uploaded: Boolean(
+            profilePhotoPath: input.profilePhotoPath,
+            aadhaarFrontPath: input.aadhaarFrontPath,
+            aadhaarBackPath: input.aadhaarBackPath,
+            allImagesUploaded: Boolean(
               input.profilePhotoPath && 
               input.aadhaarFrontPath && 
               input.aadhaarBackPath
             ),
           },
           update: {
-            profile_photo_path: input.profilePhotoPath,
-            aadhaar_front_path: input.aadhaarFrontPath,
-            aadhaar_back_path: input.aadhaarBackPath,
-            all_images_uploaded: Boolean(
+            profilePhotoPath: input.profilePhotoPath,
+            aadhaarFrontPath: input.aadhaarFrontPath,
+            aadhaarBackPath: input.aadhaarBackPath,
+            allImagesUploaded: Boolean(
               input.profilePhotoPath && 
               input.aadhaarFrontPath && 
               input.aadhaarBackPath
@@ -155,7 +155,7 @@ export const usersRouter = createTRPCRouter({
           },
         })
 
-        return profileImage
+        return profileImages
       } catch (error) {
         console.error('uploadProfileImage error:', error);
         throw new TRPCError({
@@ -170,7 +170,7 @@ export const usersRouter = createTRPCRouter({
     .input(createUserVerificationSchema)
     .mutation(async ({ input }) => {
       try {
-        const verification = await db.user_verifications.create({
+        const verification = await db.userVerification.create({
           data: input,
         })
 
@@ -189,11 +189,11 @@ export const usersRouter = createTRPCRouter({
       const { id, ...updateData } = input
 
       try {
-        const verification = await db.user_verifications.update({
+        const verification = await db.userVerification.update({
           where: { id },
           data: {
             ...updateData,
-            verified_at: updateData.status === 'approved' ? new Date() : null,
+            verifiedAt: updateData.status === 'approved' ? new Date() : null,
           },
         })
 
@@ -209,14 +209,14 @@ export const usersRouter = createTRPCRouter({
   getVerifications: protectedProcedure
     .input(getUserVerificationsSchema)
     .query(async ({ input }) => {
-      const verifications = await db.user_verifications.findMany({
+      const verifications = await db.userVerification.findMany({
         where: { userId: input.userId },
         include: {
-          users_user_verifications_verified_byTousers: {
+          verifiedByUser: {
             select: {
               id: true,
-              first_name: true,
-              last_name: true,
+              firstName: true,
+              lastName: true,
             },
           },
         },
@@ -241,8 +241,8 @@ export const usersRouter = createTRPCRouter({
       if (state) where.state = state
       if (search) {
         where.OR = [
-          { first_name: { contains: search, mode: 'insensitive' } },
-          { last_name: { contains: search, mode: 'insensitive' } },
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
           { phone: { contains: search } },
           { email: { contains: search, mode: 'insensitive' } },
         ]
@@ -250,7 +250,7 @@ export const usersRouter = createTRPCRouter({
 
       // Filter by verification status if provided
       if (verificationStatus) {
-        where.user_verifications_user_verifications_user_idTousers = {
+        where.userVerifications = {
           some: {
             status: verificationStatus,
           },
@@ -258,16 +258,16 @@ export const usersRouter = createTRPCRouter({
       }
 
       const [users, total] = await Promise.all([
-        db.users.findMany({
+        db.user.findMany({
           where,
           include: {
-              user_profile_images_user_profile_images_user_idTousers: true,
+              profileImages: true,
           },
           skip,
           take: limit,
           orderBy: { [sortBy]: sortOrder },
         }),
-        db.users.count({ where }),
+        db.user.count({ where }),
       ])
 
       return {
@@ -282,37 +282,37 @@ export const usersRouter = createTRPCRouter({
     .input(verifyProfileImagesSchema)
     .mutation(async ({ input }) => {
       try {
-        const profileImage = await db.user_profile_images.update({
+        const profileImages = await db.userProfileImage.update({
           where: { userId: input.userId },
           data: {
-            verified_by: input.verifiedBy,
-            verified_at: input.approved ? new Date() : null,
+            verifiedBy: input.verifiedBy,
+            verifiedAt: input.approved ? new Date() : null,
           },
         })
 
         // Create or update document verification record
-        await db.user_verifications.upsert({
+        await db.userVerification.upsert({
           where: {
-            user_id_verification_type: {
+            userId_verificationType: {
               userId: input.userId,
-              verification_type: 'document_verification',
+              verificationType: 'document_verification',
             },
           },
           create: {
             userId: input.userId,
-            verification_type: 'document_verification',
+            verificationType: 'document_verification',
             status: input.approved ? 'approved' : 'rejected',
-            verified_by: input.verifiedBy,
-            verified_at: input.approved ? new Date() : null,
+            verifiedBy: input.verifiedBy,
+            verifiedAt: input.approved ? new Date() : null,
           },
           update: {
             status: input.approved ? 'approved' : 'rejected',
-            verified_by: input.verifiedBy,
-            verified_at: input.approved ? new Date() : null,
+            verifiedBy: input.verifiedBy,
+            verifiedAt: input.approved ? new Date() : null,
           },
         })
 
-        return profileImage
+        return profileImages
       } catch (error) {
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -342,14 +342,14 @@ export const usersRouter = createTRPCRouter({
       }
 
       const [verifications, total] = await Promise.all([
-        db.user_verifications.findMany({
+        db.userVerification.findMany({
           where,
           include: {
-            users_user_verifications_user_idTousers: {
+            user: {
               select: {
                 id: true,
-                first_name: true,
-                last_name: true,
+                firstName: true,
+                lastName: true,
                 phone: true,
                 district: true,
                 state: true,
@@ -360,7 +360,7 @@ export const usersRouter = createTRPCRouter({
           take: limit,
           orderBy: { createdAt: 'asc' },
         }),
-        db.user_verifications.count({ where }),
+        db.userVerification.count({ where }),
       ])
 
       return {
@@ -374,11 +374,11 @@ export const usersRouter = createTRPCRouter({
   updateRole: adminProcedure
     .input(z.object({
       userId: z.string().uuid(),
-      role: z.enum(['admin', 'captain', 'player', 'volunteer', 'technical_volunteer', 'verification', 'public']),
+      role: z.enum(['admin', 'captain', 'player', 'general_volunteer', 'technical_volunteer', 'verification_volunteer', 'public']),
     }))
     .mutation(async ({ input }) => {
       try {
-        const user = await db.users.update({
+        const user = await db.user.update({
           where: { id: input.userId },
           data: { role: input.role as any }, 
         })
@@ -408,8 +408,8 @@ export const usersRouter = createTRPCRouter({
 
         return {
           id: user.id,
-          first_name: user.first_name,
-          last_name: user.last_name,
+          firstName: user.firstName,
+          lastName: user.lastName,
           role: user.role,
           email: user.email,
         };

@@ -9,7 +9,7 @@ datasource db {
 }
 
 model AuditLog {
-  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id          String    @id @default(uuid()) @db.Uuid
   userId      String?   @map("user_id") @db.Uuid
   action      String    @db.VarChar(100)
   entityType  String    @map("entity_type") @db.VarChar(50)
@@ -29,7 +29,7 @@ model AuditLog {
 }
 
 model ClusterDivisionMapping {
-  id                     String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                     String @id @default(uuid()) @db.Uuid
   eventId                String @map("event_id") @db.Uuid
   state                  String @db.VarChar(100)
   clusterVenueMappingId  String @map("cluster_venue_mapping_id") @db.Uuid
@@ -53,7 +53,7 @@ model ClusterDivisionMapping {
 }
 
 model Event {
-  id                  String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                  String @id @default(uuid()) @db.Uuid
   name                String @db.VarChar(200)
   description         String?
   registrationStartDate DateTime @map("registration_start_date") @db.Date
@@ -83,7 +83,7 @@ model Event {
 }
 
 model FixtureResult {
-  id                String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                String @id @default(uuid()) @db.Uuid
   fixtureId         String @map("fixture_id") @db.Uuid
   teamId            String @map("team_id") @db.Uuid
   finalPosition     Int
@@ -141,7 +141,7 @@ model FixtureTeam {
 }
 
 model Fixture {
-  id                     String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                     String @id @default(uuid()) @db.Uuid
   name                   String @db.VarChar(200)
   eventId                String? @db.Uuid @map("event_id")
   sportId                String @db.Uuid @map("sport_id")
@@ -166,7 +166,7 @@ model Fixture {
 }
 
 model Match {
-  id                     String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                     String @id @default(uuid()) @db.Uuid
   fixtureId              String @db.Uuid @map("fixture_id")
   eventId                String? @db.Uuid @map("event_id")
   sportId                String @db.Uuid @map("sport_id")
@@ -222,7 +222,7 @@ model Match {
 }
 
 model Media {
-  id           String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id           String @id @default(uuid()) @db.Uuid
   fileName     String @db.VarChar(255) @map("file_name")
   filePath     String @db.VarChar(500) @map("file_path")
   fileType     String @db.VarChar(50) @map("file_type")
@@ -245,7 +245,7 @@ model Media {
 }
 
 model Notification {
-  id                  String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                  String @id @default(uuid()) @db.Uuid
   userId              String @db.Uuid @map("user_id")
   title               String @db.VarChar(200)
   message             String
@@ -281,7 +281,7 @@ model SportGenderCategory {
 }
 
 model Sport {
-  id                  String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                  String @id @default(uuid()) @db.Uuid
   name                String @db.VarChar(100)
   description         String?
   mainPlayersCount    Int @map("main_players_count")
@@ -301,7 +301,7 @@ model Sport {
 }
 
 model SystemConfig {
-  id          String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id          String @id @default(uuid()) @db.Uuid
   key         String @unique @db.VarChar(100)
   value       String
   description String?
@@ -317,7 +317,7 @@ model SystemConfig {
 }
 
 model TalukClusterMapping {
-  id                    String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                    String @id @default(uuid()) @db.Uuid
   eventId               String @db.Uuid @map("event_id")
   district              String @db.VarChar(100)
   state                 String @db.VarChar(100)
@@ -356,7 +356,7 @@ model TeamPhoto {
 }
 
 model TeamPlayer {
-  id                 String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                 String @id @default(uuid()) @db.Uuid
   teamId             String @db.Uuid @map("team_id")
   userId             String @db.Uuid @map("user_id")
   position           PlayerPosition
@@ -390,7 +390,7 @@ model TeamPlayer {
 }
 
 model TeamVenueAssignment {
-  id                      String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                      String @id @default(uuid()) @db.Uuid
   teamId                  String @db.Uuid @map("team_id")
   eventId                 String @db.Uuid @map("event_id")
   level                   TournamentLevel @default(cluster)
@@ -422,7 +422,7 @@ model TeamVenueAssignment {
 }
 
 model Team {
-  id                           String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                           String @id @default(uuid()) @db.Uuid
   name                         String @db.VarChar(200)
   description                  String?
   eventId                      String? @db.Uuid @map("event_id")
@@ -489,7 +489,7 @@ model UserProfileImage {
 }
 
 model User {
-  id                  String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                  String @id @default(uuid()) @db.Uuid
   phone               String @unique @db.VarChar(20)
   email               String? @db.VarChar(255)
   role                UserRole @default(public)
@@ -526,7 +526,7 @@ model User {
   teamVenueAssignments TeamVenueAssignment[]
   teamsAsCaptain      Team[] @relation("TeamsAsCaptain")
   teamsVerified       Team[] @relation("TeamsVerifiedBy")
-  profileImage        UserProfileImage? @relation("ProfileImages")
+  profileImages        UserProfileImage? @relation("ProfileImages")
   profileImagesVerified UserProfileImage[] @relation("ProfileImagesVerifiedBy")
   userRoles           UserRoleAssignment[]
   userVerifications   UserVerification[] @relation("UserVerifications")
@@ -539,7 +539,7 @@ model User {
 }
 
 model UserVerification {
-  id               String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id               String @id @default(uuid()) @db.Uuid
   userId           String @map("user_id") @db.Uuid
   verificationType VerificationType @map("verification_type")
   status           VerificationStatus @default(pending) @map("verification_status")
@@ -559,7 +559,7 @@ model UserVerification {
 }
 
 model VenueLocationMapping {
-  id          String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id          String @id @default(uuid()) @db.Uuid
   eventId     String @map("event_id") @db.Uuid
   venueId     String @map("venue_id") @db.Uuid
   level       TournamentLevel
@@ -591,7 +591,7 @@ model VenueLocationMapping {
 }
 
 model Venue {
-  id            String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id            String @id @default(uuid()) @db.Uuid
   name          String @db.VarChar(200)
   capacity      Int?
   panchayat     String? @db.VarChar(100)
@@ -621,7 +621,7 @@ model Venue {
 }
 
 model VolunteerAssignment {
-  id                     String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id                     String @id @default(uuid()) @db.Uuid
 
   eventId                String @map("event_id") @db.Uuid
   volunteerId            String @map("volunteer_id") @db.Uuid
@@ -659,7 +659,7 @@ model VolunteerAssignment {
 }
 
 model UserRoleAssignment {
-  id         String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id         String @id @default(uuid()) @db.Uuid
   userId     String @map("user_id") @db.Uuid
   eventId    String? @map("event_id") @db.Uuid
   role       UserRole
@@ -772,7 +772,7 @@ enum UserRole {
   admin
   captain
   player
-  genenral_volunteer
+  general_volunteer
   technical_volunteer
   verification_volunteer
   public

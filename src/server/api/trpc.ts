@@ -15,12 +15,12 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     if (userId) {
       // Import db here to avoid circular dependency issues
       const { db } = await import('@/lib/db');
-      user = await db.users.findUnique({
+      user = await db.user.findUnique({
         where: { id: userId },
         select: {
           id: true,
-          first_name: true,
-          last_name: true,
+          firstName: true,
+          lastName: true,
           email: true,
           phone: true,
           role: true,

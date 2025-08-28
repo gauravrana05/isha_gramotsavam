@@ -33,7 +33,7 @@ export default function TeamRegistrationPage() {
   const router = useRouter();
   const { lang, sport } = useParams();
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
 
   // Fetch profile completion data using the new API
   const profileDataQuery = api.profile.checkCompletion.useQuery(
@@ -49,7 +49,7 @@ export default function TeamRegistrationPage() {
   const createTeamMutation = api.teams.createAndPromoteCaptain.useMutation();
   
   // Get sport parameter
-  const sportName = Array.isArray(sport) ? sport[0] : sport ?? "sport_name";
+  const sportName = Array.isArray(sport) ? sport[0] : sport ?? "sportName";
   
   // Fetch sport data with gender validation
   const sportQuery = api.sports.getByIdOrName.useQuery(
@@ -84,8 +84,8 @@ export default function TeamRegistrationPage() {
 
     // Check sport validity and gender eligibility
     if (sportQuery.data) {
-      if (!sportQuery.data.can_register) {
-        setError(sportQuery.data.registration_message || 'Registration not available for this sport');
+      if (!sportQuery.data.canRegister) {
+        setError(sportQuery.data.registrationMessage || 'Registration not available for this sport');
         return;
       }
     } else if (sportQuery.error) {
@@ -125,8 +125,8 @@ export default function TeamRegistrationPage() {
     if (!userProfileData || !sportQuery.data) return;
 
     // Check if user can register for this sport
-    if (!sportQuery.data.can_register) {
-      setError(sportQuery.data.registration_message || 'Registration not available for this sport');
+    if (!sportQuery.data.canRegister) {
+      setError(sportQuery.data.registrationMessage || 'Registration not available for this sport');
       return;
     }
 
@@ -157,6 +157,9 @@ export default function TeamRegistrationPage() {
         teamData, 
         captainId: user?.id 
       });
+      
+      // Refresh user data to get updated role before navigating
+      await refreshUser();
       
       // Navigate to team invite page
       router.push(`/${lang}/captain/teams/${result.teamId}/players/invite`);
@@ -272,7 +275,7 @@ export default function TeamRegistrationPage() {
 
           <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <p className="text-green-700 text-xs sm:text-sm font-fira">
-              <strong>Captain Details:</strong> You ({userProfile?.first_name} {userProfile?.last_name}) will automatically be set as the team captain. 
+              <strong>Captain Details:</strong> You ({userProfile?.firstName} {userProfile?.lastName}) will automatically be set as the team captain. 
               After team creation, you can add other players to your team.
             </p>
           </div>
