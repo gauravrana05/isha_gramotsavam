@@ -360,7 +360,7 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
     const allPlayersVerified = playersByStatus.verified === totalPlayers;
     const allPlayersApproved = playersByStatus.approved === totalPlayers;
 
-    // Determine new team status
+    // Determine new team status based on new flow: submitted -> verified -> checked-in
     let newTeamStatus = teamData?.status || 'submitted';
     let shouldUpdateTeam = false;
 
@@ -368,17 +368,17 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
       // Any rejected player → team becomes rejected
       newTeamStatus = 'rejected';
       shouldUpdateTeam = true;
+    } else if (allPlayersApproved) {
+      // All players approved by technical volunteer → team becomes checked-in (from any status)
+      newTeamStatus = 'checked_in';
+      shouldUpdateTeam = true;
+    } else if (allPlayersVerified && (teamData?.status === 'submitted' || teamData?.status === 'rejected')) {
+      // All players verified by verification volunteer → team becomes verified
+      newTeamStatus = 'verified';  
+      shouldUpdateTeam = true;
     } else if (hasPendingPlayers && (teamData?.status === 'verified' || teamData?.status === 'checked_in')) {
       // Any pending player when team was verified/checked-in → revert to submitted  
       newTeamStatus = 'submitted';
-      shouldUpdateTeam = true;
-    } else if (allPlayersApproved && teamData?.status !== 'checked_in') {
-      // All players approved → team becomes checked-in
-      newTeamStatus = 'checked_in';
-      shouldUpdateTeam = true;
-    } else if (allPlayersVerified && teamData?.status === 'submitted') {
-      // All players verified → team becomes verified
-      newTeamStatus = 'verified';  
       shouldUpdateTeam = true;
     }
 
@@ -439,17 +439,20 @@ export async function verifyPlayerMatchDay(request: MatchDayPlayerVerification &
       const playerData = playerDoc.data();
 
       if (teamData && playerData && userData) {
-        await auditLogService.logOnGroundVerification(
-          verifiedBy, // volunteerId
-          `${userData.firstName} ${userData.lastName}`.trim(), // volunteerName
-          playerId, // playerId
-          playerData.name || 'Unknown Player', // playerName
-          finalTeamId, // teamId
-          teamData.name || 'Unknown Team', // teamName
-          venueId || 'Unknown Venue', // venue
-          status, // status
-          comments || undefined // comments
-        );
+        // Only log for verification statuses that the audit service supports
+        if (status === 'verified' || status === 'rejected') {
+          await auditLogService.logOnGroundVerification(
+            verifiedBy, // volunteerId
+            `${userData.firstName} ${userData.lastName}`.trim(), // volunteerName
+            playerId, // playerId
+            playerData.name || 'Unknown Player', // playerName
+            finalTeamId, // teamId
+            teamData.name || 'Unknown Team', // teamName
+            venueId || 'Unknown Venue', // venue
+            status, // status
+            comments || undefined // comments
+          );
+        }
       }
     } catch (auditError) {
       // Don't fail the main operation if audit logging fails

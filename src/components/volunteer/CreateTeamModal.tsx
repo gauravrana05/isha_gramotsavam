@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
-import { X, Users, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Users, Plus, Loader2 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { createTeamByVolunteer } from '@/lib/actions/volunteer/teamManagement';
 
 interface Sport {
   id: string;
@@ -14,18 +16,133 @@ interface Sport {
 interface CreateTeamModalProps {
   isOpen: boolean;
   onClose: () => void;
+  venueLocation?: {
+    panchayat: string;
+    district: string;
+    state: string;
+  };
+  onTeamCreated: () => Promise<void>;
+}
+
+interface FormData {
+  name: string;
+  description: string;
+  sportId: string;
+  panchayat: string;
+  district: string;
+  state: string;
+  captainPhone: string;
 }
 
 export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
   isOpen,
-  onClose
+  onClose,
+  venueLocation,
+  onTeamCreated
 }) => {
   const router = useRouter();
   const { lang } = useParams();
+  const { user } = useAuth();
 
-  const handleSportSelect = (sport: string) => {
-    onClose();
-    router.push(`/${lang}/volunteer/create-team/${sport}`);
+  const [formData, setFormData] = useState<FormData>({
+    name: '',
+    description: '',
+    sportId: '',
+    panchayat: venueLocation?.panchayat || '',
+    district: venueLocation?.district || '',
+    state: venueLocation?.state || '',
+    captainPhone: ''
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const sports: Sport[] = [
+    { id: 'volleyball', name: 'Volleyball', maxPlayers: 12 },
+    { id: 'throwball', name: 'Throwball', maxPlayers: 12, genderRestriction: 'F' }
+  ];
+
+  const selectedSport = sports.find(sport => sport.id === formData.sportId);
+
+  useEffect(() => {
+    if (venueLocation) {
+      setFormData(prev => ({
+        ...prev,
+        panchayat: venueLocation.panchayat,
+        district: venueLocation.district,
+        state: venueLocation.state
+      }));
+    }
+  }, [venueLocation]);
+
+  const handleInputChange = (field: keyof FormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setError('');
+  };
+
+  const handleSubmit = async () => {
+    if (!user) {
+      setError('You must be logged in to create a team');
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      setError('Team name is required');
+      return;
+    }
+
+    if (!formData.sportId) {
+      setError('Please select a sport');
+      return;
+    }
+
+    if (!formData.captainPhone.trim()) {
+      setError('Captain phone number is required');
+      return;
+    }
+
+    if (!formData.panchayat || !formData.district || !formData.state) {
+      setError('Location information is required');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await createTeamByVolunteer({
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        sport: formData.sportId,
+        captainPhone: formData.captainPhone.trim(),
+        location: {
+          panchayat: formData.panchayat,
+          district: formData.district,
+          state: formData.state
+        },
+        createdBy: user.uid
+      });
+
+      if (result.success) {
+        await onTeamCreated();
+        onClose();
+        setFormData({
+          name: '',
+          description: '',
+          sportId: '',
+          panchayat: venueLocation?.panchayat || '',
+          district: venueLocation?.district || '',
+          state: venueLocation?.state || '',
+          captainPhone: ''
+        });
+      } else {
+        setError(result.message || 'Failed to create team');
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -167,17 +284,17 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Captain Email <span className="text-red-500">*</span>
+                  Captain Phone Number <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="email"
+                  type="tel"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
-                  placeholder="Enter captain's email address"
-                  value={formData.captainEmail}
-                  onChange={(e) => handleInputChange('captainEmail', e.target.value)}
+                  placeholder="Enter captain's phone number"
+                  value={formData.captainPhone}
+                  onChange={(e) => handleInputChange('captainPhone', e.target.value)}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  The person with this email must have a complete profile to become team captain
+                  The person with this phone number must have a complete profile to become team captain
                 </p>
               </div>
 

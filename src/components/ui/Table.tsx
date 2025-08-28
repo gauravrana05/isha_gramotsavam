@@ -110,6 +110,12 @@ export interface TableProps<T = any> extends BaseComponentProps {
   onRowClick?: (item: T, index: number) => void;
   keyExtractor?: (item: T, index: number) => string | number;
   
+  // Expandable rows
+  expandable?: boolean;
+  expandedRows?: Set<string | number>;
+  onRowExpand?: (item: T, expanded: boolean) => void;
+  renderExpandedContent?: (item: T, index: number) => React.ReactNode;
+  
   // Bulk actions
   bulkActions?: ActionButton<T[]>[];
   // Virtualization
@@ -388,6 +394,13 @@ export function Table<T>({
   onSelectionChange,
   onRowClick,
   keyExtractor = (item, index) => index,
+  
+  // Expandable props
+  expandable = false,
+  expandedRows = new Set(),
+  onRowExpand,
+  renderExpandedContent,
+  
   bulkActions,
   className,
   // virtualization props should not be spread to DOM
@@ -524,6 +537,13 @@ export function Table<T>({
               )}
             >
               <tr>
+                {/* Expand column */}
+                {expandable && (
+                  <th className="px-2 py-3 text-left w-8">
+                    {/* Empty header for expand column */}
+                  </th>
+                )}
+                
                 {/* Selection column */}
                 {selectable && (
                   <th className="px-3 py-3 text-left w-12">
@@ -597,40 +617,60 @@ export function Table<T>({
                 const index = shouldVirtualize ? startIndex + i : i;
                 const rowKey = keyExtractor(item, index);
                 const isSelected = selectedRows.has(rowKey);
+                const isExpanded = expandedRows.has(rowKey);
                 
                 return (
-                  <tr
-                    key={rowKey}
-                    className={cn(
-                      'transition-colors',
-                      hoverable && 'hover:bg-gray-50',
-                      onRowClick && 'cursor-pointer',
-                      isSelected && 'bg-blue-50',
-                      compactMode && 'text-sm'
-                    )}
-                    onClick={() => onRowClick?.(item, index)}
-                    style={shouldVirtualize ? { display: 'block', height: rowHeight } as any : undefined}
-                  >
-                    {/* Selection cell */}
-                    {selectable && (
-                      <td className="px-3 py-4">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            const newSelected = new Set(selectedRows);
-                            if (e.target.checked) {
-                              newSelected.add(rowKey);
-                            } else {
-                              newSelected.delete(rowKey);
-                            }
-                            onSelectionChange?.(newSelected);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                        />
-                      </td>
-                    )}
+                  <React.Fragment key={rowKey}>
+                    <tr
+                      className={cn(
+                        'transition-colors',
+                        hoverable && 'hover:bg-gray-50',
+                        onRowClick && 'cursor-pointer',
+                        isSelected && 'bg-blue-50',
+                        compactMode && 'text-sm'
+                      )}
+                      onClick={() => onRowClick?.(item, index)}
+                      style={shouldVirtualize ? { display: 'block', height: rowHeight } as any : undefined}
+                    >
+                      {/* Expand button cell */}
+                      {expandable && (
+                        <td className="px-1 py-4 w-8">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRowExpand?.(item, !isExpanded);
+                            }}
+                            className="p-0.5 rounded hover:bg-gray-100 transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-gray-500" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                            )}
+                          </button>
+                        </td>
+                      )}
+
+                      {/* Selection cell */}
+                      {selectable && (
+                        <td className="px-3 py-4">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              const newSelected = new Set(selectedRows);
+                              if (e.target.checked) {
+                                newSelected.add(rowKey);
+                              } else {
+                                newSelected.delete(rowKey);
+                              }
+                              onSelectionChange?.(newSelected);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                          />
+                        </td>
+                      )}
                     
                     {/* Data cells */}
                     {columns.map((column) => {
@@ -674,7 +714,13 @@ export function Table<T>({
                         </div>
                       </td>
                     )}
-                  </tr>
+                    </tr>
+                    
+                    {/* Expanded content - rendered directly as returned by renderExpandedContent */}
+                    {expandable && isExpanded && renderExpandedContent && 
+                      renderExpandedContent(item, index)
+                    }
+                  </React.Fragment>
                 );
               })}
               {shouldVirtualize ? (

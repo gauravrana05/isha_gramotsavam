@@ -107,7 +107,6 @@ export const VerificationStatusSelector: React.FC<{
 }> = ({ value, onChange, className, disabled }) => {
   const options: StatusOption[] = [
     { value: 'pending', label: 'Pending' },
-    { value: 'verified', label: 'Verified' },
     { value: 'approved', label: 'Approved' },
     { value: 'rejected', label: 'Rejected' }
   ];

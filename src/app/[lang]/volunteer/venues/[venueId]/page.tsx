@@ -136,13 +136,9 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
   }
 
   const totalTeams = teams.length;
-  const checkedInCount = teams.filter(team => team.matchDayStatus === 'checked_in').length;
-  const verifiedCount = teams.filter(team => team.matchDayStatus === 'verified').length;
-  // Teams assigned to venue should already be verified, so pending here means match-day verification pending
-  const pendingCount = teams.filter(team => team.matchDayStatus === 'pending' || !team.matchDayStatus).length;
-  
-  // Also get counts from checked-in teams for sports overview
-  const checkedInSportsCount = checkedInTeamsResult.success ? checkedInTeamsResult.totalTeams : 0;
+  const checkedInCount = teams.filter(team => team.status === 'checked_in').length;
+  const verifiedCount = teams.filter(team => team.status === 'verified').length;
+  const pendingCount = teams.filter(team => team.status === 'submitted' || team.status === 'pending' || !team.status).length;
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -156,47 +152,55 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
         </p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Clickable with filters */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Total Teams</p>
-              <p className="text-2xl font-bold text-[#4A2F1D]">{totalTeams}</p>
+        <Link href={`/en/volunteer/venues/${venueId}/teams`}>
+          <button className="w-full bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow text-left">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Total Teams</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{totalTeams}</p>
+              </div>
+              <Users className="w-8 h-8 text-gray-400" />
             </div>
-            <Users className="w-8 h-8 text-gray-400" />
-          </div>
-        </div>
+          </button>
+        </Link>
         
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Checked In</p>
-              <p className="text-2xl font-bold text-green-600">{checkedInSportsCount}</p>
+        <Link href={`/en/volunteer/venues/${venueId}/teams?teamStatus=checked_in`}>
+          <button className="w-full bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow text-left">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Checked In</p>
+                <p className="text-2xl font-bold text-green-600">{checkedInCount}</p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-green-400" />
             </div>
-            <CheckCircle className="w-8 h-8 text-green-400" />
-          </div>
-        </div>
+          </button>
+        </Link>
         
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Confirmed</p>
-              <p className="text-2xl font-bold text-blue-600">{verifiedCount}</p>
+        <Link href={`/en/volunteer/venues/${venueId}/teams?teamStatus=verified`}>
+          <button className="w-full bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow text-left">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Confirmed</p>
+                <p className="text-2xl font-bold text-blue-600">{verifiedCount}</p>
+              </div>
+              <UserCheck className="w-8 h-8 text-blue-400" />
             </div>
-            <UserCheck className="w-8 h-8 text-blue-400" />
-          </div>
-        </div>
+          </button>
+        </Link>
         
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Unconfirmed</p>
-              <p className="text-2xl font-bold text-orange-600">{pendingCount}</p>
+        <Link href={`/en/volunteer/venues/${venueId}/teams?teamStatus=submitted`}>
+          <button className="w-full bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow text-left">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Unconfirmed</p>
+                <p className="text-2xl font-bold text-orange-600">{pendingCount}</p>
+              </div>
+              <AlertCircle className="w-8 h-8 text-orange-400" />
             </div>
-            <AlertCircle className="w-8 h-8 text-orange-400" />
-          </div>
-        </div>
+          </button>
+        </Link>
       </div>
 
       {/* Quick Actions */}
@@ -325,7 +329,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
                 <div>
                   <h3 className="font-medium">{fixture.name}</h3>
                   <p className="text-sm text-gray-600">
-                    {fixture.assignedTeams?.length || 0} teams • Status: {fixture.status}
+                    {fixture.assignedTeams?.length || 0} teams " Status: {fixture.status}
                   </p>
                 </div>
                 <div className="flex space-x-2">
