@@ -108,6 +108,10 @@ export interface AdvancedTableProps<T = any> extends BaseComponentProps, Advance
   subtitle?: string;
   additionalActions?: React.ReactNode;
   headerActions?: React.ReactNode; // Actions to show in the header row with search/filter
+  // Contextual header actions based on selection
+  headerActionsNone?: React.ReactNode;
+  headerActionsSingle?: (selectedItems: T[]) => React.ReactNode;
+  headerActionsMultiple?: (selectedItems: T[]) => React.ReactNode;
   // Virtualization
   emptyMessage?:string;
   virtualize?: boolean;
@@ -228,6 +232,9 @@ export const AdvancedTable = <T,>({
   subtitle,
   additionalActions,
   headerActions,
+  headerActionsNone,
+  headerActionsSingle,
+  headerActionsMultiple,
   
   // Props that shouldn't go to DOM
   // itemsPerPageOptions,
@@ -553,6 +560,18 @@ export const AdvancedTable = <T,>({
       return state.selectedRows.has(key);
     });
   }, [paginatedData, state.selectedRows, keyExtractor]);
+
+  // Determine contextual header actions based on selection
+  const effectiveHeaderActions = useMemo(() => {
+    const count = state.selectedRows.size;
+    if (count === 0) {
+      return headerActionsNone ?? headerActions;
+    }
+    if (count === 1) {
+      return headerActionsSingle ? headerActionsSingle(selectedItems as T[]) : headerActions;
+    }
+    return headerActionsMultiple ? headerActionsMultiple(selectedItems as T[]) : headerActions;
+  }, [headerActions, headerActionsNone, headerActionsSingle, headerActionsMultiple, selectedItems, state.selectedRows.size]);
   
   return (
     <div className={cn('w-full', className)} {...props}>
@@ -610,7 +629,7 @@ export const AdvancedTable = <T,>({
           showResultsInfo={false}
           
           // Header actions
-          headerActions={headerActions}
+          headerActions={effectiveHeaderActions}
           
           // Saved views
           views={savedViewsKey ? views.map(v => ({ label: v.label, value: v.value })) : []}

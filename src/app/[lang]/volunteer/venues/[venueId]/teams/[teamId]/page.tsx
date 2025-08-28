@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getTeamForMatchDayVerification, verifyPlayerMatchDay } from '@/lib/actions/volunteer/matchDayVerification';
+import { getTeamForMatchDayVerification, verifyPlayerMatchDay, uploadTeamImage } from '@/lib/actions/volunteer/matchDayVerification';
+import { volunteerAddPlayerToTeam } from '@/lib/actions/volunteer/addPlayerToTeam';
 import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
 import DocumentPreview from '@/components/documents/DocumentPreview';
 import PlayerDocumentUpload from '@/components/players/PlayerDocumentUpload';
@@ -82,6 +83,19 @@ export default function TeamMatchDayVerificationPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
+  const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
+  const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
+  const [isSearchingPhone, setIsSearchingPhone] = useState(false);
+  const [playerExists, setPlayerExists] = useState(false);
+  const [playerFormData, setPlayerFormData] = useState({
+    phone: '',
+    firstName: '',
+    lastName: '',
+    dob: '',
+    whatsappNumber: '',
+    village: '',
+    position: 'main' as 'main' | 'substitute'
+  });
   const [searchValue, setSearchValue] = useState('');
   const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
 
@@ -133,12 +147,7 @@ export default function TeamMatchDayVerificationPage() {
       if (result.success) {
         // Reload team data to get updated verification status
         await loadTeamData();
-        
-        if (result.teamAutoCheckedIn) {
-          showSuccess(`Player ${status} successfully! Team has been automatically checked in as all players are now verified.`);
-        } else {
-          showSuccess(`Player ${status} successfully!`);
-        }
+        showSuccess(`Player ${status} successfully!`);
       } else {
         showError(`Error: ${result.error}`);
       }
@@ -337,12 +346,6 @@ export default function TeamMatchDayVerificationPage() {
       render: (_value, player) => (
         <VerificationStatusSelector
           value={player.verificationStatus || 'pending'}
-          options={[
-            { value: 'pending', label: 'Pending' },
-            { value: 'verified', label: 'Verified' },
-            { value: 'approved', label: 'Approved' },
-            { value: 'rejected', label: 'Rejected' }
-          ]}
           onChange={(newStatus) => handlePlayerStatusChange(player, newStatus as any)}
           disabled={submitting}
           className="min-w-[120px]"
@@ -371,18 +374,157 @@ export default function TeamMatchDayVerificationPage() {
     }
   ], [handlePlayerStatusChange, submitting]);
 
+  const normalizePhone = (phone: string): string => {
+    const digitsOnly = phone.replace(/\D/g, "");
+    if (digitsOnly.length === 10) return `+91${digitsOnly}`;
+    if (digitsOnly.startsWith("91") && digitsOnly.length === 12) return `+${digitsOnly}`;
+    if (phone.startsWith("+91") && digitsOnly.length === 12) return phone;
+    if (digitsOnly.length >= 10) return `+91${digitsOnly.slice(-10)}`;
+    throw new Error(`Invalid phone number format: ${phone}. Please enter a 10-digit mobile number.`);
+  };
+
+  const handlePhoneSearch = async (phone: string) => {
+    setPlayerFormData(prev => ({ ...prev, phone }));
+    if (phone.length === 10) {
+      setIsSearchingPhone(true);
+      try {
+        // Search minimal user info for prefill
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase/config');
+        const usersRef = collection(db, 'users');
+        const queries = [
+          query(usersRef, where('phoneNumber', '==', phone)),
+          query(usersRef, where('phoneNumber', '==', `+91${phone}`)),
+          query(usersRef, where('phoneNumber', '==', parseInt(phone as any)))
+        ];
+        let existingUser: any = null;
+        for (const q of queries) {
+          try {
+            const qs = await getDocs(q);
+            if (!qs.empty) { existingUser = qs.docs[0].data(); break; }
+          } catch {}
+        }
+        if (existingUser) {
+          setPlayerExists(true);
+          setPlayerFormData(prev => ({
+            ...prev,
+            firstName: existingUser.firstName || '',
+            lastName: existingUser.lastName || '',
+            dob: existingUser.dob || '',
+            whatsappNumber: existingUser.whatsappNumber || phone,
+            village: existingUser.village || team?.panchayat?.replace(' Panchayat', '') || ''
+          }));
+        } else {
+          setPlayerExists(false);
+          setPlayerFormData(prev => ({
+            ...prev,
+            firstName: '',
+            lastName: '',
+            dob: '',
+            whatsappNumber: phone,
+            village: team?.panchayat?.replace(' Panchayat', '') || ''
+          }));
+        }
+      } finally {
+        setIsSearchingPhone(false);
+      }
+    } else {
+      setPlayerExists(false);
+      if (phone.length === 0) {
+        setPlayerFormData(prev => ({ ...prev, firstName: '', lastName: '', dob: '', whatsappNumber: '', village: '' }));
+      }
+    }
+  };
+
+  const handleAddPlayerVolunteer = async () => {
+    if (!team || !user) return;
+    setIsSubmittingAdd(true);
+    try {
+      // auto-adjust position not necessary for volunteer now
+      let normalizedPhone: string;
+      try { normalizedPhone = normalizePhone(playerFormData.phone); } 
+      catch (e) { showError(e instanceof Error ? e.message : 'Invalid phone'); setIsSubmittingAdd(false); return; }
+
+      const result = await volunteerAddPlayerToTeam({
+        teamId: team.id,
+        volunteerId: user.uid,
+        playerData: {
+          name: `${playerFormData.firstName} ${playerFormData.lastName}`.trim(),
+          firstName: playerFormData.firstName,
+          lastName: playerFormData.lastName,
+          phone: normalizedPhone,
+          dateOfBirth: playerFormData.dob,
+          gender: 'M',
+          whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
+          village: playerFormData.village,
+          panchayat: team.panchayat,
+          taluk: (team as any).taluk || '',
+          district: team.district,
+          state: (team as any).state || '',
+          pincode: '',
+          position: playerFormData.position
+        }
+      });
+
+      if (!result.success) {
+        const err = (result as any).error;
+        showError(typeof err === 'string' ? err : err?.message || 'Failed to add player');
+        return;
+      }
+
+      await loadTeamData();
+      setShowAddPlayerModal(false);
+      setPlayerFormData({ phone: '', firstName: '', lastName: '', dob: '', whatsappNumber: '', village: '', position: 'main' });
+      showSuccess('Player added and approved.');
+    } catch {
+      showError('Failed to add player');
+    } finally {
+      setIsSubmittingAdd(false);
+    }
+  };
+  
+  const handleStatusChangeBulk = async (
+    playersToUpdate: PlayerData[],
+    status: 'pending' | 'verified' | 'approved' | 'rejected'
+  ) => {
+    if (!user) return;
+    setSubmitting(true);
+    try {
+      for (const player of playersToUpdate) {
+        await verifyPlayerMatchDay({
+          playerId: player.id,
+          status,
+          comments: status === 'rejected' ? 'Bulk rejection by volunteer' : `Bulk set to ${status}`,
+          verifiedBy: user.uid,
+          verificationIssues: status === 'rejected' ? ['Bulk rejection by volunteer'] : [],
+          teamId: teamId,
+          venueId: venueId
+        });
+      }
+      await loadTeamData();
+      showSuccess(`Updated ${playersToUpdate.length} players to ${status}.`);
+    } catch (e) {
+      showError('Bulk update failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Header actions based on selection - using useMemo to react to selection changes
   const headerActions = useMemo(() => {
     const selectedCount = selectedPlayers.size;
     
     if (selectedCount === 0) {
       return (
-        <button
-          className="bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors flex items-center gap-2 text-sm"
-        >
-          <User className="w-4 h-4" />
-          Add Player
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAddPlayerModal(true)}
+            className="bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors flex items-center gap-2 text-sm"
+          >
+            <User className="w-4 h-4" />
+            Add Player
+          </button>
+        </div>
       );
     } else if (selectedCount === 1) {
       return (
@@ -478,7 +620,7 @@ export default function TeamMatchDayVerificationPage() {
                   url={team.teamImageUrl}
                   label="Team Photo"
                   showActions={false}
-                  size="xl"
+                  size="xxl"
                 />
                 {/* Edit button only when photo exists */}
                 <button
@@ -518,7 +660,7 @@ export default function TeamMatchDayVerificationPage() {
                 url={team.teamImageUrl}
                 label="Team Photo"
                 showActions={false}
-                size="xl"
+                size="xxl"
                 className="w-full"
               />
               {/* Edit button only when photo exists */}
@@ -558,21 +700,50 @@ export default function TeamMatchDayVerificationPage() {
         
         // Selection functionality
         selectable={true}
-        selectedRows={selectedPlayers}
-        onSelectionChange={setSelectedPlayers}
+        // AdvancedTable manages selection internally; headerActions will not use selectedRows directly
         
         // Row interaction
         onRowClick={(player) => setSelectedPlayer(player)}
         keyExtractor={(player) => player.id}
         
         // Header actions
-        headerActions={headerActions}
+        headerActionsNone={(
+          <button
+            onClick={() => setShowAddPlayerModal(true)}
+            className="bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors flex items-center gap-2 text-sm"
+          >
+            Add Player
+          </button>
+        )}
+        headerActionsSingle={(selected) => (
+          <button
+            onClick={() => {
+              const one = selected[0] as any;
+              if (!one) return;
+              // TODO: wire up remove flow via server action if desired
+              alert(`Remove player ${one.name}`);
+            }}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm"
+          >
+            Remove Player
+          </button>
+        )}
+        headerActionsMultiple={(selected) => (
+          <button
+            onClick={async () => {
+              if (!selected?.length) return;
+              await handleStatusChangeBulk(selected as any[], 'approved');
+            }}
+            disabled={submitting}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+          >
+            Approve
+          </button>
+        )}
         
         // Search functionality
         searchable={true}
-        searchValue={searchValue}
         searchPlaceholder="Search players..."
-        onSearchChange={setSearchValue}
         
         // Table configuration
         stickyHeader={true}
@@ -580,7 +751,7 @@ export default function TeamMatchDayVerificationPage() {
         
         // Empty state
         emptyState={{
-          icon: <User className="w-12 h-12 text-gray-400" />,
+          icon: () => <div className="w-12 h-12 bg-gray-200 rounded-full" />,
           title: "No players found",
           description: "No players have been added to this team yet."
         }}
@@ -592,6 +763,79 @@ export default function TeamMatchDayVerificationPage() {
           pageSizeOptions: [5, 10, 20, 50]
         }}
       />
+      {showAddPlayerModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-[#4A2F1D]">Add New Player</h2>
+                <button
+                  onClick={() => setShowAddPlayerModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">Mobile Number <span className="text-red-500">*</span></label>
+                <input
+                  type="tel"
+                  placeholder="Enter 10-digit mobile number"
+                  value={playerFormData.phone}
+                  onChange={(e) => {
+                    const phone = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    handlePhoneSearch(phone);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
+                />
+                {isSearchingPhone && (
+                  <p className="mt-1 text-sm text-gray-500 flex items-center"><Loader2 className="w-4 h-4 animate-spin mr-1" />Searching for player...</p>
+                )}
+                {!isSearchingPhone && playerExists && (
+                  <p className="mt-1 text-sm text-[#3A7F3F]">✓ Player found in system</p>
+                )}
+                {!isSearchingPhone && playerFormData.phone.length === 10 && !playerExists && (
+                  <p className="mt-1 text-sm text-gray-600">New player - fill in details below</p>
+                )}
+              </div>
+
+              {playerFormData.phone.length === 10 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">First Name <span className="text-red-500">*</span></label>
+                      <input type="text" value={playerFormData.firstName} onChange={(e) => setPlayerFormData(prev => ({ ...prev, firstName: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]" disabled={playerExists} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">Last Name <span className="text-red-500">*</span></label>
+                      <input type="text" value={playerFormData.lastName} onChange={(e) => setPlayerFormData(prev => ({ ...prev, lastName: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]" disabled={playerExists} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">Date of Birth <span className="text-red-500">*</span></label>
+                    <input type="date" value={playerFormData.dob} onChange={(e) => setPlayerFormData(prev => ({ ...prev, dob: e.target.value }))} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]" disabled={playerExists} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">Position <span className="text-red-500">*</span></label>
+                    <select value={playerFormData.position} onChange={(e) => setPlayerFormData(prev => ({ ...prev, position: e.target.value as 'main' | 'substitute' }))} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]">
+                      <option value="main">Main Player</option>
+                      <option value="substitute">Substitute</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex space-x-4 pt-4">
+                <button onClick={() => setShowAddPlayerModal(false)} className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-lg font-semibold hover:bg-gray-300 transition-colors">Cancel</button>
+                <button onClick={handleAddPlayerVolunteer} disabled={!playerFormData.firstName || !playerFormData.lastName || !playerFormData.dob || isSubmittingAdd} className="flex-1 bg-[#F28C38] hover:bg-[#E67A26] disabled:bg-gray-400 text-white py-3 px-6 rounded-lg font-semibold transition-colors">{isSubmittingAdd ? 'Adding...' : 'Add Player'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Player Details Modal */}
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -634,10 +878,10 @@ export default function TeamMatchDayVerificationPage() {
                   <div>
                     <span className="text-gray-500">Verification Status:</span>
                     <div className={`font-medium capitalize ${
-                      selectedPlayer.matchDayVerificationStatus === 'verified' ? 'text-green-600' :
-                      selectedPlayer.matchDayVerificationStatus === 'rejected' ? 'text-red-600' : 'text-yellow-600'
+                      (selectedPlayer.verificationStatus || 'pending') === 'approved' ? 'text-green-600' :
+                      (selectedPlayer.verificationStatus || 'pending') === 'rejected' ? 'text-red-600' : 'text-yellow-600'
                     }`}>
-                      {selectedPlayer.matchDayVerificationStatus || 'pending'}
+                      {selectedPlayer.verificationStatus || 'pending'}
                     </div>
                   </div>
                 </div>
@@ -705,34 +949,7 @@ export default function TeamMatchDayVerificationPage() {
                 </div>
               )}
 
-              {/* Action Buttons */}
-              {selectedPlayer.matchDayVerificationStatus !== 'verified' && (
-                <div className="flex space-x-3">
-                  <Button
-                    onClick={() => {
-                      handlePlayerVerification(selectedPlayer.id, 'verified');
-                      setSelectedPlayer(null);
-                    }}
-                    disabled={submitting}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Verify Player
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      handlePlayerVerification(selectedPlayer.id, 'rejected', 'Rejected during detailed review');
-                      setSelectedPlayer(null);
-                    }}
-                    disabled={submitting}
-                    variant="outline"
-                    className="flex-1 text-red-600 border-red-300 hover:bg-red-50"
-                  >
-                    <XCircle className="w-4 h-4 mr-2" />
-                    Reject Player
-                  </Button>
-                </div>
-              )}
+              {/* Verification actions removed for volunteer view */}
             </div>
           </div>
         </div>
@@ -756,9 +973,22 @@ export default function TeamMatchDayVerificationPage() {
               <TeamPhotoUpload
                 teamId={teamId}
                 currentUrl={team?.teamImageUrl}
-                onSuccess={(url) => {
-                  setTeam(prev => prev ? { ...prev, teamImageUrl: url } : null);
-                  setShowImageUpload(false);
+                onSuccess={async (url) => {
+                  try {
+                    // Persist teamImageUrl on team document for server-side reads
+                    if (user) {
+                      await uploadTeamImage(teamId, url, user.uid);
+                    }
+                    // Update local state for immediate UI
+                    setTeam(prev => prev ? { ...prev, teamImageUrl: url } : null);
+                    // Refresh from server to ensure consistency
+                    await loadTeamData();
+                  } catch (e) {
+                    // Still proceed with local update if server action fails
+                    setTeam(prev => prev ? { ...prev, teamImageUrl: url } : null);
+                  } finally {
+                    setShowImageUpload(false);
+                  }
                 }}
                 onError={(error) => {
                   showError(`Upload failed: ${error}`);

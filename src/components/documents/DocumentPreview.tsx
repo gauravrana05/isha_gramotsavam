@@ -14,7 +14,7 @@ export interface DocumentPreviewProps {
   onView?: () => void;
   className?: string;
   showActions?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'xxl';
 }
 
 const DocumentPreview: React.FC<DocumentPreviewProps> = ({
@@ -63,10 +63,13 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     }
   };
 
-  const sizeClasses = {
+  const sizeClasses: Record<NonNullable<DocumentPreviewProps['size']>, string> = {
     sm: 'w-16 h-16',
     md: 'w-24 h-24',
-    lg: 'w-32 h-32'
+    lg: 'w-32 h-32',
+    xl: 'w-40 h-40',
+    // xxl: responsive – full width on mobile, half width and centered on md+
+    xxl: 'w-full mx-auto'
   };
 
   if (!url) {
@@ -79,11 +82,15 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
   return (
     <div className={`relative group ${className}`}>
-      <div className={`${sizeClasses[size]} relative`}>
+      <div className={`relative ${size === 'xxl' ? sizeClasses.xxl : sizeClasses[size]}`}>
         <img
           src={url}
           alt={label}
-          className="w-full h-full object-cover rounded-lg border border-gray-200 cursor-pointer"
+          className={
+            size === 'xxl'
+              ? 'w-full h-auto object-contain rounded-lg border border-gray-200 cursor-pointer'
+              : 'w-full h-full object-cover rounded-lg border border-gray-200 cursor-pointer'
+          }
           onClick={handleImageClick}
         />
         

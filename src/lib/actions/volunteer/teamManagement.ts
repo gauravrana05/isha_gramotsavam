@@ -1,6 +1,6 @@
 'use server';
 
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, adminAuth } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { auditLogService } from '@/lib/services/auditLogService';
 
@@ -27,29 +27,38 @@ export async function createTeamByVolunteer(data: CreateTeamData) {
       };
     }
 
-    // Check if captain exists and has complete profile
+    // Check if captain exists; if not, create a bare-minimum user and proceed (no profile completeness required)
     const usersQuery = await adminDb.collection('users')
-      .where('phone', '==', data.captainPhone)
+      .where('phone', '==', data.captainPhone.replace(/\D/g, ''))
       .limit(1)
       .get();
 
+    let captainId: string;
+    let captainData: any = {};
     if (usersQuery.empty) {
-      return {
-        success: false,
-        message: 'Captain phone number not found. The person must have a registered account.'
+      // Create a placeholder user
+      const newUserRef = adminDb.collection('users').doc();
+      captainId = newUserRef.id;
+      captainData = {
+        uid: captainId,
+        phone: data.captainPhone.replace(/\D/g, ''),
+        phoneNumber: data.captainPhone,
+        firstName: '',
+        lastName: '',
+        panchayat: data.location.panchayat,
+        district: data.location.district,
+        state: data.location.state,
+        role: 'player',
+        isProfileComplete: false,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        documents: {}
       };
-    }
-
-    const captainDoc = usersQuery.docs[0];
-    const captainData = captainDoc.data();
-    const captainId = captainDoc.id;
-
-    // Check if captain has complete profile
-    if (!captainData.isProfileComplete) {
-      return {
-        success: false,
-        message: 'Captain must have a complete profile to create a team.'
-      };
+      await newUserRef.set(captainData);
+    } else {
+      const captainDoc = usersQuery.docs[0];
+      captainData = captainDoc.data();
+      captainId = captainDoc.id;
     }
 
     // Check if captain is from the same location
@@ -133,7 +142,7 @@ export async function createTeamByVolunteer(data: CreateTeamData) {
         state: captainData.state
       },
       documents: captainData.documents || {},
-      verificationStatus: 'pending',
+      verificationStatus: 'approved',
       matchDayStatus: 'pending'
     };
 

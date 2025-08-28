@@ -5,6 +5,8 @@ import { X, Users, Plus, Loader2 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { createTeamByVolunteer } from '@/lib/actions/volunteer/teamManagement';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 
 interface Sport {
   id: string;
@@ -32,6 +34,9 @@ interface FormData {
   district: string;
   state: string;
   captainPhone: string;
+  captainFirstName?: string;
+  captainLastName?: string;
+  captainDob?: string;
 }
 
 export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
@@ -110,11 +115,29 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
     setError('');
 
     try {
+      // Normalize phone
+      const digits = formData.captainPhone.replace(/\D/g, '');
+      const normalized = digits.length === 10 ? `+91${digits}` : digits.startsWith('91') && digits.length === 12 ? `+${digits}` : formData.captainPhone;
+      // Lookup existing user
+      const usersRef = collection(db, 'users');
+      const phoneQueries = [
+        query(usersRef, where('phoneNumber', '==', formData.captainPhone)),
+        query(usersRef, where('phoneNumber', '==', normalized)),
+        query(usersRef, where('phone', '==', formData.captainPhone)),
+      ];
+      let existingUser: any = null;
+      for (const qy of phoneQueries) {
+        try {
+          const snap = await getDocs(qy);
+          if (!snap.empty) { existingUser = snap.docs[0].data(); break; }
+        } catch {}
+      }
+
       const result = await createTeamByVolunteer({
         name: formData.name.trim(),
         description: formData.description.trim(),
         sport: formData.sportId,
-        captainPhone: formData.captainPhone.trim(),
+        captainPhone: existingUser?.phoneNumber || existingUser?.phone || formData.captainPhone.trim(),
         location: {
           panchayat: formData.panchayat,
           district: formData.district,
