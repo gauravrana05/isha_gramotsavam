@@ -859,20 +859,28 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      // Check if sport has teams
-      const teamCount = await db.team.count({
-        where: { sportId: input.id }
+      // Check if sport exists and is not already deleted
+      const existingSport = await db.sport.findFirst({
+        where: { 
+          id: input.id,
+          deletedAt: null 
+        }
       });
 
-      if (teamCount > 0) {
+      if (!existingSport) {
         throw new TRPCError({ 
-          code: 'PRECONDITION_FAILED', 
-          message: `Cannot delete sport with ${teamCount} registered teams` 
+          code: 'NOT_FOUND', 
+          message: 'Sport not found or already deleted' 
         });
       }
 
-      await db.sport.delete({
-        where: { id: input.id }
+      // Perform soft delete
+      await db.sport.update({
+        where: { id: input.id },
+        data: { 
+          deletedAt: new Date(),
+          // Note: Sport model doesn't have deletedBy field in schema
+        }
       });
 
       return {
@@ -1012,7 +1020,9 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const where: any = {};
+      const where: any = {
+        deletedAt: null // Only show non-deleted events
+      };
 
       if (input.status !== 'all') {
         where.status = input.status;
@@ -1168,13 +1178,16 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      // Check if event exists
-      const existingEvent = await db.event.findUnique({
-        where: { id: input.id }
+      // Check if event exists and is not deleted
+      const existingEvent = await db.event.findFirst({
+        where: { 
+          id: input.id,
+          deletedAt: null 
+        }
       });
 
       if (!existingEvent) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Event not found' });
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Event not found or has been deleted' });
       }
 
       const updateData: any = {};
@@ -1234,27 +1247,33 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      // Check if event has dependencies
-      const [teamCount, fixtureCount, venueCount] = await Promise.all([
-        db.team.count({ where: { eventId: input.id } }),
-        db.fixture.count({ where: { eventId: input.id } }),
-        db.venueLocationMapping.count({ where: { eventId: input.id } })
-      ]);
+      // Check if event exists and is not already deleted
+      const existingEvent = await db.event.findFirst({
+        where: { 
+          id: input.id,
+          deletedAt: null 
+        }
+      });
 
-      if (teamCount > 0 || fixtureCount > 0 || venueCount > 0) {
+      if (!existingEvent) {
         throw new TRPCError({ 
-          code: 'PRECONDITION_FAILED', 
-          message: `Cannot delete event with ${teamCount} teams, ${fixtureCount} fixtures, and ${venueCount} venue mappings` 
+          code: 'NOT_FOUND', 
+          message: 'Event not found or already deleted' 
         });
       }
 
-      await db.event.delete({
-        where: { id: input.id }
+      // Perform soft delete
+      await db.event.update({
+        where: { id: input.id },
+        data: { 
+          deletedAt: new Date(),
+          deletedBy: ctx.user.id
+        }
       });
 
       return {
         success: true,
-        message: 'Event deleted successfully'
+        message: 'Event removed successfully'
       };
     }),
 
@@ -1267,8 +1286,11 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const event = await db.event.findUnique({
-        where: { id: input.id },
+      const event = await db.event.findFirst({
+        where: { 
+          id: input.id,
+          deletedAt: null 
+        },
         include: {
           createdByUser: {
             select: {
@@ -1542,30 +1564,28 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      // Check if mapping has dependencies
-      const [teamCount, fixtureCount, matchCount] = await Promise.all([
-        db.teamVenueAssignment.count({ 
-          where: { 
-            OR: [
-              { clusterVenueMappingId: input.id },
-              { divisionVenueMappingId: input.id },
-              { finalVenueMappingId: input.id }
-            ]
-          } 
-        }),
-        db.fixture.count({ where: { venueLocationMappingId: input.id } }),
-        db.match.count({ where: { venueLocationMappingId: input.id } })
-      ]);
+      // Check if mapping exists and is not already deleted
+      const existingMapping = await db.venueLocationMapping.findFirst({
+        where: { 
+          id: input.id,
+          deletedAt: null 
+        }
+      });
 
-      if (teamCount > 0 || fixtureCount > 0 || matchCount > 0) {
+      if (!existingMapping) {
         throw new TRPCError({ 
-          code: 'PRECONDITION_FAILED', 
-          message: `Cannot delete venue mapping with ${teamCount} team assignments, ${fixtureCount} fixtures, and ${matchCount} matches` 
+          code: 'NOT_FOUND', 
+          message: 'Venue location mapping not found or already deleted' 
         });
       }
 
-      await db.venueLocationMapping.delete({
-        where: { id: input.id }
+      // Perform soft delete
+      await db.venueLocationMapping.update({
+        where: { id: input.id },
+        data: { 
+          deletedAt: new Date(),
+          // Note: VenueLocationMapping model doesn't have deletedBy field in schema
+        }
       });
 
       return {
@@ -2215,17 +2235,28 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      // Check if mapping exists
-      const existingMapping = await db.talukClusterMapping.findUnique({
-        where: { id: input.id }
+      // Check if mapping exists and is not already deleted
+      const existingMapping = await db.talukClusterMapping.findFirst({
+        where: { 
+          id: input.id,
+          deletedAt: null 
+        }
       });
 
       if (!existingMapping) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Taluk cluster mapping not found' });
+        throw new TRPCError({ 
+          code: 'NOT_FOUND', 
+          message: 'Taluk cluster mapping not found or already deleted' 
+        });
       }
 
-      await db.talukClusterMapping.delete({
-        where: { id: input.id }
+      // Perform soft delete
+      await db.talukClusterMapping.update({
+        where: { id: input.id },
+        data: { 
+          deletedAt: new Date(),
+          // Note: TalukClusterMapping model doesn't have deletedBy field in schema
+        }
       });
 
       return {

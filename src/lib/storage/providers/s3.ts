@@ -1,40 +1,135 @@
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { StorageProvider, ProgressCallback } from '../types';
 
-// Placeholder implementation for future AWS S3 storage support
 export class S3StorageProvider implements StorageProvider {
+  private client: S3Client;
+  private bucket: string;
+  private region: string;
+
   constructor() {
-    // Future: Initialize AWS S3 client
-    throw new Error('S3 storage provider not yet implemented');
+    // Get configuration from environment variables
+    const region = process.env.AWS_S3_REGION;
+    const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+    const bucket = process.env.AWS_S3_BUCKET;
+
+    if (!region || !accessKeyId || !secretAccessKey || !bucket) {
+      throw new Error('Missing required S3 configuration. Please set AWS_S3_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_S3_BUCKET environment variables.');
+    }
+
+    this.region = region;
+    this.bucket = bucket;
+
+    // Initialize S3 client
+    this.client = new S3Client({
+      region: this.region,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    });
   }
 
   async upload(path: string, file: File, onProgress?: ProgressCallback): Promise<string> {
-    // Future implementation for S3 upload
-    // Should use AWS SDK v3 and implement multipart upload with progress
-    throw new Error('S3 upload not yet implemented');
+    try {
+      // Validate file
+      if (!file || file.size === 0) {
+        throw new Error('Invalid file');
+      }
+
+      // Validate file size (max 100MB)
+      const maxSize = 100 * 1024 * 1024; // 100MB
+      if (file.size > maxSize) {
+        throw new Error('File size must be less than 100MB');
+      }
+
+      // Clean the path (remove leading slash if present)
+      const key = path.startsWith('/') ? path.slice(1) : path;
+
+      // Use multipart upload with progress tracking
+      const upload = new Upload({
+        client: this.client,
+        params: {
+          Bucket: this.bucket,
+          Key: key,
+          Body: file,
+          ContentType: file.type || 'application/octet-stream',
+          CacheControl: 'max-age=3600',
+        },
+      });
+
+      // Track upload progress
+      if (onProgress) {
+        upload.on('httpUploadProgress', (progress) => {
+          if (progress.loaded && progress.total) {
+            onProgress({
+              progress: Math.round((progress.loaded / progress.total) * 100),
+              bytesTransferred: progress.loaded,
+              totalBytes: progress.total,
+              fileName: file.name,
+            });
+          }
+        });
+      }
+
+      await upload.done();
+
+      // Return the public URL
+      return this.getPublicUrl(path);
+    } catch (error) {
+      console.error('S3 upload error:', error);
+      throw new Error(error instanceof Error ? error.message : 'S3 upload failed');
+    }
   }
 
   getPublicUrl(path: string): string {
-    // Future implementation for S3 public URLs
-    // Should generate proper S3 URLs or CloudFront URLs
-    throw new Error('S3 getPublicUrl not yet implemented');
+    // Clean the path (remove leading slash if present)
+    const key = path.startsWith('/') ? path.slice(1) : path;
+    
+    // Generate standard S3 public URL
+    // Format: https://bucket-name.s3.region.amazonaws.com/key
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${encodeURIComponent(key)}`;
   }
 
   async delete(path: string): Promise<void> {
-    // Future implementation for S3 object deletion
-    throw new Error('S3 delete not yet implemented');
+    try {
+      // Clean the path (remove leading slash if present)
+      const key = path.startsWith('/') ? path.slice(1) : path;
+
+      const command = new DeleteObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      });
+
+      await this.client.send(command);
+    } catch (error) {
+      console.error('S3 delete error:', error);
+      throw new Error(error instanceof Error ? error.message : 'S3 delete failed');
+    }
   }
 
   async exists(path: string): Promise<boolean> {
-    // Future implementation for S3 object existence check
-    throw new Error('S3 exists not yet implemented');
+    try {
+      // Clean the path (remove leading slash if present)
+      const key = path.startsWith('/') ? path.slice(1) : path;
+
+      const command = new HeadObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      });
+
+      await this.client.send(command);
+      return true;
+    } catch (error: any) {
+      // If the error is 404 (Not Found), the object doesn't exist
+      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+        return false;
+      }
+      
+      // For other errors, log them but return false
+      console.error('S3 exists check error:', error);
+      return false;
+    }
   }
 }
-
-// TODO: Implement S3 storage provider
-// When S3 is needed, this class should:
-// 1. Initialize AWS S3 client with credentials
-// 2. Implement multipart upload with progress tracking
-// 3. Handle S3 bucket operations
-// 4. Implement proper error handling for S3 errors
-// 5. Support both public and private buckets
-// 6. Optionally integrate with CloudFront for CDN
