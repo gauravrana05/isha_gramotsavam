@@ -342,7 +342,6 @@ export const EnhancedModal: React.FC<EnhancedModalProps> = ({
         
         <EnhancedModalBody 
           scrollable={scrollableBody}
-          className="p-4 sm:p-6"
         >
           {children}
         </EnhancedModalBody>

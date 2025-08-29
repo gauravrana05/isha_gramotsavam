@@ -562,6 +562,342 @@ export const adminRouter = createTRPCRouter({
       };
     }),
 
+  searchUserByPhone: protectedProcedure
+    .input(z.object({
+      phone: z.string().min(10).max(10),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      const user = await db.user.findFirst({
+        where: { phone: input.phone },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          dob: true,
+          gender: true,
+          phone: true,
+        },
+      });
+
+      return {
+        success: true,
+        user: user || null,
+      };
+    }),
+
+  createTeam: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1, 'Team name is required'),
+      description: z.string().optional(),
+      sportId: z.string().uuid('Invalid sport ID'),
+      genderCategory: z.enum(['men', 'women', 'mixed']),
+      panchayat: z.string().min(1, 'Panchayat is required'),
+      district: z.string().min(1, 'District is required'),
+      state: z.string().min(1, 'State is required'),
+      taluk: z.string().optional(),
+      captainPhone: z.string().min(10, 'Captain phone number must be 10 digits').max(10, 'Captain phone number must be 10 digits'),
+      captainFirstName: z.string().min(1, 'Captain first name is required'),
+      captainLastName: z.string().min(1, 'Captain last name is required'),
+      captainDob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format, expected YYYY-MM-DD'),
+      captainGender: z.enum(['M', 'F']),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      // Check if team with same name and sport already exists
+      const existingTeam = await db.team.findFirst({
+        where: {
+          name: { equals: input.name, mode: 'insensitive' },
+          sportId: input.sportId,
+        },
+      });
+
+      if (existingTeam) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'Team with this name already exists for this sport' });
+      }
+
+      // Find or create captain user
+      let captainUser = await db.user.findFirst({
+        where: { phone: input.captainPhone },
+      });
+
+      if (!captainUser) {
+        captainUser = await db.user.create({
+          data: {
+            phone: input.captainPhone,
+            firstName: input.captainFirstName,
+            lastName: input.captainLastName,
+            dob: new Date(input.captainDob),
+            gender: input.captainGender,
+            role: 'captain', // Assign captain role by default
+            panchayat: input.panchayat,
+            district: input.district,
+            state: input.state,
+            profileComplete: true, // Mark as complete since all details are provided
+          },
+        });
+      } else {
+        // Update existing user if details are missing or different
+        const updateData: any = {};
+        if (!captainUser.firstName && input.captainFirstName) updateData.firstName = input.captainFirstName;
+        if (!captainUser.lastName && input.captainLastName) updateData.lastName = input.captainLastName;
+        if (!captainUser.dob && input.captainDob) updateData.dob = new Date(input.captainDob);
+        if (!captainUser.gender && input.captainGender) updateData.gender = input.captainGender;
+        if (captainUser.role !== 'captain') updateData.role = 'captain'; // Ensure captain role
+        if (!captainUser.panchayat && input.panchayat) updateData.panchayat = input.panchayat;
+        if (!captainUser.district && input.district) updateData.district = input.district;
+        if (!captainUser.state && input.state) updateData.state = input.state;
+        if (!captainUser.profileComplete) updateData.profileComplete = true;
+
+        if (Object.keys(updateData).length > 0) {
+          captainUser = await db.user.update({
+            where: { id: captainUser.id },
+            data: updateData,
+          });
+        }
+      }
+
+      // Create the team
+      const team = await db.team.create({
+        data: {
+          name: input.name,
+          description: input.description,
+          sportId: input.sportId,
+          genderCategory: input.genderCategory,
+          panchayat: input.panchayat,
+          district: input.district,
+          state: input.state,
+          taluk: input.taluk,
+          captainUserId: captainUser.id,
+          status: 'draft', // Initial status
+          currentPlayers: 0,
+          currentSubstitutes: 0,
+          eventId: 'clw000000000000000000000', // TODO: Make dynamic based on active event
+        },
+      });
+
+      return {
+        success: true,
+        teamId: team.id,
+        message: 'Team created successfully',
+      };
+    }),
+
+  getTeamById: protectedProcedure
+    .input(z.object({ teamId: z.string().uuid() }))
+    .query(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      const team = await db.team.findUnique({
+        where: { id: input.teamId },
+        include: {
+          sport: {
+            select: {
+              name: true,
+              mainPlayersCount: true,
+              maxSubstitutes: true,
+            },
+          },
+          teamPlayers: {
+            include: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  phone: true,
+                  dateOfBirth: true, // Corrected: now 'dateOfBirth'
+                  gender: true,
+                  profileImages: {
+                    select: {
+                      profilePhotoPath: true,
+                      aadhaarFrontPath: true,
+                      aadhaarBackPath: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          captainUser: {
+            select: {
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+        },
+      });
+
+      if (!team) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Team not found' });
+      }
+
+      return {
+        success: true,
+        team: {
+          id: team.id,
+          name: team.name,
+          description: team.description,
+          sport: {
+            name: team.sport.name,
+            mainPlayersCount: team.sport.mainPlayersCount,
+            maxSubstitutes: team.sport.maxSubstitutes,
+          },
+          genderCategory: team.genderCategory,
+          panchayat: team.panchayat,
+          district: team.district,
+          state: team.state,
+          taluk: team.taluk,
+          status: team.status,
+          captain: {
+            firstName: team.captainUser?.firstName || '',
+            lastName: team.captainUser?.lastName || '',
+            phone: team.captainUser?.phone || '',
+          },
+          players: (team.teamPlayers || []).map((player) => ({
+            id: player.id,
+            firstName: player.users?.firstName || '',
+            lastName: player.users?.lastName || '',
+            phone: player.users?.phone || '',
+            position: player.position,
+            age: player.users?.dob ? new Date().getFullYear() - new Date(player.users.dob).getFullYear() : 0, // Calculate age
+            verificationStatus: player.verificationStatus,
+            users: player.users ? {
+              profileImages: player.users.profileImages ? {
+                profilePhotoPath: player.users.profileImages.profilePhotoPath,
+                aadhaarFrontPath: player.users.profileImages.aadhaarFrontPath,
+                aadhaarBackPath: player.users.profileImages.aadhaarBackPath,
+              } : undefined,
+            } : undefined,
+          })),
+        },
+      };
+    }),
+
+  addPlayerToTeam: protectedProcedure
+    .input(z.object({
+      teamId: z.string().uuid(),
+      playerId: z.string().uuid(),
+      position: z.enum(['main', 'substitute']),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      // Check if team and player exist
+      const [team, user] = await Promise.all([
+        db.team.findUnique({ where: { id: input.teamId } }),
+        db.user.findUnique({ where: { id: input.playerId } }),
+      ]);
+
+      if (!team) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Team not found' });
+      }
+      if (!user) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Player not found' });
+      }
+
+      // Check if player is already in the team
+      const existingTeamPlayer = await db.teamPlayer.findFirst({
+        where: {
+          teamId: input.teamId,
+          userId: input.playerId,
+        },
+      });
+
+      if (existingTeamPlayer) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'Player already in this team' });
+      }
+
+      // Add player to team
+      const teamPlayer = await db.teamPlayer.create({
+        data: {
+          teamId: input.teamId,
+          userId: input.playerId,
+          position: input.position,
+          verificationStatus: 'pending', // Default status
+        },
+      });
+
+      return {
+        success: true,
+        teamPlayerId: teamPlayer.id,
+        message: 'Player added to team successfully',
+      };
+    }),
+
+  removePlayerFromTeam: protectedProcedure
+    .input(z.object({
+      teamId: z.string().uuid(),
+      teamPlayerId: z.string().uuid(), // Use teamPlayerId to uniquely identify the entry
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      // Check if the teamPlayer entry exists
+      const existingTeamPlayer = await db.teamPlayer.findUnique({
+        where: { id: input.teamPlayerId },
+      });
+
+      if (!existingTeamPlayer || existingTeamPlayer.teamId !== input.teamId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Player not found in this team' });
+      }
+
+      // Remove player from team
+      await db.teamPlayer.delete({
+        where: { id: input.teamPlayerId },
+      });
+
+      return {
+        success: true,
+        message: 'Player removed from team successfully',
+      };
+    }),
+
+  updatePlayerPosition: protectedProcedure
+    .input(z.object({
+      teamId: z.string().uuid(),
+      teamPlayerId: z.string().uuid(),
+      position: z.enum(['main', 'substitute']),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      // Check if the teamPlayer entry exists
+      const existingTeamPlayer = await db.teamPlayer.findUnique({
+        where: { id: input.teamPlayerId },
+      });
+
+      if (!existingTeamPlayer || existingTeamPlayer.teamId !== input.teamId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Player not found in this team' });
+      }
+
+      // Update player position
+      const updatedTeamPlayer = await db.teamPlayer.update({
+        where: { id: input.teamPlayerId },
+        data: { position: input.position },
+      });
+
+      return {
+        success: true,
+        teamPlayerId: updatedTeamPlayer.id,
+        message: 'Player position updated successfully',
+      };
+    }),
+
   // Venues Management
   getVenues: protectedProcedure
     .input(z.object({
