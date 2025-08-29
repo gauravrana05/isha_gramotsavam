@@ -30,7 +30,14 @@ export default function Header({ lang }: HeaderProps) {
   // Fetch profile image data for authenticated users
   const profileImageQuery = api.profile.checkCompletion.useQuery(
     { userId: user?.id || '' },
-    { enabled: !!user?.id }
+    { 
+      enabled: !!user?.id,
+      staleTime: 10 * 60 * 1000, // Consider data fresh for 10 minutes in header
+      cacheTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
+      refetchOnWindowFocus: false, // Don't refetch on window focus
+      refetchOnReconnect: false, // Don't refetch on reconnect
+      refetchOnMount: false, // Don't refetch on component mount if cache exists
+    }
   )
 
   // Fetch sports data for navigation

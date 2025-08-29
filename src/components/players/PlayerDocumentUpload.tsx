@@ -110,11 +110,11 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
 
       const result = await response.json();
 
-      // Force profile completion query to run and update profileComplete field
+      // Invalidate profile completion cache to trigger refresh only when needed
       try {
-        await utils.profile.checkCompletion.fetch({ userId: playerUserId });
+        await utils.profile.checkCompletion.invalidate({ userId: playerUserId });
       } catch (error) {
-        console.error('Profile completion check failed:', error)
+        console.error('Profile completion invalidation failed:', error)
       }
 
       // Call onProfileComplete if provided

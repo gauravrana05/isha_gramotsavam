@@ -67,7 +67,13 @@ export default function ProfilePage() {
   const updateProfileMutation = api.profile.updateComplete.useMutation();
   const profileDataQuery = api.profile.checkCompletion.useQuery(
     { userId: user?.id || '' },
-    { enabled: !!user?.id }
+    { 
+      enabled: !!user?.id,
+      staleTime: 2 * 60 * 1000, // Consider fresh for 2 minutes (profile page can be more reactive)
+      cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+      refetchOnWindowFocus: true, // Allow refetch on focus for profile page
+      refetchOnReconnect: false,
+    }
   );
 
   const [editState, setEditState] = useState<EditState>({

@@ -19,7 +19,13 @@ export const useProfileCompletion = (options: UseProfileCompletionOptions) => {
   // Fetch profile completion data using the new API
   const profileDataQuery = api.profile.checkCompletion.useQuery(
     { userId: user?.id || '' },
-    { enabled: !!user?.id }
+    { 
+      enabled: !!user?.id,
+      staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+      cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+      refetchOnWindowFocus: false, // Don't refetch on window focus
+      refetchOnReconnect: false, // Don't refetch on reconnect
+    }
   )
 
   const checkProfileCompletion = useCallback(() => {
