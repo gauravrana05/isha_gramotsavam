@@ -64,7 +64,7 @@ class OfflineStorage {
       this.initialized = true;
     } catch (error) {
       // Warning removed
-      // Continue with just memory cache - don't throw error
+      // Continue with just memory cache - don&apos;t throw error
       this.db = null;
       this.initialized = true;
     }

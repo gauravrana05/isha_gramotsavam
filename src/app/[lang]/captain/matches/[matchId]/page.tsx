@@ -145,7 +145,7 @@ export default function CaptainMatchDetailPage() {
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-gray-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Match Not Found</h1>
-          <p className="text-gray-600 mb-4">The match you're looking for doesn't exist or you don't have access to it.</p>
+          <p className="text-gray-600 mb-4">The match you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.</p>
           <Link
             href={`/${lang}/captain/matches`}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors inline-flex items-center"

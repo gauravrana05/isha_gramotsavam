@@ -883,7 +883,7 @@ export const adminRouter = createTRPCRouter({
         where: { id: input.id },
         data: { 
           deletedAt: new Date(),
-          // Note: Sport model doesn't have deletedBy field in schema
+          // Note: Sport model does&apos;t have deletedBy field in schema
         }
       });
 
@@ -1590,7 +1590,7 @@ export const adminRouter = createTRPCRouter({
         where: { id: input.id },
         data: { 
           deletedAt: new Date(),
-          // Note: VenueLocationMapping model doesn't have deletedBy field in schema
+          // Note: VenueLocationMapping model does&apos;t have deletedBy field in schema
         }
       });
 
@@ -2263,7 +2263,7 @@ export const adminRouter = createTRPCRouter({
         where: { id: input.id },
         data: { 
           deletedAt: new Date(),
-          // Note: TalukClusterMapping model doesn't have deletedBy field in schema
+          // Note: TalukClusterMapping model does&apos;t have deletedBy field in schema
         }
       });
 

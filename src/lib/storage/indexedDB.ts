@@ -172,7 +172,7 @@ class IndexedDBManager {
   private handleUpgrade(db: IDBDatabase, oldVersion: number, newVersion: number): void {
     // Console log removed
 
-    // Create stores that don't exist
+    // Create stores that don&apos;t exist
     for (const storeConfig of this.stores) {
       if (!db.objectStoreNames.contains(storeConfig.name)) {
         const store = db.createObjectStore(storeConfig.name, {

@@ -175,7 +175,7 @@ export default function CaptainDashboard() {
           <div className="bg-white rounded-lg border p-8 text-center">
             <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('no_team_found', 'No Team Found')}</h3>
-            <p className="text-gray-600">{t('no_team_registered_message', "You don't have any team registered yet.")}</p>
+            <p className="text-gray-600">{t('no_team_registered_message', "You don&apos;t have any team registered yet.")}</p>
           </div>
         )}
       </div>

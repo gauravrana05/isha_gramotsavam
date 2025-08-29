@@ -85,7 +85,7 @@ export default function SportRulesPage() {
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-[#4A2F1D] mb-2">Sport Not Found</h1>
-          <p className="text-gray-600 mb-6">The sport rules you're looking for don't exist.</p>
+          <p className="text-gray-600 mb-6">The sport rules you&apos;re looking for don&apos;t exist.</p>
           <Link href={`/${lang}/public/sports`}>
             <Button variant="primary">View All Sports</Button>
           </Link>

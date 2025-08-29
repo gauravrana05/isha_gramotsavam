@@ -109,7 +109,7 @@ export default function BulkTeamAssignmentPage() {
   const events = eventsData?.events || [];
   const teams = teamsData?.teams || [];
 
-  // Filter teams that don't have assignments
+  // Filter teams that don&apos;t have assignments
   const unassignedTeams = useMemo(() => {
     return teams.filter(team => !team.currentVenueAssignment);
   }, [teams]);

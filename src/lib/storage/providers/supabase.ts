@@ -46,7 +46,7 @@ export class SupabaseStorageProvider implements StorageProvider {
         throw new Error(`Upload failed: ${error.message}${error.details ? ` - ${error.details}` : ''}`);
       }
 
-      // Simulate progress callback for compatibility (Supabase doesn't have built-in progress)
+      // Simulate progress callback for compatibility (Supabase does&apos;t have built-in progress)
       if (onProgress) {
         onProgress({
           progress: 100,

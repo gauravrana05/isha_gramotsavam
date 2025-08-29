@@ -26,7 +26,7 @@ export default async function LangLayout({ children, params }: LayoutProps) {
 
   // Console log removed
   
-  // Note: We don't set document.lang here as this runs server-side
+  // Note: We don&apos;t set document.lang here as this runs server-side
   // The lang attribute will be set in the root layout
   
   return <>{children}</>;

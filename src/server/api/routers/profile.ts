@@ -88,7 +88,7 @@ export const profileRouter = createTRPCRouter({
         // Profile is complete only if both fields and images are complete
         const isComplete = fieldsComplete && imagesComplete
 
-        // Update profileComplete if it doesn't match current state
+        // Update profileComplete if it does&apos;t match current state
         if (user.profileComplete !== isComplete) {
           await db.user.update({
             where: { id: input.userId },

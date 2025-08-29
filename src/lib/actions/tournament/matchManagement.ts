@@ -799,14 +799,14 @@ async function triggerLevelAdvancement(fixtureData: any, winners: string[]) {
         const { advanceClusterWinnersToDivision } = await import('@/lib/actions/admin/teamVenueAssignment');
         await advanceClusterWinnersToDivision();
       } catch (error) {
-        // Error calling comprehensive advancement - this is supplementary so don't fail
+        // Error calling comprehensive advancement - this is supplementary so don&apos;t fail
       }
     } else if (fixtureData.level === 'division') {
       try {
         const { advanceDivisionWinnersToFinals } = await import('@/lib/actions/admin/teamVenueAssignment');
         await advanceDivisionWinnersToFinals();
       } catch (error) {
-        // Error calling comprehensive advancement - this is supplementary so don't fail
+        // Error calling comprehensive advancement - this is supplementary so don&apos;t fail
       }
     }
   } catch (error) {

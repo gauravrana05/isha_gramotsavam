@@ -70,62 +70,62 @@ export default function AuditLogsPage() {
       return;
     }
 
-    loadAuditLogs();
+    // loadAuditLogs();
   }, [user, userProfile, authLoading, lang, router]);
 
-  const loadAuditLogs = async () => {
-    try {
-      setLoading(true);
-      import { api } from '../../../../utils/api';
+//   const loadAuditLogs = async () => {
+//     try {
+//       setLoading(true);
+//       import { api } from '@server/trpc/react';
 
-// ... (rest of the file)
+// // ... (rest of the file)
 
-const { data: auditLogsData, isLoading, error } = api.admin.getAuditLogs.useQuery({
-  limit: 100,
-  sortBy: 'createdAt',
-  sortOrder: 'desc',
-});
+// const { data: auditLogsData, isLoading, error } = api.admin.getAuditLogs.useQuery({
+//   limit: 100,
+//   sortBy: 'createdAt',
+//   sortOrder: 'desc',
+// });
 
-const auditLogs = auditLogsData?.auditLogs || [];
+// const auditLogs = auditLogsData?.auditLogs || [];
       
-      if (!auditSnapshot.empty) {
-        // Get all logs and filter for valid audit logs
-        const allLogs = auditSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        } as AuditLog));
+//       if (!auditSnapshot.empty) {
+//         // Get all logs and filter for valid audit logs
+//         const allLogs = auditSnapshot.docs.map(doc => ({
+//           id: doc.id,
+//           ...doc.data()
+//         } as AuditLog));
         
-        // Strict filtering for valid audit logs
-        const auditData: AuditLog[] = allLogs.filter(log => {
-          // Must have all required fields
-          const hasValidStructure = (
-            log.volunteer && 
-            typeof log.volunteer === 'object' &&
-            'name' in log.volunteer &&
-            'role' in log.volunteer &&
-            log.volunteer.name && 
-            log.volunteer.role &&
-            log.action &&
-            ['player_verification', 'document_upload', 'onground_verification'].includes(log.action) &&
-            log.timestamp // Must have timestamp
-          );
+//         // Strict filtering for valid audit logs
+//         const auditData: AuditLog[] = allLogs.filter(log => {
+//           // Must have all required fields
+//           const hasValidStructure = (
+//             log.volunteer && 
+//             typeof log.volunteer === 'object' &&
+//             'name' in log.volunteer &&
+//             'role' in log.volunteer &&
+//             log.volunteer.name && 
+//             log.volunteer.role &&
+//             log.action &&
+//             ['player_verification', 'document_upload', 'onground_verification'].includes(log.action) &&
+//             log.timestamp // Must have timestamp
+//           );
           
-          return hasValidStructure;
-        }) as AuditLog[];
+//           return hasValidStructure;
+//         }) as AuditLog[];
         
         
-        setLogs(auditData);
-      } else {
-        setLogs([]);
-      }
+//         setLogs(auditData);
+//       } else {
+//         setLogs([]);
+//       }
       
-    } catch (err: any) {
-      // Error handling removed
-      setError('Failed to load audit logs. Please check your permissions.');
-    } finally {
-      setLoading(false);
-    }
-  };
+//     } catch (err: any) {
+//       // Error handling removed
+//       setError('Failed to load audit logs. Please check your permissions.');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -392,7 +392,7 @@ const auditLogs = auditLogsData?.auditLogs || [];
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
           <p className="text-gray-600 mb-4">{error}</p>
           <button 
-            onClick={loadAuditLogs}
+            // onClick={loadAuditLogs}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
             Retry

@@ -1,6 +1,6 @@
 'use client';
 
-import { api } from '@/lib/trpc/react';
+import { api } from '@/server/trpc/react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';

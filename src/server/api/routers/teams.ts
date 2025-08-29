@@ -805,7 +805,7 @@ export const teamsRouter = createTRPCRouter({
           // User exists - use existing user ID
           userId = user.id
         } else {
-          // User doesn't exist - create new user
+          // User does&apos;t exist - create new user
           const newUser = await db.user.create({
             data: {
               firstName: input.firstName,
@@ -958,7 +958,7 @@ export const teamsRouter = createTRPCRouter({
           },
           data: {
             deletedAt: new Date(),
-            // Note: TeamPlayer model doesn't have deletedBy field in schema
+            // Note: TeamPlayer model does&apos;t have deletedBy field in schema
           }
         })
 

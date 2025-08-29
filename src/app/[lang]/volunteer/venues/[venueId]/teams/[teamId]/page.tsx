@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { getTeamForMatchDayVerification, verifyPlayerMatchDay, uploadTeamImage } from '@/lib/actions/volunteer/matchDayVerification';
-import { volunteerAddPlayerToTeam } from '@/lib/actions/volunteer/addPlayerToTeam';
+// import { volunteerAddPlayerToTeam } from '@/lib/actions/volunteer/addPlayerToTeam';
 import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
 import DocumentPreview from '@/components/documents/DocumentPreview';
 import PlayerDocumentUpload from '@/components/players/PlayerDocumentUpload';
@@ -445,32 +445,32 @@ export default function TeamMatchDayVerificationPage() {
       try { normalizedPhone = normalizePhone(playerFormData.phone); } 
       catch (e) { showError(e instanceof Error ? e.message : 'Invalid phone'); setIsSubmittingAdd(false); return; }
 
-      const result = await volunteerAddPlayerToTeam({
-        teamId: team.id,
-        volunteerId: user.uid,
-        playerData: {
-          name: `${playerFormData.firstName} ${playerFormData.lastName}`.trim(),
-          firstName: playerFormData.firstName,
-          lastName: playerFormData.lastName,
-          phone: normalizedPhone,
-          dateOfBirth: playerFormData.dob,
-          gender: 'M',
-          whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
-          village: playerFormData.village,
-          panchayat: team.panchayat,
-          taluk: (team as any).taluk || '',
-          district: team.district,
-          state: (team as any).state || '',
-          pincode: '',
-          position: playerFormData.position
-        }
-      });
+      // const result = await volunteerAddPlayerToTeam({
+      //   teamId: team.id,
+      //   volunteerId: user.uid,
+      //   playerData: {
+      //     name: `${playerFormData.firstName} ${playerFormData.lastName}`.trim(),
+      //     firstName: playerFormData.firstName,
+      //     lastName: playerFormData.lastName,
+      //     phone: normalizedPhone,
+      //     dateOfBirth: playerFormData.dob,
+      //     gender: 'M',
+      //     whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
+      //     village: playerFormData.village,
+      //     panchayat: team.panchayat,
+      //     taluk: (team as any).taluk || '',
+      //     district: team.district,
+      //     state: (team as any).state || '',
+      //     pincode: '',
+      //     position: playerFormData.position
+      //   }
+      // });
 
-      if (!result.success) {
-        const err = (result as any).error;
-        showError(typeof err === 'string' ? err : err?.message || 'Failed to add player');
-        return;
-      }
+      // if (!result.success) {
+      //   const err = (result as any).error;
+      //   showError(typeof err === 'string' ? err : err?.message || 'Failed to add player');
+      //   return;
+      // }
 
       await loadTeamData();
       setShowAddPlayerModal(false);

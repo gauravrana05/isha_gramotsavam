@@ -301,7 +301,7 @@ export default function VolunteerCreateTeamPage() {
           
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 font-fira">
-              Captain's Phone Number <span className="text-red-500">*</span>
+              Captain@apos;s Phone Number <span className="text-red-500">*</span>
             </label>
             <div className="flex">
               <div className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-3">

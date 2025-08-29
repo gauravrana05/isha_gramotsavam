@@ -189,7 +189,7 @@ export async function addPlayerToTeam({ teamId, playerData, captainId }: AddPlay
         });
         userId = userRecord.uid;
 
-        // Additional check: ensure captain doesn't accidentally create duplicate account
+        // Additional check: ensure captain does&apos;t accidentally create duplicate account
         if (userId === captainId) {
           return { 
             success: false, 

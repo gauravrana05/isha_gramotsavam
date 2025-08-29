@@ -299,7 +299,7 @@ async function processDivisionVenueWinners(divisionVenueId: string, teams: any[]
       if (!winners) continue;
       
       for (const winner of winners) {
-        // Skip if winner doesn't have required data
+        // Skip if winner does&apos;t have required data
         if (!winner.teamId || !winner.teamName) continue;
         
         // Check if team is already assigned to finals level to avoid duplicates
@@ -521,7 +521,7 @@ async function processClusterVenueWinners(clusterVenueId: string, teams: any[]) 
       const winners = winnersByCategory.get(categoryKey);
       if (!winners) continue;
       for (const winner of winners) {
-        // Skip if winner doesn't have required data
+        // Skip if winner does&apos;t have required data
         if (!winner.teamId || !winner.teamName) continue;
         
         // Check if team is already assigned to division level to avoid duplicates

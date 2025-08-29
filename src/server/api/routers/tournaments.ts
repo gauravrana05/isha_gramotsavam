@@ -227,7 +227,7 @@ export const tournamentsRouter = createTRPCRouter({
             where: { id: input.id },
             data: {
               deletedAt: new Date(),
-              // Note: Event model doesn't have deletedBy field in schema
+              // Note: Event model does&apos;t have deletedBy field in schema
             }
           })
 

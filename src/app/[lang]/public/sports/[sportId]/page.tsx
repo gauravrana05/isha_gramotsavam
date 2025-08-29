@@ -110,7 +110,7 @@ export default function SportPage() {
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-[#4A2F1D] mb-2">Sport Not Found</h1>
-          <p className="text-gray-600 mb-6">The sport you're looking for doesn't exist or isn't available.</p>
+          <p className="text-gray-600 mb-6">The sport you&apos;re looking for doesn&apos;t exist or isn&apos;t available.</p>
           <Link href={`/${lang}/public/sports`}>
             <Button variant="primary">Back to Sports</Button>
           </Link>

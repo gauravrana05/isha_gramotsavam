@@ -358,7 +358,7 @@ export const venuesRouter = createTRPCRouter({
           where: { id: input.id },
           data: {
             deletedAt: new Date(),
-            // Note: Venue model doesn't have deletedBy field in schema
+            // Note: Venue model does&apos;t have deletedBy field in schema
           }
         })
 
@@ -463,7 +463,7 @@ export const venuesRouter = createTRPCRouter({
           where: { id: input.id },
           data: {
             deletedAt: new Date(),
-            // Note: VenueLocationMapping model doesn't have deletedBy field in schema
+            // Note: VenueLocationMapping model does&apos;t have deletedBy field in schema
           }
         })
 

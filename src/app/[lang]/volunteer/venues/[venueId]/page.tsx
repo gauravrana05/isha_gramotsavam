@@ -290,7 +290,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
                 <div>
                   <h3 className="font-medium">{fixture.name}</h3>
                   <p className="text-sm text-gray-600">
-                    {fixture.assignedTeams?.length || 0} teams " Status: {fixture.status}
+                    {fixture.assignedTeams?.length || 0} teams &quot; Status: {fixture.status}
                   </p>
                 </div>
                 <div className="flex space-x-2">

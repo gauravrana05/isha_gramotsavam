@@ -123,7 +123,7 @@ export interface VenueLocationMapping {
   // Venue Information
   venueId: string;
   venueName: string;
-  venueType: 'cluster' | 'division'; // finals don't need mapping
+  venueType: 'cluster' | 'division'; // finals don&apos;t need mapping
   
   // Location Assignment (hierarchical)
   assignedLocations: {

@@ -122,7 +122,7 @@ export class S3StorageProvider implements StorageProvider {
       await this.client.send(command);
       return true;
     } catch (error: any) {
-      // If the error is 404 (Not Found), the object doesn't exist
+      // If the error is 404 (Not Found), the object does&apos;t exist
       if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
         return false;
       }

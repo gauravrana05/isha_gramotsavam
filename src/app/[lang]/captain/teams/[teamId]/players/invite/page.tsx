@@ -336,7 +336,7 @@ export default function CaptainPlayerManagement() {
             whatsappNumber: phone,
           }));
         } else {
-          // User doesn't exist - clear form for new user entry
+          // User does&apos;t exist - clear form for new user entry
           setPlayerExists(false);
           setPlayerFormData(prev => ({
             ...prev,

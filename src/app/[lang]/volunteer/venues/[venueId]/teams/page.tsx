@@ -12,6 +12,10 @@ import DocumentPreview from '@/components/documents/DocumentPreview';
 import { TableControls } from '@/components/ui/TableControls';
 import FilterSidebar, { type ActiveFilter, type FilterField } from '@/components/ui/FilterSidebar';
 import { VerificationStatusSelector } from '@/components/ui/StatusSelector';
+import PlayerDocumentUpload  from '@/components/volunteer/PlayerManagementModal';
+import CreateTeamModal from '@/components/volunteer/CreateTeamModal';
+
+
 import { 
   Loader2, 
   Users, 

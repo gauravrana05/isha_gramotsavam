@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { api } from '@/lib/trpc/react';
+import { api } from '@/server/trpc/react';
 import Link from "next/link";
 import Image from "next/image";
 import { 
@@ -145,7 +145,7 @@ export default function PlayerMatchDetailPage() {
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-gray-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Match Not Found</h1>
-          <p className="text-gray-600 mb-4">The match you're looking for doesn't exist or you don't have access to it.</p>
+          <p className="text-gray-600 mb-4">The match you&apos;re looking for does&apos;t exist or you don&apos;t have access to it.</p>
           <Link
             href={`/${lang}/player/matches`}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors inline-flex items-center"
@@ -211,7 +211,7 @@ export default function PlayerMatchDetailPage() {
             <div className="flex items-center">
               <Star className="w-5 h-5 text-blue-600 mr-2" />
               <div>
-                <h3 className="text-blue-800 font-semibold">You're playing in this match!</h3>
+                <h3 className="text-blue-800 font-semibold">You&apos;re playing in this match!</h3>
                 <p className="text-blue-600 text-sm mt-1">
                   Your team is {match.playerTeamSide === 'team1' ? match.team1?.teamName : match.team2?.teamName}
                 </p>
