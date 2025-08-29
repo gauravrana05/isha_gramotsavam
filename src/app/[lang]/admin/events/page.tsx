@@ -143,7 +143,6 @@ export default function AdminEventsPage() {
     }
   }, [user, userProfile, authLoading, lang, router]);
 
-  const loading = eventsLoading;
   const error = eventsError?.message || '';
   const events = eventsData?.events || [];
 
@@ -393,8 +392,8 @@ export default function AdminEventsPage() {
     );
   };
 
-  if (authLoading || loading) {
-    return <PageLoader title="Loading events..." variant="minimal" />;
+  if (authLoading) {
+    return <PageLoader title="Loading..." variant="minimal" />;
   }
 
   if (!user || userProfile?.role !== 'admin') {
@@ -409,7 +408,7 @@ export default function AdminEventsPage() {
         data={events}
         columns={columns}
         actions={actions}
-        loading={loading}
+        loading={eventsLoading}
         searchable={true}
         searchPlaceholder="Search events..."
         filterable={false}

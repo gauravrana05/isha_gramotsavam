@@ -1,26 +1,25 @@
-import { adminDb } from '@/lib/firebase/admin';
 import { Card } from '@/components/ui/Card';
 import LocationMappingContainer from './LocationMappingContainer';
 import { serializeFirestoreDocs } from '@/lib/utils/firestore';
 
 
-async function getVenues() {
-  const venuesSnapshot = await adminDb.collection('venues').where('isActive', '==', true).get();
-  return venuesSnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      name: data.name,
-      address: {
-        state: data.address?.state || data.state || '',
-        district: data.address?.district || data.district || '',
-        taluk: data.address?.taluk || data.taluk || '',
-        panchayat: data.address?.panchayat || data.panchayat || '',
-      },
-      type: data.type || 'cluster'
-    };
-  });
-}
+// async function getVenues() {
+//   const venuesSnapshot = await adminDb.collection('venues').where('isActive', '==', true).get();
+//   return venuesSnapshot.docs.map(doc => {
+//     const data = doc.data();
+//     return {
+//       id: doc.id,
+//       name: data.name,
+//       address: {
+//         state: data.address?.state || data.state || '',
+//         district: data.address?.district || data.district || '',
+//         taluk: data.address?.taluk || data.taluk || '',
+//         panchayat: data.address?.panchayat || data.panchayat || '',
+//       },
+//       type: data.type || 'cluster'
+//     };
+//   });
+// }
 
 function analyzeVenueDistribution(venues: any[], venueType: 'cluster' | 'division' = 'cluster') {
   // Group venues by district and count venues of specified type only

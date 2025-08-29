@@ -88,6 +88,9 @@ export interface AdvancedTableConfig<T = any> {
     };
   };
   
+  // Controls
+  showRefreshButton?: boolean;
+  
   // Styling
   compact?: boolean;
   compactMode?: boolean;
@@ -222,6 +225,8 @@ export const AdvancedTable = <T,>({
   
   // Selection props
   selectable = false,
+  selectedRows,
+  onSelectionChange,
   
   // Row interaction
   onRowClick,
@@ -242,6 +247,7 @@ export const AdvancedTable = <T,>({
   compact = false,
   compactMode = false,
   stickyHeader = false,
+  showRefreshButton = false,
   title,
   subtitle,
   additionalActions,
@@ -262,8 +268,8 @@ export const AdvancedTable = <T,>({
   className,
   ...domProps
 }: AdvancedTableProps<T>) => {
-  // Separate DOM props from component-specific props
-  const { selectedRows: _, onSelectionChange: __, ...restDomProps } = domProps;
+  // Separate DOM props from component-specific props (removed selectedRows and onSelectionChange as they're needed)
+  const { ...restDomProps } = domProps;
   // Saved views state (localStorage) - only initialize if stateKey is provided
   const savedViewsKey = stateKey ? `table:views:${stateKey}` : undefined;
   const [views, setViews] = useState<{ label: string; value: string; state: Partial<TableState> }[]>([]);
@@ -306,6 +312,13 @@ export const AdvancedTable = <T,>({
       ...urlState
     };
   });
+
+  // Sync external selectedRows prop with internal state
+  useEffect(() => {
+    if (selectedRows !== undefined && selectedRows !== state.selectedRows) {
+      setState(prev => ({ ...prev, selectedRows }));
+    }
+  }, [selectedRows, state.selectedRows]);
 
   const handleConfirmSaveView = useCallback(() => {
     if (!savedViewsKey) return;
@@ -537,9 +550,10 @@ export const AdvancedTable = <T,>({
     setState(prev => ({ ...prev, pageSize, page: 1 }));
   }, []);
   
-  const handleSelectionChange = useCallback((selectedRows: Set<string | number>) => {
-    setState(prev => ({ ...prev, selectedRows }));
-  }, []);
+  const handleSelectionChange = useCallback((newSelectedRows: Set<string | number>) => {
+    setState(prev => ({ ...prev, selectedRows: newSelectedRows }));
+    onSelectionChange?.(newSelectedRows);
+  }, [onSelectionChange]);
   
   const handleFilterToggle = useCallback(() => {
     setState(prev => ({ ...prev, isFilterSidebarOpen: !prev.isFilterSidebarOpen }));
@@ -640,7 +654,7 @@ export const AdvancedTable = <T,>({
           selectedCount={state.selectedRows.size}
           totalCount={totalItems}
           
-          onRefresh={onDataLoad ? handleRefresh : undefined}
+          onRefresh={showRefreshButton && onDataLoad ? handleRefresh : undefined}
           refreshLoading={loading}
           
           showResultsInfo={false}

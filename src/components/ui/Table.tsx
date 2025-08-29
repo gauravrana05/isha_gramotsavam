@@ -339,22 +339,126 @@ const EmptyState = ({
 );
 
 // Loading state component
-const LoadingState = ({ rows = 5 }: { rows?: number }) => (
-  <div className="min-h-64 bg-white">
-    <div className="animate-pulse">
-      {Array.from({ length: rows }).map((_, index) => (
-        <div key={index} className="border-b border-gray-200 px-6 py-4">
-          <div className="flex space-x-4">
-            <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/6"></div>
-          </div>
+const LoadingState = ({ 
+  rows = 5, 
+  columns = [], 
+  selectable = false, 
+  expandable = false 
+}: { 
+  rows?: number;
+  columns?: Column<any>[];
+  selectable?: boolean;
+  expandable?: boolean;
+}) => {
+  // Generate skeleton content based on column type and content
+  const getSkeletonContent = (column: Column<any>, index: number) => {
+    const key = column.key as string;
+    
+    // Column-specific skeleton patterns
+    if (key.includes('name') || key.includes('title')) {
+      return (
+        <div className="flex items-center space-x-2">
+          <div className="w-4 h-4 bg-gray-200 rounded"></div>
+          <div className="h-4 bg-gray-200 rounded w-24"></div>
         </div>
-      ))}
+      );
+    }
+    
+    if (key.includes('description')) {
+      return <div className="h-4 bg-gray-200 rounded w-32"></div>;
+    }
+    
+    if (key.includes('status') || key.includes('active')) {
+      return <div className="h-6 bg-gray-200 rounded-full w-16"></div>;
+    }
+    
+    if (key.includes('categories') || key.includes('tags') || key === 'genderCategories') {
+      return (
+        <div className="flex gap-1">
+          <div className="h-6 bg-gray-200 rounded-full w-12"></div>
+          <div className="h-6 bg-gray-200 rounded-full w-14"></div>
+        </div>
+      );
+    }
+    
+    if (key.includes('count') || key.includes('number') || key.includes('size') || key === 'players' || key === 'teams') {
+      return (
+        <div>
+          <div className="h-4 bg-gray-200 rounded w-8 mb-1"></div>
+          <div className="h-3 bg-gray-200 rounded w-12"></div>
+        </div>
+      );
+    }
+    
+    if (key === 'isActive') {
+      return <div className="h-6 bg-gray-200 rounded-full w-16"></div>;
+    }
+    
+    if (key.includes('date') || key === 'dates') {
+      return (
+        <div>
+          <div className="h-4 bg-gray-200 rounded w-20 mb-1"></div>
+          <div className="h-3 bg-gray-200 rounded w-16"></div>
+        </div>
+      );
+    }
+    
+    // Default skeleton
+    return <div className="h-4 bg-gray-200 rounded w-20"></div>;
+  };
+
+  return (
+    <div className="bg-white sm:rounded-lg sm:border overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full divide-y divide-gray-200 text-sm" style={{ minWidth: '600px' }}>
+          {/* Headers */}
+          <thead className="bg-gray-50">
+            <tr>
+              {selectable && (
+                <th className="w-12 px-6 py-3">
+                  <div className="w-4 h-4 bg-gray-200 rounded animate-pulse"></div>
+                </th>
+              )}
+              {expandable && (
+                <th className="w-12 px-6 py-3">
+                  <div className="w-4 h-4 bg-gray-200 rounded animate-pulse"></div>
+                </th>
+              )}
+              {columns.map((column, index) => (
+                <th key={index} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {column.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          
+          {/* Skeleton Rows */}
+          <tbody className="bg-white divide-y divide-gray-200 animate-pulse">
+            {Array.from({ length: rows }).map((_, rowIndex) => (
+              <tr key={rowIndex} className="hover:bg-gray-50">
+                {selectable && (
+                  <td className="w-12 px-6 py-4">
+                    <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                  </td>
+                )}
+                {expandable && (
+                  <td className="w-12 px-6 py-4">
+                    <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                  </td>
+                )}
+                {columns.map((column, colIndex) => (
+                  <td key={colIndex} className="px-6 py-4 whitespace-nowrap">
+                    {getSkeletonContent(column, colIndex)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Main Table component
 export function Table<T>({
@@ -503,7 +607,14 @@ export function Table<T>({
   
   // Loading state
   if (loading && processedData.length === 0) {
-    return <LoadingState />;
+    return (
+      <LoadingState 
+        columns={columns}
+        selectable={selectable}
+        expandable={expandable}
+        rows={5}
+      />
+    );
   }
   
   // Check if we should show empty state (but still render table structure)
@@ -613,9 +724,9 @@ export function Table<T>({
                 <tr>
                   <td 
                     colSpan={columns.length + (selectable ? 1 : 0) + (expandable ? 1 : 0)}
-                    className="px-6 py-12 text-center"
+                    className="w-full py-12 text-center"
                   >
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center justify-center w-full">
                       <emptyState.icon className="w-12 h-12 text-gray-400 mb-3" />
                       <h3 className="text-lg font-medium text-gray-900 mb-2">{emptyState.title}</h3>
                       <p className="text-gray-600 mb-4">{emptyState.description}</p>
