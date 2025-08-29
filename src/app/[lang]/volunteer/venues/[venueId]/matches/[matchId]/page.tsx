@@ -110,7 +110,7 @@ export default function MatchPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
           <p className="text-gray-600">Loading match details...</p>
@@ -121,7 +121,7 @@ export default function MatchPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
           <div className="text-red-600 mb-4">
             <CheckCircle className="w-12 h-12 mx-auto mb-2" />
@@ -141,7 +141,7 @@ export default function MatchPage() {
 
   if (!match) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600">Match not found</p>
         </div>

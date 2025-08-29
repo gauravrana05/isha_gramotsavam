@@ -83,7 +83,7 @@ interface TeamData {
   currentSubstitutes: number;
   createdAt: Date;
   updatedAt: Date;
-  sports: {
+  sport: {
     id: string;
     name: string;
     mainPlayersCount: number;
@@ -132,7 +132,7 @@ export default function MyTeamPage() {
   };
 
   const players = teamData?.teamPlayers || [];
-  const sportConfig = teamData?.sports || { mainPlayersCount: 0, maxSubstitutes: 0 };
+  const sportConfig = teamData?.sport || { mainPlayersCount: 0, maxSubstitutes: 0 };
   const totalSlotsNeeded = sportConfig.mainPlayersCount + sportConfig.maxSubstitutes;
   const mainPlayersCount = players.filter(p => p.position === 'main').length;
   const substitutesCount = players.filter(p => p.position === 'substitute').length;
@@ -167,7 +167,7 @@ export default function MyTeamPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
       </div>
     );
@@ -175,7 +175,7 @@ export default function MyTeamPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
@@ -193,7 +193,7 @@ export default function MyTeamPage() {
 
   if (!teamData) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="lg:min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center mb-8">
             <Image
@@ -223,7 +223,7 @@ export default function MyTeamPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="lg:min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-8">
           <Image
@@ -234,7 +234,7 @@ export default function MyTeamPage() {
             className="mx-auto"
           />
           <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">{teamData.name}</h1>
-          <p className="text-gray-600">Manage your team and players for {teamData.sports.name}</p>
+          <p className="text-gray-600">Manage your team and players for {teamData.sport.name}</p>
         </div>
 
         {isReadOnly && (

@@ -30,7 +30,7 @@ export default function VolunteerLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="lg:min-h-screen bg-gray-50 flex">
       <VolunteerSidebar 
         isDesktopCollapsed={isSidebarCollapsed}
         onDesktopToggle={toggleSidebar}

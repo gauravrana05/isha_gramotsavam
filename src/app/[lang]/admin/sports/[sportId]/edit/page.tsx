@@ -210,7 +210,7 @@ export default function EditSportPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#CE4520]" />
       </div>
     );

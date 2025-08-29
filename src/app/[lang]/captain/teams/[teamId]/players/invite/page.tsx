@@ -23,10 +23,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from "@/context/AuthContext";
 import { AlertModal, ConfirmationModal } from '@/components/ui/Modal';
 import { useAlert } from '@/hooks/useAlert';
+import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
 import Image from "next/image";
 import { PlayerDocumentUpload } from "@/components/players";
 import DocumentPreview from "@/components/documents/DocumentPreview";
+import { AddPlayerModal } from '@/components/modals/AddPlayerModal';
+import { PlayerDetailModal } from '@/components/modals/PlayerDetailModal';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import { Table } from '@/components/ui/Table';
 import type { Column } from '@/components/ui/Table';
@@ -115,25 +118,12 @@ export default function CaptainPlayerManagement() {
 
   const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayer | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [playerFormData, setPlayerFormData] = useState({
-    phone: '',
-    firstName: '',
-    lastName: '',
-    dob: '',
-    whatsappNumber: '',
-    position: 'main' as 'main' | 'substitute',
-    gender: '' as 'M' | 'F' | 'O' | '',
-  });
-  const [playerExists, setPlayerExists] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchCompleted, setSearchCompleted] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string | number>>(new Set());
 
-  // Document upload states
-  const [showDocumentModal, setShowDocumentModal] = useState(false);
-  const [documentPlayer, setDocumentPlayer] = useState<TeamPlayer | null>(null);
+  // Remove player confirmation modal
+  const [showRemovePlayerModal, setShowRemovePlayerModal] = useState(false);
+  const [playerToRemove, setPlayerToRemove] = useState<TeamPlayer | null>(null);
+  const [isRemovingPlayer, setIsRemovingPlayer] = useState(false);
 
   // Team submission states
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
@@ -145,6 +135,7 @@ export default function CaptainPlayerManagement() {
   const [isMakingCaptain, setIsMakingCaptain] = useState(false);
   
   const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
+  const { addNotification } = useNotification();
 
   if (!teamId || (Array.isArray(teamId) && teamId.length === 0)) {
     throw new Error("Team ID is missing or invalid");
@@ -162,8 +153,20 @@ export default function CaptainPlayerManagement() {
     { enabled: !!teamIdStr }
   );
 
-  const addPlayerMutation = api.teams.addPlayer.useMutation();
-  const removePlayerMutation = api.teams.removePlayer.useMutation();
+  const addPlayerMutation = api.teams.addPlayer.useMutation({
+    onSuccess: () => {
+      // Invalidate and refetch the team data
+      utils.teams.getById.invalidate();
+      utils.teams.getById.invalidate({ id: teamIdStr });
+    },
+  });
+  const removePlayerMutation = api.teams.removePlayer.useMutation({
+    onSuccess: () => {
+      // Invalidate and refetch the team data
+      utils.teams.getById.invalidate();
+      utils.teams.getById.invalidate({ id: teamIdStr });
+    },
+  });
   const makeCaptainMutation = api.teams.makeCaptain.useMutation();
   const submitTeamMutation = api.teams.verify.useMutation();
   const utils = api.useUtils();
@@ -300,128 +303,6 @@ export default function CaptainPlayerManagement() {
   const canAddMain = mainPlayers < sportConfig.mainPlayersCount && !isReadOnly;
   const canAddSubstitute = substitutes < sportConfig.maxSubstitutes && !isReadOnly;
 
-  const handlePhoneSearch = async (phone: string) => {
-    setPlayerFormData(prev => ({ ...prev, phone }));
-
-    if (phone.length === 10) {
-      setIsSearching(true);
-      try {
-        // Search for existing user by phone number using tRPC client
-        // Try both formats: with and without +91 prefix
-        let user = null;
-        
-        // First try with +91 prefix
-        const normalizedPhone = normalizePhone(phone);
-        console.log('Searching for phone:', normalizedPhone);
-        user = await utils.users.getByPhone.fetch({ phone: normalizedPhone });
-        console.log('User result (with prefix):', user);
-        
-        // If not found, try with just the 10-digit format
-        if (!user && phone.replace(/\D/g, '').length === 10) {
-          const digitsOnly = phone.replace(/\D/g, '');
-          console.log('Searching for phone (digits only):', digitsOnly);
-          user = await utils.users.getByPhone.fetch({ phone: digitsOnly });
-          console.log('User result (digits only):', user);
-        }
-
-        console.log('Final user result:', user);
-        if (user) {
-          // User exists - pre-fill form with user data
-          setPlayerExists(true);
-          setPlayerFormData(prev => ({
-            ...prev,
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            dob: user.dateOfBirth ? user.dateOfBirth.split('T')[0] : '',
-            whatsappNumber: phone,
-          }));
-        } else {
-          // User does&apos;t exist - clear form for new user entry
-          setPlayerExists(false);
-          setPlayerFormData(prev => ({
-            ...prev,
-            firstName: '',
-            lastName: '',
-            dob: '',
-            whatsappNumber: phone,
-          }));
-        }
-        setSearchCompleted(true); // Mark search as completed
-      } catch (error) {
-        console.error('User search error:', error);
-        setPlayerExists(false);
-        // Pre-fill with team's location data - fallback for new user
-        setPlayerFormData(prev => ({
-          ...prev,
-          firstName: '',
-          lastName: '',
-          dob: '',
-          whatsappNumber: phone,
-        }));
-        setSearchCompleted(true); // Mark search as completed even on error
-      } finally {
-        setIsSearching(false);
-      }
-    } else {
-      // Reset when phone number is not complete
-      setPlayerExists(false);
-      setSearchCompleted(false); // Reset search completion state
-      if (phone.length === 0) {
-        setPlayerFormData(prev => ({
-          ...prev,
-          firstName: '',
-          lastName: '',
-          dob: '',
-          whatsappNumber: '',
-          gender: ''
-        }));
-      }
-    }
-  };
-
-  const calculateAge = (dob: string): number => {
-    const today = new Date();
-    const birthDate = new Date(dob);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    return age;
-  };
-
-  // Helper function to clean undefined values from objects before Firestore save
-  const cleanFirestoreData = (obj: any): any => {
-    if (obj === undefined) {
-      return null; // Convert undefined to null (Firestore accepts null but not undefined)
-    }
-
-    if (obj === null) {
-      return null; // Keep null as is
-    }
-
-    // Handle Date objects - check if they're valid
-    if (obj instanceof Date) {
-      return isNaN(obj.getTime()) ? null : obj; // Return null for invalid dates, keep valid dates
-    }
-
-    if (Array.isArray(obj)) {
-      return obj.map(cleanFirestoreData);
-    }
-
-    if (typeof obj === 'object') {
-      const cleaned: any = {};
-      for (const [key, value] of Object.entries(obj)) {
-        const cleanedValue = cleanFirestoreData(value);
-        cleaned[key] = cleanedValue; // Include null values, exclude only undefined
-      }
-      return cleaned;
-    }
-
-    return obj;
-  };
 
   // Handle document upload success - refresh team data
   const handleDocumentUploadSuccess = async (playerId: string, documentType: 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack', url: string) => {
@@ -434,156 +315,90 @@ export default function CaptainPlayerManagement() {
     // Refetch team data to get updated player information
     teamQuery.refetch();
   };
-
-
-  const openDocumentModal = (player: TeamPlayer) => {
-    setDocumentPlayer(player);
-    setShowDocumentModal(true);
-  };
-
-  const resetPlayerForm = () => {
-    setPlayerFormData({
-      phone: '',
-      firstName: '',
-      lastName: '',
-      dob: '',
-      whatsappNumber: '',
-      position: 'main',
-      gender: '',
-    });
-    setPlayerExists(false);
-    setSearchCompleted(false);
-  };
-  const normalizePhone = (phone: string): string => {
-    const digitsOnly = phone.replace(/\D/g, "");
-
-    // Handle 10-digit Indian mobile number
-    if (digitsOnly.length === 10) {
-      return `+91${digitsOnly}`;
-    }
-
-    // Handle 12-digit number starting with 91
-    if (digitsOnly.startsWith("91") && digitsOnly.length === 12) {
-      return `+${digitsOnly}`;
-    }
-
-    // Handle already formatted number
-    if (phone.startsWith("+91") && digitsOnly.length === 12) {
-      return phone;
-    }
-
-    // If none of the above, return the digits with +91 prefix as best effort
-    if (digitsOnly.length >= 10) {
-      const last10Digits = digitsOnly.slice(-10);
-      return `+91${last10Digits}`;
-    }
-
-    throw new Error(`Invalid phone number format: ${phone}. Please enter a 10-digit mobile number.`);
-  }
-  const handleAddPlayer = async () => {
+  const handleAddPlayer = async (playerData: any) => {
     if (!teamData) {
-      showInfo('Team data is not loaded yet. Please wait a moment and try again.');
-      return;
+      throw new Error('Team data is not loaded yet. Please wait a moment and try again.');
     }
-    setIsSubmitting(true);
 
     try {
       // Check for duplicate player by phone number
-      const existingPlayerInTeam = players.find(p => p.phone === playerFormData.phone);
+      const existingPlayerInTeam = players.find(p => p.phone === playerData.phone);
       if (existingPlayerInTeam) {
-        showInfo(`A player with phone number ${playerFormData.phone} is already in this team.`);
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Auto-select correct position based on availability
-      let playerPosition = playerFormData.position;
-      if (playerPosition === 'main' && !canAddMain) {
-        if (canAddSubstitute) {
-          playerPosition = 'substitute';
-        } else {
-          showInfo('No available positions. Team is full.');
-          setIsSubmitting(false);
-          return;
-        }
-      } else if (playerPosition === 'substitute' && !canAddSubstitute) {
-        if (canAddMain) {
-          playerPosition = 'main';
-        } else {
-          showInfo('No available positions. Team is full.');
-          setIsSubmitting(false);
-          return;
-        }
+        throw new Error(`A player with phone number ${playerData.phone} is already in this team.`);
       }
 
       // Use tRPC mutation to add player
-      try {
-        // Validate phone number format
-        let normalizedPhone: string;
-        try {
-          normalizedPhone = normalizePhone(playerFormData.phone);
-        } catch (phoneError) {
-          throw new Error(phoneError instanceof Error ? phoneError.message : 'Invalid phone number format');
-        }
+      const result = await addPlayerMutation.mutateAsync(playerData);
 
-        const result = await addPlayerMutation.mutateAsync({
-          teamId: teamData.id,
-          firstName: playerFormData.firstName,
-          lastName: playerFormData.lastName,
-          phone: normalizedPhone,
-          whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
-          dateOfBirth: new Date(playerFormData.dob),
-          age: calculateAge(playerFormData.dob),
-          gender: teamData.genderCategory === 'women' ? 'F' : 'M',
-          position: playerPosition,
-          panchayat: teamData.panchayat,
-          taluk: teamData.taluk || '',
-          district: teamData.district,
-          state: teamData.state,
-          pincode: teamData.pincode || '000000',
-          verificationStatus: 'pending'
-        });
-
-        // Player added successfully - refetch team data
-        await teamQuery.refetch();
-        showSuccess('Player added successfully!');
-        setShowAddPlayerModal(false);
-        resetPlayerForm();
-      } catch (error) {
-        console.error('Add player error:', error);
-        showError(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
+      // Player added successfully - cache will be invalidated by onSuccess callback
+      addNotification('Player added successfully!', 'success');
     } catch (error) {
-      showError(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsSubmitting(false);
+      console.error('Add player error:', error);
+      addNotification(`Failed to add player: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      throw error; // Re-throw so modal can handle loading state
     }
   };
 
   const removePlayer = async (playerId: string) => {
-    if (!teamData || !user) return;
+    console.log('🗑️ removePlayer called with playerId:', playerId);
 
-    if (!confirm('Are you sure you want to remove this player from the team?')) {
+    if (!teamData || !user) {
+      console.log('🗑️ Missing teamData or user, returning early');
       return;
     }
 
+    // Find the player to get the userId
+    const player = players.find(p => p.id === playerId);
+    console.log('🗑️ Found player:', player);
+
+    if (!player) {
+      console.log('🗑️ Player not found');
+      addNotification('Player not found', 'error');
+      return;
+    }
+
+    // Prevent removing captain
+    if (player.userId === teamData.captainId) {
+      console.log('🗑️ Attempted to remove captain');
+      addNotification('Cannot remove team captain', 'error');
+      return;
+    }
+
+    // Show confirmation modal instead of browser confirm
+    setPlayerToRemove(player);
+    setShowRemovePlayerModal(true);
+  };
+
+  const confirmRemovePlayer = async () => {
+    if (!playerToRemove || !teamData) return;
+
     try {
-      setLoading(true);
+      console.log('🗑️ Starting removal process for:', playerToRemove);
+      setIsRemovingPlayer(true);
 
-      // Use tRPC mutation to remove player
-      await removePlayerMutation.mutateAsync({
+      // Use tRPC mutation to remove player (needs userId, not playerId)
+      console.log('🗑️ Calling tRPC mutation with:', { teamId: teamData.id, userId: playerToRemove.userId });
+      const result = await removePlayerMutation.mutateAsync({
         teamId: teamData.id,
-        userId: playerId
+        userId: playerToRemove.userId
       });
+      console.log('🗑️ tRPC mutation result:', result);
 
-      // Refetch team data to reflect changes
-      await teamQuery.refetch();
-      showSuccess('Player removed successfully!');
+      console.log('🗑️ Player removed, cache will be invalidated by onSuccess callback');
+      
+      // Close modal and reset state immediately
+      setShowRemovePlayerModal(false);
+      setPlayerToRemove(null);
+      setSelectedRows(new Set()); // Clear selection
+      
+      // Show success toast notification
+      addNotification('Player removed successfully!', 'success');
     } catch (error) {
-      console.error('Remove player error:', error);
-      showError('Failed to remove player. Please try again.');
+      console.error('🗑️ Remove player error:', error);
+      addNotification('Failed to remove player. Please try again.', 'error');
     } finally {
-      setLoading(false);
+      console.log('🗑️ Cleanup: setting loading to false');
+      setIsRemovingPlayer(false);
     }
   };
 
@@ -739,7 +554,7 @@ export default function CaptainPlayerManagement() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
       </div>
     );
@@ -747,7 +562,7 @@ export default function CaptainPlayerManagement() {
 
   if (error || !teamData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         {/* <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
@@ -764,7 +579,7 @@ export default function CaptainPlayerManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-fira">
+    <div className="lg:min-h-screen bg-gray-50 font-fira">
 
       <div className="max-w-7xl mx-auto sm:px-4 py-8">
         {/* Read-only notification */}
@@ -787,10 +602,10 @@ export default function CaptainPlayerManagement() {
 
 
         {/* Team Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 px-2 sm:px-0 gap-3 md:gap-6 mb-8">
           
           <div className="bg-white rounded-lg p-3 md:p-6 shadow-lg">
-            <div className="flex items-center justify-between pt-1 pr-4">
+            <div className="flex items-center justify-between pt-1 sm:pt-2 pr-4">
               <p className=" text-lg md:text-2xl font-bold text-[#4A2F1D] truncate">{teamData?.name || 'Team'}</p>
               <Trophy className=" w-4 h-4 md:w-8 md:h-8 text-[#F28C38]" />
             </div>
@@ -845,8 +660,14 @@ export default function CaptainPlayerManagement() {
           // Selection configuration
           selectable={true}
           selectedRows={selectedRows}
-          onSelectionChange={setSelectedRows}
-          onRowClick={(player) => setSelectedPlayer(player)}
+          onSelectionChange={(newSelectedRows) => {
+            console.log('🟢 Selection changed:', newSelectedRows);
+            setSelectedRows(newSelectedRows);
+          }}
+          onRowClick={(player) => {
+            console.log('🟢 Row clicked:', player);
+            setSelectedPlayer(player);
+          }}
           
           // Header actions based on selection
           headerActionsNone={
@@ -861,13 +682,14 @@ export default function CaptainPlayerManagement() {
           }
           
           headerActionsSingle={(selectedPlayers) => {
-            const selectedPlayer = players.find(p => selectedRows.has(p.id));
+            // Use the selectedPlayers parameter directly - it contains the actual selected players
+            const selectedPlayer = selectedPlayers[0] || null;
+            
             return selectedPlayer?.userId !== teamData?.captainId ? (
               <button
                 onClick={() => {
                   if (selectedPlayer) {
                     removePlayer(selectedPlayer.id);
-                    setSelectedRows(new Set());
                   }
                 }}
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold flex items-center space-x-2 transition-colors"
@@ -889,6 +711,14 @@ export default function CaptainPlayerManagement() {
               label: "Add First Player",
               onClick: () => setShowAddPlayerModal(true)
             } : undefined
+          }}
+          
+          // No search results empty state
+          noSearchResultsEmptyState={{
+            icon: Search,
+            title: "No Players Found",
+            description: "No players match your search criteria. Try adjusting your search terms.",
+            action: undefined
           }}
           
           // Table configuration
@@ -936,362 +766,27 @@ export default function CaptainPlayerManagement() {
       </div>
 
       {/* Add Player Modal */}
-      {showAddPlayerModal && (
-        <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-all duration-300 ${searchCompleted ? 'sm:p-0' : 'p-4'}`}>
-          <div className={`bg-white w-full flex flex-col transition-all duration-300 ease-in-out ${
-            searchCompleted 
-              ? 'h-full sm:h-full sm:max-w-none max-w-2xl rounded-none sm:rounded-lg' 
-              : 'h-auto max-w-md sm:max-w-lg max-h-[90vh] rounded-lg'
-          } overflow-y-auto`}>
-            {/* Header with close button */}
-            <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
-              <h2 className="text-xl font-bold text-[#4A2F1D]">Add New Player</h2>
-              <button
-                onClick={() => {
-                  setShowAddPlayerModal(false);
-                  resetPlayerForm();
-                }}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Content - scrollable */}
-            <div className={`p-4 sm:p-6 space-y-6 transition-all duration-300 ${
-              searchCompleted ? 'flex-1 overflow-y-auto' : ''
-            }`}>
-              {/* Phone Number Search */}
-              <div>
-                <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
-                  Mobile Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  placeholder="Enter 10-digit mobile number"
-                  value={playerFormData.phone}
-                  onChange={(e) => {
-                    const phone = e.target.value.replace(/[^\d]/g, '').slice(0, 10);             
-                    handlePhoneSearch(phone);
-                  }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-                />
-                {isSearching && (
-                  <p className="mt-1 text-sm text-gray-500 flex items-center">
-                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                    Searching for player...
-                  </p>
-                )}
-                {!isSearching && playerExists && (
-                  <p className="mt-1 text-sm text-[#3A7F3F]">✓ Player found in system</p>
-                )}
-                {!isSearching && playerFormData.phone.length === 10 && !playerExists && (
-                  <p className="mt-1 text-sm text-gray-600">New player - fill in details below</p>
-                )}
-              </div>
-
-              {/* Player Details Form - Show only after search is complete */}
-              {searchCompleted && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
-                        First Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={playerFormData.firstName}
-                        onChange={(e) => setPlayerFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
-                        disabled={playerExists}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
-                        Last Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={playerFormData.lastName}
-                        onChange={(e) => setPlayerFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
-                        disabled={playerExists}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
-                      Date of Birth <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={playerFormData.dob}
-                      onChange={(e) => setPlayerFormData(prev => ({ ...prev, dob: e.target.value }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
-                      disabled={playerExists}
-                    />
-                  </div>
-
-                  {teamData?.genderCategory === 'mixed' && (
-                    <div>
-                      <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
-                        Gender <span className="text-red-500">*</span>
-                      </label>
-                      <Select
-                        value={playerFormData.gender}
-                        onValueChange={(value) => setPlayerFormData(prev => ({ ...prev, gender: value as 'M' | 'F' | 'O' }))}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select Gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="M">Male</SelectItem>
-                          <SelectItem value="F">Female</SelectItem>
-                          <SelectItem value="O">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
-                      Position <span className="text-red-500">*</span>
-                    </label>
-                    <Select
-                      value={playerFormData.position}
-                      onValueChange={(value) => setPlayerFormData(prev => ({ ...prev, position: value as 'main' | 'substitute' }))}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select Position" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {canAddMain && <SelectItem value="main">Main Player</SelectItem>}
-                        {canAddSubstitute && <SelectItem value="substitute">Substitute</SelectItem>}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-
-            </div>
-
-            {/* Action Buttons - Conditional positioning */}
-            <div className={`p-4 sm:p-6 bg-white transition-all duration-300 ${
-              searchCompleted ? 'border-t border-gray-200 flex-shrink-0' : 'pt-6'
-            }`}>
-              <div className="flex space-x-4">
-                <button
-                  onClick={() => {
-                    setShowAddPlayerModal(false);
-                    resetPlayerForm();
-                  }}
-                  className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
-                >
-                  Cancel
-                </button>
-                {searchCompleted && (
-                  <button
-                    onClick={handleAddPlayer}
-                    disabled={!playerFormData.firstName || !playerFormData.lastName || !playerFormData.dob || isSubmitting || (teamData?.genderCategory === 'mixed' && !playerFormData.gender)}
-                    className="flex-1 bg-[#F28C38] hover:bg-[#E67A26] disabled:bg-gray-400 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
-                  >
-                    {isSubmitting ? 'Adding...' : 'Add Player'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddPlayerModal
+        isOpen={showAddPlayerModal}
+        onClose={() => setShowAddPlayerModal(false)}
+        onAddPlayer={handleAddPlayer}
+        teamData={teamData}
+        canAddMain={canAddMain}
+        canAddSubstitute={canAddSubstitute}
+        canAddPlayer={canAddPlayer}
+      />
 
       {/* Player Detail Modal */}
-      {selectedPlayer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 sm:p-4">
-          <div className="bg-white w-full h-full sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] flex flex-col overflow-hidden">
-            {/* Header - Fixed at top */}
-            <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
-              <div>
-                <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.firstName} {selectedPlayer.lastName}</h2>
-                <p className="text-gray-600">{selectedPlayer.phone}</p>
-              </div>
-              <button
-                onClick={() => setSelectedPlayer(null)}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Content - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Player Information */}
-                <div>
-                  <h3 className="text-lg font-bold text-[#4A2F1D] mb-4">Player Information</h3>
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm text-gray-600">Age</label>
-                        <p className="font-semibold">{selectedPlayer.age} years</p>
-                      </div>
-                      <div>
-                        <label className="text-sm text-gray-600">Position</label>
-                        <p className="font-semibold capitalize">{selectedPlayer.position}</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-sm text-gray-600">WhatsApp Number</label>
-                      <p className="font-semibold">{selectedPlayer.whatsappNumber}</p>
-                    </div>
-
-                    <div>
-                      <label className="text-sm text-gray-600">Village</label>
-                      <p className="font-semibold">{selectedPlayer.panchayat}</p>
-                    </div>
-
-                    <div>
-                      <label className="text-sm text-gray-600">Panchayat</label>
-                      <p className="font-semibold">{selectedPlayer.panchayat}</p>
-                    </div>
-
-                    <div>
-                      <label className="text-sm text-gray-600">District</label>
-                      <p className="font-semibold">{selectedPlayer.district}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Document Management */}
-                <div>
-                  <h3 className="text-lg font-bold text-[#4A2F1D] mb-4">Identity Documents</h3>
-                  <div className="space-y-4">
-
-                    {/* Profile Photo */}
-                    <div className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold">Profile Photo</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.user?.profileImages?.profilePhotoPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
-                      </div>
-                      {selectedPlayer.user?.profileImages?.profilePhotoPath && isReadOnly ? (
-                        <DocumentPreview
-                          type="profilePhoto"
-                          url={selectedPlayer.user?.profileImages.profilePhotoPath}
-                          label="Profile Photo"
-                          verified={!!selectedPlayer.user?.profileImages.verifiedAt}
-                          showActions={false}
-                          size="md"
-                        />
-                      ) : (
-                        <PlayerDocumentUpload
-                          playerId={selectedPlayer.id}
-                          playerUserId={selectedPlayer.userId}
-                          documentType="profilePhoto"
-                          label="Profile Photo"
-                          currentUrl={selectedPlayer.user?.profileImages?.profilePhotoPath || null}
-                          onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'profilePhoto', url)}
-                          onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.id, isComplete)}
-                          variant="card"
-                          disabled={isReadOnly === true}
-                        />
-                      )}
-                    </div>
-
-                    {/* Aadhaar Front */}
-                    <div className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold">Aadhaar Front</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.user?.profileImages?.aadhaarFrontPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
-                      </div>
-                      {selectedPlayer.user?.profileImages?.aadhaarFrontPath && isReadOnly ? (
-                        <DocumentPreview
-                          type="aadhaarFront"
-                          url={selectedPlayer.user.profileImages.aadhaarFrontPath}
-                          label="Aadhaar Front"
-                          verified={!!selectedPlayer.user.profileImages.verifiedAt}
-                          showActions={false}
-                          size="md"
-                        />
-                      ) : (
-                        <PlayerDocumentUpload
-                          playerId={selectedPlayer.id}
-                          playerUserId={selectedPlayer.userId}
-                          documentType="aadhaarFront"
-                          label="Aadhaar Front"
-                          currentUrl={selectedPlayer.user?.profileImages?.aadhaarFrontPath || null}
-                          onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'aadhaarFront', url)}
-                          onProfileComplete={(isComplete) => handleProfileComplete(selectedPlayer.id, isComplete)}
-                          variant="card"
-                          disabled={isReadOnly === true}
-                        />
-                      )}
-                    </div>
-
-                    {/* Aadhaar Back */}
-                    <div className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold">Aadhaar Back</span>
-                        <div className={`w-3 h-3 rounded-full ${selectedPlayer.user?.profileImages?.aadhaarBackPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`}></div>
-                      </div>
-                      {selectedPlayer.user?.profileImages?.aadhaarBackPath && isReadOnly ? (
-                        <DocumentPreview
-                          type="aadhaarBack"
-                          url={selectedPlayer.user.profileImages.aadhaarBackPath}
-                          label="Aadhaar Back"
-                          verified={!!selectedPlayer.user.profileImages.verifiedAt}
-                          showActions={false}
-                          size="md"
-                        />
-                      ) : (
-                        <PlayerDocumentUpload
-                          playerId={selectedPlayer.id}
-                          playerUserId={selectedPlayer.userId}
-                          documentType="aadhaarBack"
-                          label="Aadhaar Back"
-                          currentUrl={selectedPlayer.user?.profileImages?.aadhaarBackPath || null}
-                          onSuccess={(url) => handleDocumentUploadSuccess(selectedPlayer.id, 'aadhaarBack', url)}
-                          onProfileComplete={(isComplete: boolean | undefined) => handleProfileComplete(selectedPlayer.id, isComplete === true)}
-                          variant="card"
-                          disabled={isReadOnly === true}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons - Fixed at bottom */}
-            <div className="border-t border-gray-200 p-4 sm:p-6 flex-shrink-0 bg-white">
-              <div className="flex flex-row space-x-3 sm:space-x-4 sm:justify-end">
-                <button
-                  onClick={() => setSelectedPlayer(null)}
-                  className="flex-1 sm:flex-none sm:w-auto px-4 py-2 sm:px-6 sm:py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm sm:text-base"
-                >
-                  Close
-                </button>
-                {/* Make Captain button - disabled for current captain */}
-                {selectedPlayer.userId !== teamData.captainId && !isReadOnly ? (
-                  <button
-                    onClick={() => handleMakeCaptainClick(selectedPlayer.id)}
-                    className="flex-1 sm:flex-none sm:w-auto px-4 py-2 sm:px-6 sm:py-3 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium text-sm sm:text-base"
-                  >
-                    Make Captain
-                  </button>
-                ) : (
-                  <button
-                    className="flex-1 sm:flex-none sm:w-auto px-4 py-2 sm:px-6 sm:py-3 bg-gray-400 text-white rounded-lg cursor-not-allowed transition-colors font-medium text-sm sm:text-base"
-                    disabled
-                  >
-                    {selectedPlayer.userId === teamData.captainId ? 'Already Captain' : 'Cannot Make Captain (Team Submitted)'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PlayerDetailModal
+        isOpen={!!selectedPlayer}
+        onClose={() => setSelectedPlayer(null)}
+        selectedPlayer={selectedPlayer}
+        teamData={teamData}
+        isReadOnly={isReadOnly}
+        onMakeCaptain={handleMakeCaptainClick}
+        onDocumentUploadSuccess={handleDocumentUploadSuccess}
+        onProfileComplete={handleProfileComplete}
+      />
 
       {/* Team Submission Confirmation Modal */}
       {showSubmissionModal && teamData && teamData.sport && (
@@ -1408,6 +903,21 @@ export default function CaptainPlayerManagement() {
         cancelLabel="Cancel"
         confirmVariant="primary"
         loading={isMakingCaptain}
+      />
+
+      <ConfirmationModal
+        isOpen={showRemovePlayerModal}
+        onClose={() => {
+          setShowRemovePlayerModal(false);
+          setPlayerToRemove(null);
+        }}
+        onConfirm={confirmRemovePlayer}
+        title="Remove Player"
+        description={playerToRemove ? `Are you sure you want to remove ${playerToRemove.firstName} ${playerToRemove.lastName} from the team? This action cannot be undone.` : ''}
+        confirmLabel="Remove Player"
+        cancelLabel="Cancel"
+        confirmVariant="danger"
+        loading={isRemovingPlayer}
       />
     </div>
   );

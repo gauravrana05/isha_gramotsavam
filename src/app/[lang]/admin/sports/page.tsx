@@ -1,313 +1,400 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { useState, useMemo, useCallback } from 'react';
+
+import { Plus, Edit, Trash2, Search, Users, Calendar } from 'lucide-react';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+
 import { api } from '@/server/trpc/react';
-import { 
-  AdvancedTable,
-  SingleStatCard,
-  PageLoader,
-  Button
-} from '@/components/ui';
-import type { Column, ActionButton } from '@/components/ui';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  Users, 
-  Trophy, 
-  CheckCircle,
-  XCircle,
-  Clock,
-  Loader2
-} from 'lucide-react';
+import { AdvancedTable, Column, FilterField, TableParams } from '@/components/ui/AdvancedTable';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { Label } from '@/components/ui/Label';
+import { useNotification } from '@/context/NotificationContext';
+import { Sport } from '@prisma/client'; // Assuming Sport type is available from Prisma client
+import { SportForm, SportFormValues } from '@/components/admin/SportForm';
 
-interface SportData {
-  id: string;
-  name: string;
-  description: string | null;
-  mainPlayersCount: number;
-  maxSubstitutes: number;
-  maxPlayers: number;
-  isActive: boolean;
-  genderCategories?: string[];
-  teamCount?: number;
-  fixtureCount?: number;
-  matchCount?: number;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
+// Define the schema for the Sport form
+const sportFormSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1, 'Sport name is required'),
+  description: z.string().optional(),
+  mainPlayersCount: z.number().int().min(1, 'Must have at least 1 main player').max(50, 'Too many players'),
+  maxSubstitutes: z.number().int().min(0).max(20, 'Too many substitutes').default(0),
+  isActive: z.boolean().default(true),
+  genderCategories: z.array(z.enum(['men', 'women', 'mixed'])).min(1, 'At least one gender category required'),
+});
+
+
 
 export default function AdminSportsPage() {
-  const router = useRouter();
-  const { lang } = useParams();
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const { addNotification } = useNotification();
 
-  // tRPC query with enhanced parameters
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
+  const [tableParams, setTableParams] = useState<TableParams>({
+    search: '',
+    sort: [],
+    filters: [],
+    page: 1,
+    pageSize: 25,
+  });
+
   const {
     data: sportsData,
-    isLoading: sportsLoading,
-    error: sportsError,
-    refetch: refetchSports
-  } = api.admin.getSports.useQuery({
-    includeTeamCounts: true,
-    includeGenderCategories: true,
-    isActive: true
-  }, {
-    enabled: !!user && userProfile?.role === 'admin'
-  });
-
-  useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
+    isLoading: isLoadingSports,
+    refetch: refetchSports,
+  } = api.admin.getSports.useQuery(
+    {
+      limit: tableParams.pageSize,
+      offset: (tableParams.page - 1) * tableParams.pageSize,
+      // Add filters and search to the query if needed
+      // For now, getSports doesn't support search/filters directly, but we can add it later if required
+    },
+    {
+      keepPreviousData: true,
     }
+  );
 
-    if (userProfile?.role !== 'admin') {
-      router.push(`/${lang}/player/dashboard`);
-      return;
-    }
-  }, [user, userProfile, authLoading, lang, router]);
-
-  const loading = sportsLoading;
-  const error = sportsError?.message || '';
-  const sports = sportsData?.sports || [];
-
-  // Delete sport mutation
-  const deleteSportMutation = api.admin.deleteSport.useMutation({
+  const createSportMutation = api.admin.createSport.useMutation({
     onSuccess: () => {
-      // Refetch sports data
-      void sportsData;
+      addNotification('Sport created successfully!', 'success');
+      refetchSports();
+      setIsModalOpen(false);
+      reset();
     },
     onError: (error) => {
-      alert(error.message || 'Failed to delete sport');
-    }
+      addNotification(t('createError', { message: error.message }), 'error');
+    },
   });
 
-  const handleDeleteSport = async (sportId: string) => {
-    if (!confirm('Are you sure you want to delete this sport?')) {
-      return;
-    }
-    
-    deleteSportMutation.mutate({ id: sportId });
+  const updateSportMutation = api.admin.updateSport.useMutation({
+    onSuccess: () => {
+      addNotification(t('updateSuccess'), 'success');
+      refetchSports();
+      setIsModalOpen(false);
+      setSelectedSport(null);
+      reset();
+    },
+    onError: (error) => {
+      addNotification(t('updateError', { message: error.message }), 'error');
+    },
+  });
+
+  const deleteSportMutation = api.admin.deleteSport.useMutation({
+    onSuccess: () => {
+      addNotification(t('deleteSuccess'), 'success');
+      refetchSports();
+      setIsDeleteModalOpen(false);
+      setSelectedSport(null);
+    },
+    onError: (error) => {
+      addNotification(t('deleteError', { message: error.message }), 'error');
+    },
+  });
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+    setValue,
+    watch,
+  } = useForm<SportFormValues>({
+    resolver: zodResolver(sportFormSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      mainPlayersCount: 1,
+      maxSubstitutes: 0,
+      isActive: true,
+      genderCategories: ['men', 'women'],
+    },
+  });
+
+  const genderCategoriesWatch = watch('genderCategories');
+
+  const handleOpenCreateModal = () => {
+    setSelectedSport(null);
+    reset();
+    setValue('genderCategories', ['men', 'women']); // Default for new sport
+    setIsModalOpen(true);
   };
 
-  // Define table columns for AdvancedTable
-  const columns: Column<SportData>[] = [
-    {
-      key: 'name',
-      header: 'Sport Name',
-      accessor: 'name',
-      sortable: true,
-      minWidth: 200,
-      render: (_, sport) => (
-        <div>
-          <div className="text-sm font-medium text-gray-900">{sport.name}</div>
-          <div className="text-sm text-gray-500">{sport.description || 'No description'}</div>
-        </div>
-      ),
-    },
-    {
-      key: 'players',
-      header: 'Players Configuration',
-      accessor: 'maxPlayers',
-      sortable: true,
-      minWidth: 160,
-      render: (_, sport) => (
-        <div>
-          <div className="text-sm font-medium text-gray-900">
-            {sport.mainPlayersCount} + {sport.maxSubstitutes} = {sport.maxPlayers}
-          </div>
-          <div className="text-xs text-gray-500">Main + Subs = Total</div>
-        </div>
-      ),
-    },
-    {
-      key: 'genderCategories',
-      header: 'Categories',
-      accessor: 'genderCategories',
-      minWidth: 140,
-      render: (_, sport) => (
-        <div className="flex flex-wrap gap-1">
-          {sport.genderCategories?.map(category => (
-            <span key={category} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 capitalize">
-              {category}
-            </span>
-          )) || <span className="text-xs text-gray-400">No categories</span>}
-        </div>
-      ),
-    },
-    {
-      key: 'stats',
-      header: 'Activity Stats',
-      accessor: 'teamCount',
-      sortable: true,
-      minWidth: 140,
-      render: (_, sport) => (
-        <div className="text-sm space-y-1">
-          <div className="flex items-center space-x-1">
-            <Users className="w-3 h-3 text-gray-400" />
-            <span>{sport.teamCount || 0} teams</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Trophy className="w-3 h-3 text-gray-400" />
-            <span>{sport.fixtureCount || 0} fixtures</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Clock className="w-3 h-3 text-gray-400" />
-            <span>{sport.matchCount || 0} matches</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      accessor: 'isActive',
-      sortable: true,
-      minWidth: 100,
-      render: (_, sport) => (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
-          sport.isActive 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {sport.isActive ? (
-            <>
-              <CheckCircle className="w-3 h-3 mr-1" />
-              Active
-            </>
-          ) : (
-            <>
-              <XCircle className="w-3 h-3 mr-1" />
-              Inactive
-            </>
-          )}
-        </span>
-      ),
-    },
-    {
-      key: 'createdAt',
-      header: 'Created',
-      accessor: 'createdAt',
-      sortable: true,
-      minWidth: 120,
-      render: (_, sport) => (
-        <span className="text-sm text-gray-500">
-          {sport.createdAt ? new Date(sport.createdAt).toLocaleDateString() : 'N/A'}
-        </span>
-      ),
-    },
-  ];
+  const handleOpenEditModal = (sport: Sport) => {
+    setSelectedSport(sport);
+    reset({
+      id: sport.id,
+      name: sport.name,
+      description: sport.description || '',
+      mainPlayersCount: sport.mainPlayersCount,
+      maxSubstitutes: sport.maxSubstitutes,
+      isActive: sport.isActive,
+      // Assuming sportGenderCategories is available on the Sport object from the API
+      // If not, you might need to fetch it separately or adjust the API response
+      genderCategories: (sport as any).genderCategories || ['men', 'women'],
+    });
+    setIsModalOpen(true);
+  };
 
-  // Define action buttons for AdvancedTable
-  const actions: ActionButton<SportData>[] = [
-    {
-      label: 'View',
-      icon: Eye,
-      onClick: (sport) => router.push(`/${lang}/admin/sports/${sport.id}`),
-      variant: 'primary',
-    },
-    {
-      label: 'Edit',
-      icon: Edit,
-      onClick: (sport) => router.push(`/${lang}/admin/sports/${sport.id}/edit`),
-      variant: 'secondary',
-    },
-    {
-      label: 'Delete',
-      icon: Trash2,
-      onClick: (sport) => handleDeleteSport(sport.id),
-      variant: 'danger',
-      disabled: (sport) => deleteSportMutation.isPending,
-    },
-  ];
+  const handleOpenDeleteModal = (sport: Sport) => {
+    setSelectedSport(sport);
+    setIsDeleteModalOpen(true);
+  };
 
-  if (authLoading || loading) {
-    return <PageLoader title="Loading sports..." variant="minimal" />;
-  }
+  const onSubmit = async (data: SportFormValues) => {
+    if (selectedSport) {
+      await updateSportMutation.mutateAsync({
+        id: selectedSport.id,
+        ...data,
+      });
+    } else {
+      await createSportMutation.mutateAsync(data);
+    }
+  };
 
-  if (!user || userProfile?.role !== 'admin') {
-    return null;
-  }
+  const confirmDelete = async () => {
+    if (selectedSport) {
+      await deleteSportMutation.mutateAsync({ id: selectedSport.id });
+    }
+  };
+
+  const columns = useMemo<Column<Sport>[]>(
+    () => [
+      {
+        key: 'name',
+        header: 'Name',
+        sortable: true,
+        accessor: 'name',
+      },
+      {
+        key: 'description',
+        header: 'Description',
+        accessor: 'description',
+        render: (value) => value || 'N/A',
+      },
+      {
+        key: 'mainPlayersCount',
+        header: 'Main Players',
+        sortable: true,
+        accessor: 'mainPlayersCount',
+      },
+      {
+        key: 'maxSubstitutes',
+        header: 'Max Substitutes',
+        sortable: true,
+        accessor: 'maxSubstitutes',
+      },
+      {
+        key: 'isActive',
+        header: 'Active',
+        sortable: true,
+        accessor: 'isActive',
+        render: (value) => (value ? 'Yes' : 'No'),
+      },
+      {
+        key: 'genderCategories',
+        header: 'Gender Categories',
+        accessor: 'genderCategories',
+        render: (value: string[]) => value?.join(', ') || 'N/A',
+      },
+      {
+        key: 'actions',
+        header: 'Actions',
+        render: (_, sport) => (
+          <div className="flex space-x-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleOpenEditModal(sport)}
+              aria-label="Edit"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleOpenDeleteModal(sport)}
+              aria-label="Delete"
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    []
+  );
+
+  const filterFields = useMemo<FilterField[]>(
+    () => [
+      {
+        key: 'isActive',
+        label: t('filterIsActive'),
+        type: 'select',
+        category: commonT('status'),
+        options: [
+          { label: commonT('all'), value: 'all' },
+          { label: commonT('yes'), value: 'true' },
+          { label: commonT('no'), value: 'false' },
+        ],
+      },
+      {
+        key: 'genderCategory',
+        label: t('filterGenderCategory'),
+        type: 'multi-select',
+        category: commonT('details'),
+        options: [
+          { label: commonT('men'), value: 'men' },
+          { label: commonT('women'), value: 'women' },
+          { label: commonT('mixed'), value: 'mixed' },
+        ],
+      },
+    ],
+    [t, commonT]
+  );
+
+  const handleTableParamsChange = useCallback((newParams: TableParams) => {
+    setTableParams(newParams);
+    // If getSports supported search/filters, you would pass them here
+    // refetchSports();
+  }, []);
+
+  const totalSports = sportsData?.sports?.length || 0; // getSports doesn't return total count, so using length for now
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sports Management</h1>
-          <p className="text-gray-600 text-sm">Manage sports and their configurations</p>
-        </div>
-        
-        <Button
-          onClick={() => router.push(`/${lang}/admin/sports/create`)}
-          leftIcon={Plus}
-          variant="primary"
-          size="sm"
-        >
-          Add Sport
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">{t('title')}</h1>
+        <Button onClick={handleOpenCreateModal}>
+          <Plus className="mr-2 h-4 w-4" />
+          {t('addSport')}
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      {sports.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SingleStatCard
-            stat={{
-              label: "Total Sports",
-              value: sports.length.toString(),
-              icon: Trophy,
-              color: "info"
-            }}
-          />
-          <SingleStatCard
-            stat={{
-              label: "Total Teams",
-              value: sports.reduce((sum, sport) => sum + (sport.teamCount || 0), 0).toString(),
-              icon: Users,
-              color: "success"
-            }}
-          />
-          <SingleStatCard
-            stat={{
-              label: "Avg Teams/Sport",
-              value: (sports.reduce((sum, sport) => sum + (sport.teamCount || 0), 0) / sports.length).toFixed(1),
-              icon: Clock,
-              color: "primary"
-            }}
-          />
-        </div>
-      )}
-
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-600">{error}</p>
-        </div>
-      )}
-
-      {/* AdvancedTable */}
-      <AdvancedTable<SportData>
-        data={sports}
+      <AdvancedTable
+        data={sportsData?.sports || []}
         columns={columns}
-        actions={actions}
-        loading={loading}
+        loading={isLoadingSports}
         searchable={true}
-        searchPlaceholder="Search sports..."
-        filterable={false}
+        searchPlaceholder={t('searchPlaceholder')}
+        searchFields={['name', 'description']}
+        filterable={true}
+        filters={filterFields}
         sortable={true}
-        keyExtractor={(sport) => sport.id}
-        emptyState={{
-          icon: Trophy,
-          title: 'No sports found',
-          description: 'No sports have been added yet.'
+        pagination={{
+          enabled: true,
+          pageSize: tableParams.pageSize,
+          pageSizeOptions: [10, 25, 50, 100],
+          serverSide: false, // Set to true if getSports returns total count and handles pagination
+          total: totalSports,
         }}
+        onDataLoad={handleTableParamsChange}
+        emptyState={{
+          icon: Calendar, // Changed from Calendar to a more relevant icon if available, otherwise keep Calendar
+          title: t('noSportsFound'),
+          description: t('noSportsDescription'),
+          action: {
+            label: t('addSport'),
+            onClick: handleOpenCreateModal,
+          },
+        }}
+        persistState={true}
+        stateKey="admin-sports-table"
       />
+
+      {/* Create/Edit Sport Modal */}
+      <EnhancedModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={selectedSport ? t('editSport') : t('createSport')}
+        subtitle={selectedSport ? t('editSportSubtitle') : t('createSportSubtitle')}
+        size="lg"
+        mobileFullScreen={true}
+        scrollableBody={true}
+        footer={
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setIsModalOpen(false)}
+              disabled={createSportMutation.isLoading || updateSportMutation.isLoading}
+            >
+              {commonT('cancel')}
+            </Button>
+            <Button
+              onClick={handleSubmit(onSubmit)}
+              disabled={createSportMutation.isLoading || updateSportMutation.isLoading}
+            >
+              {createSportMutation.isLoading || updateSportMutation.isLoading
+                ? commonT('saving')
+                : selectedSport
+                ? commonT('update')
+                : commonT('create')}
+            </Button>
+          </div>
+        }
+      >
+        <SportForm
+          onSubmit={onSubmit}
+          defaultValues={selectedSport ? {
+            id: selectedSport.id,
+            name: selectedSport.name,
+            description: selectedSport.description || '',
+            mainPlayersCount: selectedSport.mainPlayersCount,
+            maxSubstitutes: selectedSport.maxSubstitutes,
+            isActive: selectedSport.isActive,
+            genderCategories: (selectedSport as any).genderCategories || ['men', 'women'],
+          } : {
+            name: '',
+            description: '',
+            mainPlayersCount: 1,
+            maxSubstitutes: 0,
+            isActive: true,
+            genderCategories: ['men', 'women'],
+          }}
+          isLoading={createSportMutation.isLoading || updateSportMutation.isLoading}
+        />
+      </EnhancedModal>
+
+      {/* Delete Confirmation Modal */}
+      <EnhancedModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title={t('deleteSport')}
+        subtitle={t('deleteSportSubtitle')}
+        size="sm"
+        footer={
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteModalOpen(false)}
+              disabled={deleteSportMutation.isLoading}
+            >
+              {commonT('cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteSportMutation.isLoading}
+            >
+              {deleteSportMutation.isLoading ? commonT('deleting') : commonT('delete')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="text-center py-4">
+          <p className="text-gray-600 mb-4">
+            {t('deleteConfirmation', { sportName: selectedSport?.name })}
+          </p>
+          <p className="text-sm text-red-600">{t('deleteWarning')}</p>
+        </div>
+      </EnhancedModal>
     </div>
   );
 }

@@ -506,10 +506,8 @@ export function Table<T>({
     return <LoadingState />;
   }
   
-  // Empty state
-  if (processedData.length === 0 && emptyState && !loading) {
-    return <EmptyState emptyState={emptyState} />;
-  }
+  // Check if we should show empty state (but still render table structure)
+  const showEmptyState = processedData.length === 0 && emptyState && !loading;
 
   return (
     <div className={cn('w-full', className)} {...rest}>
@@ -611,10 +609,33 @@ export function Table<T>({
               className="bg-white divide-y divide-gray-200 transition-opacity duration-300 ease-in-out"
               style={shouldVirtualize ? { display: 'block', height: viewportHeight } as any : undefined}
             >
-              {shouldVirtualize && (
-                <tr style={{ height: offsetY, display: 'block' }} />
-              )}
-              {(shouldVirtualize ? processedData.slice(startIndex, endIndex) : processedData).map((item, i) => {
+              {showEmptyState ? (
+                <tr>
+                  <td 
+                    colSpan={columns.length + (selectable ? 1 : 0) + (expandable ? 1 : 0)}
+                    className="px-6 py-12 text-center"
+                  >
+                    <div className="flex flex-col items-center">
+                      <emptyState.icon className="w-12 h-12 text-gray-400 mb-3" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">{emptyState.title}</h3>
+                      <p className="text-gray-600 mb-4">{emptyState.description}</p>
+                      {emptyState.action && (
+                        <button
+                          onClick={emptyState.action.onClick}
+                          className="inline-flex items-center px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+                        >
+                          {emptyState.action.label}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {shouldVirtualize && (
+                    <tr style={{ height: offsetY, display: 'block' }} />
+                  )}
+                  {(shouldVirtualize ? processedData.slice(startIndex, endIndex) : processedData).map((item, i) => {
                 const index = shouldVirtualize ? startIndex + i : i;
                 const rowKey = keyExtractor(item, index);
                 const isSelected = selectedRows.has(rowKey);
@@ -725,10 +746,12 @@ export function Table<T>({
                     }
                   </React.Fragment>
                 );
-              })}
-              {shouldVirtualize ? (
-                <tr style={{ height: Math.max(0, (totalRows - endIndex) * rowHeight), display: 'block' }} />
-              ) : null}
+                  })}
+                  {shouldVirtualize ? (
+                    <tr style={{ height: Math.max(0, (totalRows - endIndex) * rowHeight), display: 'block' }} />
+                  ) : null}
+                </>
+              )}
             </tbody>
           </table>
           

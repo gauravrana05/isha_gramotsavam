@@ -29,7 +29,7 @@ export default function VolunteerMainPage() {
 
   if (authLoading || (user && assignmentsLoading)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
           <p className="text-gray-600">Loading your profile...</p>
@@ -47,7 +47,7 @@ export default function VolunteerMainPage() {
   // This will only render if the useRedirect hook did not find a venue to redirect to
   if (assignmentsError || !assignmentsData?.success || !assignmentsData.assignments?.length) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-orange-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">No Venue Assignments</h1>

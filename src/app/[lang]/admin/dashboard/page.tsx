@@ -228,7 +228,7 @@ export default function AdminDashboard() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
       </div>
     );
@@ -236,7 +236,7 @@ export default function AdminDashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 mb-4">
             <Activity className="w-16 h-16 mx-auto" />
@@ -273,7 +273,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="lg:min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
         {/* Header */}

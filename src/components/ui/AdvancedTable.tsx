@@ -77,6 +77,17 @@ export interface AdvancedTableConfig<T = any> {
     };
   };
   
+  // No search results empty state (when data exists but search returns no results)
+  noSearchResultsEmptyState?: {
+    icon: React.ComponentType<{ className?: string }>;
+    title: string;
+    description: string;
+    action?: {
+      label: string;
+      onClick: () => void;
+    };
+  };
+  
   // Styling
   compact?: boolean;
   compactMode?: boolean;
@@ -227,6 +238,7 @@ export const AdvancedTable = <T,>({
   
   // Other props
   emptyState,
+  noSearchResultsEmptyState,
   compact = false,
   compactMode = false,
   stickyHeader = false,
@@ -692,7 +704,15 @@ export const AdvancedTable = <T,>({
           onRowExpand={onRowExpand}
           renderExpandedContent={renderExpandedContent}
           
-          emptyState={emptyState}
+          emptyState={(() => {
+            // Intelligent empty state selection
+            if (processedData.length === 0 && data.length > 0) {
+              // Data exists but no results after filtering/searching - use noSearchResultsEmptyState
+              return noSearchResultsEmptyState || emptyState;
+            }
+            // No data at all - use regular emptyState
+            return emptyState;
+          })()}
           // Virtualization
           // virtualize={props.virtualize || totalItems > (props.virtualizeThreshold ?? 200)}
           // rowHeight={props.rowHeight}
@@ -718,7 +738,7 @@ export const AdvancedTable = <T,>({
         )}
         
         {/* Results info at bottom */}
-        <div className="flex justify-between items-center py-3 px-4 border-t border-gray-200 bg-gray-50">
+        <div className="flex justify-between items-center py-3 px-4 border-t border-gray-200 bg-gray-50 mt-0">
           <div className="text-sm text-gray-500">
             Showing {Math.min((state.page - 1) * state.pageSize + 1, totalItems)}-{Math.min(state.page * state.pageSize, totalItems)} of {totalItems} results
           </div>

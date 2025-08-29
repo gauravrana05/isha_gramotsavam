@@ -426,7 +426,7 @@ export default function VolunteerVenueAssignmentPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
       </div>
     );
@@ -434,7 +434,7 @@ export default function VolunteerVenueAssignmentPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md">
           <Users className="w-16 h-16 text-red-400 mx-auto mb-3" />
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">Unable to load assignments</h1>

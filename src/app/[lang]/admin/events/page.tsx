@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
 import { 
   AdvancedTable,
@@ -13,6 +14,8 @@ import {
   type Column,
   type ActionButton,
 } from '@/components/ui';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { 
   Plus, 
   Calendar,
@@ -49,10 +52,15 @@ export default function AdminEventsPage() {
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
-  const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
+  const { addNotification } = useNotification();
+  const [selectedEvents, setSelectedEvents] = useState<Set<string | number>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [eventToEdit, setEventToEdit] = useState<EventData | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<EventData | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -66,7 +74,7 @@ export default function AdminEventsPage() {
   // tRPC query with enhanced parameters
   const {
     data: eventsData,
-    isLoading: eventsLoading,
+    isPending: eventsLoading,
     error: eventsError,
     refetch: refetchEvents
   } = api.admin.getEvents.useQuery({
@@ -81,9 +89,11 @@ export default function AdminEventsPage() {
   const deleteEventMutation = api.admin.deleteEvent.useMutation({
     onSuccess: () => {
       refetchEvents();
+      addNotification('Event deleted successfully', 'success');
     },
     onError: (error) => {
       console.error('Error deleting event:', error);
+      addNotification('Failed to delete event. Please try again.', 'error');
     },
   });
 
@@ -93,9 +103,29 @@ export default function AdminEventsPage() {
       refetchEvents();
       setShowCreateModal(false);
       resetForm();
+      setIsEditMode(false);
+      setEventToEdit(null);
+      addNotification('Event created successfully', 'success');
     },
     onError: (error) => {
       console.error('Error creating event:', error);
+      addNotification('Failed to create event. Please try again.', 'error');
+    },
+  });
+
+  // Update event mutation
+  const updateEventMutation = api.admin.updateEvent.useMutation({
+    onSuccess: () => {
+      refetchEvents();
+      setShowCreateModal(false);
+      resetForm();
+      setIsEditMode(false);
+      setEventToEdit(null);
+      addNotification('Event updated successfully', 'success');
+    },
+    onError: (error) => {
+      console.error('Error updating event:', error);
+      addNotification('Failed to update event. Please try again.', 'error');
     },
   });
 
@@ -108,7 +138,7 @@ export default function AdminEventsPage() {
     }
 
     if (userProfile?.role !== 'admin') {
-      router.push(`/${lang}/player/dashboard`);
+      router.push(`/${lang}/public`);
       return;
     }
   }, [user, userProfile, authLoading, lang, router]);
@@ -177,15 +207,15 @@ export default function AdminEventsPage() {
     {
       key: 'registration',
       header: 'Registration',
-      accessor: 'registrationDeadline',
+      accessor: 'registrationEndDate',
       sortable: true,
       minWidth: 130,
       render: (_, event) => (
         <div className="text-sm text-gray-900">
-          {event.registrationDeadline ? (
+          {event.registrationEndDate ? (
             <>
               <div>Until</div>
-              <div className="text-xs">{new Date(event.registrationDeadline).toLocaleDateString()}</div>
+              <div className="text-xs">{new Date(event.registrationEndDate).toLocaleDateString()}</div>
             </>
           ) : 'Not set'}
         </div>
@@ -236,10 +266,15 @@ export default function AdminEventsPage() {
     {
       label: 'Edit',
       icon: Edit,
-      onClick: (event) => router.push(`/${lang}/admin/events/${event.id}/edit`),
+      onClick: (event) => {
+        setEventToEdit(event);
+        setIsEditMode(true);
+        populateFormWithEvent(event);
+        setShowCreateModal(true);
+      },
       variant: 'secondary',
     }
-  ], [router, lang]);
+  ], []);
 
   // Handle row click to view event
   const handleRowClick = (event: EventData) => {
@@ -260,37 +295,82 @@ export default function AdminEventsPage() {
     });
   };
 
+  const formatDateForInput = (dateString: string | null) => {
+    if (!dateString) return '';
+    return new Date(dateString).toISOString().split('T')[0];
+  };
+
+  const populateFormWithEvent = (event: EventData) => {
+    setFormData({
+      name: event.name,
+      description: event.description || '',
+      registrationStartDate: formatDateForInput(event.registrationStartDate),
+      registrationEndDate: formatDateForInput(event.registrationEndDate),
+      startDate: formatDateForInput(event.startDate),
+      endDate: formatDateForInput(event.endDate),
+      status: event.status as any,
+    });
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSelectChange = (value: string, name: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     try {
-      await createEventMutation.mutateAsync({
+      // Convert date strings to ISO datetime format
+      const formatDateToISO = (dateString: string) => {
+        if (!dateString) return '';
+        return new Date(dateString + 'T00:00:00.000Z').toISOString();
+      };
+
+      const eventData = {
         name: formData.name,
         description: formData.description || undefined,
-        registrationStartDate: formData.registrationStartDate,
-        registrationEndDate: formData.registrationEndDate,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
+        registrationStartDate: formatDateToISO(formData.registrationStartDate),
+        registrationEndDate: formatDateToISO(formData.registrationEndDate),
+        startDate: formatDateToISO(formData.startDate),
+        endDate: formatDateToISO(formData.endDate),
         status: formData.status,
-      });
+      };
+
+      if (isEditMode && eventToEdit) {
+        await updateEventMutation.mutateAsync({
+          id: eventToEdit.id,
+          ...eventData,
+        });
+      } else {
+        await createEventMutation.mutateAsync(eventData);
+      }
     } catch (error) {
-      console.error('Failed to create event:', error);
+      console.error('Failed to save event:', error);
     }
   };
 
   // Handle delete event
-  const handleDeleteEvent = async (eventId: string) => {
-    if (window.confirm('Are you sure you want to remove this event? This action cannot be undone.')) {
-      try {
-        await deleteEventMutation.mutateAsync({ id: eventId });
-        setSelectedEvents(new Set()); // Clear selection after delete
-      } catch (error) {
-        console.error('Failed to delete event:', error);
-      }
+  const handleDeleteEvent = (eventId: string) => {
+    const event = events.find(e => e.id === eventId);
+    if (event) {
+      setEventToDelete(event);
+      setShowDeleteConfirm(true);
+    }
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!eventToDelete) return;
+    try {
+      await deleteEventMutation.mutateAsync({ id: eventToDelete.id });
+      setSelectedEvents(new Set()); // Clear selection after delete
+      setShowDeleteConfirm(false);
+      setEventToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete event:', error);
     }
   };
 
@@ -303,12 +383,12 @@ export default function AdminEventsPage() {
       <Button
         onClick={() => handleDeleteEvent(selectedEvent.id)}
         leftIcon={Trash2}
-        variant="outline"
+        variant="danger"
         size="sm"
         className="text-red-600 border-red-300 hover:bg-red-50"
-        disabled={deleteEventMutation.isLoading}
+        disabled={deleteEventMutation.isPending}
       >
-        {deleteEventMutation.isLoading ? 'Removing...' : 'Remove Event'}
+        {deleteEventMutation.isPending ? 'Removing...' : 'Remove Event'}
       </Button>
     );
   };
@@ -323,51 +403,6 @@ export default function AdminEventsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-full">
-
-      {/* Stats Cards */}
-      {events.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <SingleStatCard
-            stat={{
-              label: "Total Events",
-              value: events.length.toString(),
-              icon: Calendar,
-              color: "info"
-            }}
-          />
-          <SingleStatCard
-            stat={{
-              label: "Active Events",
-              value: events.filter((e: EventData) => e.status === 'active').length.toString(),
-              icon: CheckCircle,
-              color: "success"
-            }}
-          />
-          <SingleStatCard
-            stat={{
-              label: "Total Teams",
-              value: events.reduce((sum: number, event: EventData) => sum + event.teamCount, 0).toString(),
-              icon: Users,
-              color: "primary"
-            }}
-          />
-          <SingleStatCard
-            stat={{
-              label: "Total Fixtures",
-              value: events.reduce((sum: number, event: EventData) => sum + event.fixtureCount, 0).toString(),
-              icon: Trophy,
-              color: "secondary"
-            }}
-          />
-        </div>
-      )}
-
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-600">{error}</p>
-        </div>
-      )}
 
       {/* AdvancedTable */}
       <AdvancedTable<EventData>
@@ -402,18 +437,50 @@ export default function AdminEventsPage() {
         }}
       />
 
-      {/* Create Event Modal */}
-      <Modal
+      {/* Create/Edit Event Modal */}
+      <EnhancedModal
         isOpen={showCreateModal}
         onClose={() => {
           setShowCreateModal(false);
           resetForm();
+          setIsEditMode(false);
+          setEventToEdit(null);
         }}
-        title="Create New Event"
-        description="Create a new tournament event with registration and schedule details"
-        size="lg"
+        title={isEditMode ? "Edit Event" : "Create New Event"}
+        subtitle={isEditMode ? "Update event details and settings" : "Create a new tournament event with registration and schedule details"}
+        size="xl"
+        mobileFullScreen={true}
+        scrollableBody={true}
+        footer={
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreateModal(false);
+                resetForm();
+                setIsEditMode(false);
+                setEventToEdit(null);
+              }}
+              disabled={createEventMutation.isPending || updateEventMutation.isPending}
+              className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSubmit()}
+              disabled={createEventMutation.isPending || updateEventMutation.isPending}
+              className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm"
+            >
+              {(createEventMutation.isPending || updateEventMutation.isPending)
+                ? (isEditMode ? 'Updating...' : 'Creating...') 
+                : (isEditMode ? 'Update Event' : 'Create Event')
+              }
+            </button>
+          </div>
+        }
       >
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-6">
           {/* Event Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
@@ -517,56 +584,59 @@ export default function AdminEventsPage() {
             <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
               Status
             </label>
-            <select
-              id="status"
-              name="status"
+            <Select
               value={formData.status}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onValueChange={(value) => handleSelectChange(value, 'status')}
             >
-              <option value="draft">Draft</option>
-              <option value="registration_open">Registration Open</option>
-              <option value="registration_closed">Registration Closed</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select event status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="registration_open">Registration Open</SelectItem>
+                <SelectItem value="registration_closed">Registration Closed</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
-          {/* Form Actions */}
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowCreateModal(false);
-                resetForm();
-              }}
-              disabled={createEventMutation.isLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={createEventMutation.isLoading}
-            >
-              {createEventMutation.isLoading ? 'Creating...' : 'Create Event'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        </div>
+      </EnhancedModal>
 
       {/* View Event Modal */}
-      <Modal
+      <EnhancedModal
         isOpen={showViewModal}
         onClose={() => {
           setShowViewModal(false);
           setSelectedEvent(null);
         }}
         title={selectedEvent?.name || 'Event Details'}
-        description="View event details and information"
-        size="lg"
+        subtitle="View event details and information"
+        size="xl"
+        mobileFullScreen={true}
+        scrollableBody={true}
+        footer={
+          selectedEvent ? (
+            <div className="flex flex-row space-x-3 sm:justify-end">
+             
+              <button
+                onClick={() => {
+                  if (selectedEvent) {
+                    setEventToEdit(selectedEvent);
+                    setIsEditMode(true);
+                    populateFormWithEvent(selectedEvent);
+                    setShowViewModal(false);
+                    setShowCreateModal(true);
+                  }
+                }}
+                className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm"
+              >
+                Edit Event
+              </button>
+            </div>
+          ) : undefined
+        }
       >
         {selectedEvent && (
           <div className="space-y-6">
@@ -673,23 +743,53 @@ export default function AdminEventsPage() {
               </div>
             </div>
 
-            {/* Action Button */}
-            <div className="flex justify-end pt-6 border-t border-gray-200">
-              <Button
-                onClick={() => {
-                  setShowViewModal(false);
-                  router.push(`/${lang}/admin/events/${selectedEvent.id}/edit`);
-                }}
-                leftIcon={Edit}
-                variant="primary"
-                size="sm"
-              >
-                Edit Event
-              </Button>
-            </div>
           </div>
         )}
-      </Modal>
+      </EnhancedModal>
+
+      {/* Delete Confirmation Modal */}
+      <EnhancedModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setEventToDelete(null);
+        }}
+        title="Confirm Delete"
+        subtitle="This action cannot be undone"
+        size="sm"
+        footer={
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                setEventToDelete(null);
+              }}
+              disabled={deleteEventMutation.isPending}
+              className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDeleteEvent}
+              disabled={deleteEventMutation.isPending}
+              className="flex-1 sm:flex-initial sm:px-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium py-2 text-sm"
+            >
+              {deleteEventMutation.isPending ? 'Deleting...' : 'Delete Event'}
+            </button>
+          </div>
+        }
+      >
+        <div className="text-center py-4">
+          <p className="text-gray-600 mb-4">
+            Are you sure you want to delete the event <strong>"{eventToDelete?.name}"</strong>?
+          </p>
+          <p className="text-sm text-red-600">
+            This action cannot be undone and will permanently remove all associated data.
+          </p>
+        </div>
+      </EnhancedModal>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { useDropzone } from 'react-dropzone';
 import { Upload, X, Image, Video, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Progress } from '@/components/ui/Progress';
-import Input from '@/components/ui/Input';
+import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Label } from '@/components/ui/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';

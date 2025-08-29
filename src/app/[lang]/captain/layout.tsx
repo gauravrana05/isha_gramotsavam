@@ -26,16 +26,16 @@ export default function CaptainLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="lg:min-h-screen bg-gray-50">
       <CaptainSidebar 
         isDesktopCollapsed={isDesktopSidebarCollapsed}
         onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
       />
-      <div className={`flex flex-col min-h-screen ${
+      <div className={`${
         isDesktopSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80'
       } transition-[margin] duration-300 ease-in-out`}>
         <div className="lg:hidden h-16"></div>
-        <main className="flex-1 overflow-auto">
+        <main className="lg:min-h-screen">
           {children}
         </main>
       </div>

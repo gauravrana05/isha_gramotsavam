@@ -130,7 +130,7 @@ export default function VolunteerCreateTeamPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#CE4520]" />
       </div>
     );
@@ -142,7 +142,7 @@ export default function VolunteerCreateTeamPage() {
 
   if (!['technical_volunteer', 'admin'].includes(userProfile.role || '')) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
@@ -160,7 +160,7 @@ export default function VolunteerCreateTeamPage() {
 
   if (!validSports.includes(sportName)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Sport</h1>
@@ -177,7 +177,7 @@ export default function VolunteerCreateTeamPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F3F0E5] font-fira">
+    <div className="lg:min-h-screen bg-[#F3F0E5] font-fira">
       <div className="max-w-4xl mx-auto p-3 sm:p-4 py-6 sm:py-8">
         <div className="text-center mb-6 sm:mb-8">
           <div className="mb-3 sm:mb-4">

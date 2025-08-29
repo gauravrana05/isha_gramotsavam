@@ -111,7 +111,7 @@ export default function PlayerFixtureDetailPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
       </div>
     );
@@ -119,7 +119,7 @@ export default function PlayerFixtureDetailPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
@@ -137,7 +137,7 @@ export default function PlayerFixtureDetailPage() {
 
   if (!fixture) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-gray-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Tournament Not Found</h1>
@@ -155,7 +155,7 @@ export default function PlayerFixtureDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="lg:min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

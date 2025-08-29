@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Edit, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
+import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Label } from '@/components/ui/Label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';

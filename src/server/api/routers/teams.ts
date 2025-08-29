@@ -928,11 +928,11 @@ export const teamsRouter = createTRPCRouter({
     .input(removeTeamPlayerSchema)
     .mutation(async ({ input }) => {
       try {
-        // The userId being passed is actually the teamPlayers.id
-        // Let's find the player by teamPlayers.id instead
-        const player = await db.teamPlayer.findUnique({
+        // Find the player by userId and teamId
+        const player = await db.teamPlayer.findFirst({
           where: {
-            id: input.userId, // This is actually the teamPlayers.id
+            userId: input.userId,
+            teamId: input.teamId,
           },
         })
 
@@ -943,32 +943,20 @@ export const teamsRouter = createTRPCRouter({
           })
         }
 
-        // Verify the player belongs to the correct team
-        if (player.teamId !== input.teamId) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Player does not belong to this team',
-          })
-        }
-
-        // Perform soft delete
-        await db.teamPlayer.update({
+        // Perform hard delete
+        await db.teamPlayer.delete({
           where: {
-            id: input.userId, // This is actually the teamPlayers.id
+            id: player.id,
           },
-          data: {
-            deletedAt: new Date(),
-            // Note: TeamPlayer model does&apos;t have deletedBy field in schema
-          }
         })
 
         // Update team player counts
         const [mainCount, subCount] = await Promise.all([
           db.teamPlayer.count({
-            where: { teamId: input.teamId, position: 'main', deletedAt: null },
+            where: { teamId: input.teamId, position: 'main' },
           }),
           db.teamPlayer.count({
-            where: { teamId: input.teamId, position: 'substitute', deletedAt: null },
+            where: { teamId: input.teamId, position: 'substitute' },
           }),
         ])
 

@@ -104,7 +104,7 @@ export default async function TeamCheckInPage({ params }: PageProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
           <div>Loading players...</div>
@@ -117,7 +117,7 @@ export default async function TeamCheckInPage({ params }: PageProps) {
   const allVerified = verifiedCount === players.length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="lg:min-h-screen bg-gray-50">
       {/* Mobile Header */}
       <div className="bg-white border-b px-4 py-3 sticky top-0 z-10">
         <div className="flex items-center justify-between">

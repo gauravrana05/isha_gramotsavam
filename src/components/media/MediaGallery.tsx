@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Filter, Search, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
+import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/badge';
 import { MediaFullPreview } from './MediaFullPreview';
 import { MediaItem } from '@/lib/types/media';

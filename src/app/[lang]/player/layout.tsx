@@ -26,12 +26,12 @@ export default function PlayerLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="lg:min-h-screen bg-gray-50">
       <PlayerSidebar 
         isDesktopCollapsed={isDesktopSidebarCollapsed}
         onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
       />
-      <div className={`flex flex-col min-h-screen ${
+      <div className={`flex flex-col lg:min-h-screen ${
         isDesktopSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80'
       } transition-[margin] duration-300 ease-in-out`}>
         <div className="lg:hidden h-16"></div>

@@ -1270,8 +1270,7 @@ export const adminRouter = createTRPCRouter({
       await db.event.update({
         where: { id: input.id },
         data: { 
-          deletedAt: new Date(),
-          deletedBy: ctx.user.id
+          deletedAt: new Date()
         }
       });
 

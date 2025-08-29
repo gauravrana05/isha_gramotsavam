@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { X, Filter, Search, Calendar, User, Tag, MapPin, Image, Video } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
+import { Input } from '@/components/ui/Input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { Badge } from '@/components/ui/badge';
 

@@ -487,7 +487,7 @@ export default function VolunteersManagement() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md">
           <Users className="w-16 h-16 text-red-400 mx-auto mb-3" />
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">Unable to load volunteers</h1>

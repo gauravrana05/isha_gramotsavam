@@ -846,7 +846,7 @@ export default function CaptainPlayerManagement() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
       </div>
     );
@@ -854,7 +854,7 @@ export default function CaptainPlayerManagement() {
 
   if (error || !teamData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
@@ -871,7 +871,7 @@ export default function CaptainPlayerManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F3F0E5] font-fira">
+    <div className="lg:min-h-screen bg-[#F3F0E5] font-fira">
       {/* Header */}
       <div className="bg-[#4A2F1D] text-white py-6">
         <div className="max-w-7xl mx-auto px-4">

@@ -15,7 +15,15 @@ export async function GET(req: NextRequest) {
     });
 
     if (user) {
-      return NextResponse.json({ user });
+      // Set userId in cookie for tRPC context
+      const response = NextResponse.json({ user });
+      response.cookies.set('userId', user.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/'
+      });
+      return response;
     } else {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
