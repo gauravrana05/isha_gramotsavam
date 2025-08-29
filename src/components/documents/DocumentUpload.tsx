@@ -141,11 +141,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     <div className={`border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-[#CE4520] transition-colors ${className}`}>
       <div className="text-center">
         {currentUrl ? (
-          <div className="mb-4">
+          <div className="mb-4 w-full h-full">
             <img
               src={currentUrl}
               alt={label}
-              className="w-32 h-20 object-cover rounded-lg mx-auto border border-gray-200 cursor-pointer"
+              className="w-full h-full max-h-[400px] object-cover rounded-lg mx-auto border border-gray-200 cursor-pointer"
               onClick={handleImageClick}
             />
           </div>

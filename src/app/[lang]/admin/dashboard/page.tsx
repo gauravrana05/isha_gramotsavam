@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/server/trpc/react';
 import { 
@@ -16,7 +16,12 @@ import {
   TrendingUp,
   Calendar,
   Target,
-  Settings
+  Settings,
+  RefreshCw,
+  Zap,
+  Pause,
+  Play,
+  Timer
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -43,8 +48,18 @@ export default function AdminDashboard() {
   const { user, userProfile, loading: authLoading } = useAuth();
   const { lang } = useParams();
   const router = useRouter();
+  
+  // Real-time update state
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState(30); // seconds
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [nextRefreshIn, setNextRefreshIn] = useState<number>(30);
+  const [criticalAlerts, setCriticalAlerts] = useState<string[]>([]);
+  const intervalRef = useRef<NodeJS.Timeout>();
+  const countdownRef = useRef<NodeJS.Timeout>();
+  const previousDataRef = useRef<any>(null);
 
-  // tRPC queries
+  // tRPC queries with real-time refetch
   const {
     data: dashboardData,
     isLoading: dashboardLoading,
@@ -53,9 +68,13 @@ export default function AdminDashboard() {
   } = api.admin.getDashboardOverview.useQuery({
     level: 'all',
     includeDetailed: true,
-    refreshCache: false
+    refreshCache: true // Enable cache refresh for real-time data
   }, {
-    enabled: !!user && userProfile?.role === 'admin'
+    enabled: !!user && userProfile?.role === 'admin',
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 1000 * 20, // Consider data stale after 20 seconds
+    cacheTime: 1000 * 60 // Cache for 1 minute
   });
 
   const {
@@ -67,7 +86,11 @@ export default function AdminDashboard() {
     level: 'all',
     status: 'all'
   }, {
-    enabled: !!user && userProfile?.role === 'admin'
+    enabled: !!user && userProfile?.role === 'admin',
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 1000 * 20,
+    cacheTime: 1000 * 60
   });
 
   // Auth check
@@ -85,14 +108,121 @@ export default function AdminDashboard() {
     }
   }, [user, userProfile, authLoading, lang, router]);
 
+  // Real-time refresh functionality with change detection
+  const handleRefresh = useCallback(async () => {
+    try {
+      const [dashboardResult, tournamentResult] = await Promise.all([
+        refetchDashboard(),
+        refetchTournament()
+      ]);
+      
+      // Check for critical changes
+      if (previousDataRef.current && dashboardResult.data) {
+        const alerts: string[] = [];
+        const current = dashboardResult.data.overview;
+        const previous = previousDataRef.current;
+        
+        // Check verification queue spike
+        if (current?.verification?.pending && previous?.verification?.pending) {
+          const increase = current.verification.pending - previous.verification.pending;
+          if (increase >= 10) {
+            alerts.push(`Verification queue increased by ${increase} teams`);
+          }
+        }
+        
+        // Check system health degradation
+        if (current?.systemHealth?.overall !== previous?.systemHealth?.overall && 
+            current?.systemHealth?.overall === 'critical') {
+          alerts.push('System health status changed to CRITICAL');
+        }
+        
+        setCriticalAlerts(alerts);
+        
+        // Clear alerts after 10 seconds
+        if (alerts.length > 0) {
+          setTimeout(() => setCriticalAlerts([]), 10000);
+        }
+      }
+      
+      // Store current data for next comparison
+      if (dashboardResult.data) {
+        previousDataRef.current = dashboardResult.data.overview;
+      }
+      
+      setLastUpdated(new Date());
+      setNextRefreshIn(refreshInterval);
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    }
+  }, [refetchDashboard, refetchTournament, refreshInterval]);
+
+  // Auto-refresh setup
+  useEffect(() => {
+    if (!autoRefreshEnabled || !user || userProfile?.role !== 'admin') return;
+
+    const startAutoRefresh = () => {
+      // Clear existing intervals
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+
+      // Set up auto-refresh interval
+      intervalRef.current = setInterval(() => {
+        handleRefresh();
+      }, refreshInterval * 1000);
+
+      // Set up countdown timer
+      let countdown = refreshInterval;
+      setNextRefreshIn(countdown);
+      
+      countdownRef.current = setInterval(() => {
+        countdown--;
+        setNextRefreshIn(countdown);
+        
+        if (countdown <= 0) {
+          countdown = refreshInterval;
+        }
+      }, 1000);
+    };
+
+    startAutoRefresh();
+
+    // Cleanup on unmount or dependency change
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [autoRefreshEnabled, refreshInterval, user, userProfile, handleRefresh]);
+
+  // Handle visibility change for better resource management
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Pause auto-refresh when tab is not visible
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        if (countdownRef.current) clearInterval(countdownRef.current);
+      } else if (autoRefreshEnabled && user && userProfile?.role === 'admin') {
+        // Resume auto-refresh when tab becomes visible
+        handleRefresh(); // Immediate refresh
+        // Auto-refresh will restart via useEffect dependency
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [autoRefreshEnabled, user, userProfile, handleRefresh]);
+
   const loading = dashboardLoading || tournamentLoading;
   const error = dashboardError?.message || tournamentError?.message || '';
   const dashboardOverview = dashboardData?.overview;
   const tournamentOverview = tournamentData?.tournament;
 
-  const handleRefresh = () => {
-    refetchDashboard();
-    refetchTournament();
+  const toggleAutoRefresh = () => {
+    setAutoRefreshEnabled(!autoRefreshEnabled);
+  };
+
+  const handleIntervalChange = (newInterval: number) => {
+    setRefreshInterval(newInterval);
+    setNextRefreshIn(newInterval);
   };
 
 
@@ -147,28 +277,109 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
         {/* Header */}
-        <div className="mb-6 flex justify-between items-start">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
-              Admin Dashboard
-            </h1>
-            <p className="text-sm sm:text-base text-gray-600 font-fira">
-              Welcome back, {userProfile?.firstName}! Here&apos;s your system overview.
-            </p>
+        <div className="mb-6">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
+                Admin Dashboard
+              </h1>
+              <p className="text-sm sm:text-base text-gray-600 font-fira">
+                Welcome back, {userProfile?.firstName}! Here&apos;s your system overview.
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="flex items-center px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Refresh
+              </button>
+              <button
+                onClick={toggleAutoRefresh}
+                className={`flex items-center px-4 py-2 border rounded-lg transition-colors ${
+                  autoRefreshEnabled
+                    ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                    : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                {autoRefreshEnabled ? (
+                  <Play className="w-4 h-4 mr-2" />
+                ) : (
+                  <Pause className="w-4 h-4 mr-2" />
+                )}
+                Auto-Refresh
+              </button>
+            </div>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={loading}
-            className="flex items-center px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            ) : (
-              <Activity className="w-4 h-4 mr-2" />
-            )}
-            Refresh
-          </button>
+
+          {/* Real-time Status Bar */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-6">
+                <div className="flex items-center">
+                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                    autoRefreshEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                  }`} />
+                  <span className="text-sm font-medium text-gray-700">
+                    {autoRefreshEnabled ? 'Live Updates' : 'Manual Refresh'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center text-sm text-gray-600">
+                  <Timer className="w-4 h-4 mr-1" />
+                  Last updated: {lastUpdated.toLocaleTimeString()}
+                </div>
+
+                {autoRefreshEnabled && (
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Clock className="w-4 h-4 mr-1" />
+                    Next refresh: {nextRefreshIn}s
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Refresh interval:</span>
+                <select
+                  value={refreshInterval}
+                  onChange={(e) => handleIntervalChange(parseInt(e.target.value))}
+                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!autoRefreshEnabled}
+                >
+                  <option value={15}>15s</option>
+                  <option value={30}>30s</option>
+                  <option value={60}>1m</option>
+                  <option value={120}>2m</option>
+                  <option value={300}>5m</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Critical Alerts */}
+        {criticalAlerts.length > 0 && (
+          <div className="mb-6">
+            {criticalAlerts.map((alert, index) => (
+              <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-4 mb-2 animate-pulse">
+                <div className="flex items-center">
+                  <AlertTriangle className="w-5 h-5 text-red-500 mr-3" />
+                  <div>
+                    <h3 className="font-semibold text-red-900">Critical Update Detected</h3>
+                    <p className="text-sm text-red-700 mt-1">{alert}</p>
+                  </div>
+                  <Zap className="w-4 h-4 text-red-500 ml-auto animate-bounce" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* System Health */}
         {dashboardOverview?.systemHealth && (
@@ -205,75 +416,120 @@ export default function AdminDashboard() {
 
         {/* Overview Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className={`bg-white rounded-lg p-4 shadow-sm relative ${loading ? 'animate-pulse' : ''}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Total Teams</p>
                 <p className="text-2xl font-bold text-[#4A2F1D]">
-                  {dashboardOverview?.teams?.total || 0}
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    dashboardOverview?.teams?.total || 0
+                  )}
                 </p>
                 <p className="text-xs text-green-600">
                   {dashboardOverview?.teams?.verificationRate || 0}% verified
                 </p>
               </div>
-              <Users className="w-8 h-8 text-gray-400" />
+              <div className="relative">
+                <Users className="w-8 h-8 text-gray-400" />
+                {autoRefreshEnabled && !loading && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                )}
+              </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className={`bg-white rounded-lg p-4 shadow-sm relative ${loading ? 'animate-pulse' : ''}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Total Players</p>
                 <p className="text-2xl font-bold text-[#4A2F1D]">
-                  {dashboardOverview?.players?.total || 0}
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    dashboardOverview?.players?.total || 0
+                  )}
                 </p>
                 <p className="text-xs text-blue-600">
                   Avg age: {dashboardOverview?.players?.averageAge || 0}
                 </p>
               </div>
-              <Trophy className="w-8 h-8 text-gray-400" />
+              <div className="relative">
+                <Trophy className="w-8 h-8 text-gray-400" />
+                {autoRefreshEnabled && !loading && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                )}
+              </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className={`bg-white rounded-lg p-4 shadow-sm relative ${loading ? 'animate-pulse' : ''}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Verification Queue</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  {dashboardOverview?.verification?.pending || 0}
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    dashboardOverview?.verification?.pending || 0
+                  )}
                 </p>
                 <p className="text-xs text-gray-600">
                   {dashboardOverview?.verification?.backlogDays || 0} days backlog
                 </p>
               </div>
-              <Clock className="w-8 h-8 text-orange-400" />
+              <div className="relative">
+                <Clock className="w-8 h-8 text-orange-400" />
+                {autoRefreshEnabled && !loading && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                )}
+              </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg p-4 shadow-sm">
+          <div className={`bg-white rounded-lg p-4 shadow-sm relative ${loading ? 'animate-pulse' : ''}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Active Venues</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {dashboardOverview?.venues?.active || 0}
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    dashboardOverview?.venues?.active || 0
+                  )}
                 </p>
                 <p className="text-xs text-gray-600">
                   {dashboardOverview?.venues?.utilizationRate || 0}% utilized
                 </p>
               </div>
-              <MapPin className="w-8 h-8 text-purple-400" />
+              <div className="relative">
+                <MapPin className="w-8 h-8 text-purple-400" />
+                {autoRefreshEnabled && !loading && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                )}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Tournament Progress */}
         {tournamentOverview && (
-          <div className="mb-6 bg-white rounded-lg shadow-sm border p-6">
+          <div className={`mb-6 bg-white rounded-lg shadow-sm border p-6 ${loading ? 'animate-pulse' : ''}`}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 font-fira">Tournament Progress</h2>
+              <div className="flex items-center">
+                <h2 className="text-lg font-semibold text-gray-900 font-fira mr-3">Tournament Progress</h2>
+                {autoRefreshEnabled && !loading && (
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                )}
+              </div>
               <div className="flex items-center text-sm text-gray-600">
                 <TrendingUp className="w-4 h-4 mr-1" />
-                {tournamentOverview.summary.overallProgress}% Complete
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  `${tournamentOverview.summary.overallProgress}% Complete`
+                )}
               </div>
             </div>
             
@@ -330,6 +586,106 @@ export default function AdminDashboard() {
                     <span className="font-medium">{tournamentOverview.stats.progression.divToFinal}</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Multi-Level Venue Statistics */}
+        {dashboardOverview?.venues && (
+          <div className={`mb-6 bg-white rounded-lg shadow-sm border p-6 ${loading ? 'animate-pulse' : ''}`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <h2 className="text-lg font-semibold text-gray-900 font-fira mr-3">Multi-Level Venue System</h2>
+                {autoRefreshEnabled && !loading && (
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                )}
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <MapPin className="w-4 h-4 mr-1" />
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  `${dashboardOverview.venues.total} Total Venues`
+                )}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-2 flex items-center">
+                  <Target className="w-4 h-4 mr-2 text-blue-600" />
+                  Cluster Venues
+                </h3>
+                <div className="text-2xl font-bold text-blue-600">
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    dashboardOverview.venues.mappings?.cluster || 0
+                  )}
+                </div>
+                <div className="text-sm text-blue-700 mt-1">
+                  {dashboardOverview.venueAssignments?.cluster || 0} teams assigned
+                </div>
+              </div>
+
+              <div className="bg-green-50 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-2 flex items-center">
+                  <Trophy className="w-4 h-4 mr-2 text-green-600" />
+                  Division Venues
+                </h3>
+                <div className="text-2xl font-bold text-green-600">
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    dashboardOverview.venues.mappings?.division || 0
+                  )}
+                </div>
+                <div className="text-sm text-green-700 mt-1">
+                  {dashboardOverview.venueAssignments?.division || 0} teams assigned
+                </div>
+              </div>
+
+              <div className="bg-purple-50 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-2 flex items-center">
+                  <Trophy className="w-4 h-4 mr-2 text-purple-600" />
+                  Final Venues
+                </h3>
+                <div className="text-2xl font-bold text-purple-600">
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    dashboardOverview.venues.mappings?.final || 0
+                  )}
+                </div>
+                <div className="text-sm text-purple-700 mt-1">
+                  {dashboardOverview.venueAssignments?.final || 0} teams assigned
+                </div>
+              </div>
+
+              <div className="bg-orange-50 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 mb-2 flex items-center">
+                  <Users className="w-4 h-4 mr-2 text-orange-600" />
+                  Total Assignments
+                </h3>
+                <div className="text-2xl font-bold text-orange-600">
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    (dashboardOverview.venueAssignments?.cluster || 0) + 
+                    (dashboardOverview.venueAssignments?.division || 0) + 
+                    (dashboardOverview.venueAssignments?.final || 0)
+                  )}
+                </div>
+                <div className="text-sm text-orange-700 mt-1">
+                  Across all levels
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-600">
+                <strong>Multi-Level Architecture:</strong> Same physical venues can host different tournament levels (cluster, division, final) with independent capacity management.
               </div>
             </div>
           </div>

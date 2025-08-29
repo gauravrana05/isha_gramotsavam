@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { getVenueTeamsForMatchDay } from '@/lib/actions/volunteer/matchDayVerification';
-import { getVenueCheckedInTeams, getVenueFixtures, getVenueDetails } from '@/lib/actions/tournament/fixtureManagement';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { api } from '@/server/trpc/react';
 import { Loader2, Users, CheckCircle, UserCheck, Trophy, Calendar, Camera, AlertCircle } from 'lucide-react';
 
 interface PageProps {
@@ -19,92 +18,60 @@ interface PageProps {
 
 export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) {
   const { venueId } = use(params);
-  const { user, loading: authLoading } = useAuth();
-  
-  const [venue, setVenue] = useState<any>(null);
-  const [teams, setTeams] = useState<any[]>([]);
-  const [fixtures, setFixtures] = useState<any[]>([]);
-  const [checkedInTeamsResult, setCheckedInTeamsResult] = useState<any>({ success: false });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { user, userProfile, loading: authLoading } = useAuth();
 
+  // tRPC queries
+  const { 
+    data: teamsData, 
+    isLoading: teamsLoading, 
+    error: teamsError 
+  } = api.volunteers.getVenueTeams.useQuery(
+    { venueId },
+    { enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
+  );
+
+  const { 
+    data: checkedInTeamsData, 
+    isLoading: checkedInLoading 
+  } = api.volunteers.getVenueCheckedInTeams.useQuery(
+    { venueId },
+    { enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
+  );
+
+  const { 
+    data: fixturesData, 
+    isLoading: fixturesLoading 
+  } = api.volunteers.getVenueFixtures.useQuery(
+    { venueId },
+    { enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
+  );
+
+  const teams = teamsData?.teams || [];
+  const fixtures = fixturesData || [];
+  const checkedInTeamsResult = checkedInTeamsData || { success: false };
+  const loading = authLoading || teamsLoading || checkedInLoading || fixturesLoading;
+  const error = teamsError?.message || '';
+
+  // Redirect if not authorized
   useEffect(() => {
     if (authLoading) return;
     
     if (!user) {
-      setError('Please log in to access this page');
-      setLoading(false);
+      // Handle redirect or show error
       return;
     }
 
-    loadVenueData();
-  }, [user, authLoading, venueId]);
-
-  const loadVenueData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch teams for match day verification
-      try {
-        const teamsResult = await getVenueTeamsForMatchDay(venueId, user!.uid);
-        
-        if (teamsResult.success) {
-          setTeams(teamsResult.teams ?? []);
-        } else {
-          setError(teamsResult.error || 'Failed to load teams');
-        }
-      } catch (teamsError) {
-        // Error handling removed
-        setTeams([]);
-      }
-      
-      // Fetch checked-in teams for sports overview
-      try {
-        const checkedInResult = await getVenueCheckedInTeams(venueId, 'isha_gramotsavam_2025');
-        setCheckedInTeamsResult(checkedInResult);
-      } catch (checkedInError) {
-        // Error handling removed
-        setCheckedInTeamsResult({ success: false, teams: [], teamsBySport: {}, totalTeams: 0 });
-      }
-      
-      // Fetch venue fixtures
-      try {
-        const fixturesData = await getVenueFixtures(venueId);
-        setFixtures(fixturesData);
-      } catch (fixturesError) {
-        // Error handling removed
-        setFixtures([]);
-      }
-      
-      // Fetch real venue details
-      try {
-        const venueResult = await getVenueDetails(venueId);
-        if (venueResult.success && venueResult.venue) {
-          setVenue(venueResult.venue);
-        } else {
-          // Fallback if venue not found
-          setVenue({
-            id: venueId,
-            name: `Venue ${venueId}`,
-            location: 'Match Day Verification Center'
-          });
-        }
-      } catch (venueError) {
-        // Error handling removed
-        // Use fallback venue data
-        setVenue({
-          id: venueId,
-          name: `Venue ${venueId}`,
-          location: 'Match Day Verification Center'
-        });
-      }
-      
-    } catch (err) {
-      // Error handling removed
-      setError('Failed to load venue data');
-    } finally {
-      setLoading(false);
+    if (!['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '')) {
+      // Handle unauthorized access
+      return;
     }
+  }, [user, userProfile, authLoading]);
+
+  // Fallback venue data if needed
+  const venue = {
+    id: venueId,
+    name: `Venue ${venueId}`,
+    location: 'Match Day Verification Center'
   };
 
   if (authLoading || loading) {
@@ -124,23 +91,15 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Error</h1>
           <p className="mt-2 text-gray-600">{error}</p>
-          <button 
-            onClick={loadVenueData}
-            className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
-          >
-            Retry
-          </button>
         </div>
       </div>
     );
   }
 
   const totalTeams = teams.length;
-  const checkedInCount = teams.filter(team => team.matchDayStatus === 'checked_in').length;
-  const verifiedCount = teams.filter(team => team.matchDayStatus === 'verified').length;
-  
-  // Also get counts from checked-in teams for sports overview
-  const checkedInSportsCount = checkedInTeamsResult.success ? checkedInTeamsResult.totalTeams : 0;
+  const checkedInCount = teams.filter(team => team.status === 'checked_in').length;
+  const verifiedCount = teams.filter(team => team.status === 'verified').length;
+  const pendingCount = teams.filter(team => team.status === 'submitted' || team.status === 'pending' || !team.status).length;
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -150,51 +109,59 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
           {venue?.name || 'Match Day Venue'}
         </h1>
         <p className="text-sm sm:text-base text-gray-600 font-fira">
-          {venue?.address || venue?.location || 'Technical Volunteer Station'} - Match Day Operations
+          {venue?.address || venue?.location || 'Technical Volunteer Station'} - Match Day Check-in & Verification
         </p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Clickable with filters */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Total Teams</p>
-              <p className="text-2xl font-bold text-[#4A2F1D]">{totalTeams}</p>
+        <Link href={`/en/volunteer/venues/${venueId}/teams`}>
+          <button className="w-full bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow text-left">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Total Teams</p>
+                <p className="text-2xl font-bold text-[#4A2F1D]">{totalTeams}</p>
+              </div>
+              <Users className="w-8 h-8 text-gray-400" />
             </div>
-            <Users className="w-8 h-8 text-gray-400" />
-          </div>
-        </div>
+          </button>
+        </Link>
         
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Checked In</p>
-              <p className="text-2xl font-bold text-green-600">{checkedInSportsCount}</p>
+        <Link href={`/en/volunteer/venues/${venueId}/teams?teamStatus=checked_in`}>
+          <button className="w-full bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow text-left">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Checked In</p>
+                <p className="text-2xl font-bold text-green-600">{checkedInCount}</p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-green-400" />
             </div>
-            <CheckCircle className="w-8 h-8 text-green-400" />
-          </div>
-        </div>
+          </button>
+        </Link>
         
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Verified</p>
-              <p className="text-2xl font-bold text-blue-600">{verifiedCount}</p>
+        <Link href={`/en/volunteer/venues/${venueId}/teams?teamStatus=verified`}>
+          <button className="w-full bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow text-left">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Confirmed</p>
+                <p className="text-2xl font-bold text-blue-600">{verifiedCount}</p>
+              </div>
+              <UserCheck className="w-8 h-8 text-blue-400" />
             </div>
-            <UserCheck className="w-8 h-8 text-blue-400" />
-          </div>
-        </div>
+          </button>
+        </Link>
         
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Fixtures</p>
-              <p className="text-2xl font-bold text-purple-600">{fixtures.length}</p>
+        <Link href={`/en/volunteer/venues/${venueId}/teams?teamStatus=submitted`}>
+          <button className="w-full bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow text-left">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Unconfirmed</p>
+                <p className="text-2xl font-bold text-orange-600">{pendingCount}</p>
+              </div>
+              <AlertCircle className="w-8 h-8 text-orange-400" />
             </div>
-            <Trophy className="w-8 h-8 text-purple-400" />
-          </div>
-        </div>
+          </button>
+        </Link>
       </div>
 
       {/* Quick Actions */}
@@ -268,7 +235,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
       </div>
 
       {/* Sports Overview */}
-      {checkedInTeamsResult.success && (
+      {false && checkedInTeamsResult.success && (
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <h3 className="text-lg font-semibold text-[#4A2F1D] mb-4">Sports Overview</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -323,7 +290,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
                 <div>
                   <h3 className="font-medium">{fixture.name}</h3>
                   <p className="text-sm text-gray-600">
-                    {fixture.assignedTeams?.length || 0} teams • Status: {fixture.status}
+                    {fixture.assignedTeams?.length || 0} teams " Status: {fixture.status}
                   </p>
                 </div>
                 <div className="flex space-x-2">
@@ -347,7 +314,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
       )}
 
       {/* Teams Status */}
-      {teams.length > 0 && (
+      {false && teams.length > 0 && (
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Team Status</h2>
           <div className="space-y-2">

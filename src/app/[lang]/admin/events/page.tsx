@@ -28,13 +28,19 @@ interface EventData {
   id: string;
   name: string;
   description: string | null;
-  status: string;
+  status: 'draft' | 'registration_open' | 'registration_closed' | 'active' | 'completed' | 'cancelled';
+  registrationStartDate: string | null;
+  registrationEndDate: string | null;
   startDate: string | null;
   endDate: string | null;
-  registrationDeadline: string | null;
-  teamCount: number;
-  fixtureCount: number;
+  createdBy: string;
+  createdByName: string;
+  teamCount?: number;
+  fixtureCount?: number;
+  matchCount?: number;
+  venueCount?: number;
   createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export default function AdminEventsPage() {
@@ -42,14 +48,16 @@ export default function AdminEventsPage() {
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
 
-  // tRPC query
+  // tRPC query with enhanced parameters
   const {
     data: eventsData,
     isLoading: eventsLoading,
-    error: eventsError
+    error: eventsError,
+    refetch: refetchEvents
   } = api.admin.getEvents.useQuery({
     limit: 100,
-    status: 'all'
+    status: 'all',
+    includeStats: true
   }, {
     enabled: !!user && userProfile?.role === 'admin'
   });

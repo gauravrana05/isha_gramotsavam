@@ -10,8 +10,8 @@ async function main() {
     {
       name: 'Throwball',
       description: 'Traditional ball sport',
-      mainPlayersCount: 7,
-      maxSubstitutes: 5,
+      mainPlayersCount: 2,
+      maxSubstitutes: 1,
       genderCategories: ['men'] as const,
     },
     {

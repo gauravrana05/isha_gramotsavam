@@ -50,6 +50,17 @@ export interface AdvancedTableConfig<T = any> {
   
   // Selection
   selectable?: boolean;
+  selectedRows?: Set<string | number>;
+  onSelectionChange?: (selectedRows: Set<string | number>) => void;
+  
+  // Row interaction
+  onRowClick?: (item: T, index: number) => void;
+  
+  // Nested/Expandable rows
+  expandable?: boolean;
+  expandedRows?: Set<string | number>;
+  onRowExpand?: (item: T, expanded: boolean) => void;
+  renderExpandedContent?: (item: T, index: number) => React.ReactNode;
   
   // URL state persistence
   persistState?: boolean;
@@ -68,6 +79,7 @@ export interface AdvancedTableConfig<T = any> {
   
   // Styling
   compact?: boolean;
+  compactMode?: boolean;
   stickyHeader?: boolean;
   emptyMessage?: string;
 }
@@ -97,6 +109,11 @@ export interface AdvancedTableProps<T = any> extends BaseComponentProps, Advance
   title?: string;
   subtitle?: string;
   additionalActions?: React.ReactNode;
+  headerActions?: React.ReactNode; // Actions to show in the header row with search/filter
+  // Contextual header actions based on selection
+  headerActionsNone?: React.ReactNode;
+  headerActionsSingle?: (selectedItems: T[]) => React.ReactNode;
+  headerActionsMultiple?: (selectedItems: T[]) => React.ReactNode;
   // Virtualization
   emptyMessage?:string;
   virtualize?: boolean;
@@ -195,17 +212,31 @@ export const AdvancedTable = <T,>({
   // Selection props
   selectable = false,
   
+  // Row interaction
+  onRowClick,
+  
+  // Expandable rows
+  expandable = false,
+  expandedRows,
+  onRowExpand,
+  renderExpandedContent,
+  
   // State persistence
   persistState = false,
-  stateKey = 'table',
+  stateKey,
   
   // Other props
   emptyState,
   compact = false,
+  compactMode = false,
   stickyHeader = false,
   title,
   subtitle,
   additionalActions,
+  headerActions,
+  headerActionsNone,
+  headerActionsSingle,
+  headerActionsMultiple,
   
   // Props that shouldn't go to DOM
   // itemsPerPageOptions,
@@ -217,9 +248,11 @@ export const AdvancedTable = <T,>({
   viewportHeight,
   
   className,
-  ...props
+  ...domProps
 }: AdvancedTableProps<T>) => {
-  // Saved views state (localStorage)
+  // Separate DOM props from component-specific props
+  const { selectedRows: _, onSelectionChange: __, ...restDomProps } = domProps;
+  // Saved views state (localStorage) - only initialize if stateKey is provided
   const savedViewsKey = stateKey ? `table:views:${stateKey}` : undefined;
   const [views, setViews] = useState<{ label: string; value: string; state: Partial<TableState> }[]>([]);
   const [currentView, setCurrentView] = useState<string | undefined>(undefined);
@@ -452,6 +485,7 @@ export const AdvancedTable = <T,>({
   const endIndex = pagination?.serverSide ? processedData.length : startIndex + state.pageSize;
   const paginatedData = pagination?.serverSide ? processedData : processedData.slice(startIndex, endIndex);
   
+  
   // Event handlers
   const handleSearchChange = useCallback((search: string) => {
     setState(prev => ({ ...prev, search, page: 1 }));
@@ -531,9 +565,21 @@ export const AdvancedTable = <T,>({
       return state.selectedRows.has(key);
     });
   }, [paginatedData, state.selectedRows, keyExtractor]);
+
+  // Determine contextual header actions based on selection
+  const effectiveHeaderActions = useMemo(() => {
+    const count = state.selectedRows.size;
+    if (count === 0) {
+      return headerActionsNone ?? headerActions;
+    }
+    if (count === 1) {
+      return headerActionsSingle ? headerActionsSingle(selectedItems as T[]) : headerActions;
+    }
+    return headerActionsMultiple ? headerActionsMultiple(selectedItems as T[]) : headerActions;
+  }, [headerActions, headerActionsNone, headerActionsSingle, headerActionsMultiple, selectedItems, state.selectedRows.size]);
   
   return (
-    <div className={cn('w-full', className)} {...props}>
+    <div className={cn('w-full', className)} {...restDomProps}>
       {/* Header */}
       {(title || subtitle || additionalActions) && (
         <div className="mb-6">
@@ -585,18 +631,18 @@ export const AdvancedTable = <T,>({
           onRefresh={onDataLoad ? handleRefresh : undefined}
           refreshLoading={loading}
           
-          showResultsInfo={true}
-          currentPage={state.page}
-          pageSize={state.pageSize}
-          totalResults={totalItems}
+          showResultsInfo={false}
+          
+          // Header actions
+          headerActions={effectiveHeaderActions}
           
           // Saved views
-          views={views.map(v => ({ label: v.label, value: v.value }))}
-          currentView={currentView}
-          onViewChange={handleApplyView}
+          views={savedViewsKey ? views.map(v => ({ label: v.label, value: v.value })) : []}
+          currentView={savedViewsKey ? currentView : undefined}
+          onViewChange={savedViewsKey ? handleApplyView : undefined}
 
           compact={compact}
-          additionalActions={(
+          additionalActions={savedViewsKey ? (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -615,7 +661,7 @@ export const AdvancedTable = <T,>({
                 </button>
               )}
             </div>
-          )}
+          ) : null}
         />
         
         {/* Table */}
@@ -636,8 +682,15 @@ export const AdvancedTable = <T,>({
           onSelectionChange={handleSelectionChange}
           
           stickyHeader={stickyHeader}
-          compactMode={compact}
+          compactMode={compact || compactMode}
           keyExtractor={keyExtractor}
+          onRowClick={onRowClick}
+          
+          // Expandable rows
+          expandable={expandable}
+          expandedRows={expandedRows}
+          onRowExpand={onRowExpand}
+          renderExpandedContent={renderExpandedContent}
           
           emptyState={emptyState}
           // Virtualization
@@ -663,45 +716,54 @@ export const AdvancedTable = <T,>({
             size={compact ? 'sm' : 'base'}
           />
         )}
+        
+        {/* Results info at bottom */}
+        <div className="flex justify-between items-center py-3 px-4 border-t border-gray-200 bg-gray-50">
+          <div className="text-sm text-gray-500">
+            Showing {Math.min((state.page - 1) * state.pageSize + 1, totalItems)}-{Math.min(state.page * state.pageSize, totalItems)} of {totalItems} results
+          </div>
+        </div>
       </div>
       
-      {/* Save View Modal */}
-      <Modal
-        isOpen={isSaveViewOpen}
-        onClose={() => { setIsSaveViewOpen(false); setSaveViewName(''); }}
-        title="Save current view"
-        description="Name and save your current filters, search, and sort settings"
-        size="sm"
-        footer={(
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={() => { setIsSaveViewOpen(false); setSaveViewName(''); }}
-              className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleConfirmSaveView}
-              disabled={!saveViewName.trim()}
-              className="px-4 py-2 text-sm text-white bg-primary-600 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 disabled:opacity-50"
-            >
-              Save
-            </button>
+      {/* Save View Modal - only render when save view functionality is enabled */}
+      {savedViewsKey && (
+        <Modal
+          isOpen={isSaveViewOpen}
+          onClose={() => { setIsSaveViewOpen(false); setSaveViewName(''); }}
+          title="Save current view"
+          description="Name and save your current filters, search, and sort settings"
+          size="sm"
+          footer={(
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setIsSaveViewOpen(false); setSaveViewName(''); }}
+                className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSaveView}
+                disabled={!saveViewName.trim()}
+                className="px-4 py-2 text-sm text-white bg-primary-600 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600 disabled:opacity-50"
+              >
+                Save
+              </button>
+            </div>
+          )}
+        >
+          <div className="px-6 py-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">View name</label>
+            <input
+              type="text"
+              autoFocus
+              value={saveViewName}
+              onChange={(e) => setSaveViewName(e.target.value)}
+              placeholder="e.g., Verified last 30d"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+            />
           </div>
-        )}
-      >
-        <div className="px-6 py-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">View name</label>
-          <input
-            type="text"
-            autoFocus
-            value={saveViewName}
-            onChange={(e) => setSaveViewName(e.target.value)}
-            placeholder="e.g., Verified last 30d"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-          />
-        </div>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Filter sidebar */}
       {filterable && filters.length > 0 && (

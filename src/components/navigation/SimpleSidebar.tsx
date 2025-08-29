@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import Image from 'next/image';
 import { 
   LayoutDashboard,
   Calendar,
@@ -53,6 +52,9 @@ export default function CaptainSidebar({
   const pathname = usePathname();
   const { lang,teamId } = useParams();
   const { user, userProfile, logout } = useAuth();
+
+  // Admin detection - check if admin is accessing captain routes
+  const isAdminAccessing = userProfile?.role === 'admin' && !pathname.includes('/admin/');
 
   // Handle content visibility delay for smooth animations
   useEffect(() => {
@@ -217,7 +219,9 @@ export default function CaptainSidebar({
                   <Users className="w-5 h-5 text-white" />
                 </div>
                 <div className="ml-3">
-                  <h2 className="text-lg font-semibold text-gray-900">Captain Panel</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {isAdminAccessing ? 'Admin Panel' : 'Captain Panel'}
+                  </h2>
                   <p className="text-sm text-gray-600">Isha Gramotsavam</p>
                 </div>
               </div>
@@ -258,15 +262,11 @@ export default function CaptainSidebar({
             }`}>
               <div className="flex items-center">
                 {userProfile.profileImages?.profilePhotoPath ? (
-                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                    <Image
-                      src={userProfile.profileImages.profilePhotoPath}
-                      alt={`${userProfile.firstName} ${userProfile.lastName}`}
-                      width={40}
-                      height={40}
-                      className="object-cover w-full h-full"
-                    />
-                  </div>
+                  <img 
+                    src={userProfile.profileImages.profilePhotoPath} 
+                    alt={`${userProfile.firstName} ${userProfile.lastName}`}
+                    className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                  />
                 ) : (
                   <div className="w-10 h-10 bg-[#3A7F3F] rounded-full flex items-center justify-center flex-shrink-0">
                     <span className="text-white font-medium text-sm">
@@ -293,14 +293,31 @@ export default function CaptainSidebar({
 
           {/* Footer Actions */}
           <div className="border-t border-gray-200 p-4 space-y-2">
+            {/* Back to Admin Dashboard - only show when admin is accessing */}
+            {isAdminAccessing && (
+              <Link
+                href={`/${lang}/admin/dashboard`}
+                className="flex items-center px-4 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-12"
+                onClick={() => setIsMobileOpen(false)}
+                title={isDesktopCollapsed ? 'Back to Admin Dashboard' : undefined}
+              >
+                <Settings className="w-5 h-5 mr-3 flex-shrink-0" />
+                {showContent && <span className="animate-fade-in">Back to Admin Dashboard</span>}
+              </Link>
+            )}
+            
             <Link
               href={`/${lang}/captain/profile`}
               className="flex items-center px-4 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-12"
               onClick={() => setIsMobileOpen(false)}
-              title={isDesktopCollapsed ? 'Profile' : undefined}
+              title={isDesktopCollapsed ? (isAdminAccessing ? 'Captain Profile' : 'Profile') : undefined}
             >
               <User className="w-5 h-5 mr-3 flex-shrink-0" />
-              {showContent && <span className="animate-fade-in">Profile</span>}
+              {showContent && (
+                <span className="animate-fade-in">
+                  {isAdminAccessing ? 'Captain Profile' : 'Profile'}
+                </span>
+              )}
             </Link>
             
            

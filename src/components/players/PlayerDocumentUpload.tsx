@@ -229,11 +229,11 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
     <div className={`border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-[#CE4520] transition-colors ${disabled ? 'opacity-50' : ''} ${className}`}>
       <div className="text-center">
         {currentUrl ? (
-          <div className="mb-4">
+          <div className="w-full h-full mb-4">
             <img
               src={currentUrl}
               alt={label}
-              className="w-32 h-20 object-cover rounded-lg mx-auto border border-gray-200 cursor-pointer"
+              className="w-full h-full max-h-[350px] object-cover rounded-lg mx-auto border border-gray-200 cursor-pointer"
               onClick={handleImageClick}
             />
           </div>

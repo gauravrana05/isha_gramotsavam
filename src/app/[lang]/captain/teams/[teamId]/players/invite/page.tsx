@@ -16,16 +16,20 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Loader2
+  Loader2,
+  Trophy
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { useAuth } from "@/context/AuthContext";
-import { AlertModal } from '@/components/ui/Modal';
+import { AlertModal, ConfirmationModal } from '@/components/ui/Modal';
 import { useAlert } from '@/hooks/useAlert';
 import { api } from '@/server/trpc/react';
 import Image from "next/image";
 import { PlayerDocumentUpload } from "@/components/players";
 import DocumentPreview from "@/components/documents/DocumentPreview";
+import { AdvancedTable } from '@/components/ui/AdvancedTable';
+import { Table } from '@/components/ui/Table';
+import type { Column } from '@/components/ui/Table';
 
 interface TeamPlayer {
   id: string;
@@ -119,10 +123,13 @@ export default function CaptainPlayerManagement() {
     dob: '',
     whatsappNumber: '',
     position: 'main' as 'main' | 'substitute',
+    gender: '' as 'M' | 'F' | 'O' | '',
   });
   const [playerExists, setPlayerExists] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchCompleted, setSearchCompleted] = useState(false);
+  const [selectedRows, setSelectedRows] = useState<Set<string | number>>(new Set());
 
   // Document upload states
   const [showDocumentModal, setShowDocumentModal] = useState(false);
@@ -131,6 +138,12 @@ export default function CaptainPlayerManagement() {
   // Team submission states
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
+  
+  // Captain transfer states
+  const [showCaptainConfirmModal, setShowCaptainConfirmModal] = useState(false);
+  const [playerToBeMadeCaptain, setPlayerToBeMadeCaptain] = useState<TeamPlayer | null>(null);
+  const [isMakingCaptain, setIsMakingCaptain] = useState(false);
+  
   const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
 
   if (!teamId || (Array.isArray(teamId) && teamId.length === 0)) {
@@ -151,6 +164,7 @@ export default function CaptainPlayerManagement() {
 
   const addPlayerMutation = api.teams.addPlayer.useMutation();
   const removePlayerMutation = api.teams.removePlayer.useMutation();
+  const makeCaptainMutation = api.teams.makeCaptain.useMutation();
   const submitTeamMutation = api.teams.verify.useMutation();
   const utils = api.useUtils();
 
@@ -206,6 +220,81 @@ export default function CaptainPlayerManagement() {
   const mainPlayers = players.filter(p => p.position === 'main').length;
   const substitutes = players.filter(p => p.position === 'substitute').length;
 
+  // Table columns - Fixed to match Table component expectations
+  const columns: Column<TeamPlayer>[] = [
+    {
+      key: 'name',
+      header: 'Player',
+      render: (value, player, index) => (
+        <div>
+          <div className="text-sm font-semibold text-[#4A2F1D] flex items-center">
+            {player?.firstName || ''} {player?.lastName || ''}
+            {player?.userId && teamData?.captainId && player.userId === teamData.captainId && (
+              <span className="ml-2 text-xs bg-[#F28C38] text-white px-2 py-1 rounded">Captain</span>
+            )}
+          </div>
+          <div className="text-sm text-gray-500">{player?.phone || ''}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'position',
+      header: 'Position',
+      render: (value, player, index) => (
+        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+          player?.position === 'main'
+            ? 'bg-[#3A7F3F] text-white'
+            : 'bg-[#C79016] text-white'
+        }`}>
+          {player?.position === 'main' ? 'Main' : 'Substitute'}
+        </span>
+      ),
+    },
+    {
+      key: 'age',
+      header: 'Age',
+      render: (value, player, index) => {
+        if (!player?.dateOfBirth) return '-';
+        const age = new Date().getFullYear() - new Date(player.dateOfBirth).getFullYear();
+        return `${age} years`;
+      },
+    },
+    {
+      key: 'documents',
+      header: 'Documents',
+      render: (value, player, index) => (
+        <div className="flex space-x-1">
+          {player?.user?.profileImages?.profilePhotoPath ? (
+            <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
+          ) : (
+            <div className="w-4 h-4 rounded-full bg-gray-300" title="Profile Photo Missing"></div>
+          )}
+          {player?.user?.profileImages?.aadhaarFrontPath ? (
+            <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
+          ) : (
+            <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Front Missing"></div>
+          )}
+          {player?.user?.profileImages?.aadhaarBackPath ? (
+            <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
+          ) : (
+            <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Back Missing"></div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (value, player, index) => (
+        <div className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold rounded-full ${getPlayerStatusColor(player)}`}>
+          {getPlayerStatusIcon(player)}
+          <span>{getPlayerStatusText(player)}</span>
+        </div>
+      ),
+    },
+  ];
+
+
   const isReadOnly = teamData?.status && teamData.status !== 'draft';
   const canAddPlayer = currentPlayers < totalSlotsNeeded && !isReadOnly;
   const canAddMain = mainPlayers < sportConfig.mainPlayersCount && !isReadOnly;
@@ -257,6 +346,7 @@ export default function CaptainPlayerManagement() {
             whatsappNumber: phone,
           }));
         }
+        setSearchCompleted(true); // Mark search as completed
       } catch (error) {
         console.error('User search error:', error);
         setPlayerExists(false);
@@ -268,12 +358,14 @@ export default function CaptainPlayerManagement() {
           dob: '',
           whatsappNumber: phone,
         }));
+        setSearchCompleted(true); // Mark search as completed even on error
       } finally {
         setIsSearching(false);
       }
     } else {
       // Reset when phone number is not complete
       setPlayerExists(false);
+      setSearchCompleted(false); // Reset search completion state
       if (phone.length === 0) {
         setPlayerFormData(prev => ({
           ...prev,
@@ -281,7 +373,7 @@ export default function CaptainPlayerManagement() {
           lastName: '',
           dob: '',
           whatsappNumber: '',
-          village: ''
+          gender: ''
         }));
       }
     }
@@ -357,8 +449,10 @@ export default function CaptainPlayerManagement() {
       dob: '',
       whatsappNumber: '',
       position: 'main',
+      gender: '',
     });
     setPlayerExists(false);
+    setSearchCompleted(false);
   };
   const normalizePhone = (phone: string): string => {
     const digitsOnly = phone.replace(/\D/g, "");
@@ -493,33 +587,76 @@ export default function CaptainPlayerManagement() {
     }
   };
 
+  const handleMakeCaptainClick = (playerId: string) => {
+    if (!teamData || !user) return;
+
+    const player = players.find(p => p.id === playerId);
+    if (!player) return;
+
+    setPlayerToBeMadeCaptain(player);
+    setShowCaptainConfirmModal(true);
+  };
+
+  const confirmMakeCaptain = async () => {
+    if (!teamData || !user || !playerToBeMadeCaptain) return;
+
+    try {
+      setIsMakingCaptain(true);
+
+      // Use tRPC mutation to make player captain
+      const result = await makeCaptainMutation.mutateAsync({
+        teamId: teamData.id,
+        newCaptainId: playerToBeMadeCaptain.userId
+      });
+
+      // Refetch team data to reflect changes
+      await teamQuery.refetch();
+      showSuccess(result.message || 'Captain transferred successfully!');
+      
+      // Close modals
+      setShowCaptainConfirmModal(false);
+      setPlayerToBeMadeCaptain(null);
+      setSelectedPlayer(null);
+      
+      // Redirect to dashboard since user is no longer captain
+      router.push(`/${lang}/captain/dashboard`);
+    } catch (error) {
+      console.error('Make captain error:', error);
+      showError('Failed to transfer captaincy. Please try again.');
+      
+      // Close modal with delay even on error
+      setTimeout(() => {
+        setShowCaptainConfirmModal(false);
+        setPlayerToBeMadeCaptain(null);
+      }, 2000);
+    } finally {
+      setIsMakingCaptain(false);
+    }
+  };
+
 
 
   const getPlayerStatusColor = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return 'text-[#3A7F3F] bg-green-50';
-    if (player.verificationStatus === 'rejected') return 'text-red-600 bg-red-50';
+    if (player?.verificationStatus === 'verified') return 'text-[#3A7F3F] bg-green-50';
+    if (player?.verificationStatus === 'rejected') return 'text-red-600 bg-red-50';
     // TODO: Add profile completion check when document system is implemented
     return 'text-gray-600 bg-gray-50';
   };
 
   const getPlayerStatusIcon = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return <CheckCircle className="w-4 h-4" />;
-    if (player.verificationStatus === 'rejected') return <X className="w-4 h-4" />;
+    if (player?.verificationStatus === 'verified') return <CheckCircle className="w-4 h-4" />;
+    if (player?.verificationStatus === 'rejected') return <X className="w-4 h-4" />;
     // TODO: Add profile completion check when document system is implemented
     return <AlertCircle className="w-4 h-4" />;
   };
 
   const getPlayerStatusText = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return 'Verified';
-    if (player.verificationStatus === 'rejected') return 'Rejected';
+    if (player?.verificationStatus === 'verified') return 'Verified';
+    if (player?.verificationStatus === 'rejected') return 'Rejected';
     // TODO: Add profile completion check when document system is implemented
     return 'Pending';
   };
 
-  const filteredPlayers = players.filter(player =>
-    `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    player.phone.includes(searchTerm)
-  );
 
   const handleSubmitTeam = async () => {
     if (!teamData) {
@@ -558,12 +695,12 @@ export default function CaptainPlayerManagement() {
       if (teamData.genderCategory === 'women') {
         const malePlayersCount = players.filter(p => p.gender === 'M').length;
         if (malePlayersCount > 0) {
-          validationErrors.push(`${sport.name} is only for women. Found ${malePlayersCount} male player(s).`);
+          validationErrors.push(`${sport?.name || 'This sport'} is only for women. Found ${malePlayersCount} male player(s).`);
         }
       } else if (teamData.genderCategory === 'men') {
         const femalePlayersCount = players.filter(p => p.gender === 'F').length;
         if (femalePlayersCount > 0) {
-          validationErrors.push(`${sport.name} is only for men. Found ${femalePlayersCount} female player(s).`);
+          validationErrors.push(`${sport?.name || 'This sport'} is only for men. Found ${femalePlayersCount} female player(s).`);
         }
       }
     }
@@ -590,7 +727,7 @@ export default function CaptainPlayerManagement() {
       });
 
       setShowSubmissionModal(false);
-      showSuccess(`Team "${teamData.name}" submitted for verification successfully!\n\nYou will be notified once the review is complete.`);
+      showSuccess(`Team "${teamData?.name || 'Your team'}" submitted for verification successfully!\n\nYou will be notified once the review is complete.`);
       router.push(`/${lang}/captain/dashboard`);
     } catch (error) {
       console.error('Submit team error:', error);
@@ -627,24 +764,9 @@ export default function CaptainPlayerManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F3F0E5] font-fira">
-      {/* Header */}
-      <div className="bg-[#4A2F1D] text-white py-6">
-        <div className="max-w-7xl mx-auto px-4">
-          {/* <button
-            onClick={() => router.push(`/${lang}/captain/dashboard`)}
-            className="flex items-center space-x-2 text-cream-200 hover:text-white mb-4 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Back to Dashboard</span>
-          </button> */}
+    <div className="min-h-screen bg-gray-50 font-fira">
 
-          <h1 className="text-3xl font-bold mb-2">{teamData.name}</h1>
-          <p className="text-cream-200">Step 2 of 2: Add Players</p>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto sm:px-4 py-8">
         {/* Read-only notification */}
         {isReadOnly && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -663,291 +785,131 @@ export default function CaptainPlayerManagement() {
           </div>
         )}
 
-        {/* Progress Indicator */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-[#3A7F3F] text-white rounded-full flex items-center justify-center font-semibold">
-                ✓
-              </div>
-              <span className="font-semibold text-[#3A7F3F]">Team Details</span>
-            </div>
 
-            <div className="flex-1 mx-4 h-2 bg-gray-200 rounded-full">
-              <div className="h-full bg-[#F28C38] rounded-full w-full"></div>
+        {/* Team Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-8">
+          
+          <div className="bg-white rounded-lg p-3 md:p-6 shadow-lg">
+            <div className="flex items-center justify-between pt-1 pr-4">
+              <p className=" text-lg md:text-2xl font-bold text-[#4A2F1D] truncate">{teamData?.name || 'Team'}</p>
+              <Trophy className=" w-4 h-4 md:w-8 md:h-8 text-[#F28C38]" />
             </div>
+          </div>
 
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-[#F28C38] text-white rounded-full flex items-center justify-center font-semibold">
-                2
+          <div className="bg-white rounded-lg p-3 md:p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-xs md:text-sm">Total Players</p>
+                <p className="text-sm md:text-2xl font-bold text-[#4A2F1D]">{currentPlayers}/{totalSlotsNeeded}</p>
               </div>
-              <span className="font-semibold text-[#4A2F1D]">Add Players</span>
+              <Users className="w-4 h-4 md:w-8 md:h-8 text-[#F28C38]" />
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-3 md:p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-xs md:text-sm">Main Players</p>
+                <p className="text-sm md:text-2xl font-bold text-[#4A2F1D]">{mainPlayers}/{sportConfig.mainPlayersCount}</p>
+              </div>
+              <Users className="w-4 h-4 md:w-8 md:h-8 text-[#3A7F3F]" />
+            </div>
+          </div>
+          <div className="bg-white rounded-lg p-3 md:p-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-xs md:text-sm">Substitute Players</p>
+                <p className="text-sm md:text-2xl font-bold text-[#4A2F1D]">{substitutes}/{sportConfig.maxSubstitutes}</p>
+              </div>
+              <Users className="w-4 h-4 md:w-8 md:h-8 text-blue-500" />
             </div>
           </div>
         </div>
+        
 
-        {/* Team Progress */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Total Players</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{currentPlayers}/{totalSlotsNeeded}</p>
-              </div>
-              <Users className="w-8 h-8 text-[#F28C38]" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Main Players</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{mainPlayers}/{sportConfig.mainPlayersCount}</p>
-              </div>
-              <Users className="w-8 h-8 text-[#3A7F3F]" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Substitutes</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{substitutes}/{sportConfig.maxSubstitutes}</p>
-              </div>
-              <Users className="w-8 h-8 text-[#C79016]" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg p-6 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Completed Profiles</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">
-                  {players.filter(p => p.user?.profileComplete).length}
-                </p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-[#3A7F3F]" />
-            </div>
-          </div>
-        </div>
-
-        {/* Action Bar */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        {/* Players Table - Full AdvancedTable with all features */}
+        <AdvancedTable
+          data={players}
+          columns={columns}
+          keyExtractor={(player) => player.id}
+          loading={loading}
+          
+          // Search configuration
+          searchable={true}
+          searchPlaceholder="Search players..."
+          searchFields={['firstName', 'lastName', 'phone']}
+          
+          // Disable sorting
+          sortable={false}
+          
+          // Selection configuration
+          selectable={true}
+          selectedRows={selectedRows}
+          onSelectionChange={setSelectedRows}
+          onRowClick={(player) => setSelectedPlayer(player)}
+          
+          // Header actions based on selection
+          headerActionsNone={
             <button
               onClick={() => setShowAddPlayerModal(true)}
               disabled={!canAddPlayer}
-              className="bg-[#F28C38] hover:bg-[#E67A26] disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold flex items-center space-x-2 transition-colors text-sm sm:text-base w-full sm:w-auto justify-center"
+              className="bg-[#F28C38] hover:bg-[#E67A26] disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-semibold flex items-center space-x-2 transition-colors"
             >
-              <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Add Player</span>
+              <UserPlus className="w-4 h-4" />
+              <span className='text-xs sm:text-md'>Add Player</span>
             </button>
-
-            <div className="text-xs sm:text-sm text-gray-600 flex flex-col sm:flex-row gap-1 sm:gap-2">
-              <div className="bg-[#3A7F3F] text-white px-2 py-1 rounded text-xs">
-                {sportConfig.mainPlayersCount - mainPlayers} main slots left
-              </div>
-              <div className="bg-[#C79016] text-white px-2 py-1 rounded text-xs">
-                {sportConfig.maxSubstitutes - substitutes} sub slots left
-              </div>
-            </div>
-          </div>
-
-          <div className="relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search players..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-            />
-          </div>
-        </div>
-
-        {/* Players Table */}
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
-          <div className="px-4 sm:px-6 py-4 bg-[#4A2F1D] text-white">
-            <h2 className="text-lg sm:text-xl font-bold">Team Players</h2>
-          </div>
-
-          {filteredPlayers.length === 0 ? (
-            <div className="p-8 sm:p-12 text-center">
-              <Users className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg sm:text-xl font-semibold text-gray-600 mb-2">No Players Added Yet</h3>
-              <p className="text-gray-500 mb-6 text-sm sm:text-base">Start building your team by adding players</p>
+          }
+          
+          headerActionsSingle={(selectedPlayers) => {
+            const selectedPlayer = players.find(p => selectedRows.has(p.id));
+            return selectedPlayer?.userId !== teamData?.captainId ? (
               <button
-                onClick={() => setShowAddPlayerModal(true)}
-                className="bg-[#F28C38] hover:bg-[#E67A26] text-white px-6 py-3 rounded-lg font-semibold"
+                onClick={() => {
+                  if (selectedPlayer) {
+                    removePlayer(selectedPlayer.id);
+                    setSelectedRows(new Set());
+                  }
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold flex items-center space-x-2 transition-colors"
               >
-                Add First Player
+                <Trash2 className="w-4 h-4" />
+                <span className='text-xs sm:text-md'>Remove Player</span>
               </button>
-            </div>
-          ) : (
-            <div className="overflow-hidden">
-              {/* Mobile Card View */}
-              <div className="block sm:hidden">
-                <div className="max-h-96 overflow-y-auto">
-                  {filteredPlayers.map((player) => (
-                    <div key={player.id} className="border-b border-gray-200 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="font-semibold text-[#4A2F1D] text-sm">
-                            {player.firstName} {player.lastName}
-                            {player.userId === teamData.captainId && (
-                              <span className="ml-2 text-xs bg-[#F28C38] text-white px-2 py-1 rounded">Captain</span>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-500">{player.phone}</div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => setSelectedPlayer(player)}
-                            className="text-[#F28C38] p-1"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          {player.userId !== teamData.captainId && (
-                            <button
-                              onClick={() => removePlayer(player.id)}
-                              className="text-red-600 p-1"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${player.position === 'main'
-                              ? 'bg-[#3A7F3F] text-white'
-                              : 'bg-[#C79016] text-white'
-                            }`}>
-                            {player.position === 'main' ? 'Main' : 'Sub'}
-                          </span>
-                          <span className="text-xs text-gray-600">{player.age}y</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="flex space-x-1">
-                            <div className={`w-2 h-2 rounded-full ${player.user?.profileImages?.profilePhotoPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Profile"></div>
-                            <div className={`w-2 h-2 rounded-full ${player.user?.profileImages?.aadhaarFrontPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
-                            <div className={`w-2 h-2 rounded-full ${player.user?.profileImages?.aadhaarBackPath ? 'bg-[#3A7F3F]' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
-                          </div>
-                          <div className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold rounded-full ${getPlayerStatusColor(player)}`}>
-                            {getPlayerStatusIcon(player)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Desktop Table View */}
-              <div className="hidden sm:block overflow-x-auto">
-                <div className="max-h-96 overflow-y-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredPlayers.map((player) => (
-                        <tr key={player.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div>
-                              <div className="text-sm font-semibold text-[#4A2F1D] flex items-center">
-                                {player.firstName} {player.lastName}
-                                {player.userId === teamData.captainId && (
-                                  <span className="ml-2 text-xs bg-[#F28C38] text-white px-2 py-1 rounded">Captain</span>
-                                )}
-                              </div>
-                              <div className="text-sm text-gray-500">{player.phone}</div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${player.position === 'main'
-                                ? 'bg-[#3A7F3F] text-white'
-                                : 'bg-[#C79016] text-white'
-                              }`}>
-                              {player.position === 'main' ? 'Main' : 'Substitute'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {player.age} years
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex space-x-1">
-                              {player.user?.profileImages?.profilePhotoPath ? (
-                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
-                              ) : (
-                                <div className="w-4 h-4 rounded-full bg-gray-300" title="Profile Photo Missing"></div>
-                              )}
-                              {player.user?.profileImages?.aadhaarFrontPath ? (
-                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
-                              ) : (
-                                <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Front Missing"></div>
-                              )}
-                              {player.user?.profileImages?.aadhaarBackPath ? (
-                                <CheckCircle className="w-4 h-4 text-[#3A7F3F]" />
-                              ) : (
-                                <div className="w-4 h-4 rounded-full bg-gray-300" title="Aadhaar Back Missing"></div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold rounded-full ${getPlayerStatusColor(player)}`}>
-                              {getPlayerStatusIcon(player)}
-                              <span className="hidden sm:inline">{getPlayerStatusText(player)}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => setSelectedPlayer(player)}
-                                className="text-[#F28C38] hover:text-[#E67A26] transition-colors"
-                                title="View/Edit Player"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              {player.userId !== teamData.captainId && (
-                                <button
-                                  onClick={() => removePlayer(player.id)}
-                                  className="text-red-600 hover:text-red-800 transition-colors"
-                                  title="Remove Player"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="text-sm text-gray-500 px-4 py-2">Captain cannot be removed</div>
+            );
+          }}
+          
+          // Empty state
+          emptyState={{
+            icon: Users,
+            title: "No Players Added Yet",
+            description: "Start building your team by adding players",
+            action: canAddPlayer ? {
+              label: "Add First Player",
+              onClick: () => setShowAddPlayerModal(true)
+            } : undefined
+          }}
+          
+          // Table configuration
+          stickyHeader={false}
+          compact={true}
+          
+          // Disable pagination
+          pagination={{ enabled: false }}
+        />
 
         {/* Submit Section */}
-        {!isReadOnly && teamData?.sports && mainPlayers >= teamData.sports.mainPlayersCount && (
+        {!isReadOnly && teamData?.sport && mainPlayers >= teamData.sport.mainPlayersCount && (
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex flex-col sm:flex-row items-center justify-between">
 
               <div>
                 <h3 className="text-lg font-bold text-[#4A2F1D] mb-2">Ready to Submit?</h3>
                 <p className="text-gray-600">
-                  {mainPlayers >= teamData.sports.mainPlayersCount
+                  {mainPlayers >= teamData.sport.mainPlayersCount
                     ? `You have ${mainPlayers} main players. Submit your team for verification.`
-                    : `Add at least ${teamData.sports.mainPlayersCount} main players to submit.`}
+                    : `Add at least ${teamData.sport.mainPlayersCount} main players to submit.`}
                 </p>
               </div>
               <button
@@ -975,24 +937,30 @@ export default function CaptainPlayerManagement() {
 
       {/* Add Player Modal */}
       {showAddPlayerModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-[#4A2F1D]">Add New Player</h2>
-                <button
-                  onClick={() => {
-                    setShowAddPlayerModal(false);
-                    resetPlayerForm();
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
+        <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-all duration-300 ${searchCompleted ? 'sm:p-0' : 'p-4'}`}>
+          <div className={`bg-white w-full flex flex-col transition-all duration-300 ease-in-out ${
+            searchCompleted 
+              ? 'h-full sm:h-full sm:max-w-none max-w-2xl rounded-none sm:rounded-lg' 
+              : 'h-auto max-w-md sm:max-w-lg max-h-[90vh] rounded-lg'
+          } overflow-y-auto`}>
+            {/* Header with close button */}
+            <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
+              <h2 className="text-xl font-bold text-[#4A2F1D]">Add New Player</h2>
+              <button
+                onClick={() => {
+                  setShowAddPlayerModal(false);
+                  resetPlayerForm();
+                }}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            {/* Content - scrollable */}
+            <div className={`p-4 sm:p-6 space-y-6 transition-all duration-300 ${
+              searchCompleted ? 'flex-1 overflow-y-auto' : ''
+            }`}>
               {/* Phone Number Search */}
               <div>
                 <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
@@ -1022,8 +990,8 @@ export default function CaptainPlayerManagement() {
                 )}
               </div>
 
-              {/* Player Details Form */}
-              {playerFormData.phone.length === 10 && (
+              {/* Player Details Form - Show only after search is complete */}
+              {searchCompleted && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -1106,8 +1074,13 @@ export default function CaptainPlayerManagement() {
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex space-x-4 pt-4">
+            </div>
+
+            {/* Action Buttons - Conditional positioning */}
+            <div className={`p-4 sm:p-6 bg-white transition-all duration-300 ${
+              searchCompleted ? 'border-t border-gray-200 flex-shrink-0' : 'pt-6'
+            }`}>
+              <div className="flex space-x-4">
                 <button
                   onClick={() => {
                     setShowAddPlayerModal(false);
@@ -1117,13 +1090,15 @@ export default function CaptainPlayerManagement() {
                 >
                   Cancel
                 </button>
-                <button
-                  onClick={handleAddPlayer}
-                  disabled={!playerFormData.firstName || !playerFormData.lastName || !playerFormData.dob || isSubmitting || (teamData?.genderCategory === 'mixed' && !playerFormData.gender)}
-                  className="flex-1 bg-[#F28C38] hover:bg-[#E67A26] disabled:bg-gray-400 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
-                >
-                  {isSubmitting ? 'Adding...' : 'Add Player'}
-                </button>
+                {searchCompleted && (
+                  <button
+                    onClick={handleAddPlayer}
+                    disabled={!playerFormData.firstName || !playerFormData.lastName || !playerFormData.dob || isSubmitting || (teamData?.genderCategory === 'mixed' && !playerFormData.gender)}
+                    className="flex-1 bg-[#F28C38] hover:bg-[#E67A26] disabled:bg-gray-400 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+                  >
+                    {isSubmitting ? 'Adding...' : 'Add Player'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1132,24 +1107,24 @@ export default function CaptainPlayerManagement() {
 
       {/* Player Detail Modal */}
       {selectedPlayer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.firstName} {selectedPlayer.lastName}</h2>
-                  <p className="text-gray-600">{selectedPlayer.phone}</p>
-                </div>
-                <button
-                  onClick={() => setSelectedPlayer(null)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="w-6 h-6" />
-                </button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 sm:p-4">
+          <div className="bg-white w-full h-full sm:h-auto sm:max-w-4xl sm:rounded-lg sm:max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Header - Fixed at top */}
+            <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
+              <div>
+                <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.firstName} {selectedPlayer.lastName}</h2>
+                <p className="text-gray-600">{selectedPlayer.phone}</p>
               </div>
+              <button
+                onClick={() => setSelectedPlayer(null)}
+                className="text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
 
-            <div className="p-6">
+            {/* Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Player Information */}
                 <div>
@@ -1284,35 +1259,34 @@ export default function CaptainPlayerManagement() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
 
-                {/* Action Buttons */}
-                <div className="mt-8 flex justify-end space-x-4">
+            {/* Action Buttons - Fixed at bottom */}
+            <div className="border-t border-gray-200 p-4 sm:p-6 flex-shrink-0 bg-white">
+              <div className="flex flex-row space-x-3 sm:space-x-4 sm:justify-end">
+                <button
+                  onClick={() => setSelectedPlayer(null)}
+                  className="flex-1 sm:flex-none sm:w-auto px-4 py-2 sm:px-6 sm:py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm sm:text-base"
+                >
+                  Close
+                </button>
+                {/* Make Captain button - disabled for current captain */}
+                {selectedPlayer.userId !== teamData.captainId && !isReadOnly ? (
                   <button
-                    onClick={() => setSelectedPlayer(null)}
-                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    onClick={() => handleMakeCaptainClick(selectedPlayer.id)}
+                    className="flex-1 sm:flex-none sm:w-auto px-4 py-2 sm:px-6 sm:py-3 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium text-sm sm:text-base"
                   >
-                    Close
+                    Make Captain
                   </button>
-                  {/* Remove Player button - disabled for captain */}
-                  {selectedPlayer.userId !== teamData.captainId && !isReadOnly ? (
-                    <button
-                      onClick={() => {
-                        removePlayer(selectedPlayer.id);
-                        setSelectedPlayer(null);
-                      }}
-                      className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                      Remove Player
-                    </button>
-                  ) : (
-                    <button
-                      className="px-6 py-2 bg-gray-400 text-white rounded-lg cursor-not-allowed transition-colors"
-                      disabled
-                    >
-                      {isReadOnly ? 'Cannot Remove (Team Submitted)' : 'Cannot Remove Player'}
-                    </button>
-                  )}
-                </div>
+                ) : (
+                  <button
+                    className="flex-1 sm:flex-none sm:w-auto px-4 py-2 sm:px-6 sm:py-3 bg-gray-400 text-white rounded-lg cursor-not-allowed transition-colors font-medium text-sm sm:text-base"
+                    disabled
+                  >
+                    {selectedPlayer.userId === teamData.captainId ? 'Already Captain' : 'Cannot Make Captain (Team Submitted)'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1320,7 +1294,7 @@ export default function CaptainPlayerManagement() {
       )}
 
       {/* Team Submission Confirmation Modal */}
-      {showSubmissionModal && teamData && teamData.sports && (
+      {showSubmissionModal && teamData && teamData.sport && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full">
             <div className="p-6 border-b border-gray-200">
@@ -1342,11 +1316,11 @@ export default function CaptainPlayerManagement() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Team Name:</span>
-                      <span className="font-medium">{teamData.name}</span>
+                      <span className="font-medium">{teamData?.name || 'Team'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Sport:</span>
-                      <span className="font-medium">{teamData.sports.name}</span>
+                      <span className="font-medium">{teamData?.sport?.name || 'Sport'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Total Players:</span>
@@ -1422,6 +1396,18 @@ export default function CaptainPlayerManagement() {
         message={alertState.message}
         type={alertState.type}
         title={alertState.title}
+      />
+
+      <ConfirmationModal
+        isOpen={showCaptainConfirmModal}
+        onClose={() => setShowCaptainConfirmModal(false)}
+        onConfirm={confirmMakeCaptain}
+        title="Transfer Team Captaincy"
+        description={playerToBeMadeCaptain ? `Are you sure you want to make ${playerToBeMadeCaptain.firstName} ${playerToBeMadeCaptain.lastName} the new team captain? You will no longer be the captain of this team.` : ''}
+        confirmLabel="Make Captain"
+        cancelLabel="Cancel"
+        confirmVariant="primary"
+        loading={isMakingCaptain}
       />
     </div>
   );

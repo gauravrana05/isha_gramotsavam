@@ -110,6 +110,12 @@ export interface TableProps<T = any> extends BaseComponentProps {
   onRowClick?: (item: T, index: number) => void;
   keyExtractor?: (item: T, index: number) => string | number;
   
+  // Expandable rows
+  expandable?: boolean;
+  expandedRows?: Set<string | number>;
+  onRowExpand?: (item: T, expanded: boolean) => void;
+  renderExpandedContent?: (item: T, index: number) => React.ReactNode;
+  
   // Bulk actions
   bulkActions?: ActionButton<T[]>[];
   // Virtualization
@@ -388,6 +394,13 @@ export function Table<T>({
   onSelectionChange,
   onRowClick,
   keyExtractor = (item, index) => index,
+  
+  // Expandable props
+  expandable = false,
+  expandedRows = new Set(),
+  onRowExpand,
+  renderExpandedContent,
+  
   bulkActions,
   className,
   // virtualization props should not be spread to DOM
@@ -414,6 +427,7 @@ export function Table<T>({
     if (pagination) {
       result = paginateData(result, pagination);
     }
+    
     
     return result;
   }, [data, currentSearch, currentFilters, currentSortConfig, pagination, columns]);
@@ -500,7 +514,7 @@ export function Table<T>({
   return (
     <div className={cn('w-full', className)} {...rest}>
       {/* Table Container with horizontal scroll */}
-      <div className="bg-white rounded-lg border overflow-hidden">
+      <div className="bg-white sm:rounded-lg sm:border overflow-hidden">
         <div 
           className="overflow-x-auto"
           style={{ 
@@ -512,18 +526,25 @@ export function Table<T>({
           <table 
             className={cn(
               'w-full divide-y divide-gray-200',
-              compactMode ? 'text-sm' : '',
+              compactMode ? 'text-xs sm:text-sm' : 'text-sm',
             )}
-            style={{ minWidth: '500px' }} // Ensures horizontal scroll on mobile
+            style={{ minWidth: '600px' }} // Ensures horizontal scroll on mobile
           >
             {/* Table Header */}
             <thead 
               className={cn(
-                'bg-gray-50',
+                'bg-gray-50 border-b border-gray-200',
                 stickyHeader && 'sticky top-0 z-20'
               )}
             >
               <tr>
+                {/* Expand column */}
+                {expandable && (
+                  <th className="px-2 py-3 text-left w-8">
+                    {/* Empty header for expand column */}
+                  </th>
+                )}
+                
                 {/* Selection column */}
                 {selectable && (
                   <th className="px-3 py-3 text-left w-12">
@@ -552,7 +573,7 @@ export function Table<T>({
                       'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider',
                       column.headerClassName,
                       column.sortable && 'cursor-pointer select-none hover:bg-gray-100',
-                      compactMode && 'px-4 py-2'
+                      compactMode && 'px-2 py-2 text-xs sm:px-4 sm:py-2'
                     )}
                     style={{
                       width: column.width,
@@ -577,7 +598,7 @@ export function Table<T>({
                 {actions && actions.length > 0 && (
                   <th className={cn(
                     'px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider',
-                    compactMode && 'px-4 py-2'
+                    compactMode && 'px-2 py-2 text-xs sm:px-4 sm:py-2'
                   )}>
                     Actions
                   </th>
@@ -597,40 +618,61 @@ export function Table<T>({
                 const index = shouldVirtualize ? startIndex + i : i;
                 const rowKey = keyExtractor(item, index);
                 const isSelected = selectedRows.has(rowKey);
+                const isExpanded = expandedRows.has(rowKey);
+                
                 
                 return (
-                  <tr
-                    key={rowKey}
-                    className={cn(
-                      'transition-colors',
-                      hoverable && 'hover:bg-gray-50',
-                      onRowClick && 'cursor-pointer',
-                      isSelected && 'bg-blue-50',
-                      compactMode && 'text-sm'
-                    )}
-                    onClick={() => onRowClick?.(item, index)}
-                    style={shouldVirtualize ? { display: 'block', height: rowHeight } as any : undefined}
-                  >
-                    {/* Selection cell */}
-                    {selectable && (
-                      <td className="px-3 py-4">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => {
-                            const newSelected = new Set(selectedRows);
-                            if (e.target.checked) {
-                              newSelected.add(rowKey);
-                            } else {
-                              newSelected.delete(rowKey);
-                            }
-                            onSelectionChange?.(newSelected);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                        />
-                      </td>
-                    )}
+                  <React.Fragment key={rowKey}>
+                    <tr
+                      className={cn(
+                        'transition-colors',
+                        hoverable && 'hover:bg-gray-50',
+                        onRowClick && 'cursor-pointer',
+                        isSelected && 'bg-blue-50',
+                        compactMode && 'text-sm'
+                      )}
+                      onClick={() => onRowClick?.(item, index)}
+                      style={shouldVirtualize ? { display: 'block', height: rowHeight } as any : undefined}
+                    >
+                      {/* Expand button cell */}
+                      {expandable && (
+                        <td className="py-4 text-right">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRowExpand?.(item, !isExpanded);
+                            }}
+                            className="p-0.5 rounded hover:bg-gray-200 transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-black" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-black" />
+                            )}
+                          </button>
+                        </td>
+                      )}
+
+                      {/* Selection cell */}
+                      {selectable && (
+                        <td className="px-3 py-4">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              const newSelected = new Set(selectedRows);
+                              if (e.target.checked) {
+                                newSelected.add(rowKey);
+                              } else {
+                                newSelected.delete(rowKey);
+                              }
+                              onSelectionChange?.(newSelected);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                          />
+                        </td>
+                      )}
                     
                     {/* Data cells */}
                     {columns.map((column) => {
@@ -638,13 +680,14 @@ export function Table<T>({
                         (typeof column.accessor === 'function' ? column.accessor(item) : getNestedValue(item, String(column.accessor))) : 
                         getNestedValue(item, String(column.key));
                       
+                      
                       return (
                         <td
                           key={column.key}
                           className={cn(
                             'px-6 py-4 whitespace-nowrap text-sm text-gray-900',
                             column.className,
-                            compactMode && 'px-4 py-3 text-xs'
+                            compactMode && 'px-2 py-2 text-xs sm:px-3 sm:py-2'
                           )}
                           style={{
                             width: column.width,
@@ -660,7 +703,7 @@ export function Table<T>({
                     {actions && actions.length > 0 && (
                       <td className={cn(
                         'px-6 py-4 whitespace-nowrap text-center',
-                        compactMode && 'px-4 py-3'
+                        compactMode && 'px-2 py-2 sm:px-3 sm:py-2'
                       )}>
                         <div className="flex items-center justify-center gap-1">
                           {actions.map((action, actionIndex) => (
@@ -674,7 +717,13 @@ export function Table<T>({
                         </div>
                       </td>
                     )}
-                  </tr>
+                    </tr>
+                    
+                    {/* Expanded content - rendered directly as returned by renderExpandedContent */}
+                    {expandable && isExpanded && renderExpandedContent && 
+                      renderExpandedContent(item, index)
+                    }
+                  </React.Fragment>
                 );
               })}
               {shouldVirtualize ? (

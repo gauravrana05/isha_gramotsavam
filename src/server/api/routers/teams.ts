@@ -785,7 +785,7 @@ export const teamsRouter = createTRPCRouter({
         // Get team and sport info for validation
         const team = await db.team.findUnique({
           where: { id: input.teamId },
-          include: { sports: true },
+          include: { sport: true },
         })
         if (!team) {
           throw new TRPCError({
@@ -828,7 +828,7 @@ export const teamsRouter = createTRPCRouter({
         // Check if user is already in this team
         const existingPlayer = await db.teamPlayer.findUnique({
           where: {
-            team_id_user_id: {
+            teamId_userId: {
               teamId: input.teamId,
               userId: userId,
             },
@@ -994,7 +994,7 @@ export const teamsRouter = createTRPCRouter({
       const players = await db.teamPlayer.findMany({
         where,
         include: {
-          users: {
+          user: {
             select: {
               id: true,
               firstName: true,
@@ -1100,6 +1100,138 @@ export const teamsRouter = createTRPCRouter({
           code: 'NOT_FOUND',
           message: 'Venue assignment not found',
         })
+      }
+    }),
+
+  makeCaptain: protectedProcedure
+    .input(z.object({
+      teamId: z.string().uuid(),
+      newCaptainId: z.string().uuid(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { teamId, newCaptainId } = input;
+
+      try {
+        // Get team and verify current user is the captain
+        const team = await db.team.findUnique({
+          where: { id: teamId },
+          include: {
+            captainUser: true,
+            teamPlayers: {
+              where: { userId: newCaptainId },
+              include: { user: true }
+            }
+          }
+        });
+
+        if (!team) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Team not found',
+          });
+        }
+
+        // Verify current user is the team captain
+        if (team.captainId !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only the current captain can transfer captaincy',
+          });
+        }
+
+        // Verify the new captain is a player on this team
+        const newCaptainPlayer = team.teamPlayers.find(p => p.userId === newCaptainId);
+        if (!newCaptainPlayer || !newCaptainPlayer.user) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'New captain must be a player on this team',
+          });
+        }
+
+        // Check if new captain is already captain of another team
+        const existingCaptaincy = await db.team.findFirst({
+          where: { 
+            captainId: newCaptainId,
+            id: { not: teamId } // Exclude current team
+          }
+        });
+
+        if (existingCaptaincy) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Selected player is already captain of another team',
+          });
+        }
+
+        // Perform the captain transfer in a transaction
+        const result = await db.$transaction(async (tx) => {
+          // Update team captain
+          const updatedTeam = await tx.team.update({
+            where: { id: teamId },
+            data: {
+              captainId: newCaptainId,
+              captainName: `${newCaptainPlayer.user!.firstName} ${newCaptainPlayer.user!.lastName}`,
+            },
+            include: {
+              captainUser: true,
+              teamPlayers: {
+                include: { user: true }
+              }
+            }
+          });
+
+          // Update old captain's role from captain to player (if they have captain role)
+          await tx.user.update({
+            where: { id: ctx.user.id },
+            data: { role: 'player' }
+          });
+
+          // Update new captain's role to captain
+          await tx.user.update({
+            where: { id: newCaptainId },
+            data: { role: 'captain' }
+          });
+
+          // Create role history for old captain (demote)
+          await tx.userRoleAssignment.create({
+            data: {
+              userId: ctx.user.id,
+              eventId: null,
+              role: 'player',
+              assignedBy: ctx.user.id,
+            }
+          });
+
+          // Create role history for new captain (promote)
+          await tx.userRoleAssignment.create({
+            data: {
+              userId: newCaptainId,
+              eventId: null,
+              role: 'captain',
+              assignedBy: ctx.user.id,
+            }
+          });
+
+          return updatedTeam;
+        });
+
+        return {
+          success: true,
+          team: result,
+          message: `${newCaptainPlayer.user!.firstName} ${newCaptainPlayer.user!.lastName} is now the team captain`,
+        };
+
+      } catch (error) {
+        console.error('Make captain error:', error);
+        
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to transfer captaincy',
+        });
       }
     }),
 
@@ -1406,7 +1538,7 @@ export const teamsRouter = createTRPCRouter({
           panchayat: team.panchayat,
           district: team.district,
           state: team.state,
-          currentPlayers: team._count?.teamPlayer || 0,
+          currentPlayers: team._count?.teamPlayers || 0,
           maxPlayers: team.sport?.mainPlayersCount || 0,
           status: team.status,
           submittedAt: team.createdAt,
@@ -1462,7 +1594,7 @@ export const teamsRouter = createTRPCRouter({
                 phone: true,
               },
             },
-            events: {
+            event: {
               select: {
                 id: true,
                 name: true,
@@ -1499,9 +1631,9 @@ export const teamsRouter = createTRPCRouter({
                         profilePhotoPath: true,
                         aadhaarFrontPath: true,
                         aadhaarBackPath: true,
-                        all_images_uploaded: true,
+                        allImagesUploaded: true,
                         verifiedBy: true,
-                        verified_at: true,
+                        verifiedAt: true,
                       },
                     },
                   },
@@ -1563,20 +1695,20 @@ export const teamsRouter = createTRPCRouter({
           },
           documents: {
             profilePhoto: {
-              url: player.users?.profileImages?.profilePhotoPath || null,
-              verified: !!player.users?.profileImages?.verifiedBy,
+              url: player.user?.profileImages?.profilePhotoPath || null,
+              verified: !!player.user?.profileImages?.verifiedBy,
               uploadedAt: null,
               uploadedBy: null,
             },
             aadhaarFront: {
-              url: player.users?.profileImages?.aadhaarFrontPath || null,
-              verified: !!player.users?.profileImages?.verifiedBy,
+              url: player.user?.profileImages?.aadhaarFrontPath || null,
+              verified: !!player.user?.profileImages?.verifiedBy,
               uploadedAt: null,
               uploadedBy: null,
             },
             aadhaarBack: {
-              url: player.users?.profileImages?.aadhaarBackPath || null,
-              verified: !!player.users?.profileImages?.verifiedBy,
+              url: player.user?.profileImages?.aadhaarBackPath || null,
+              verified: !!player.user?.profileImages?.verifiedBy,
               uploadedAt: null,
               uploadedBy: null,
             },
@@ -1740,7 +1872,7 @@ export const teamsRouter = createTRPCRouter({
       }
 
       // Get teams where user is captain or player
-      let teams = [];
+      let teams: any[] = [];
       
       if (ctx.user.role === 'captain') {
         teams = await db.team.findMany({
@@ -1810,16 +1942,15 @@ export const teamsRouter = createTRPCRouter({
           venue_location_mapping_id: { in: Array.from(venueLocationMappingIds) },
         },
         include: {
-          sports: {
+          sport: {
             select: {
               id: true,
               name: true,
-              display_name: true,
             },
           },
-          venue_location_mappings: {
+          venueLocationMapping: {
             include: {
-              venues: {
+              venue: {
                 select: {
                   id: true,
                   name: true,
@@ -1830,9 +1961,9 @@ export const teamsRouter = createTRPCRouter({
               },
             },
           },
-          fixture_teams: {
+          fixtureTeams: {
             include: {
-              teams: {
+              team: {
                 select: {
                   id: true,
                   name: true,
@@ -1855,7 +1986,7 @@ export const teamsRouter = createTRPCRouter({
 
       // Transform fixtures for frontend
       const transformedFixtures = fixtures.map(fixture => {
-        const assignedTeams = fixture.fixture_teams?.map(ft => ft.teams) || [];
+        const assignedTeams = fixture.fixtureTeams?.map(ft => ft.teams) || [];
         const hasCaptainTeam = assignedTeams.some(team => team && teamIds.includes(team.id));
         const captainTeamNames = assignedTeams
           .filter(team => team && teamIds.includes(team.id))
@@ -1865,16 +1996,16 @@ export const teamsRouter = createTRPCRouter({
           id: fixture.id,
           name: fixture.name,
           sportId: fixture.sportId,
-          sportName: fixture.sport?.display_name || fixture.sport?.name || 'Unknown',
+          sportName: fixture.sport?.name || 'Unknown',
           genderCategory: fixture.genderCategory,
           level: fixture.level,
           status: fixture.status,
           venue: {
-            id: fixture.venueLocationMapping?.venues?.id,
-            name: fixture.venueLocationMapping?.venues?.name || 'Unknown Venue',
-            address: fixture.venueLocationMapping?.venues?.address || '',
-            district: fixture.venueLocationMapping?.venues?.district || '',
-            state: fixture.venueLocationMapping?.venues?.state || '',
+            id: fixture.venueLocationMapping?.venue?.id,
+            name: fixture.venueLocationMapping?.venue?.name || 'Unknown Venue',
+            address: fixture.venueLocationMapping?.venue?.address || '',
+            district: fixture.venueLocationMapping?.venue?.district || '',
+            state: fixture.venueLocationMapping?.venue?.state || '',
           },
           assignedTeams: assignedTeams.map(team => ({
             id: team?.id,
@@ -2066,7 +2197,7 @@ export const teamsRouter = createTRPCRouter({
         teams = await db.team.findMany({
           where: { captainId: ctx.user.id },
           include: {
-            sports: {
+            sport: {
               select: {
                 name: true,
                 display_name: true,
@@ -2192,13 +2323,13 @@ export const teamsRouter = createTRPCRouter({
         return {
           teamId: team.id,
           name: team.name,
-          sportName: team.sports?.display_name || team.sports?.name || 'Unknown',
+          sportName: team.sport?.display_name || team.sport?.name || 'Unknown',
           panchayat: team.panchayat,
           district: team.district,
           state: team.state,
           status: team.status,
           currentPlayers: team.teamPlayers?.length || 0,
-          maxPlayers: (team.sports?.mainPlayersCount || 0) + (team.sports?.maxSubstitutes || 0),
+          maxPlayers: (team.sport?.mainPlayersCount || 0) + (team.sport?.maxSubstitutes || 0),
           venue: venueAssignment?.venues ? {
             id: venueAssignment.venues.id,
             name: venueAssignment.venues.name,

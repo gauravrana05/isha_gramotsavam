@@ -93,8 +93,8 @@ export default function AdminSidebar({
       icon: MapPin,
       children: [
         { name: 'All Venues', href: `/${lang}/admin/venues`, icon: MapPin },
-        { name: 'Location Mapping', href: `/${lang}/admin/venues/location-mapping`, icon: MapPin },
-        { name: 'Division Mapping', href: `/${lang}/admin/venues/cluster-division-mapping`, icon: MapPin },
+        { name: 'Venue Mappings', href: `/${lang}/admin/venue-mappings`, icon: MapPin },
+        { name: 'Legacy Mapping', href: `/${lang}/admin/venues/location-mapping`, icon: MapPin },
       ]
     },
     {
@@ -102,7 +102,10 @@ export default function AdminSidebar({
       icon: Users,
       children: [
         { name: 'All Teams', href: `/${lang}/admin/teams`, icon: Users },
-        { name: 'Venue Assignment', href: `/${lang}/admin/teams/venue-assignment`, icon: MapPin },
+        { name: '3-Tier Assignment', href: `/${lang}/admin/team-venue-assignment`, icon: Target },
+        { name: 'Bulk Assignment', href: `/${lang}/admin/bulk-team-assignment`, icon: Users },
+        { name: 'Taluk Mappings', href: `/${lang}/admin/taluk-mappings`, icon: Target },
+        { name: 'Legacy Assignment', href: `/${lang}/admin/teams/venue-assignment`, icon: MapPin },
       ]
     },
     {
@@ -308,11 +311,19 @@ export default function AdminSidebar({
               isDesktopCollapsed ? 'justify-center px-2' : 'px-4'
             }`}>
               <div className="flex items-center">
-                <div className="w-10 h-10 bg-[#3A7F3F] rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-white font-medium text-sm">
-                    {userProfile.firstName?.charAt(0)}{userProfile.lastName?.charAt(0)}
-                  </span>
-                </div>
+                {userProfile.profileImages?.profilePhotoPath ? (
+                  <img 
+                    src={userProfile.profileImages.profilePhotoPath} 
+                    alt={`${userProfile.firstName} ${userProfile.lastName}`}
+                    className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-[#3A7F3F] rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-medium text-sm">
+                      {userProfile.firstName?.charAt(0)}{userProfile.lastName?.charAt(0)}
+                    </span>
+                  </div>
+                )}
                 {showContent && (
                   <div className="ml-3 animate-fade-in">
                     <p className="text-sm font-medium text-gray-900">

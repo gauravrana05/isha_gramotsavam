@@ -111,7 +111,7 @@ export default function SportDetailPage() {
   if (error || !sport) {
     return (
       <Container>
-        <div className="max-w-4xl mx-auto py-8">
+        <div className="max-w-4xl mx-auto py-8 font-fira">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Sport Not Found</h1>
             <p className="text-gray-600 mb-6">{error || 'The requested sport could not be found.'}</p>

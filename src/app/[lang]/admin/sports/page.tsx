@@ -28,9 +28,16 @@ interface SportData {
   id: string;
   name: string;
   description: string | null;
+  mainPlayersCount: number;
+  maxSubstitutes: number;
   maxPlayers: number;
+  isActive: boolean;
+  genderCategories?: string[];
   teamCount?: number;
+  fixtureCount?: number;
+  matchCount?: number;
   createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export default function AdminSportsPage() {
@@ -38,13 +45,16 @@ export default function AdminSportsPage() {
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
 
-  // tRPC query
+  // tRPC query with enhanced parameters
   const {
     data: sportsData,
     isLoading: sportsLoading,
-    error: sportsError
+    error: sportsError,
+    refetch: refetchSports
   } = api.admin.getSports.useQuery({
-    includeTeamCounts: true
+    includeTeamCounts: true,
+    includeGenderCategories: true,
+    isActive: true
   }, {
     enabled: !!user && userProfile?.role === 'admin'
   });
@@ -102,26 +112,82 @@ export default function AdminSportsPage() {
       ),
     },
     {
-      key: 'maxPlayers',
-      header: 'Max Players',
+      key: 'players',
+      header: 'Players Configuration',
       accessor: 'maxPlayers',
       sortable: true,
-      minWidth: 120,
+      minWidth: 160,
       render: (_, sport) => (
-        <span className="text-sm text-gray-900">{sport.maxPlayers}</span>
+        <div>
+          <div className="text-sm font-medium text-gray-900">
+            {sport.mainPlayersCount} + {sport.maxSubstitutes} = {sport.maxPlayers}
+          </div>
+          <div className="text-xs text-gray-500">Main + Subs = Total</div>
+        </div>
       ),
     },
     {
-      key: 'teamCount',
-      header: 'Teams',
+      key: 'genderCategories',
+      header: 'Categories',
+      accessor: 'genderCategories',
+      minWidth: 140,
+      render: (_, sport) => (
+        <div className="flex flex-wrap gap-1">
+          {sport.genderCategories?.map(category => (
+            <span key={category} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-800 capitalize">
+              {category}
+            </span>
+          )) || <span className="text-xs text-gray-400">No categories</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'stats',
+      header: 'Activity Stats',
       accessor: 'teamCount',
+      sortable: true,
+      minWidth: 140,
+      render: (_, sport) => (
+        <div className="text-sm space-y-1">
+          <div className="flex items-center space-x-1">
+            <Users className="w-3 h-3 text-gray-400" />
+            <span>{sport.teamCount || 0} teams</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Trophy className="w-3 h-3 text-gray-400" />
+            <span>{sport.fixtureCount || 0} fixtures</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Clock className="w-3 h-3 text-gray-400" />
+            <span>{sport.matchCount || 0} matches</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      accessor: 'isActive',
       sortable: true,
       minWidth: 100,
       render: (_, sport) => (
-        <div className="flex items-center space-x-1">
-          <Users className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-900">{sport.teamCount || 0}</span>
-        </div>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
+          sport.isActive 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {sport.isActive ? (
+            <>
+              <CheckCircle className="w-3 h-3 mr-1" />
+              Active
+            </>
+          ) : (
+            <>
+              <XCircle className="w-3 h-3 mr-1" />
+              Inactive
+            </>
+          )}
+        </span>
       ),
     },
     {

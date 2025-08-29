@@ -15,40 +15,32 @@ export const volunteersRouter = createTRPCRouter({
         });
       }
 
-      const assignments = await db.volunteer_assignments.findMany({
-        where: { volunteer_id: ctx.user.id },
+      const assignments = await db.volunteerAssignment.findMany({
+        where: { volunteerId: ctx.user.id },
         include: {
-          events: {
+          event: {
             select: {
               id: true,
               name: true,
               status: true,
             },
           },
-          venue_location_mappings: {
+          venueLocationMapping: {
             include: {
-              venues: {
+              venue: {
                 select: {
                   id: true,
                   name: true,
-                  address: true,
                   district: true,
                   state: true,
-                  venue_type: true,
-                  venue_sports: {
-                    include: {
-                      sports: {
-                        select: {
-                          name: true,
-                        },
-                      },
-                    },
-                  },
+                  panchayat: true,
+                  taluk: true,
+                  facilities: true,
                 },
               },
             },
           },
-          users: {
+          volunteerUser: {
             select: {
               firstName: true,
               lastName: true,
@@ -60,19 +52,19 @@ export const volunteersRouter = createTRPCRouter({
 
       // Transform data to match frontend expectations
       const transformedAssignments = assignments.map(assignment => ({
-        id: assignment.venue_location_mapping_id,
+        id: assignment.venueLocationMappingId,
         assignmentId: assignment.id,
-        volunteerId: assignment.volunteer_id,
-        volunteerName: `${assignment.users.firstName} ${assignment.users.lastName}`,
-        volunteerType: assignment.users.role,
-        venueId: assignment.venue_location_mappings?.venues?.id,
-        venueName: assignment.venue_location_mappings?.venues?.name || 'Unknown Venue',
-        venueAddress: assignment.venue_location_mappings?.venues?.address || '',
-        venueDistrict: assignment.venue_location_mappings?.venues?.district || '',
-        venueType: assignment.venue_location_mappings?.venues?.venue_type || 'standard',
-        supportedSports: assignment.venue_location_mappings?.venues?.venue_sports?.map(vs => vs.sports.name) || [],
-        status: 'assigned', // Default status
-        assignedAt: assignment.assigned_at?.toISOString() || null,
+        volunteerId: assignment.volunteerId,
+        volunteerName: `${assignment.volunteerUser.firstName} ${assignment.volunteerUser.lastName}`,
+        volunteerType: assignment.volunteerUser.role,
+        venueId: assignment.venueLocationMapping?.venue?.id,
+        venueName: assignment.venueLocationMapping?.venue?.name || 'Unknown Venue',
+        venueAddress: `${assignment.venueLocationMapping?.venue?.panchayat || ''}, ${assignment.venueLocationMapping?.venue?.taluk || ''}`.trim().replace(/^,\s*|,\s*$/g, '') || '',
+        venueDistrict: assignment.venueLocationMapping?.venue?.district || '',
+        venueType: 'standard', // Default type since not in schema
+        supportedSports: [], // Will need to get this data differently
+        status: assignment.status || 'assigned',
+        assignedAt: assignment.assignedAt?.toISOString() || null,
       }));
 
       return {
@@ -104,8 +96,8 @@ export const volunteersRouter = createTRPCRouter({
         }
 
         // Get venue location mapping for this venue
-        const venueLocationMapping = await db.venue_location_mappings.findFirst({
-          where: { venue_id: input.venueId },
+        const venueLocationMapping = await db.venueLocationMapping.findFirst({
+          where: { venueId: input.venueId },
         });
 
         if (!venueLocationMapping) {
@@ -116,20 +108,20 @@ export const volunteersRouter = createTRPCRouter({
         }
 
         // Get teams assigned to this venue
-        const teams = await db.teams.findMany({
+        const teams = await db.team.findMany({
           where: {
             teamVenueAssignments: {
               some: {
                 OR: [
-                  { cluster_venue_mapping_id: venueLocationMapping.id },
-                  { division_venue_mapping_id: venueLocationMapping.id },
-                  { final_venue_mapping_id: venueLocationMapping.id },
+                  { clusterVenueMappingId: venueLocationMapping.id },
+                  { divisionVenueMappingId: venueLocationMapping.id },
+                  { finalVenueMappingId: venueLocationMapping.id },
                 ],
               },
             },
           },
           include: {
-            sports: {
+            sport: {
               select: {
                 id: true,
                 name: true,
@@ -151,7 +143,7 @@ export const volunteersRouter = createTRPCRouter({
                 verificationStatus: true,
               },
             },
-            team_photos: {
+            teamPhoto: {
               select: {
                 photoPath: true,
               },
@@ -163,7 +155,7 @@ export const volunteersRouter = createTRPCRouter({
         const transformedTeams = teams.map(team => ({
           id: team.id,
           name: team.name,
-          sportName: team.sports?.name || 'Unknown',
+          sportName: team.sport?.name || 'Unknown',
           captainProfile: {
             name: `${team.captainUser?.firstName || ''} ${team.captainUser?.lastName || ''}`.trim(),
             phone: team.captainUser?.phone || '',
@@ -172,12 +164,12 @@ export const volunteersRouter = createTRPCRouter({
           district: team.district,
           state: team.state,
           currentPlayers: team.teamPlayers?.length || 0,
-          maxPlayers: (team.sports?.mainPlayersCount || 0) + (team.sports?.maxSubstitutes || 0),
+          maxPlayers: (team.sport?.mainPlayersCount || 0) + (team.sport?.maxSubstitutes || 0),
           verifiedPlayersCount: team.teamPlayers?.filter(p => p.verificationStatus === 'approved').length || 0,
           status: team.status,
           matchDayStatus: team.status === 'checked_in' ? 'checked_in' : 
                           team.teamPlayers?.every(p => p.verificationStatus === 'approved') ? 'verified' : 'pending',
-          teamImageUrl: team.team_photos?.[0]?.photoPath || null,
+          teamImageUrl: team.teamPhoto?.photoPath || null,
         }));
 
         return {
@@ -208,7 +200,7 @@ export const volunteersRouter = createTRPCRouter({
           });
         }
 
-        const team = await db.teams.findUnique({
+        const team = await db.team.findUnique({
           where: { id: input.teamId },
           include: {
             sports: {
@@ -361,7 +353,7 @@ export const volunteersRouter = createTRPCRouter({
         }
 
         // Update player verification status to approved/rejected
-        const updatedPlayer = await db.teamPlayers.update({
+        const updatedPlayer = await db.teamPlayer.update({
           where: { id: input.playerId },
           data: {
             verificationStatus: input.status,
@@ -370,7 +362,7 @@ export const volunteersRouter = createTRPCRouter({
         });
 
         // Get team and check if all players are approved for auto check-in
-        const team = await db.teams.findUnique({
+        const team = await db.team.findUnique({
           where: { id: input.teamId },
           include: {
             teamPlayers: {
@@ -432,7 +424,7 @@ export const volunteersRouter = createTRPCRouter({
         }
 
         // Update all players
-        const updatedPlayers = await db.teamPlayers.updateMany({
+        const updatedPlayers = await db.teamPlayer.updateMany({
           where: { id: { in: input.playerIds } },
           data: {
             verificationStatus: input.status,
@@ -440,7 +432,7 @@ export const volunteersRouter = createTRPCRouter({
         });
 
         // Check if team should be auto checked-in
-        const team = await db.teams.findUnique({
+        const team = await db.team.findUnique({
           where: { id: input.teamId },
           include: {
             teamPlayers: {
@@ -510,7 +502,7 @@ export const volunteersRouter = createTRPCRouter({
         }
 
         // Get teams that are checked-in for this venue
-        const teams = await db.teams.findMany({
+        const teams = await db.team.findMany({
           where: {
             status: 'checked_in',
             teamVenueAssignments: {
@@ -616,7 +608,7 @@ export const volunteersRouter = createTRPCRouter({
         }
 
         // Get fixtures for this venue
-        const fixtures = await db.fixtures.findMany({
+        const fixtures = await db.fixture.findMany({
           where: { venue_location_mapping_id: venueLocationMapping.id },
           include: {
             sports: {
@@ -714,7 +706,7 @@ export const volunteersRouter = createTRPCRouter({
         }
 
         // Get matches for this venue
-        const matches = await db.matches.findMany({
+        const matches = await db.match.findMany({
           where: whereConditions,
           include: {
             teams_matches_team1_idToteams: {
@@ -810,7 +802,7 @@ export const volunteersRouter = createTRPCRouter({
           });
         }
 
-        const fixture = await db.fixtures.findUnique({
+        const fixture = await db.fixture.findUnique({
           where: { id: input.fixtureId },
           include: {
             sports: {
@@ -842,7 +834,7 @@ export const volunteersRouter = createTRPCRouter({
         }
 
         // Get matches for this fixture to create bracket structure
-        const matches = await db.matches.findMany({
+        const matches = await db.match.findMany({
           where: { fixture_id: input.fixtureId },
           include: {
             teams_matches_team1_idToteams: {
@@ -942,7 +934,7 @@ export const volunteersRouter = createTRPCRouter({
           return {};
         }
 
-        const teams = await db.teams.findMany({
+        const teams = await db.team.findMany({
           where: {
             id: { in: input.teamIds },
           },

@@ -75,6 +75,9 @@ export interface TableControlsProps extends BaseComponentProps {
   onRefresh?: () => void;
   refreshLoading?: boolean;
   
+  // Header actions (buttons to show in the same row as search/filter)
+  headerActions?: React.ReactNode;
+  
   // Results info
   showResultsInfo?: boolean;
   currentPage?: number;
@@ -365,6 +368,9 @@ export const TableControls: React.FC<TableControlsProps> = ({
   onRefresh,
   refreshLoading = false,
   
+  // Header actions
+  headerActions,
+  
   // Results info
   showResultsInfo = false,
   currentPage = 1,
@@ -384,23 +390,23 @@ export const TableControls: React.FC<TableControlsProps> = ({
   return (
     <div 
       className={cn(
-        'bg-white border-b border-gray-200',
-        compact ? 'p-3' : 'p-4',
+        'border-b border-gray-200',
+        compact ? 'py-3 px-0' : 'py-4 px-0',
         className
       )}
       {...props}
     >
-      {/* Main controls row */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      {/* Main controls row - Mobile friendly with all items in one row */}
+      <div className="flex items-center justify-between gap-2 sm:gap-4 px-2 sm:px-0">
         {/* Left side - Search and filters */}
-        <div className="flex flex-col sm:flex-row gap-3 flex-1">
+        <div className="flex items-center gap-2 flex-1">
           {/* Search input */}
           {searchable && onSearchChange && (
             <SearchInput
               value={searchValue}
               onChange={onSearchChange}
               placeholder={searchPlaceholder}
-              className="flex-1 max-w-sm"
+              className="flex-1 min-w-0"
             />
           )}
           
@@ -409,22 +415,29 @@ export const TableControls: React.FC<TableControlsProps> = ({
             <button
               onClick={onFilterToggle}
               className={cn(
-                "inline-flex items-center px-3 py-2 border rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent",
+                "inline-flex items-center px-2 sm:px-3 py-2 border rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent whitespace-nowrap",
                 isFilterOpen || hasActiveFilters
                   ? "border-primary-300 text-primary-700 bg-primary-50"
                   : "border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
               )}
             >
-              <Filter className="w-4 h-4 mr-2" />
-              Filters
+              <Filter className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Filters</span>
               {hasActiveFilters && (
-                <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary-200 text-primary-800">
+                <span className="ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 text-xs rounded-full bg-primary-200 text-primary-800">
                   {activeFilters.length}
                 </span>
               )}
             </button>
           )}
         </div>
+        
+        {/* Header actions (like Create Team button) */}
+        {headerActions && (
+          <div className="flex items-center gap-2">
+            {headerActions}
+          </div>
+        )}
         
         {/* Right side - Actions */}
         <div className="flex items-center gap-3">
