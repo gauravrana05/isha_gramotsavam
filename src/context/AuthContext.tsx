@@ -106,11 +106,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const authSuccess = urlParams.get('auth');
         const userId = urlParams.get('userId');
         const mockUser = urlParams.get('mockUser');
+        const phone = urlParams.get('phone');
+
+        const roleToPhone: { [key: string]: string } = {
+          admin: '9876543210',
+          public: '9876543211',
+          verification_volunteer: '9876543212',
+          technical_volunteer: '9876543213',
+        };
+
+        const mockPhone = phone || (mockUser && roleToPhone[mockUser]);
 
         // Handle mock authentication for testing
-        if (mockUser && (mockUser === 'admin' || mockUser === 'public' || mockUser ==='captain' || mockUser === 'player' || mockUser === 'verification_volunteer' || mockUser === 'technical_volunteer')) {
+        if (mockPhone) {
           try {
-            const response = await fetch(`/api/auth/mock?role=${mockUser}`, {
+            const response = await fetch(`/api/get-user?phone=${mockPhone}`, {
               method: 'GET',
               credentials: 'include',
             });
@@ -124,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Clean up URL parameters
                 const newUrl = new URL(window.location.href);
                 newUrl.searchParams.delete('mockUser');
+                newUrl.searchParams.delete('phone');
                 window.history.replaceState({}, '', newUrl.toString());
                 setLoading(false);
                 return;

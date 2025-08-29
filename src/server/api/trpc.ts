@@ -2,6 +2,9 @@ import { initTRPC, TRPCError } from '@trpc/server'
 import { type CreateNextContextOptions } from '@trpc/server/adapters/next'
 import superjson from 'superjson'
 import { ZodError } from 'zod'
+import { redis } from '@/lib/redis'; // Import the Redis client
+
+const STALE_TIME = 60; // 60 seconds
 
 // Create context for tRPC
 export const createTRPCContext = async (opts: CreateNextContextOptions) => {
@@ -13,19 +16,27 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     // Check for user ID in cookies or headers
     const userId = req.cookies?.userId || req.headers.userid as string;
     if (userId) {
-      // Import db here to avoid circular dependency issues
-      const { db } = await import('@/lib/db');
-      user = await db.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          role: true,
+      const cachedUser = await redis.get(`user:${userId}`);
+      if (cachedUser) {
+        user = JSON.parse(cachedUser);
+      } else {
+        // Import db here to avoid circular dependency issues
+        const { db } = await import('@/lib/db');
+        user = await db.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            role: true,
+          }
+        });
+        if (user) {
+          await redis.set(`user:${userId}`, JSON.stringify(user), 'EX', STALE_TIME);
         }
-      });
+      }
     }
   } catch (error) {
     console.error('Failed to get user in tRPC context:', error);
