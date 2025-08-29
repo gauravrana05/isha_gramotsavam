@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { documentUploadService } from '@/lib/services/documentUploadService';
+// Removed direct import of documentUploadService - now using server-side API
 import { api } from '@/server/trpc/react';
 import type { UploadProgress } from '@/lib/storage';
 import type { UserDocuments } from '@/lib/types/user';
@@ -79,25 +79,25 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
     updateDocumentState(type, { uploading: true, progress: 0, error: null });
 
     try {
-      const onProgress = (progress: UploadProgress) => {
-        updateDocumentState(type, { progress: progress.progress });
-      };
+      // Create FormData for server-side upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', user.id);
+      formData.append('documentType', type);
 
-      let downloadURL: string;
-      
-      switch (type) {
-        case 'profilePhoto':
-          downloadURL = await documentUploadService.uploadProfilePhoto(user.id, file, onProgress);
-          break;
-        case 'aadhaarFront':
-          downloadURL = await documentUploadService.uploadAadhaarFront(user.id, file, onProgress);
-          break;
-        case 'aadhaarBack':
-          downloadURL = await documentUploadService.uploadAadhaarBack(user.id, file, onProgress);
-          break;
-        default:
-          throw new Error(`Invalid document type: ${type}`);
+      // Upload to server-side API endpoint
+      const uploadResponse = await fetch('/api/upload-document', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
+
+      const uploadResult = await uploadResponse.json();
+      const downloadURL = uploadResult.url;
 
       // Update user document in database via direct fetch to tRPC endpoint
       const response = await fetch('/api/trpc/profile.updateImageUpload', {
@@ -150,7 +150,15 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
         throw new Error(`Invalid document type: ${type}`);
       }
 
-      await documentUploadService.deleteDocument(user.id, type);
+      // Delete via server-side API
+      const deleteResponse = await fetch(`/api/upload-document?userId=${user.id}&documentType=${type}`, {
+        method: 'DELETE',
+      });
+
+      if (!deleteResponse.ok) {
+        const errorData = await deleteResponse.json();
+        throw new Error(errorData.error || 'Delete failed');
+      }
 
       // TODO: Update user document via tRPC once profile endpoints are created
       // For now, just update local state - tRPC integration pending
@@ -171,16 +179,30 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
     updateDocumentState(type, { uploading: true, progress: 0, error: null });
 
     try {
-      const onProgress = (progress: UploadProgress) => {
-        updateDocumentState(type, { progress: progress.progress });
-      };
-
       // Only allow replacement for valid document types
       if (type !== 'profilePhoto' && type !== 'aadhaarFront' && type !== 'aadhaarBack') {
         throw new Error(`Invalid document type: ${type}`);
       }
 
-      const downloadURL = await documentUploadService.replaceDocument(user.id, type, file, onProgress);
+      // Create FormData for server-side replace
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', user.id);
+      formData.append('documentType', type);
+
+      // Replace via server-side API endpoint
+      const replaceResponse = await fetch('/api/upload-document', {
+        method: 'PUT',
+        body: formData,
+      });
+
+      if (!replaceResponse.ok) {
+        const errorData = await replaceResponse.json();
+        throw new Error(errorData.error || 'Replace failed');
+      }
+
+      const replaceResult = await replaceResponse.json();
+      const downloadURL = replaceResult.url;
 
       // TODO: Update user document via tRPC once profile endpoints are created
       // For now, just update local state - tRPC integration pending
@@ -226,8 +248,15 @@ export const DocumentProvider: React.FC<DocumentProviderProps> = ({ children }) 
       const types: DocumentType[] = ['profilePhoto', 'aadhaarFront', 'aadhaarBack'];
       
       for (const type of types) {
-        const url = await documentUploadService.getDocumentURL(user.id, type as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack');
-        updateDocumentState(type as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack', { url, error: null });
+        if (type === 'teamPhoto') continue; // Skip team photo for now
+        
+        const response = await fetch(`/api/get-document-url?userId=${user.id}&documentType=${type}`);
+        const result = await response.json();
+        
+        updateDocumentState(type as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack', { 
+          url: result.url, 
+          error: null 
+        });
       }
     } catch (error) {
       // Error handling removed

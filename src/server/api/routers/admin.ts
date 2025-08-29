@@ -576,7 +576,9 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const where: any = {};
+      const where: any = {
+        deletedAt: null // Only show non-deleted venues
+      };
 
       if (input.status !== 'all') {
         where.isActive = input.status === 'active';
@@ -658,7 +660,9 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const whereCondition: any = {};
+      const whereCondition: any = {
+        deletedAt: null // Only show non-deleted sports
+      };
       if (input.isActive !== undefined) {
         whereCondition.isActive = input.isActive;
       }
@@ -1353,7 +1357,9 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const where: any = {};
+      const where: any = {
+        deletedAt: null // Only show non-deleted venue location mappings
+      };
       if (input.eventId) where.eventId = input.eventId;
       if (input.level !== 'all') where.level = input.level;
       if (input.isActive !== undefined) where.isActive = input.isActive;
@@ -1996,7 +2002,9 @@ export const adminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const where: any = {};
+      const where: any = {
+        deletedAt: null // Only show non-deleted taluk cluster mappings
+      };
       if (input.eventId) where.eventId = input.eventId;
       if (input.district) where.district = { contains: input.district, mode: 'insensitive' };
       if (input.state) where.state = { contains: input.state, mode: 'insensitive' };

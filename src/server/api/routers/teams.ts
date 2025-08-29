@@ -847,6 +847,7 @@ export const teamsRouter = createTRPCRouter({
           where: {
             teamId: input.teamId,
             position: 'main',
+            deletedAt: null, // Only count non-deleted players
           },
         })
 
@@ -854,6 +855,7 @@ export const teamsRouter = createTRPCRouter({
           where: {
             teamId: input.teamId,
             position: 'substitute',
+            deletedAt: null, // Only count non-deleted players
           },
         })
         // Validate player limits
@@ -949,19 +951,24 @@ export const teamsRouter = createTRPCRouter({
           })
         }
 
-        await db.teamPlayer.delete({
+        // Perform soft delete
+        await db.teamPlayer.update({
           where: {
             id: input.userId, // This is actually the teamPlayers.id
           },
+          data: {
+            deletedAt: new Date(),
+            // Note: TeamPlayer model doesn't have deletedBy field in schema
+          }
         })
 
         // Update team player counts
         const [mainCount, subCount] = await Promise.all([
           db.teamPlayer.count({
-            where: { teamId: input.teamId, position: 'main' },
+            where: { teamId: input.teamId, position: 'main', deletedAt: null },
           }),
           db.teamPlayer.count({
-            where: { teamId: input.teamId, position: 'substitute' },
+            where: { teamId: input.teamId, position: 'substitute', deletedAt: null },
           }),
         ])
 
@@ -988,7 +995,10 @@ export const teamsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { teamId, position } = input
 
-      const where: any = { teamId }
+      const where: any = { 
+        teamId,
+        deletedAt: null // Only show non-deleted players
+      }
       if (position) where.position = position
 
       const players = await db.teamPlayer.findMany({

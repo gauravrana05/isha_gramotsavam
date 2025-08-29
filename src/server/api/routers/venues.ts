@@ -353,8 +353,13 @@ export const venuesRouter = createTRPCRouter({
           })
         }
 
-        await db.venue.delete({
+        // Perform soft delete
+        await db.venue.update({
           where: { id: input.id },
+          data: {
+            deletedAt: new Date(),
+            // Note: Venue model doesn't have deletedBy field in schema
+          }
         })
 
         return { success: true }
@@ -453,8 +458,13 @@ export const venuesRouter = createTRPCRouter({
           })
         }
 
-        await db.venueLocationMapping.delete({
+        // Perform soft delete
+        await db.venueLocationMapping.update({
           where: { id: input.id },
+          data: {
+            deletedAt: new Date(),
+            // Note: VenueLocationMapping model doesn't have deletedBy field in schema
+          }
         })
 
         return { success: true }

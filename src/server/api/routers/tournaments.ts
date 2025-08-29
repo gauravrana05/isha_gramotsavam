@@ -222,8 +222,13 @@ export const tournamentsRouter = createTRPCRouter({
             })
           }
 
-          await db.event.delete({
+          // Perform soft delete
+          await db.event.update({
             where: { id: input.id },
+            data: {
+              deletedAt: new Date(),
+              // Note: Event model doesn't have deletedBy field in schema
+            }
           })
 
           return { success: true }

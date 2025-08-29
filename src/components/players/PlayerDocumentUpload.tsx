@@ -71,37 +71,25 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
     setProgress(0);
 
     try {
-      // Use existing document upload service with Supabase
-      const { documentUploadService } = await import('@/lib/services/documentUploadService');
-      
-      let downloadURL: string;
-      
-      // Use appropriate upload method based on document type
-      switch (documentType) {
-        case 'profilePhoto':
-          downloadURL = await documentUploadService.uploadProfilePhoto(
-            playerUserId,
-            file,
-            (progress) => setProgress(progress.progress)
-          );
-          break;
-        case 'aadhaarFront':
-          downloadURL = await documentUploadService.uploadAadhaarFront(
-            playerUserId,
-            file,
-            (progress) => setProgress(progress.progress)
-          );
-          break;
-        case 'aadhaarBack':
-          downloadURL = await documentUploadService.uploadAadhaarBack(
-            playerUserId,
-            file,
-            (progress) => setProgress(progress.progress)
-          );
-          break;
-        default:
-          throw new Error(`Invalid document type: ${documentType}`);
+      // Create FormData for server-side upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', playerUserId);
+      formData.append('documentType', documentType);
+
+      // Upload to server-side API endpoint
+      const uploadResponse = await fetch('/api/upload-document', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
+
+      const uploadResult = await uploadResponse.json();
+      const downloadURL = uploadResult.url;
 
       // Update user document in database via direct fetch to tRPC endpoint (same as DocumentContext)
       const response = await fetch('/api/trpc/profile.updateImageUpload', {
