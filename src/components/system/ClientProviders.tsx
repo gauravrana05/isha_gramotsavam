@@ -10,7 +10,6 @@ import { TRPCReactProvider } from "@/server/trpc/react";
 import dynamic from "next/dynamic";
 
 const ThemeProvider = dynamic(() => import("@/context/ThemeContext").then(mod => ({ default: mod.ThemeProvider })), { ssr: false });
-const OfflineProvider = dynamic(() => import("@/context/OfflineContext").then(mod => ({ default: mod.OfflineProvider })), { ssr: false });
 const AuthProvider = dynamic(() => import("@/context/AuthContext").then(mod => ({ default: mod.AuthProvider })), { ssr: false });
 const NotificationProvider = dynamic(() => import("@/context/NotificationContext").then(mod => ({ default: mod.NotificationProvider })), { ssr: false });
 const LoadingProvider = dynamic(() => import("@/context/LoadingContext").then(mod => ({ default: mod.LoadingProvider })), { ssr: false });
@@ -32,7 +31,6 @@ const ClientProviders: React.FC<ClientProvidersProps> = ({ children, cookies }) 
         <ClientOnly>
           <LoadingProvider>
             <ThemeProvider>
-              <OfflineProvider>
                 <AuthProvider>
                   <DocumentProvider>
                     <NotificationProvider>
@@ -44,7 +42,6 @@ const ClientProviders: React.FC<ClientProvidersProps> = ({ children, cookies }) 
                     </NotificationProvider>
                   </DocumentProvider>
                 </AuthProvider>
-              </OfflineProvider>
             </ThemeProvider>
           </LoadingProvider>
         </ClientOnly>
