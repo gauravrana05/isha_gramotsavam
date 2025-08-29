@@ -3,16 +3,24 @@
 import { adminDb, adminAuth } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { auditLogService } from '@/lib/services/auditLogService';
+import { assignTeamToVenue } from '@/lib/actions/admin/teamVenueAssignment';
 
 interface CreateTeamData {
   name: string;
   description: string;
   sport: string;
   captainPhone: string;
+  captainDetails?: {
+    firstName: string;
+    lastName: string;
+    dob: string;
+    gender: 'M' | 'F';
+  };
   location: {
     panchayat: string;
     district: string;
     state: string;
+    taluk?: string;
   };
   createdBy: string;
 }
@@ -42,14 +50,18 @@ export async function createTeamByVolunteer(data: CreateTeamData) {
       captainData = {
         uid: captainId,
         phone: data.captainPhone.replace(/\D/g, ''),
-        phoneNumber: data.captainPhone,
-        firstName: '',
-        lastName: '',
+        phoneNumber: `+91${data.captainPhone.replace(/\D/g, '')}`,
+        firstName: data.captainDetails?.firstName || '',
+        lastName: data.captainDetails?.lastName || '',
+        dob: data.captainDetails?.dob || '',
+        gender: data.captainDetails?.gender || '',
+        age: 0,
         panchayat: data.location.panchayat,
         district: data.location.district,
         state: data.location.state,
+        taluk: data.location.taluk || '',
         role: 'player',
-        isProfileComplete: false,
+        isProfileComplete: data.captainDetails ? true : false,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
         documents: {}
@@ -59,6 +71,30 @@ export async function createTeamByVolunteer(data: CreateTeamData) {
       const captainDoc = usersQuery.docs[0];
       captainData = captainDoc.data();
       captainId = captainDoc.id;
+      
+      // Update user with captain details if provided and missing
+      if (data.captainDetails && (!captainData.firstName || !captainData.lastName || !captainData.dob)) {
+        const updateData: any = {};
+        if (!captainData.firstName && data.captainDetails.firstName) {
+          updateData.firstName = data.captainDetails.firstName;
+        }
+        if (!captainData.lastName && data.captainDetails.lastName) {
+          updateData.lastName = data.captainDetails.lastName;
+        }
+        if (!captainData.dob && data.captainDetails.dob) {
+          updateData.dob = data.captainDetails.dob;
+        }
+        if (!captainData.gender && data.captainDetails.gender) {
+          updateData.gender = data.captainDetails.gender;
+        }
+        
+        if (Object.keys(updateData).length > 0) {
+          updateData.updatedAt = FieldValue.serverTimestamp();
+          await adminDb.collection('users').doc(captainId).update(updateData);
+          // Update local captainData
+          Object.assign(captainData, updateData);
+        }
+      }
     }
 
     // Check if captain is from the same location
@@ -95,13 +131,20 @@ export async function createTeamByVolunteer(data: CreateTeamData) {
       name: data.name,
       description: data.description || '',
       sport: data.sport,
+      sportName: data.sport.charAt(0).toUpperCase() + data.sport.slice(1),
+      genderCategory: captainData.gender || (data.captainDetails?.gender || ''),
       captainId: captainId,
       captainPhone: data.captainPhone,
+      captainProfile: {
+        name: `${captainData.firstName || ''} ${captainData.lastName || ''}`.trim() || 'Captain',
+        phone: captainData.phone || captainData.phoneNumber || data.captainPhone
+      },
       panchayat: data.location.panchayat,
       district: data.location.district,
       state: data.location.state,
-      status: 'submitted',
-      matchDayStatus: 'pending',
+      taluk: data.location.taluk || '',
+      status: 'checked_in',
+      matchDayStatus: 'checked_in',
       playerCount: 1,
       maxPlayers: data.sport === 'volleyball' ? 12 : 12,
       createdAt: FieldValue.serverTimestamp(),
@@ -111,19 +154,31 @@ export async function createTeamByVolunteer(data: CreateTeamData) {
       submittedAt: FieldValue.serverTimestamp()
     };
 
-    // Create player document for captain
-    const playerRef = adminDb.collection('players').doc();
+    // Create player document for captain in team subcollection
+    const playerRef = adminDb.collection('teams').doc(teamId).collection('players').doc();
     const playerId = playerRef.id;
+
+    // Calculate age if DOB is available
+    let calculatedAge = 0;
+    if (captainData.dob) {
+      const birthDate = new Date(captainData.dob);
+      const today = new Date();
+      calculatedAge = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        calculatedAge--;
+      }
+    }
 
     const playerData = {
       id: playerId,
       userId: captainId,
       teamId: teamId,
-      name: `${captainData.firstName} ${captainData.lastName}`.trim(),
-      phone: captainData.phone || '',
+      name: `${captainData.firstName || ''} ${captainData.lastName || ''}`.trim() || 'Captain',
+      phone: captainData.phone || captainData.phoneNumber || '',
       dob: captainData.dob || '',
-      age: captainData.age || 0,
-      gender: captainData.gender || '',
+      age: calculatedAge,
+      gender: captainData.gender || (data.captainDetails?.gender || ''),
       position: 'main' as const,
       isCaptain: true,
       addedAt: FieldValue.serverTimestamp(),
@@ -131,15 +186,16 @@ export async function createTeamByVolunteer(data: CreateTeamData) {
       addedByVolunteer: true,
       isProfileComplete: true,
       profileData: {
-        firstName: captainData.firstName,
-        lastName: captainData.lastName,
-        phone: captainData.phone,
-        dob: captainData.dob,
-        age: captainData.age,
-        gender: captainData.gender,
-        panchayat: captainData.panchayat,
-        district: captainData.district,
-        state: captainData.state
+        firstName: captainData.firstName || '',
+        lastName: captainData.lastName || '',
+        phone: captainData.phone || captainData.phoneNumber || '',
+        dob: captainData.dob || '',
+        age: calculatedAge,
+        gender: captainData.gender || (data.captainDetails?.gender || ''),
+        panchayat: captainData.panchayat || '',
+        district: captainData.district || '',
+        state: captainData.state || '',
+        taluk: captainData.taluk || ''
       },
       documents: captainData.documents || {},
       verificationStatus: 'approved',
@@ -165,6 +221,22 @@ export async function createTeamByVolunteer(data: CreateTeamData) {
     });
 
     await batch.commit();
+
+    // Assign team to venue
+    try {
+      const venueAssignmentResult = await assignTeamToVenue({
+        id: teamId,
+        name: data.name,
+        state: data.location.state,
+        district: data.location.district,
+        panchayat: data.location.panchayat
+      });
+      
+      console.log('Venue assignment result:', venueAssignmentResult);
+    } catch (venueError) {
+      console.error('Venue assignment failed:', venueError);
+      // Don't fail the main operation if venue assignment fails
+    }
 
     // Log audit trail
     try {
@@ -259,8 +331,9 @@ export async function addPlayerToTeamByVolunteer(teamId: string, playerPhone: st
     }
 
     // Check if player is already in this team
-    const existingPlayerQuery = await adminDb.collection('players')
-      .where('teamId', '==', teamId)
+    const existingPlayerQuery = await adminDb.collection('teams')
+      .doc(teamId)
+      .collection('players')
       .where('userId', '==', playerId)
       .limit(1)
       .get();
@@ -294,8 +367,9 @@ export async function addPlayerToTeamByVolunteer(teamId: string, playerPhone: st
     }
 
     // Check team capacity
-    const currentPlayersQuery = await adminDb.collection('players')
-      .where('teamId', '==', teamId)
+    const currentPlayersQuery = await adminDb.collection('teams')
+      .doc(teamId)
+      .collection('players')
       .get();
 
     if (currentPlayersQuery.size >= teamData.maxPlayers) {
@@ -305,8 +379,8 @@ export async function addPlayerToTeamByVolunteer(teamId: string, playerPhone: st
       };
     }
 
-    // Create player document
-    const newPlayerRef = adminDb.collection('players').doc();
+    // Create player document in team subcollection
+    const newPlayerRef = adminDb.collection('teams').doc(teamId).collection('players').doc();
     const newPlayerId = newPlayerRef.id;
 
     const newPlayerData = {

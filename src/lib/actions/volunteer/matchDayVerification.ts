@@ -128,6 +128,8 @@ export async function getVenueTeamsForMatchDay(venueId: string, volunteerId: str
         captainProfile: teamData.captainProfile,
         panchayat: teamData.panchayat,
         district: teamData.district,
+        state: teamData.state,
+        taluk: teamData.taluk,
         currentPlayers: activePlayers.length,
         maxPlayers: teamData.maxPlayers,
         status: teamData.status,

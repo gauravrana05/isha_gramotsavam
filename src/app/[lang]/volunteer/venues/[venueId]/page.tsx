@@ -274,7 +274,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
       </div>
 
       {/* Sports Overview */}
-      {checkedInTeamsResult.success && (
+      {false && checkedInTeamsResult.success && (
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <h3 className="text-lg font-semibold text-[#4A2F1D] mb-4">Sports Overview</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -353,7 +353,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
       )}
 
       {/* Teams Status */}
-      {teams.length > 0 && (
+      {false && teams.length > 0 && (
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Team Status</h2>
           <div className="space-y-2">

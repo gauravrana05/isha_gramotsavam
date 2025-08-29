@@ -634,18 +634,18 @@ export function Table<T>({
                     >
                       {/* Expand button cell */}
                       {expandable && (
-                        <td className="px-1 py-4 w-8">
+                        <td className="py-4 text-right">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               onRowExpand?.(item, !isExpanded);
                             }}
-                            className="p-0.5 rounded hover:bg-gray-100 transition-colors"
+                            className="p-0.5 rounded hover:bg-gray-200 transition-colors"
                           >
                             {isExpanded ? (
-                              <ChevronUp className="w-4 h-4 text-gray-500" />
+                              <ChevronUp className="w-4 h-4 text-black" />
                             ) : (
-                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                              <ChevronDown className="w-4 h-4 text-black" />
                             )}
                           </button>
                         </td>

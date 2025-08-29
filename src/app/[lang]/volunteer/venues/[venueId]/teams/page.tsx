@@ -558,7 +558,7 @@ export default function MatchDayTeamsPage() {
                   onClick={() => setSelectedPlayer(player)}
                 >
                   <td className="px-2 py-2">
-                    <div className="text-sm font-medium text-gray-900">{player.name || 'N/A'}</div>
+                    <div className="text-sm text-gray-900">{player.name || 'N/A'}</div>
                   </td>
                   <td className="px-2 py-2 text-sm text-gray-600">{player.phone || 'N/A'}</td>
                   <td className="px-2 py-2 text-sm text-gray-600">{player.age || 'N/A'}</td>
@@ -1033,8 +1033,10 @@ export default function MatchDayTeamsPage() {
         venueLocation={teams.length > 0 ? {
           panchayat: teams[0].panchayat || '',
           district: teams[0].district || '',
-          state: teams[0].state || ''
+          state: teams[0].state || '',
+          taluk: teams[0].taluk || ''
         } : undefined}
+        venueId={venueId}
         onTeamCreated={loadTeams}
       />
 

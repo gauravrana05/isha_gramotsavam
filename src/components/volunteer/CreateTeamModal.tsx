@@ -2,17 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Users, Plus, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { createTeamByVolunteer } from '@/lib/actions/volunteer/teamManagement';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 
 interface Sport {
   id: string;
   name: string;
+  displayName?: string;
   maxPlayers: number;
   genderRestriction?: 'M' | 'F' | null;
+  isActive?: boolean;
 }
 
 interface CreateTeamModalProps {
@@ -22,7 +25,9 @@ interface CreateTeamModalProps {
     panchayat: string;
     district: string;
     state: string;
+    taluk?: string;
   };
+  venueId: string;
   onTeamCreated: () => Promise<void>;
 }
 
@@ -33,16 +38,19 @@ interface FormData {
   panchayat: string;
   district: string;
   state: string;
+  taluk: string;
   captainPhone: string;
-  captainFirstName?: string;
-  captainLastName?: string;
-  captainDob?: string;
+  captainFirstName: string;
+  captainLastName: string;
+  captainDob: string;
+  captainGender: 'M' | 'F' | '';
 }
 
 export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
   isOpen,
   onClose,
   venueLocation,
+  venueId,
   onTeamCreated
 }) => {
   const router = useRouter();
@@ -56,18 +64,121 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
     panchayat: venueLocation?.panchayat || '',
     district: venueLocation?.district || '',
     state: venueLocation?.state || '',
-    captainPhone: ''
+    taluk: venueLocation?.taluk || '',
+    captainPhone: '',
+    captainFirstName: '',
+    captainLastName: '',
+    captainDob: '',
+    captainGender: ''
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const sports: Sport[] = [
-    { id: 'volleyball', name: 'Volleyball', maxPlayers: 12 },
-    { id: 'throwball', name: 'Throwball', maxPlayers: 12, genderRestriction: 'F' }
-  ];
+  const [sports, setSports] = useState<Sport[]>([]);
+  const [sportsLoading, setSportsLoading] = useState(true);
+  const [playerExists, setPlayerExists] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const selectedSport = sports.find(sport => sport.id === formData.sportId);
+
+  // Phone search functionality
+  const handlePhoneSearch = async (phone: string) => {
+    setFormData(prev => ({ ...prev, captainPhone: phone }));
+    setPlayerExists(false);
+    
+    if (phone.length === 10) {
+      setIsSearching(true);
+      try {
+        const usersRef = collection(db, 'users');
+        const queries = [
+          query(usersRef, where('phone', '==', phone)),
+          query(usersRef, where('phoneNumber', '==', phone)),
+          query(usersRef, where('phoneNumber', '==', `+91${phone}`)),
+          query(usersRef, where('phone', '==', `+91${phone}`))
+        ];
+        
+        let existingUser: any = null;
+        for (const q of queries) {
+          try {
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+              existingUser = snap.docs[0].data();
+              break;
+            }
+          } catch (err) {
+            console.error('Search query failed:', err);
+          }
+        }
+        
+        if (existingUser) {
+          setPlayerExists(true);
+          setFormData(prev => ({
+            ...prev,
+            captainFirstName: existingUser.firstName || '',
+            captainLastName: existingUser.lastName || '',
+            captainDob: existingUser.dob || '',
+            captainGender: existingUser.gender || ''
+          }));
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            captainFirstName: '',
+            captainLastName: '',
+            captainDob: '',
+            captainGender: ''
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to search for player:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }
+  };
+
+  // Load sports from database
+  const loadSports = async () => {
+    try {
+      setSportsLoading(true);
+      const sportsRef = collection(db, 'sports');
+      const sportsSnapshot = await getDocs(sportsRef);
+      const sportsData = sportsSnapshot.docs
+        .filter(doc => doc.data().isActive !== false)
+        .map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || doc.id,
+            displayName: data.displayName,
+            maxPlayers: data.maxPlayers || 12,
+            genderRestriction: data.genderRestriction || null,
+            isActive: data.isActive
+          };
+        })
+        .sort((a, b) => (a.displayName || a.name).localeCompare(b.displayName || b.name));
+      
+      setSports(sportsData);
+    } catch (error) {
+      console.error('Failed to load sports:', error);
+      // Fallback to basic sports list
+      setSports([
+        { id: 'volleyball', name: 'Volleyball', maxPlayers: 12 },
+        { id: 'throwball', name: 'Throwball', maxPlayers: 12, genderRestriction: 'F' }
+      ]);
+    } finally {
+      setSportsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadSports();
+      // Reset form when modal opens
+      setPlayerExists(false);
+      setIsSearching(false);
+      setError('');
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (venueLocation) {
@@ -75,7 +186,8 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
         ...prev,
         panchayat: venueLocation.panchayat,
         district: venueLocation.district,
-        state: venueLocation.state
+        state: venueLocation.state,
+        taluk: venueLocation.taluk || ''
       }));
     }
   }, [venueLocation]);
@@ -106,6 +218,31 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
       return;
     }
 
+    if (formData.captainPhone.length !== 10) {
+      setError('Captain phone number must be 10 digits');
+      return;
+    }
+
+    if (!formData.captainFirstName.trim()) {
+      setError('Captain first name is required');
+      return;
+    }
+
+    if (!formData.captainLastName.trim()) {
+      setError('Captain last name is required');
+      return;
+    }
+
+    if (!formData.captainDob.trim()) {
+      setError('Captain date of birth is required');
+      return;
+    }
+
+    if (!formData.captainGender) {
+      setError('Captain gender is required');
+      return;
+    }
+
     if (!formData.panchayat || !formData.district || !formData.state) {
       setError('Location information is required');
       return;
@@ -117,31 +254,66 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
     try {
       // Normalize phone
       const digits = formData.captainPhone.replace(/\D/g, '');
-      const normalized = digits.length === 10 ? `+91${digits}` : digits.startsWith('91') && digits.length === 12 ? `+${digits}` : formData.captainPhone;
-      // Lookup existing user
+      const normalizedPhone = digits.length === 10 ? digits : formData.captainPhone.replace(/\D/g, '').slice(-10);
+      
+      // Update or create captain user first if needed
       const usersRef = collection(db, 'users');
       const phoneQueries = [
-        query(usersRef, where('phoneNumber', '==', formData.captainPhone)),
-        query(usersRef, where('phoneNumber', '==', normalized)),
-        query(usersRef, where('phone', '==', formData.captainPhone)),
+        query(usersRef, where('phoneNumber', '==', normalizedPhone)),
+        query(usersRef, where('phoneNumber', '==', `+91${normalizedPhone}`)),
+        query(usersRef, where('phone', '==', normalizedPhone)),
+        query(usersRef, where('phone', '==', `+91${normalizedPhone}`))
       ];
+      
       let existingUser: any = null;
       for (const qy of phoneQueries) {
         try {
           const snap = await getDocs(qy);
-          if (!snap.empty) { existingUser = snap.docs[0].data(); break; }
+          if (!snap.empty) { 
+            existingUser = { id: snap.docs[0].id, ...snap.docs[0].data() }; 
+            break; 
+          }
         } catch {}
+      }
+
+      // If user exists but missing required fields, update them
+      if (existingUser && (!existingUser.firstName || !existingUser.lastName || !existingUser.dob || !existingUser.gender)) {
+        const userDocRef = doc(db, 'users', existingUser.id);
+        const updateData: any = {};
+        if (!existingUser.firstName && formData.captainFirstName.trim()) {
+          updateData.firstName = formData.captainFirstName.trim();
+        }
+        if (!existingUser.lastName && formData.captainLastName.trim()) {
+          updateData.lastName = formData.captainLastName.trim();
+        }
+        if (!existingUser.dob && formData.captainDob) {
+          updateData.dob = formData.captainDob;
+        }
+        if (!existingUser.gender && formData.captainGender) {
+          updateData.gender = formData.captainGender;
+        }
+        if (Object.keys(updateData).length > 0) {
+          updateData.updatedAt = new Date();
+          await updateDoc(userDocRef, updateData);
+        }
       }
 
       const result = await createTeamByVolunteer({
         name: formData.name.trim(),
         description: formData.description.trim(),
         sport: formData.sportId,
-        captainPhone: existingUser?.phoneNumber || existingUser?.phone || formData.captainPhone.trim(),
+        captainPhone: normalizedPhone,
+        captainDetails: {
+          firstName: formData.captainFirstName.trim(),
+          lastName: formData.captainLastName.trim(),
+          dob: formData.captainDob,
+          gender: formData.captainGender
+        },
         location: {
           panchayat: formData.panchayat,
           district: formData.district,
-          state: formData.state
+          state: formData.state,
+          taluk: formData.taluk
         },
         createdBy: user.uid
       });
@@ -149,6 +321,13 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
       if (result.success) {
         await onTeamCreated();
         onClose();
+        
+        // Redirect to the team page
+        if (result.teamId) {
+          router.push(`/${lang}/volunteer/venues/${venueId}/teams/${result.teamId}`);
+        }
+        
+        // Reset form
         setFormData({
           name: '',
           description: '',
@@ -156,8 +335,15 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
           panchayat: venueLocation?.panchayat || '',
           district: venueLocation?.district || '',
           state: venueLocation?.state || '',
-          captainPhone: ''
+          taluk: venueLocation?.taluk || '',
+          captainPhone: '',
+          captainFirstName: '',
+          captainLastName: '',
+          captainDob: '',
+          captainGender: ''
         });
+        setPlayerExists(false);
+        setIsSearching(false);
       } else {
         setError(result.message || 'Failed to create team');
       }
@@ -172,7 +358,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[95vh] flex flex-col">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
@@ -191,7 +377,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
           </button>
         </div>
 
-        <div className="p-6 max-h-[calc(90vh-140px)] overflow-y-auto">
+        <div className="p-6 flex-1 overflow-y-auto">
           <div className="space-y-6">
             {/* Team Information */}
             <div className="space-y-4">
@@ -219,18 +405,22 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Sport <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
-                    value={formData.sportId}
-                    onChange={(e) => handleInputChange('sportId', e.target.value)}
+                  <Select 
+                    value={formData.sportId} 
+                    onValueChange={(value) => handleInputChange('sportId', value)}
+                    disabled={sportsLoading}
                   >
-                    <option value="">Select a sport</option>
-                    {sports.map((sport) => (
-                      <option key={sport.id} value={sport.id}>
-                        {sport.name} {sport.genderRestriction === 'F' ? '(Women Only)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]">
+                      <SelectValue placeholder={sportsLoading ? 'Loading sports...' : 'Select a sport'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sports.map((sport) => (
+                        <SelectItem key={sport.id} value={sport.id}>
+                          {sport.displayName || sport.name} {sport.genderRestriction === 'F' ? '(Women Only)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -312,19 +502,99 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                 <input
                   type="tel"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
-                  placeholder="Enter captain's phone number"
+                  placeholder="Enter 10-digit mobile number"
                   value={formData.captainPhone}
-                  onChange={(e) => handleInputChange('captainPhone', e.target.value)}
+                  onChange={(e) => {
+                    const phone = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    handlePhoneSearch(phone);
+                  }}
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  The person with this phone number must have a complete profile to become team captain
-                </p>
+                {isSearching && (
+                  <p className="mt-1 text-sm text-gray-500 flex items-center">
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                    Searching for captain...
+                  </p>
+                )}
+                {!isSearching && playerExists && (
+                  <p className="mt-1 text-sm text-green-600">
+                    ✓ Captain found - details populated
+                  </p>
+                )}
+                {!isSearching && formData.captainPhone.length === 10 && !playerExists && (
+                  <p className="mt-1 text-sm text-blue-600">
+                    New captain - please fill details below
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                    placeholder="Enter first name"
+                    value={formData.captainFirstName}
+                    onChange={(e) => handleInputChange('captainFirstName', e.target.value)}
+                    readOnly={playerExists}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Last Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                    placeholder="Enter last name"
+                    value={formData.captainLastName}
+                    onChange={(e) => handleInputChange('captainLastName', e.target.value)}
+                    readOnly={playerExists}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Date of Birth <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                    value={formData.captainDob}
+                    onChange={(e) => handleInputChange('captainDob', e.target.value)}
+                    readOnly={playerExists}
+                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 16)).toISOString().split('T')[0]}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gender <span className="text-red-500">*</span>
+                  </label>
+                  <Select 
+                    value={formData.captainGender} 
+                    onValueChange={(value) => handleInputChange('captainGender', value)}
+                    disabled={playerExists}
+                  >
+                    <SelectTrigger className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]">
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="M">Male</SelectItem>
+                      <SelectItem value="F">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-yellow-700 text-sm">
-                  <strong>Note:</strong> All team members must be from the same panchayat. 
-                  This will be verified during the approval process.
+                  <strong>Note:</strong> The captain will be automatically added to the team with approved status. All team members must be from the same panchayat.
                 </p>
               </div>
             </div>
@@ -337,7 +607,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 flex-shrink-0">
           <button
             onClick={onClose}
             disabled={loading}
@@ -356,10 +626,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                 Creating Team...
               </>
             ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                Create Team
-              </>
+              'Create Team'
             )}
           </button>
         </div>
