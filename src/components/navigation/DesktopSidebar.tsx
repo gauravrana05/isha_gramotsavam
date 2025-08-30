@@ -17,6 +17,7 @@ import {
   Settings
 } from 'lucide-react';
 import { cn } from '@/lib/component-patterns';
+import { useAuth } from '@/context/AuthContext';
 
 export interface SidebarNavItem {
   id: string;
@@ -210,9 +211,10 @@ const SidebarNavItem: React.FC<{
 // User profile section component  
 const UserProfileSection: React.FC<{
   userProfile?: DesktopSidebarProps['userProfile'];
+  profileImage: string | null;
   isCollapsed: boolean;
   onProfileClick: () => void;
-}> = ({ userProfile, isCollapsed, onProfileClick }) => {
+}> = ({ userProfile, profileImage, isCollapsed, onProfileClick }) => {
   const displayName = userProfile?.firstName && userProfile?.lastName 
     ? `${userProfile.firstName} ${userProfile.lastName}`
     : 'User';
@@ -233,16 +235,18 @@ const UserProfileSection: React.FC<{
         'flex items-center justify-center',
         !isCollapsed && 'mr-3'
       )}>
-        {userProfile?.profilePhoto ? (
-          <Image
-            src={userProfile.profilePhoto}
+        {profileImage ? (
+          <img
+            src={profileImage}
             alt={displayName}
-            width={32}
-            height={32}
             className="w-8 h-8 rounded-full object-cover"
           />
         ) : (
-          <User className="w-4 h-4 text-gray-600" />
+          <div className="w-8 h-8 bg-[#3A7F3F] rounded-full flex items-center justify-center">
+            <span className="text-white font-medium text-xs">
+              {userProfile?.firstName?.charAt(0)}{userProfile?.lastName?.charAt(0)}
+            </span>
+          </div>
         )}
       </div>
       
@@ -271,6 +275,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   const pathname = usePathname();
   const router = useRouter();
   const { lang } = useParams();
+  const { user, profileImage } = useAuth();
   
   const langStr = Array.isArray(lang) ? lang[0] : lang || 'en';
   
@@ -372,7 +377,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 space-y-1">
+      <nav className="flex-1 overflow-y-auto py-4 space-y-1 scrollbar-none hover:scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
         {navStructure.map((item) => (
           <SidebarNavItem
             key={item.id}
@@ -389,6 +394,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
       {/* User Profile */}
       <UserProfileSection
         userProfile={userProfile}
+        profileImage={profileImage}
         isCollapsed={isCollapsed}
         onProfileClick={handleProfileClick}
       />

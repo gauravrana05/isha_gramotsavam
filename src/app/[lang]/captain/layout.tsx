@@ -32,7 +32,7 @@ export default function CaptainLayout({
         onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
       />
       <div className={`${
-        isDesktopSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80'
+        isDesktopSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
       } transition-[margin] duration-300 ease-in-out`}>
         <div className="lg:hidden h-16"></div>
         <main className="lg:min-h-screen">

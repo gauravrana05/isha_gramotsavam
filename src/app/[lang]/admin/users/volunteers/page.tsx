@@ -23,13 +23,15 @@ import {
 } from 'lucide-react';
 import {
   AdvancedTable,
-  StatsCard,
+  SingleStatCard,
   PageLoader,
   type Column,
   type ActionButton,
-  type FilterField,
-  type ExportConfig
+  type FilterField
 } from '@/components/ui';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
+import { cn } from '@/lib/component-patterns';
 import Link from 'next/link';
 
 type VolunteerRole = 'verification_volunteer' | 'general_volunteer' | 'technical_volunteer';
@@ -46,6 +48,7 @@ interface AdminVolunteerRow {
   panchayat?: string;
   district?: string;
   state?: string;
+  venueAssignment?: string;
   isVerified: boolean;
   isProfileComplete: boolean;
   isActive?: boolean;
@@ -55,91 +58,146 @@ interface AdminVolunteerRow {
 interface AddVolunteerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  createMutation: any;
+  selectedEvent: string;
 }
 
-function AddVolunteerModal({ isOpen, onClose, onSuccess }: AddVolunteerModalProps) {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: AddVolunteerModalProps) {
   const [sameAsWhatsapp, setSameAsWhatsapp] = useState(true);
+  const [isVerificationVolunteer, setIsVerificationVolunteer] = useState(false);
+  const [selectedVenue, setSelectedVenue] = useState<string>('none');
+
+  // Fetch venue level mappings
+  const {
+    data: venueData,
+    isLoading: venueLoading
+  } = api.admin.venues.getVenueLevelMappings.useQuery({
+    ...(selectedEvent && { eventId: selectedEvent }),
+    level: 'all'
+  }, {
+    enabled: isOpen && !isVerificationVolunteer
+  });
+
+  // Format venue options for AdvancedSelect
+  const venueOptions = useMemo(() => {
+    if (!venueData) return [];
+    
+    // Handle both array response and object with venueLevelMappings property
+    const mappings = Array.isArray(venueData) ? venueData : venueData.venueLevelMappings || [];
+    
+    return mappings.map((mapping: any) => ({
+      value: mapping.id,
+      label: `${mapping.venue?.name || 'Unknown Venue'} - ${mapping.level}`,
+      description: `${mapping.venue?.district || ''}, ${mapping.venue?.taluk || ''}`.replace(/^, |, $/, ''),
+      data: mapping
+    }));
+  }, [venueData]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
 
     try {
       const formData = new FormData(e.currentTarget);
-      formData.set('sameAsWhatsapp', sameAsWhatsapp.toString());
       
       // Set role based on verification checkbox
-      const isVerificationVolunteer = formData.get('isVerificationVolunteer') === 'on';
-      formData.set('role', isVerificationVolunteer ? 'verification_volunteer' : 'general_volunteer');
+      const role = isVerificationVolunteer ? 'verification_volunteer' : 'general_volunteer';
       
-      const result = await addVolunteer(formData);
+      const volunteerData = {
+        firstName: formData.get('firstName') as string,
+        lastName: formData.get('lastName') as string,
+        phone: formData.get('phoneNumber') as string,
+        email: formData.get('email') as string || undefined,
+        gender: formData.get('gender') as 'M' | 'F' | 'O',
+        role: role as 'general_volunteer' | 'verification_volunteer',
+        whatsappNumber: sameAsWhatsapp 
+          ? formData.get('phoneNumber') as string 
+          : formData.get('whatsappNumber') as string || undefined,
+        venueAssignmentId: selectedVenue && selectedVenue !== 'none' ? selectedVenue : undefined,
+      };
+
+      await createMutation.mutateAsync(volunteerData);
       
-      if (result.success) {
-        onSuccess();
-        onClose();
+      // Reset form
+      if (e.currentTarget) {
         e.currentTarget.reset();
-        setSameAsWhatsapp(true);
-      } else {
-        setError(result.error || 'Failed to add volunteer');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to add volunteer');
-    } finally {
-      setLoading(false);
+      setSameAsWhatsapp(true);
+      setIsVerificationVolunteer(false);
+      setSelectedVenue('none');
+    } catch (error) {
+      console.error('Form submission error:', error);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
-        <h3 className="text-lg font-semibold mb-4">Add New Volunteer</h3>
-        
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <EnhancedModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add New Volunteer"
+      subtitle="Create a new volunteer account with role assignment"
+      size="lg"
+      mobileFullScreen={true}
+      scrollableBody={true}
+      footer={
+        <div className="flex flex-row space-x-3 sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={createMutation.isPending}
+            className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const form = document.querySelector('#volunteer-form-element') as HTMLFormElement;
+              if (form) {
+                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+              }
+            }}
+            disabled={createMutation.isPending}
+            className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm"
+          >
+            {createMutation.isPending ? 'Adding...' : 'Add Volunteer'}
+          </button>
+        </div>
+      }
+    >
+      <div id="volunteer-form">
+        <form onSubmit={handleSubmit} className="space-y-6" id="volunteer-form-element">
           {/* Personal Information */}
           <div>
             <h4 className="text-md font-medium text-gray-900 mb-3">Personal Information</h4>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">First Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
                 <input 
                   name="firstName" 
                   required 
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Enter first name"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-2">Last Name *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
                 <input 
                   name="lastName" 
                   required 
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Enter last name"
                 />
               </div>
             </div>
             
             <div className="mt-4">
-              <label className="block text-sm font-medium mb-2">Gender *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Gender *</label>
               <select 
                 name="gender" 
                 required 
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Select Gender</option>
                 <option value="M">Male</option>
@@ -155,13 +213,13 @@ function AddVolunteerModal({ isOpen, onClose, onSuccess }: AddVolunteerModalProp
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Phone Number *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
                 <input 
                   name="phoneNumber" 
                   type="tel"
                   required 
                   pattern="[+]?[0-9\s\-\(\)]*"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="+91 9876543210"
                 />
               </div>
@@ -173,7 +231,7 @@ function AddVolunteerModal({ isOpen, onClose, onSuccess }: AddVolunteerModalProp
                     id="sameAsWhatsapp"
                     checked={sameAsWhatsapp}
                     onChange={(e) => setSameAsWhatsapp(e.target.checked)}
-                    className="h-4 w-4 text-[#F28C38] focus:ring-[#F28C38] border-gray-300 rounded"
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
                   <label htmlFor="sameAsWhatsapp" className="ml-2 block text-sm text-gray-700">
                     WhatsApp number is same as phone number
@@ -186,19 +244,19 @@ function AddVolunteerModal({ isOpen, onClose, onSuccess }: AddVolunteerModalProp
                     type="tel"
                     required={!sameAsWhatsapp}
                     pattern="[+]?[0-9\s\-\(\)]*"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="+91 9876543210"
                   />
                 )}
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-2">Email Address *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
                 <input 
                   name="email" 
                   type="email"
                   required 
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="volunteer@example.com"
                 />
               </div>
@@ -213,8 +271,9 @@ function AddVolunteerModal({ isOpen, onClose, onSuccess }: AddVolunteerModalProp
               <input
                 type="checkbox"
                 id="isVerificationVolunteer"
-                name="isVerificationVolunteer"
-                className="h-4 w-4 text-[#F28C38] focus:ring-[#F28C38] border-gray-300 rounded"
+                checked={isVerificationVolunteer}
+                onChange={(e) => setIsVerificationVolunteer(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
               <label htmlFor="isVerificationVolunteer" className="ml-2 block text-sm text-gray-700">
                 Verification Volunteer
@@ -225,25 +284,38 @@ function AddVolunteerModal({ isOpen, onClose, onSuccess }: AddVolunteerModalProp
             </p>
           </div>
 
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 px-4 py-2 text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F28C38] disabled:opacity-50"
-            >
-              {loading ? 'Adding...' : 'Add Volunteer'}
-            </button>
-          </div>
+          {/* Venue Selection - Only show if not verification volunteer */}
+          {!isVerificationVolunteer && (
+            <div>
+              <h4 className="text-md font-medium text-gray-900 mb-3">Venue Assignment</h4>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Venue</label>
+                <Select value={selectedVenue} onValueChange={setSelectedVenue} disabled={venueLoading}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={venueLoading ? "Loading venues..." : "Select a venue for assignment..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No venue assignment</SelectItem>
+                    {venueOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <span className="font-medium">{option.label}</span>
+                        {option.description && (
+                          <span className="block text-xs text-gray-500 mt-0.5">{option.description}</span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-sm text-gray-500">
+                  Volunteers can be assigned to venues later if not selected now.
+                </p>
+              </div>
+            </div>
+          )}
         </form>
       </div>
-    </div>
+    </EnhancedModal>
   );
 }
 
@@ -251,66 +323,140 @@ export default function VolunteersManagement() {
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
+  const { addNotification } = useNotification();
 
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
-  const [volunteers, setVolunteers] = useState<AdminVolunteerRow[]>([]);
-  const [total, setTotal] = useState<number>(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedVolunteers, setSelectedVolunteers] = useState<Set<string | number>>(new Set());
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedVolunteer, setSelectedVolunteer] = useState<AdminVolunteerRow | null>(null);
+  const [showAssignVenueModal, setShowAssignVenueModal] = useState(false);
+  const [selectedAssignmentVenue, setSelectedAssignmentVenue] = useState<string>('none');
+  const [selectedAssignmentType, setSelectedAssignmentType] = useState<string>('');
 
-  // Load volunteers data with volunteer role filter
-  const loadVolunteers = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      if (!user?.uid) {
-        throw new Error('User not authenticated');
-      }
+  // State for event selection
+  const [selectedEvent, setSelectedEvent] = useState<string>('');
 
-      // Get volunteer users
-      const result = await getAdminUsers(
-        {
-          limit: 100,
-          offset: 0,
-          role: 'volunteer', // Get all volunteer types
-          gender: 'all',
-          district: undefined,
-          isVerified: 'all',
-          isProfileComplete: 'all',
-          searchQuery: undefined,
-          sortBy: 'createdAt' as any,
-          sortOrder: 'desc'
-        },
-        user.uid
-      );
+  // Get events (ongoing = registration_open, registration_closed, active)
+  const { data: eventsData, isLoading: eventsLoading } = api.admin.events.getEvents.useQuery({
+    limit: 1,
+    status: 'ongoing',
+  });
 
-      if (!result.success) {
-        setError(result.error || 'Failed to load volunteers');
-        setVolunteers([]);
-        setTotal(0);
-        return;
-      }
-
-      // Map volunteer users
-      const volunteerUsers = (result.users || []).map(user => ({
-        ...user,
-        role: user.role as VolunteerRole,
-        isActive: user.isVerified && user.isProfileComplete
-      }));
-
-      setError('');
-      setVolunteers(volunteerUsers);
-      setTotal(volunteerUsers.length);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load volunteers');
-      setVolunteers([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
+  // Set default event (always use first ongoing event)
+  useEffect(() => {
+    console.log('Events data:', eventsData);
+    if (eventsData?.events && eventsData.events.length > 0) {
+      console.log('Setting selectedEvent to:', eventsData.events[0].id);
+      setSelectedEvent(eventsData.events[0].id);
+    } else {
+      console.log('No events found or events data is empty');
     }
-  }, [user?.uid]);
+  }, [eventsData]);
 
-  // Auth gate and data loading
+  console.log('Volunteers page selectedEvent:', selectedEvent);
+
+  // tRPC query for volunteers data
+  const {
+    data: usersData,
+    isLoading: volunteersLoading,
+    error: volunteersError,
+    refetch: refetchVolunteers
+  } = api.admin.users.getUsers.useQuery({
+    limit: 100,
+    offset: 0,
+    role: 'volunteer', // Get all volunteer types
+    gender: 'all',
+    isVerified: 'all',
+    isProfileComplete: 'all',
+    sortBy: 'createdAt',
+    sortOrder: 'desc'
+  }, {
+    enabled: !!user && userProfile?.role === 'admin'
+  });
+
+  // Process volunteers data
+  const volunteers = useMemo(() => {
+    if (!usersData?.users) return [];
+    
+    return usersData.users.map(user => ({
+      id: user.id || user.uid,
+      uid: user.uid || user.id,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      phoneNumber: user.phoneNumber || '',
+      email: user.email,
+      role: user.role as VolunteerRole,
+      gender: user.gender as 'M' | 'F' | 'O',
+      panchayat: user.panchayat,
+      district: user.district,
+      state: user.state,
+      venueAssignment: user.venueAssignment || null,
+      isVerified: true, // TODO: Fix verification mapping
+      isProfileComplete: user.isProfileComplete || false,
+      isActive: user.isProfileComplete || false,
+      createdAt: user.createdAt
+    }));
+  }, [usersData?.users]);
+
+  const loading = volunteersLoading || authLoading;
+  const error = volunteersError?.message || '';
+
+  // tRPC mutation for creating volunteers
+  const createVolunteerMutation = api.admin.users.createUser.useMutation({
+    onSuccess: (data) => {
+      refetchVolunteers();
+      addNotification('Volunteer created successfully!', 'success');
+      setIsAddModalOpen(false);
+    },
+    onError: (error) => {
+      console.error('Create volunteer error:', error);
+      addNotification(error.message || 'Failed to create volunteer. Please try again.', 'error');
+    },
+  });
+
+  // tRPC mutation for assigning volunteers to venue
+  const assignVolunteersMutation = api.admin.venueAssignment.assignVolunteersToVenue.useMutation({
+    onSuccess: (data) => {
+      refetchVolunteers();
+      addNotification(data.message, 'success');
+      setShowAssignVenueModal(false);
+      setSelectedAssignmentVenue('none');
+      setSelectedAssignmentType('');
+      setSelectedVolunteers(new Set());
+    },
+    onError: (error) => {
+      console.error('Assign volunteers error:', error);
+      addNotification(error.message || 'Failed to assign volunteers to venue', 'error');
+    }
+  });
+
+  // Fetch venue level mappings for assignment modal
+  const {
+    data: assignmentVenueData,
+    isLoading: assignmentVenueLoading
+  } = api.admin.venues.getVenueLevelMappings.useQuery({
+    ...(selectedEvent && { eventId: selectedEvent }),
+    level: 'all'
+  }, {
+    enabled: showAssignVenueModal
+  });
+
+  // Format assignment venue options for Select
+  const assignmentVenueOptions = useMemo(() => {
+    if (!assignmentVenueData) return [];
+    
+    // Handle both array response and object with venueLevelMappings property
+    const mappings = Array.isArray(assignmentVenueData) ? assignmentVenueData : assignmentVenueData.venueLevelMappings || [];
+    
+    return mappings.map((mapping: any) => ({
+      value: mapping.id,
+      label: `${mapping.venue?.name || 'Unknown Venue'} - ${mapping.level}`,
+      description: `${mapping.venue?.district || ''}, ${mapping.venue?.taluk || ''}`.replace(/^, |, $/, ''),
+      data: mapping
+    }));
+  }, [assignmentVenueData]);
+
+  // Auth gate
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -321,12 +467,7 @@ export default function VolunteersManagement() {
       router.push(`/${lang}/player/dashboard`);
       return;
     }
-    
-    loadVolunteers();
-  }, [user, userProfile, authLoading, lang, router, loadVolunteers]);
-
-  // Client-side filtering handled by AdvancedTable
-  const filteredVolunteers = volunteers;
+  }, [user, userProfile, authLoading, lang, router]);
 
   const columns: Column<AdminVolunteerRow>[] = useMemo(() => [
     {
@@ -385,23 +526,49 @@ export default function VolunteersManagement() {
           </div>
         </div>
       )
+    },
+    {
+      key: 'venue',
+      header: 'Venue',
+      accessor: 'venueAssignment',
+      sortable: true,
+      minWidth: 150,
+      render: (venue, v) => (
+        <div className="text-sm text-gray-900">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-gray-400" />
+            <span>{v.venueAssignment || '—'}</span>
+          </div>
+        </div>
+      )
     }
   ], []);
 
-  const actions: ActionButton<AdminVolunteerRow>[] = useMemo(() => [
-    {
-      label: 'View',
-      icon: Eye,
-      variant: 'primary',
-      onClick: (v) => router.push(`/${lang}/admin/users/${v.id}`)
-    },
-    {
-      label: 'Edit',
-      icon: Edit,
-      variant: 'secondary',
-      onClick: (v) => router.push(`/${lang}/admin/users/${v.id}/edit`)
-    }
-  ], [router, lang]);
+  // Header actions for different selection states
+  const getHeaderActions = () => (
+    <button 
+      onClick={() => setIsAddModalOpen(true)}
+      className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+    >
+      <Plus className="w-4 h-4 mr-2" />
+      Add Volunteer
+    </button>
+  );
+
+  const getHeaderActionsSingle = (selectedItems: AdminVolunteerRow[]) => (
+    <button 
+      onClick={() => setShowAssignVenueModal(true)}
+      className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+    >
+      <MapPin className="w-4 h-4 mr-2" />
+      Assign Venue
+    </button>
+  );
+
+  const handleRowClick = (volunteer: AdminVolunteerRow) => {
+    setSelectedVolunteer(volunteer);
+    setShowViewModal(true);
+  };
 
   const filterFields: FilterField[] = useMemo(() => [
     {
@@ -426,58 +593,32 @@ export default function VolunteersManagement() {
     }
   ], []);
 
-  const exportOptions: ExportConfig[] = useMemo(() => [
-    {
-      label: 'Export CSV',
-      format: 'csv',
-      onExport: () => {
-        const csv = [
-          ['Name', 'Role', 'Phone', 'Email', 'Gender'].join(','),
-          ...filteredVolunteers.map(v => [
-            `${v.firstName} ${v.lastName}`.trim(),
-            v.role.replace('_', ' '),
-            v.phoneNumber,
-            v.email || '',
-            v.gender
-          ].join(','))
-        ].join('\n');
 
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `volunteers_export_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      }
-    }
-  ], [filteredVolunteers]);
-
-  // Stats for StatsCard
+  // Stats for SingleStatCard
   const statsData = useMemo(() => [
     {
-      label: 'Total',
+      label: 'Total Volunteers',
       value: volunteers.length,
-      color: 'info' as const,
-      icon: Users
+      icon: Users,
+      color: 'info' as const
     },
     {
       label: 'General',
       value: volunteers.filter(v => v.role === 'general_volunteer').length,
-      color: 'secondary' as const,
-      icon: UserCheck
+      icon: UserCheck,
+      color: 'success' as const
     },
     {
       label: 'Technical',
       value: volunteers.filter(v => v.role === 'technical_volunteer').length,
-      color: 'warning' as const,
-      icon: Users
+      icon: Users,
+      color: 'warning' as const
     },
     {
       label: 'Verification',
       value: volunteers.filter(v => v.role === 'verification_volunteer').length,
-      color: 'success' as const,
-      icon: Shield
+      icon: Shield,
+      color: 'primary' as const
     }
   ], [volunteers]);
 
@@ -499,47 +640,10 @@ export default function VolunteersManagement() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Volunteers Management</h1>
-          <p className="text-gray-600 text-sm">View and manage volunteers, assignments, and coordination</p>
-        </div>
-        
-        <div className="flex gap-3">
-          <Link href={`/${lang}/admin/users/volunteers/assign-venues`}>
-            <button className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600">
-              <MapPin className="w-4 h-4 mr-2" />
-              Assign Venues
-            </button>
-          </Link>
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-600"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Volunteer
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      {statsData.length > 0 && (
-        <div className="mb-8">
-          <StatsCard 
-            stats={statsData}
-            columns={4}
-            size="base"
-            showBorder
-          />
-        </div>
-      )}
-
       {/* Advanced Table */}
       <AdvancedTable<AdminVolunteerRow>
-        data={filteredVolunteers}
+        data={volunteers}
         columns={columns}
-        actions={actions}
         loading={loading}
 
         searchable={true}
@@ -549,33 +653,342 @@ export default function VolunteersManagement() {
         filters={filterFields}
 
         sortable={true}
-        multiSort={true}
+        multiSort={false}
         defaultSort={[{ key: 'createdAt', direction: 'desc' }]}
 
-        pagination={{ enabled: false }}
+        pagination={{ enabled: true }}
 
-        exportOptions={exportOptions}
-
-        selectable={false}
+        selectable={true}
+        selectedRows={selectedVolunteers}
+        onSelectionChange={setSelectedVolunteers}
+        onRowClick={handleRowClick}
         keyExtractor={(v) => v.id}
         stickyHeader={true}
 
-        persistState={true}
-        stateKey="admin-volunteers"
+        persistState={false}
+
+        headerActions={getHeaderActions()}
+        headerActionsSingle={getHeaderActionsSingle}
 
         emptyState={{
           icon: Users,
           title: 'No volunteers found',
-          description: 'Try adjusting your search or filters'
+          description: 'No volunteers have been created yet.',
+          action: {
+            label: 'Add Volunteer',
+            onClick: () => setIsAddModalOpen(true)
+          }
+        }}
+        noSearchResultsEmptyState={{
+          icon: Users,
+          title: 'No matching volunteers',
+          description: 'Try adjusting your search or filters to find what you\'re looking for.',
         }}
       />
+
+      {/* Stats Cards - Horizontal Layout */}
+      {statsData.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-8">
+          {statsData.map((stat, index) => (
+            <div 
+              key={index}
+              className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => {
+                // TODO: Add filtering by stat type
+              }}
+            >
+              <div className="flex items-center space-x-3">
+                {stat.icon && (
+                  <div className={cn(
+                    'p-2 rounded-full',
+                    stat.color === 'primary' ? 'bg-orange-50' :
+                    stat.color === 'success' ? 'bg-green-50' :
+                    stat.color === 'warning' ? 'bg-purple-50' :
+                    stat.color === 'info' ? 'bg-blue-50' :
+                    'bg-gray-50'
+                  )}>
+                    <stat.icon className={cn(
+                      'w-5 h-5',
+                      stat.color === 'primary' ? 'text-[#F28C38]' :
+                      stat.color === 'success' ? 'text-green-600' :
+                      stat.color === 'warning' ? 'text-purple-600' :
+                      stat.color === 'info' ? 'text-blue-600' :
+                      'text-gray-600'
+                    )} />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <div className={cn(
+                    'text-2xl font-bold',
+                    stat.color === 'primary' ? 'text-[#F28C38]' :
+                    stat.color === 'success' ? 'text-green-600' :
+                    stat.color === 'warning' ? 'text-purple-600' :
+                    stat.color === 'info' ? 'text-blue-600' :
+                    'text-gray-600'
+                  )}>
+                    {stat.value}
+                  </div>
+                  <div className="text-sm text-gray-600 font-medium truncate">
+                    {stat.label}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       
       {/* Add Volunteer Modal */}
       <AddVolunteerModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onSuccess={loadVolunteers}
+        createMutation={createVolunteerMutation}
+        selectedEvent={selectedEvent}
       />
+
+      {/* View Volunteer Modal */}
+      {selectedVolunteer && (
+        <EnhancedModal
+          isOpen={showViewModal}
+          onClose={() => setShowViewModal(false)}
+          title="Volunteer Details"
+          subtitle={`${selectedVolunteer.firstName} ${selectedVolunteer.lastName} - Complete Information`}
+          size="lg"
+          mobileFullScreen={true}
+          scrollableBody={true}
+          footer={
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => {
+                  setShowViewModal(false);
+                  // TODO: Add edit functionality
+                }}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26] transition-colors"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Volunteer
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-6">
+            {/* Basic Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Volunteer Name</h3>
+                <p className="text-gray-900 text-lg font-semibold">{selectedVolunteer.firstName} {selectedVolunteer.lastName}</p>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Role</h3>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  selectedVolunteer.role === 'technical_volunteer' ? 'bg-purple-100 text-purple-800' :
+                  selectedVolunteer.role === 'general_volunteer' ? 'bg-blue-100 text-blue-800' :
+                  selectedVolunteer.role === 'verification_volunteer' ? 'bg-green-100 text-green-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {selectedVolunteer.role.replace('_', ' ')}
+                </span>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Phone Number</h3>
+                <p className="text-gray-900">{selectedVolunteer.phoneNumber}</p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Email</h3>
+                <p className="text-gray-900">{selectedVolunteer.email || 'Not provided'}</p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Gender</h3>
+                <p className="text-gray-900">{selectedVolunteer.gender === 'M' ? 'Male' : selectedVolunteer.gender === 'F' ? 'Female' : 'Other'}</p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Status</h3>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  selectedVolunteer.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {selectedVolunteer.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            </div>
+
+            {/* Location Information */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-gray-200">
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Panchayat</h3>
+                <p className="text-gray-900">{selectedVolunteer.panchayat || 'Not provided'}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">District</h3>
+                <p className="text-gray-900">{selectedVolunteer.district || 'Not provided'}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">State</h3>
+                <p className="text-gray-900">{selectedVolunteer.state || 'Not provided'}</p>
+              </div>
+            </div>
+
+            {/* Timestamps */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-200">
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Created At</h3>
+                <p className="text-gray-900">
+                  {selectedVolunteer.createdAt 
+                    ? new Date(selectedVolunteer.createdAt).toLocaleDateString() 
+                    : 'Unknown'}
+                </p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Profile Status</h3>
+                <p className="text-gray-900">
+                  {selectedVolunteer.isProfileComplete ? 'Complete' : 'Incomplete'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </EnhancedModal>
+      )}
+
+      {/* Assign Venue Modal */}
+      <EnhancedModal
+        isOpen={showAssignVenueModal}
+        onClose={() => setShowAssignVenueModal(false)}
+        title="Assign Venue to Volunteers"
+        subtitle={`Assign selected ${selectedVolunteers.size} volunteer${selectedVolunteers.size !== 1 ? 's' : ''} to a venue`}
+        size="md"
+        mobileFullScreen={true}
+        scrollableBody={true}
+        footer={
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setShowAssignVenueModal(false);
+                setSelectedAssignmentVenue('none');
+                setSelectedAssignmentType('');
+              }}
+              className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!selectedAssignmentVenue || selectedAssignmentVenue === 'none') {
+                  addNotification('Please select a venue before assigning', 'warning');
+                  return;
+                }
+                
+                if (!selectedAssignmentType) {
+                  addNotification('Please select an assignment type', 'warning');
+                  return;
+                }
+                
+                if (!selectedEvent) {
+                  addNotification('No ongoing event found', 'error');
+                  return;
+                }
+                
+                console.log('Assignment data:', {
+                  volunteerIds: Array.from(selectedVolunteers),
+                  venueLevelMappingId: selectedAssignmentVenue,
+                  eventId: selectedEvent,
+                  volunteerType: selectedAssignmentType === 'technical' ? 'technical_volunteer' : 'general_volunteer',
+                });
+                
+                // Call the assignment mutation
+                assignVolunteersMutation.mutate({
+                  volunteerIds: Array.from(selectedVolunteers) as string[],
+                  venueLevelMappingId: selectedAssignmentVenue,
+                  eventId: selectedEvent,
+                  volunteerType: selectedAssignmentType === 'technical' ? 'technical_volunteer' : 'general_volunteer',
+                });
+              }}
+              disabled={!selectedAssignmentVenue || selectedAssignmentVenue === 'none' || assignmentVenueLoading || assignVolunteersMutation.isPending}
+              className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm disabled:opacity-50"
+            >
+              {assignVolunteersMutation.isPending ? 'Assigning...' : 'Assign Venue'}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Selected Volunteers</h3>
+            <div className="bg-gray-50 rounded-lg p-3">
+              {Array.from(selectedVolunteers).map(id => {
+                const volunteer = volunteers.find(v => v.id === id);
+                return volunteer ? (
+                  <div key={id} className="flex items-center justify-between py-1">
+                    <span className="text-sm text-gray-900">
+                      {volunteer.firstName} {volunteer.lastName}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {volunteer.role.replace('_', ' ')}
+                    </span>
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Venue
+            </label>
+            <Select 
+              value={selectedAssignmentVenue} 
+              onValueChange={setSelectedAssignmentVenue} 
+              disabled={assignmentVenueLoading}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={assignmentVenueLoading ? "Loading venues..." : "Select a venue..."} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No venue selected</SelectItem>
+                {assignmentVenueOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <span className="font-medium">{option.label}</span>
+                    {option.description && (
+                      <span className="block text-xs text-gray-500 mt-0.5">{option.description}</span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Assignment Type
+            </label>
+            <Select value={selectedAssignmentType} onValueChange={setSelectedAssignmentType}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select assignment type..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general">General Support</SelectItem>
+                <SelectItem value="technical">Technical Support</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Notes (Optional)
+            </label>
+            <textarea 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              rows={3}
+              placeholder="Add any notes for this venue assignment..."
+            />
+          </div>
+        </div>
+      </EnhancedModal>
     </div>
   );
 }

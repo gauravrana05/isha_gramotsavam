@@ -399,7 +399,6 @@ export default function AdminSportsPage() {
       <AdvancedTable<SportData>
         data={sports}
         columns={columns}
-        actions={actions}
         loading={loading}
         onDataLoad={handleDataLoad}
         searchable={true}

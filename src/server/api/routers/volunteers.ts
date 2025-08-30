@@ -5,11 +5,13 @@ import { createTRPCRouter } from "../trpc";
 import { volunteersAssignmentsRouter } from "./volunteers/assignments";
 import { volunteersVenueRouter } from "./volunteers/venue";
 import { volunteersVerificationRouter } from "./volunteers/verification";
+import { volunteersDashboardRouter } from "./volunteers/dashboard";
 
 export const volunteersRouter = createTRPCRouter({
   assignments: volunteersAssignmentsRouter,
   venue: volunteersVenueRouter,
   verification: volunteersVerificationRouter,
+  dashboard: volunteersDashboardRouter,
 });
 
 // Router Statistics:

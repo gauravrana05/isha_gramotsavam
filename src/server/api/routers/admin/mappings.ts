@@ -183,6 +183,7 @@ export const adminMappingsRouter = createTRPCRouter({
       eventId: z.string(),
       clusterVenueMappingId: z.string(),
       divisionVenueMappingId: z.string(),
+      state: z.string(), // Add state parameter
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
@@ -205,7 +206,12 @@ export const adminMappingsRouter = createTRPCRouter({
       }
 
       const mapping = await db.clusterDivisionMapping.create({
-        data: input,
+        data: {
+          eventId: input.eventId,
+          clusterVenueMappingId: input.clusterVenueMappingId,
+          divisionVenueMappingId: input.divisionVenueMappingId,
+          state: input.state, // Include state in database create
+        },
         include: {
           clusterVenueMapping: {
             include: { venue: true },
@@ -219,7 +225,7 @@ export const adminMappingsRouter = createTRPCRouter({
       return mapping;
     }),
 
-  // Delete Cluster Division Mappings (unchanged)
+  // Delete Cluster Division Mappings (plural - unchanged)
   deleteClusterDivisionMappings: protectedProcedure
     .input(z.object({
       mappingIds: z.array(z.string()),
@@ -236,5 +242,70 @@ export const adminMappingsRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+
+  // Delete Cluster Division Mapping (singular)
+  deleteClusterDivisionMapping: protectedProcedure
+    .input(z.object({
+      mappingIds: z.array(z.string()),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      await db.clusterDivisionMapping.deleteMany({
+        where: {
+          id: { in: input.mappingIds },
+        },
+      });
+
+      return { success: true };
+    }),
+
+  // Update Cluster Division Mapping
+  updateClusterDivisionMapping: protectedProcedure
+    .input(z.object({
+      eventId: z.string(),
+      divisionVenueMappingId: z.string(),
+      clusterVenueMappingIds: z.array(z.string()),
+      state: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      // First, delete existing mappings for this division venue
+      await db.clusterDivisionMapping.deleteMany({
+        where: {
+          eventId: input.eventId,
+          divisionVenueMappingId: input.divisionVenueMappingId,
+        },
+      });
+
+      // Then create new mappings
+      const mappings = await Promise.all(
+        input.clusterVenueMappingIds.map(clusterVenueMappingId =>
+          db.clusterDivisionMapping.create({
+            data: {
+              eventId: input.eventId,
+              divisionVenueMappingId: input.divisionVenueMappingId,
+              clusterVenueMappingId: clusterVenueMappingId,
+              state: input.state,
+            },
+            include: {
+              clusterVenueMapping: {
+                include: { venue: true },
+              },
+              divisionVenueMapping: {
+                include: { venue: true },
+              },
+            },
+          })
+        )
+      );
+
+      return mappings;
     }),
 });

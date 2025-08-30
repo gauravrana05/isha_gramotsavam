@@ -60,7 +60,7 @@ export const handleRedirect = async (user: User, lang: string, router: AppRouter
       if (role === 'general_volunteer' || role === 'technical_volunteer') {
         const venueId = await getVolunteerVenueRedirect(user.id);
         if (venueId) {
-          router.push(`/${lang}/volunteer/venues/${venueId}`);
+          router.push(`/${lang}/volunteer/venues/${venueId}/dashboard`);
           return;
         }
       }
@@ -121,13 +121,16 @@ export const useRedirect = (allowedRoles?: string[]) => {
         return;
       }
       
-      // Special handling for volunteers: redirect to an assigned venue
+      // Special handling for volunteers: redirect to an assigned venue dashboard
       if ((role === 'general_volunteer' || role === 'technical_volunteer') && assignmentsData?.assignments) {
         if (assignmentsData.assignments.length > 0) {
-          // Redirect to the first assigned venue
+          // Extract venue ID from first assignment and redirect to venue dashboard
           const firstAssignment = assignmentsData.assignments[0];
-          router.push(`/${lang}/volunteer/venues/${firstAssignment.venueId}`);
-          return;
+          const venueId = firstAssignment.venueLocationMapping?.venue?.id;
+          if (venueId) {
+            router.push(`/${lang}/volunteer/venues/${venueId}/dashboard`);
+            return;
+          }
         } 
         // If there are no assignments, we do NOT redirect.
         // The component (VolunteerMainPage) will handle rendering the "no assignments" message.

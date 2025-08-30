@@ -75,7 +75,7 @@ model Event {
   teamVenueAssignments  TeamVenueAssignment[]
   teams                 Team[]
   userRoles             UserRoleAssignment[]
-  venueLocationMappings VenueLevelMapping[]
+  venueLevelMappings VenueLevelMapping[]
   volunteerAssignments  VolunteerAssignment[]
 
   @@map("events")
@@ -144,7 +144,7 @@ model Fixture {
   name                   String @db.VarChar(200)
   eventId                String? @db.Uuid @map("event_id")
   sportId                String @db.Uuid @map("sport_id")
-  venueLocationMappingId String @db.Uuid @map("venue_location_mapping_id")
+  venueLevelMappingId String @db.Uuid @map("venue_level_mapping_id")
   genderCategory         GenderCategory @map("gender_category")
   level                  TournamentLevel
   status                 FixtureStatus @default(draft)
@@ -157,10 +157,10 @@ model Fixture {
 
   event                Event? @relation(fields: [eventId], references: [id])
   sport                Sport @relation(fields: [sportId], references: [id])
-  venueLocationMapping VenueLevelMapping @relation(fields: [venueLocationMappingId], references: [id])
+  venueLevelMapping VenueLevelMapping @relation(fields: [venueLevelMappingId], references: [id])
   matches              Match[]
 
-  @@index([eventId, sportId, venueLocationMappingId, genderCategory, level])
+  @@index([eventId, sportId, venueLevelMappingId, genderCategory, level])
   @@map("fixtures")
 }
 
@@ -169,7 +169,7 @@ model Match {
   fixtureId              String @db.Uuid @map("fixture_id")
   eventId                String? @db.Uuid @map("event_id")
   sportId                String @db.Uuid @map("sport_id")
-  venueLocationMappingId String @db.Uuid @map("venue_location_mapping_id")
+  venueLevelMappingId String @db.Uuid @map("venue_level_mapping_id")
   genderCategory         GenderCategory @map("gender_category")
   roundName              String @db.VarChar(100) @map("round_name")
   matchNumber            Int @map("match_number")
@@ -201,7 +201,7 @@ model Match {
   event                Event? @relation(fields: [eventId], references: [id])
   fixture              Fixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
   sport                Sport @relation(fields: [sportId], references: [id])
-  venueLocationMapping VenueLevelMapping @relation(fields: [venueLocationMappingId], references: [id])
+  venueLevelMapping VenueLevelMapping @relation(fields: [venueLevelMappingId], references: [id])
   team1                Team? @relation("MatchTeam1", fields: [team1Id], references: [id])
   team2                Team? @relation("MatchTeam2", fields: [team2Id], references: [id])
   winner               Team? @relation("MatchWinner", fields: [winnerId], references: [id])
@@ -214,7 +214,7 @@ model Match {
   @@index([fixtureId])
   @@index([eventId])
   @@index([sportId])
-  @@index([venueLocationMappingId])
+  @@index([venueLevelMappingId])
   @@index([team1Id])
   @@index([team2Id])
   @@index([winnerId])
@@ -333,7 +333,7 @@ model LocationClusterMapping {
   deletedAt             DateTime? @db.Timestamptz(6) @map("deleted_at")
 
   // Relations
-  venueLocationMapping VenueLevelMapping @relation(fields: [clusterVenueMappingId], references: [id], onDelete: Cascade)
+  venueLevelMapping VenueLevelMapping @relation(fields: [clusterVenueMappingId], references: [id], onDelete: Cascade)
   event                Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, locationType, locationName, state, district])
@@ -466,7 +466,7 @@ model Team {
   verifiedByUser               User? @relation("TeamsVerifiedBy", fields: [verifiedBy], references: [id])
   event                        Event? @relation(fields: [eventId], references: [id])
   sport                        Sport @relation(fields: [sportId], references: [id])
-  venueLocationMapping         VenueLevelMapping? @relation(fields: [tournamentNumberVenueMappingId], references: [id])
+  venueLevelMapping         VenueLevelMapping? @relation(fields: [tournamentNumberVenueMappingId], references: [id])
 
   @@index([eventId])
   @@index([sportId])
@@ -631,7 +631,7 @@ model VolunteerAssignment {
 
   eventId                String @map("event_id") @db.Uuid
   volunteerId            String @map("volunteer_id") @db.Uuid
-  venueLocationMappingId String @map("venue_location_mapping_id") @db.Uuid
+  venueLevelMappingId    String @map("venue_level_mapping_id") @db.Uuid
 
   volunteerType          VolunteerType @map("volunteer_type")
   contactPhone           String? @map("contact_phone") @db.VarChar(20)
@@ -648,15 +648,15 @@ model VolunteerAssignment {
   assignedByUser       User @relation("VolunteerAssignmentsAssignedBy", fields: [assignedBy], references: [id])
   volunteerUser        User @relation("VolunteerAssignmentsAsVolunteer", fields: [volunteerId], references: [id], onDelete: Cascade)
   event                Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  venueLocationMapping VenueLevelMapping @relation(fields: [venueLocationMappingId], references: [id], onDelete: Cascade)
+  venueLevelMapping    VenueLevelMapping @relation(fields: [venueLevelMappingId], references: [id], onDelete: Cascade)
 
   // Composite uniqueness
-  @@unique([eventId, volunteerId, venueLocationMappingId], map: "volunteer_assignments_unique")
+  @@unique([eventId, volunteerId, venueLevelMappingId], map: "volunteer_assignments_unique")
 
   // Useful indexes
   @@index([eventId], map: "idx_volunteer_assignments_event_id")
   @@index([volunteerId], map: "idx_volunteer_assignments_volunteer_id")
-  @@index([venueLocationMappingId], map: "idx_volunteer_assignments_venue_location_mapping_id")
+  @@index([venueLevelMappingId], map: "idx_volunteer_assignments_venue_level_mapping_id")
   @@index([assignedBy], map: "idx_volunteer_assignments_assigned_by")
   @@index([status], map: "idx_volunteer_assignments_status")
   @@index([deletedAt], map: "idx_volunteer_assignments_deleted_at")

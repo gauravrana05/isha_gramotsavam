@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/config';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+// import { db } from '@/lib/firebase/config';
+// import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { 
   ArrowLeft,
   User,

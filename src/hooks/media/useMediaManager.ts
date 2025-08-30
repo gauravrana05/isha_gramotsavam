@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, getDoc, deleteDoc, updateDoc, DocumentSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+// import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, getDoc, deleteDoc, updateDoc, DocumentSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/db';
 import { clientMediaUploadService } from '@/lib/services/clientMediaService';
 import { MediaItem, MediaFilter } from '@/lib/types/media';
 

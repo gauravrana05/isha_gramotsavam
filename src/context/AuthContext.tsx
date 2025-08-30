@@ -2,10 +2,12 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { users } from "@prisma/client";
+import { api } from "@/server/trpc/react";
 
 interface AuthContextType {
   user: users | null;
   userProfile: users | null; // Keep backward compatibility 
+  profileImage: string | null;
   loading: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
@@ -19,6 +21,19 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<users | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Fetch profile image data using tRPC
+  const profileImageQuery = api.profile.checkCompletion.useQuery(
+    { userId: user?.id || '' },
+    { 
+      enabled: !!user?.id,
+      staleTime: 10 * 60 * 1000,
+      cacheTime: 15 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+    }
+  );
 
   const login = useCallback(async () => {
     setLoading(true);
@@ -192,6 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value: AuthContextType = {
     user,
     userProfile: user, // Backward compatibility - same as user
+    profileImage: profileImageQuery.data?.userProfileImages?.profilePhotoPath || null,
     loading,
     login,
     logout,
@@ -214,6 +230,7 @@ export const useAuth = () => {
     return {
       user: null,
       userProfile: null,
+      profileImage: null,
       loading: false,
       login: async () => {
         const response = await fetch('/api/auth/login', { method: 'POST' });

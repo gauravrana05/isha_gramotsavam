@@ -29,7 +29,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { api } from '@/server/trpc/react';
 
 interface AdminSidebarProps {
   className?: string;
@@ -56,21 +55,8 @@ export default function AdminSidebar({
   
   const pathname = usePathname();
   const { lang } = useParams();
-  const { user, userProfile, logout } = useAuth();
+  const { user, userProfile, profileImage, logout } = useAuth();
   const router = useRouter();
-
-  // Fetch profile image data
-  const profileImageQuery = api.profile.checkCompletion.useQuery(
-    { userId: user?.id || '' },
-    { 
-      enabled: !!user?.id,
-      staleTime: 10 * 60 * 1000,
-      cacheTime: 15 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      refetchOnMount: false,
-    }
-  );
 
   // Handle content visibility delay for smooth animations
   useEffect(() => {
@@ -266,7 +252,7 @@ export default function AdminSidebar({
         fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
         lg:translate-x-0 lg:fixed lg:top-0 lg:bottom-0 lg:flex-shrink-0 lg:transition-[width] lg:duration-300 lg:ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${isDesktopCollapsed ? 'lg:w-20' : 'lg:w-80'} w-80
+        ${isDesktopCollapsed ? 'lg:w-16' : 'lg:w-64'} w-64
         ${className}
       `}>
         <div className="flex flex-col h-full">
@@ -320,9 +306,9 @@ export default function AdminSidebar({
               isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
             }`}>
               <div className="flex items-center">
-                {profileImageQuery.data?.userProfileImages?.profilePhotoPath ? (
+                {profileImage ? (
                   <img 
-                    src={profileImageQuery.data.userProfileImages.profilePhotoPath} 
+                    src={profileImage} 
                     alt={`${userProfile.firstName} ${userProfile.lastName}`}
                     className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                   />
@@ -346,7 +332,7 @@ export default function AdminSidebar({
           )}
 
           {/* Navigation */}
-          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+          <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-none hover:scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {navigation.map(item => renderNavItem(item))}
           </nav>
 

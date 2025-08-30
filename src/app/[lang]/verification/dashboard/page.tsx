@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Image from "next/image";
-import { Users, Loader2, AlertCircle, Search, Filter, CheckCircle, Clock, X, Eye } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useNotification } from "@/context/NotificationContext";
 import { api } from "@/server/trpc/react";
+import { AdvancedTable } from "@/components/ui/AdvancedTable";
+import { EnhancedModal } from "@/components/ui/EnhancedModal";
+import { SingleStatCard } from "@/components/ui";
+import type { Column, ActionButton } from "@/components/ui/Table";
+import { Users, Loader2, AlertCircle, Search, Filter, CheckCircle, Clock, X, Eye, FileCheck, UserCheck, Shield, TrendingUp } from "lucide-react";
 
 interface TeamData {
   id: string;
@@ -22,31 +27,51 @@ interface TeamData {
   status: string;
   submittedAt: any;
   genderCategory: string;
+  verificationStatus?: string;
+  pendingPlayersCount?: number;
+  verifiedPlayersCount?: number;
+}
+
+interface QuickActionData {
+  id: string;
+  title: string;
+  description: string;
+  href: string;
+  icon: any;
+  color: string;
+  count?: number;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 export default function VerificationDashboardPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-
   const router = useRouter();
   const { lang } = useParams();
+  const { user, userProfile, loading: authLoading } = useAuth();
+  const { addNotification } = useNotification();
 
-  const { data: userProfile, isLoading: userProfileLoading, error: userProfileError } = api.users.getVerificationProfile.useQuery();
+  // State management
+  const [selectedTeams, setSelectedTeams] = useState<Set<string | number>>(new Set());
+  const [showQuickVerifyModal, setShowQuickVerifyModal] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<TeamData | null>(null);
 
-  const { data: teamsData, isLoading: teamsLoading, error: teamsError } = api.teams.verification.getForVerification.useQuery(
-    {
-      searchTerm,
-      statusFilter,
-    },
-    {
-      enabled: !!userProfile, // Only fetch teams if user profile is loaded
-    }
+  // Enhanced tRPC queries for dashboard
+  const { data: dashboardStats, isLoading: statsLoading, error: statsError } = api.verification.dashboard.getStats.useQuery(
+    undefined,
+    { enabled: !authLoading && !!user && ['admin', 'verification_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
   );
 
-  const teams = teamsData?.teams || [];
-  const filteredTeams = teamsData?.filteredTeams || [];
-  const loading = userProfileLoading || teamsLoading;
-  const error = userProfileError || teamsError;
+  const { data: recentActivity, isLoading: recentActivityLoading, error: recentActivityError } = api.verification.dashboard.getRecentActivity.useQuery(
+    undefined,
+    { enabled: !authLoading && !!user && ['admin', 'verification_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
+  );
+
+  const { data: quickActions, isLoading: quickActionsLoading } = api.verification.dashboard.getQuickActions.useQuery(
+    undefined,
+    { enabled: !authLoading && !!user && ['admin', 'verification_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
+  );
+
+  const loading = authLoading || statsLoading || recentActivityLoading;
+  const error = statsError || recentActivityError;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -56,6 +81,8 @@ export default function VerificationDashboardPage() {
         return 'bg-red-100 text-red-800';
       case 'partial_verification':
         return 'bg-yellow-100 text-yellow-800';
+      case 'pending':
+        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -69,6 +96,8 @@ export default function VerificationDashboardPage() {
         return <X className="w-4 h-4" />;
       case 'partial_verification':
         return <Clock className="w-4 h-4" />;
+      case 'pending':
+        return <Clock className="w-4 h-4" />;
       default:
         return <Clock className="w-4 h-4" />;
     }
@@ -76,7 +105,7 @@ export default function VerificationDashboardPage() {
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return 'Unknown';
-    const date = new Date(timestamp); // Assuming timestamp is already a valid date string or number
+    const date = new Date(timestamp);
     return date.toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -84,262 +113,450 @@ export default function VerificationDashboardPage() {
     });
   };
 
+  // Stats calculations
+  const stats = useMemo(() => {
+    if (!dashboardStats) return null;
+    
+    return {
+      totalTeams: dashboardStats.totalTeams || 0,
+      pendingVerification: dashboardStats.pendingVerification || 0,
+      verifiedTeams: dashboardStats.verifiedTeams || 0,
+      rejectedTeams: dashboardStats.rejectedTeams || 0,
+      totalPlayers: dashboardStats.totalPlayers || 0,
+      pendingPlayers: dashboardStats.pendingPlayers || 0,
+      verifiedPlayers: dashboardStats.verifiedPlayers || 0,
+      todayVerifications: dashboardStats.todayVerifications || 0
+    };
+  }, [dashboardStats]);
+
+  // Quick actions data
+  const quickActionsData = useMemo<QuickActionData[]>(() => [
+    {
+      id: 'teams',
+      title: 'Team Verification',
+      description: 'Review and verify team registrations',
+      href: `/${lang}/verification/teams`,
+      icon: Users,
+      color: 'from-blue-50 to-blue-100 border-blue-200',
+      count: stats?.pendingVerification || 0,
+      priority: 'high'
+    },
+    {
+      id: 'players',
+      title: 'Player Documents',
+      description: 'Verify player documents and eligibility',
+      href: `/${lang}/verification/players`,
+      icon: FileCheck,
+      color: 'from-green-50 to-green-100 border-green-200',
+      count: stats?.pendingPlayers || 0,
+      priority: 'high'
+    },
+    {
+      id: 'reports',
+      title: 'Verification Reports',
+      description: 'View verification statistics and reports',
+      href: `/${lang}/verification/reports`,
+      icon: TrendingUp,
+      color: 'from-purple-50 to-purple-100 border-purple-200',
+      count: 0,
+      priority: 'medium'
+    },
+    {
+      id: 'settings',
+      title: 'Verification Settings',
+      description: 'Configure verification parameters',
+      href: `/${lang}/verification/settings`,
+      icon: Shield,
+      color: 'from-orange-50 to-orange-100 border-orange-200',
+      count: 0,
+      priority: 'low'
+    }
+  ], [lang, stats]);
+
+  // Recent teams table columns
+  const recentActivityColumns = useMemo<Column<TeamData>[]>(() => [
+    {
+      key: 'name',
+      header: 'Team',
+      sortable: true,
+      render: (_, team) => (
+        <div className="flex items-center space-x-3">
+          <div className={`p-2 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200`}>
+            <Users className="w-4 h-4 text-blue-600" />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-900">{team.name}</div>
+            <div className="text-sm text-gray-600">{team.sportName} • {team.genderCategory}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'captain',
+      header: 'Captain',
+      render: (_, team) => (
+        <div className="text-sm">
+          <div className="text-gray-900">{team.captainProfile.name}</div>
+          <div className="text-gray-600">+91 {team.captainProfile.phone}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'progress',
+      header: 'Progress',
+      render: (_, team) => (
+        <div className="text-center">
+          <div className="text-sm font-medium text-gray-900">
+            {team.verifiedPlayersCount || 0}/{team.currentPlayers || 0}
+          </div>
+          <div className="text-xs text-gray-500">verified</div>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      render: (_, team) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(team.verificationStatus || team.status)}`}>
+          {getStatusIcon(team.verificationStatus || team.status)}
+          <span className="ml-1 capitalize">{(team.verificationStatus || team.status).replace('_', ' ')}</span>
+        </span>
+      ),
+    },
+  ], []);
+
+  // Recent teams actions
+  const recentActivityActions = useMemo<ActionButton<TeamData>[]>(() => [
+    {
+      label: 'Verify',
+      icon: UserCheck,
+      onClick: (team) => router.push(`/${lang}/verification/teams/${team.id}`),
+      variant: 'primary',
+    },
+    {
+      label: 'View Details',
+      icon: Eye,
+      onClick: (team) => {
+        setSelectedTeam(team);
+        setShowQuickVerifyModal(true);
+      },
+      variant: 'secondary',
+    }
+  ], [router, lang]);
+
+  // Quick actions table columns  
+  const quickActionColumns = useMemo<Column<QuickActionData>[]>(() => [
+    {
+      key: 'title',
+      header: 'Action',
+      sortable: true,
+      render: (_, action) => (
+        <div className="flex items-center space-x-3">
+          <div className={`p-2 rounded-lg bg-gradient-to-r ${action.color}`}>
+            <action.icon className="w-5 h-5 text-gray-600" />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-900">{action.title}</div>
+            <div className="text-sm text-gray-600">{action.description}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'count',
+      header: 'Pending',
+      sortable: true,
+      render: (_, action) => (
+        <div className="text-center">
+          <div className="text-lg font-bold text-gray-900">{action.count || 0}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'priority',
+      header: 'Priority',
+      sortable: true,
+      render: (_, action) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          action.priority === 'high' ? 'bg-red-100 text-red-800' :
+          action.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+          'bg-gray-100 text-gray-800'
+        }`}>
+          {action.priority?.charAt(0).toUpperCase() + action.priority?.slice(1)}
+        </span>
+      ),
+    }
+  ], []);
+
+  // Quick actions table actions
+  const quickActionActions = useMemo<ActionButton<QuickActionData>[]>(() => [
+    {
+      label: 'Open',
+      icon: Eye,
+      onClick: (action) => router.push(action.href),
+      variant: 'primary',
+    }
+  ], [router]);
+
+  // Handle quick action row click
+  const handleQuickActionClick = (action: QuickActionData) => {
+    router.push(action.href);
+  };
+
+  // Handle recent team row click
+  const handleRecentTeamClick = (team: TeamData) => {
+    router.push(`/${lang}/verification/teams/${team.id}`);
+  };
+
   if (loading) {
     return (
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#CE4520]" />
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
+          <p className="text-gray-600">Loading verification dashboard...</p>
+        </div>
       </div>
     );
   }
 
-  if (error || !userProfile) {
+  if (error || !user || !['admin', 'verification_volunteer', 'technical_volunteer'].includes(userProfile?.role || '')) {
     return (
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-4">
-            {error?.message || "You don&apos;t have permission to access this page."}
+            {error?.message || "You don't have permission to access this page."}
           </p>
           <button 
-            onClick={() => router.push(`/${lang}/player/dashboard`)}
-            className="bg-[#CE4520] text-white px-6 py-2 rounded-lg hover:bg-[#1565C0] transition-colors"
+            onClick={() => router.push(`/${lang}/login`)}
+            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
-            Go to Dashboard
+            Go to Login
           </button>
         </div>
       </div>
     );
   }
 
-  const stats = {
-    total: teams.length,
-    pending: teams.filter(t => t.status === 'submitted' || t.status === 'pending').length,
-    verified: teams.filter(t => t.status === 'verified').length,
-    rejected: teams.filter(t => t.status === 'rejected').length,
-    partial: teams.filter(t => t.status === 'partial_verification').length
-  };
-
   return (
-    <div className="lg:min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* Header */}
-        <div className="text-center mb-6 sm:mb-8">
-          <div className="mb-3 sm:mb-4">
-            <Image 
-              src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" 
-              alt="Isha Logo" 
-              width={60} 
-              height={60} 
-              className="mx-auto sm:w-20 sm:h-20"
-            />
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
-            Team Verification
-          </h1>
-          <p className="text-sm sm:text-base text-gray-600 font-fira">
-            Review and verify team registrations
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
+          Verification Dashboard
+        </h1>
+        <p className="text-sm sm:text-base text-gray-600 font-fira">
+          Team and player verification management center
+        </p>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Total</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{stats.total}</p>
-              </div>
-              <Users className="w-8 h-8 text-gray-400" />
-            </div>
-          </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <SingleStatCard
+          stat={{
+            label: "Total Teams",
+            value: stats?.totalTeams || 0,
+            icon: Users,
+            onClick: () => router.push(`/${lang}/verification/teams`)
+          }}
+          showShadow={true}
+        />
+        
+        <SingleStatCard
+          stat={{
+            label: "Pending Verification",
+            value: stats?.pendingVerification || 0,
+            icon: Clock,
+            color: "warning",
+            onClick: () => router.push(`/${lang}/verification/teams?status=pending`)
+          }}
+          showShadow={true}
+        />
+        
+        <SingleStatCard
+          stat={{
+            label: "Verified",
+            value: stats?.verifiedTeams || 0,
+            icon: CheckCircle,
+            color: "success",
+            onClick: () => router.push(`/${lang}/verification/teams?status=verified`)
+          }}
+          showShadow={true}
+        />
+        
+        <SingleStatCard
+          stat={{
+            label: "Today's Verifications",
+            value: stats?.todayVerifications || 0,
+            icon: TrendingUp,
+            color: "info",
+            onClick: () => router.push(`/${lang}/verification/reports?period=today`)
+          }}
+          showShadow={true}
+        />
+      </div>
+
+      {/* Quick Actions Table */}
+      <AdvancedTable<QuickActionData>
+        data={quickActionsData}
+        columns={quickActionColumns}
+        actions={quickActionActions}
+        loading={false}
+        searchable={false}
+        filterable={false}
+        sortable={false}
+        selectable={false}
+        onRowClick={handleQuickActionClick}
+        keyExtractor={(action) => action.id}
+        headerActions={
+          <button
+            onClick={() => router.push(`/${lang}/verification/profile`)}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+          >
+            <UserCheck className="w-4 h-4 mr-2" />
+            My Profile
+          </button>
+        }
+        emptyState={{
+          icon: Shield,
+          title: 'No actions available',
+          description: 'Verification actions will appear here.'
+        }}
+        pagination={{ enabled: false }}
+        persistState={false}
+      />
+
+      {/* Recent Teams Table */}
+      {recentActivity && recentActivity.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <Users className="w-5 h-5 mr-2 text-[#F28C38]" />
+            Recent Submissions
+          </h2>
           
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-              </div>
-              <Clock className="w-8 h-8 text-yellow-400" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Verified</p>
-                <p className="text-2xl font-bold text-green-600">{stats.verified}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-400" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Rejected</p>
-                <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
-              </div>
-              <X className="w-8 h-8 text-red-400" />
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Partial</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.partial}</p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-orange-400" />
-            </div>
-          </div>
-        </div>
-
-        {/* Search and Filter */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Search teams, captains, or locations..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38]"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="sm:w-48">
-              <div className="relative">
-                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <select
-                  className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#F28C38] focus:border-[#F28C38] appearance-none bg-white"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="verified">Verified</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="partial">Partial</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Teams Table - Desktop */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden hidden md:block">
-          <div className="overflow-x-auto">
-            <table className="w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sport</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Captain</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Players</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTeams.map((team) => (
-                  <tr key={team.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{team.name}</div>
-                      <div className="text-xs text-gray-500 capitalize">{team.genderCategory}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {team.sportName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{team.captainProfile.name}</div>
-                      <div className="text-xs text-gray-500">{team.captainProfile.phone}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{team.panchayat}</div>
-                      <div className="text-xs text-gray-500">{team.district}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {team.currentPlayers}/{team.maxPlayers}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(team.status)}`}>
-                        {getStatusIcon(team.status)}
-                        <span className="ml-1 capitalize">{team.status.replace('_', ' ')}</span>
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(team.submittedAt)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => router.push(`/${lang}/verification/teams/${team.id}`)}
-                        className="text-[#F28C38] hover:text-[#E67A26] font-medium text-sm flex items-center"
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                        Review
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Teams Cards - Mobile */}
-        <div className="md:hidden space-y-4">
-          {filteredTeams.map((team) => (
-            <div key={team.id} className="bg-white rounded-lg shadow-sm p-4">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{team.name}</h3>
-                  <p className="text-sm text-gray-600">{team.sportName} • {team.genderCategory}</p>
-                </div>
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(team.status)}`}>
-                  {getStatusIcon(team.status)}
-                  <span className="ml-1 capitalize">{team.status.replace('_', ' ')}</span>
-                </span>
-              </div>
-
-              <div className="space-y-2 text-sm text-gray-600 mb-4">
-                <div><strong>Captain:</strong> {team.captainProfile.name}</div>
-                <div><strong>Location:</strong> {team.panchayat}, {team.district}</div>
-                <div><strong>Players:</strong> {team.currentPlayers}/{team.maxPlayers}</div>
-                <div><strong>Submitted:</strong> {formatDate(team.submittedAt)}</div>
-              </div>
-
+          <AdvancedTable<TeamData>
+            data={recentActivity}
+            columns={recentActivityColumns}
+            actions={recentActivityActions}
+            loading={recentActivityLoading}
+            searchable={true}
+            searchPlaceholder="Search teams..."
+            filterable={true}
+            filters={[
+              {
+                key: 'status',
+                label: 'Status',
+                type: 'select',
+                options: [
+                  { label: 'All', value: '' },
+                  { label: 'Pending', value: 'pending' },
+                  { label: 'Verified', value: 'verified' },
+                  { label: 'Rejected', value: 'rejected' }
+                ]
+              }
+            ]}
+            sortable={true}
+            selectable={true}
+            selectedRows={selectedTeams}
+            onSelectionChange={setSelectedTeams}
+            onRowClick={handleRecentTeamClick}
+            keyExtractor={(team) => team.id}
+            headerActions={
               <button
-                onClick={() => router.push(`/${lang}/verification/teams/${team.id}`)}
-                className="w-full bg-[#F28C38] hover:bg-[#E67A26] text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
+                onClick={() => router.push(`/${lang}/verification/teams`)}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26]"
               >
                 <Eye className="w-4 h-4 mr-2" />
-                Review Team
+                View All Teams
               </button>
-            </div>
-          ))}
+            }
+            emptyState={{
+              icon: Users,
+              title: 'No recent teams',
+              description: 'Recent team submissions will appear here.'
+            }}
+            pagination={{ enabled: true, pageSize: 5 }}
+            persistState={false}
+          />
         </div>
+      )}
 
-        {/* Empty State */}
-        {filteredTeams.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 font-fira mb-2">
-              No teams found
-            </h3>
-            <p className="text-gray-600 font-fira">
-              {searchTerm || statusFilter !== 'all' 
-                ? "Try adjusting your search or filter criteria."
-                : "No teams have been submitted for verification yet."
-              }
-            </p>
+      {/* Team Detail Quick Modal */}
+      <EnhancedModal
+        isOpen={showQuickVerifyModal}
+        onClose={() => {
+          setShowQuickVerifyModal(false);
+          setSelectedTeam(null);
+        }}
+        title="Quick Team Review"
+        subtitle={selectedTeam ? `${selectedTeam.name} - ${selectedTeam.sportName}` : undefined}
+        size="lg"
+        mobileFullScreen={true}
+        scrollableBody={true}
+        footer={
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <button
+              onClick={() => {
+                if (selectedTeam) {
+                  router.push(`/${lang}/verification/teams/${selectedTeam.id}`);
+                }
+              }}
+              className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] hover:bg-[#E67A26] text-white rounded-lg font-medium py-2 text-sm transition-colors flex items-center justify-center"
+            >
+              <UserCheck className="w-4 h-4 mr-2" />
+              Full Verification
+            </button>
+            <button
+              onClick={() => {
+                setShowQuickVerifyModal(false);
+                setSelectedTeam(null);
+              }}
+              className="flex-1 sm:flex-initial sm:px-4 text-gray-700 border border-gray-300 hover:bg-gray-50 rounded-lg font-medium py-2 text-sm transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        {selectedTeam && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Team Overview</h3>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span className="font-medium">Captain:</span>
+                  <span>{selectedTeam.captainProfile.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Phone:</span>
+                  <span>+91 {selectedTeam.captainProfile.phone}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Location:</span>
+                  <span>{selectedTeam.panchayat}, {selectedTeam.district}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Players:</span>
+                  <span>{selectedTeam.currentPlayers}/{selectedTeam.maxPlayers}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Verified:</span>
+                  <span>{selectedTeam.verifiedPlayersCount || 0}/{selectedTeam.currentPlayers || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Status:</span>
+                  <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusColor(selectedTeam.verificationStatus || selectedTeam.status)}`}>
+                    {getStatusIcon(selectedTeam.verificationStatus || selectedTeam.status)}
+                    <span className="ml-1 capitalize">{(selectedTeam.verificationStatus || selectedTeam.status).replace('_', ' ')}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
-      </div>
+      </EnhancedModal>
     </div>
   );
 }

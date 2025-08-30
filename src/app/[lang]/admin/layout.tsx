@@ -32,7 +32,7 @@ export default function AdminLayout({
         onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
       />
       <div className={`flex flex-col lg:min-h-screen ${
-        isDesktopSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80'
+        isDesktopSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
       } transition-[margin] duration-300 ease-in-out`}>
         <div className="lg:hidden h-16"></div>
         <main className="flex-1 overflow-auto">

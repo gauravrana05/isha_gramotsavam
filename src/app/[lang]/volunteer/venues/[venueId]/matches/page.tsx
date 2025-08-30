@@ -1,9 +1,14 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { api } from '@/server/trpc/react';
 import { useAuth } from '@/context/AuthContext';
+import { useNotification } from '@/context/NotificationContext';
 import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { AdvancedTable } from '@/components/ui/AdvancedTable';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
+import type { Column, ActionButton } from '@/components/ui/Table';
 import { 
   ArrowLeft,
   Trophy,
@@ -15,16 +20,41 @@ import {
   Calendar,
   Target,
   Camera,
-  Edit
+  Edit,
+  Loader2
 } from 'lucide-react';
+
+interface MatchData {
+  id: string;
+  roundName: string;
+  status: string;
+  team1Name: string;
+  team2Name: string;
+  team1Score?: number;
+  team2Score?: number;
+  scheduledTime?: string;
+  actualStartTime?: string;
+  completedTime?: string;
+  fixtureId?: string;
+  fixtureName?: string;
+}
 
 export default function MatchesPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const { addNotification } = useNotification();
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   
   const venueId = params?.venueId as string;
+  const lang = params?.lang as string;
   const fixtureId = searchParams?.get('fixture') || undefined;
+
+  // State management
+  const [selectedMatches, setSelectedMatches] = useState<Set<string | number>>(new Set());
+  const [showMatchModal, setShowMatchModal] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<MatchData | null>(null);
+  const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
 
   // Get matches using tRPC
   const { data: matches = [], isLoading: matchesLoading, error: matchesError } = api.volunteers.venue.getVenueMatches.useQuery(
@@ -94,26 +124,145 @@ export default function MatchesPage() {
     }
   };
 
-  // Group matches by round
-  const matchesByRound = (matches || []).reduce((acc, match) => {
-    const round = match.roundName;
-    if (!acc[round]) {
-      acc[round] = [];
+  // Table columns configuration
+  const matchColumns = useMemo<Column<MatchData>[]>(() => [
+    {
+      key: 'round',
+      header: 'Round',
+      sortable: true,
+      render: (_, match) => (
+        <div className="flex items-center">
+          <Trophy className="w-4 h-4 text-gray-400 mr-2" />
+          <span className="font-medium text-gray-900">{match.roundName}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'teams',
+      header: 'Match',
+      render: (_, match) => (
+        <div className="text-sm">
+          <div className="font-medium text-gray-900">
+            {match.team1Name} vs {match.team2Name}
+          </div>
+          {match.fixtureName && (
+            <div className="text-gray-500 text-xs mt-1">{match.fixtureName}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'score',
+      header: 'Score',
+      render: (_, match) => (
+        <div className="text-center">
+          {match.status === 'completed' && (match.team1Score !== undefined && match.team2Score !== undefined) ? (
+            <div className="font-mono font-bold text-gray-900">
+              {match.team1Score} - {match.team2Score}
+            </div>
+          ) : (
+            <div className="text-gray-400 text-sm">-</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      render: (_, match) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(match.status)}`}>
+          {getStatusIcon(match.status)}
+          <span className="ml-1 capitalize">{match.status.replace('_', ' ')}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'time',
+      header: 'Time',
+      render: (_, match) => (
+        <div className="text-sm text-gray-600">
+          {match.status === 'completed' && match.completedTime ? (
+            <>Completed<br /><span className="text-xs">{new Date(match.completedTime).toLocaleTimeString()}</span></>
+          ) : match.status === 'in_progress' && match.actualStartTime ? (
+            <>Started<br /><span className="text-xs">{new Date(match.actualStartTime).toLocaleTimeString()}</span></>
+          ) : match.scheduledTime ? (
+            <>Scheduled<br /><span className="text-xs">{new Date(match.scheduledTime).toLocaleTimeString()}</span></>
+          ) : (
+            <span className="text-gray-400">Not scheduled</span>
+          )}
+        </div>
+      ),
     }
-    acc[round].push(match);
-    return acc;
-  }, {} as Record<string, any[]>);
+  ], []);
 
-  // Sort rounds in proper tournament order
-  const roundOrder = ['Final', 'Semi Final', 'Quarter Final', 'Round of 16', 'Round of 32', 'Round of 64'];
-  const sortedRounds = Object.keys(matchesByRound).sort((a, b) => {
-    const aIndex = roundOrder.indexOf(a);
-    const bIndex = roundOrder.indexOf(b);
-    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-    if (aIndex === -1) return 1;
-    if (bIndex === -1) return -1;
-    return aIndex - bIndex;
-  });
+  // Table actions
+  const matchActions = useMemo<ActionButton<MatchData>[]>(() => [
+    {
+      label: 'Manage',
+      icon: Edit,
+      onClick: (match) => router.push(`/${lang}/volunteer/venues/${venueId}/matches/${match.id}`),
+      variant: 'secondary',
+    },
+    {
+      label: 'Score',
+      icon: Target,
+      onClick: (match) => router.push(`/${lang}/volunteer/venues/${venueId}/matches/${match.id}/scoring`),
+      variant: 'primary',
+      show: (match) => match.status === 'ready' || match.status === 'in_progress'
+    },
+    {
+      label: 'Media',
+      icon: Camera,
+      onClick: (match) => router.push(`/${lang}/volunteer/venues/${venueId}/media/upload?matchId=${match.id}`),
+      variant: 'secondary'
+    }
+  ], [router, lang, venueId]);
+
+  // Filter configuration
+  const matchFilters = useMemo(() => [
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select' as const,
+      options: [
+        { label: 'All', value: '' },
+        { label: 'Scheduled', value: 'scheduled' },
+        { label: 'Ready', value: 'ready' },
+        { label: 'In Progress', value: 'in_progress' },
+        { label: 'Completed', value: 'completed' }
+      ]
+    },
+    {
+      key: 'round',
+      label: 'Round',
+      type: 'select' as const,
+      options: [
+        { label: 'All Rounds', value: '' },
+        ...Array.from(new Set((matches || []).map(m => m.roundName))).map(round => ({
+          label: round,
+          value: round
+        }))
+      ]
+    }
+  ], [matches]);
+
+  // Header actions
+  const getHeaderActions = () => (
+    <button
+      onClick={() => setShowBulkUpdateModal(true)}
+      className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+    >
+      <Edit className="w-4 h-4 mr-2" />
+      Bulk Update
+    </button>
+  );
+
+  // Handle match row click
+  const handleMatchClick = (match: MatchData) => {
+    setSelectedMatch(match);
+    setShowMatchModal(true);
+  };
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -121,7 +270,7 @@ export default function MatchesPage() {
       <div className="mb-6">
         <div className="flex items-center mb-4">
           <Link 
-            href={fixtureId ? `/en/volunteer/venues/${venueId}/fixtures/${fixtureId}` : `/en/volunteer/venues/${venueId}/fixtures`} 
+            href={fixtureId ? `/${lang}/volunteer/venues/${venueId}/fixtures/${fixtureId}` : `/${lang}/volunteer/venues/${venueId}/fixtures`} 
             className="text-[#F28C38] hover:text-[#E67A26] flex items-center mr-4"
           >
             <ArrowLeft className="w-5 h-5 mr-1" />
@@ -149,183 +298,161 @@ export default function MatchesPage() {
                 </p>
               </div>
             </div>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(fixture.status)}`}>
-              {getStatusIcon(fixture.status)}
-              <span className="ml-1 capitalize">{fixture.status.replace('_', ' ')}</span>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(fixture.status || '')}`}>
+              {getStatusIcon(fixture.status || '')}
+              <span className="ml-1 capitalize">{(fixture.status || '').replace('_', ' ')}</span>
             </span>
           </div>
         </div>
       )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg p-4 shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Total Matches</p>
-              <p className="text-2xl font-bold text-gray-900">{matches?.length || 0}</p>
-            </div>
-            <Calendar className="w-8 h-8 text-gray-400" />
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg p-4 shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Ready to Play</p>
-              <p className="text-2xl font-bold text-yellow-600">
-                {matches?.filter(m => m.status === 'ready').length || 0}
-              </p>
-            </div>
-            <Clock className="w-8 h-8 text-yellow-400" />
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg p-4 shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">In Progress</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {matches?.filter(m => m.status === 'in_progress').length || 0}
-              </p>
-            </div>
-            <Play className="w-8 h-8 text-blue-400" />
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg p-4 shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Completed</p>
-              <p className="text-2xl font-bold text-green-600">
-                {matches?.filter(m => m.status === 'completed').length || 0}
-              </p>
-            </div>
-            <CheckCircle className="w-8 h-8 text-green-400" />
-          </div>
-        </div>
-      </div>
+      {/* Matches Table */}
+      <AdvancedTable<MatchData>
+        data={matches || []}
+        columns={matchColumns}
+        actions={matchActions}
+        loading={authLoading || matchesLoading || (fixtureId && fixtureLoading)}
+        searchable={true}
+        searchPlaceholder="Search matches..."
+        filterable={true}
+        filters={matchFilters}
+        sortable={true}
+        selectable={true}
+        selectedRows={selectedMatches}
+        onSelectionChange={setSelectedMatches}
+        onRowClick={handleMatchClick}
+        keyExtractor={(match) => match.id}
+        headerActions={getHeaderActions()}
+        emptyState={{
+          icon: Calendar,
+          title: 'No matches scheduled',
+          description: fixtureId 
+            ? 'This tournament has no matches yet.' 
+            : 'No matches are scheduled for this venue.'
+        }}
+        groupBy="roundName"
+        pagination={{ enabled: true, pageSize: 20 }}
+        persistState={false}
+      />
 
-      {/* Matches by Round */}
-      {matches && matches.length > 0 ? (
-        <div className="space-y-6">
-          {sortedRounds.map(roundName => (
-            <div key={roundName} className="bg-white rounded-lg border shadow-sm p-6">
-              <div className="flex items-center mb-4">
-                <Target className="w-5 h-5 text-[#F28C38] mr-2" />
-                <h3 className="text-lg font-semibold text-gray-900">{roundName}</h3>
-                <span className="ml-auto text-sm text-gray-500">
-                  {matchesByRound[roundName].length} matches
-                </span>
-              </div>
-              
-              {/* Mobile Cards */}
-              <div className="space-y-4">
-                {matchesByRound[roundName].map((match: any) => (
-                  <div key={match.matchId} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h4 className="font-medium text-gray-900">Match #{match.matchNumber}</h4>
-                        <p className="text-sm text-gray-500">{match.roundName}</p>
-                      </div>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(match.status)}`}>
-                        {getStatusIcon(match.status)}
-                        <span className="ml-1 capitalize">{match.status.replace('_', ' ')}</span>
-                      </span>
-                    </div>
-                    
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center">
-                        <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                        {match.team1 ? (
-                          <span className="font-medium">
-                            {match.team1.teamName}
-                            {match.team1.tournamentNumber && (
-                              <span className="ml-1 text-gray-500">#{match.team1.tournamentNumber}</span>
-                            )}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 italic">TBD</span>
-                        )}
-                      </div>
-                      <div className="flex items-center">
-                        <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                        {match.team2 ? (
-                          <span className="font-medium">
-                            {match.team2.teamName}
-                            {match.team2.tournamentNumber && (
-                              <span className="ml-1 text-gray-500">#{match.team2.tournamentNumber}</span>
-                            )}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 italic">TBD</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {match.result && (
-                      <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded">
-                        <div className="text-sm text-green-800">
-                          <div className="font-medium">Winner: {match.result.winnerName}</div>
-                          {match.result.score && (
-                            <div>Score: {match.result.score.team1Score} - {match.result.score.team2Score}</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="space-y-2">
-                      {(match.status === 'ready' || match.status === 'in_progress') && (
-                        <Link href={`/en/volunteer/venues/${venueId}/matches/${match.matchId}`} className="block">
-                          <button className="w-full bg-[#F28C38] text-white px-4 py-2 rounded-md hover:bg-[#E67A26] transition-colors">
-                            {match.status === 'ready' ? 'Start Match' : 'Update Result'}
-                          </button>
-                        </Link>
-                      )}
-                      {match.status === 'completed' && (
-                        <Link href={`/en/volunteer/venues/${venueId}/matches/${match.matchId}`} className="block">
-                          <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors">
-                            View Result
-                          </button>
-                        </Link>
-                      )}
-                      {match.status !== 'completed' && (
-                        <Link href={`/en/volunteer/venues/${venueId}/matches/${match.matchId}/edit`} className="block">
-                          <button className="w-full flex items-center justify-center px-4 py-2 text-sm text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-md border border-blue-200">
-                            <Edit className="w-4 h-4 mr-1" />
-                            Edit Match
-                          </button>
-                        </Link>
-                      )}
-                      <Link href={`/en/volunteer/venues/${venueId}/media/upload?matchId=${match.matchId}`} className="block">
-                        <button className="w-full flex items-center justify-center px-4 py-2 text-sm text-purple-600 hover:text-purple-900 hover:bg-purple-50 rounded-md border border-purple-200">
-                          <Camera className="w-4 h-4 mr-1" />
-                          Upload Media
-                        </button>
-                      </Link>
-                    </div>
+      {/* Match Detail Modal */}
+      <EnhancedModal
+        isOpen={showMatchModal}
+        onClose={() => {
+          setShowMatchModal(false);
+          setSelectedMatch(null);
+        }}
+        title="Match Management"
+        subtitle={selectedMatch ? `${selectedMatch.team1Name} vs ${selectedMatch.team2Name}` : undefined}
+        size="lg"
+        mobileFullScreen={true}
+        scrollableBody={true}
+        footer={
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <button
+              onClick={() => {
+                if (selectedMatch) {
+                  router.push(`/${lang}/volunteer/venues/${venueId}/matches/${selectedMatch.id}/scoring`);
+                }
+              }}
+              className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] hover:bg-[#E67A26] text-white rounded-lg font-medium py-2 text-sm transition-colors flex items-center justify-center"
+              disabled={selectedMatch?.status !== 'ready' && selectedMatch?.status !== 'in_progress'}
+            >
+              <Target className="w-4 h-4 mr-2" />
+              Score Match
+            </button>
+            <button
+              onClick={() => {
+                setShowMatchModal(false);
+                setSelectedMatch(null);
+              }}
+              className="flex-1 sm:flex-initial sm:px-4 text-gray-700 border border-gray-300 hover:bg-gray-50 rounded-lg font-medium py-2 text-sm transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        {selectedMatch && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Match Information</h3>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span className="font-medium">Round:</span>
+                  <span>{selectedMatch.roundName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Status:</span>
+                  <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusColor(selectedMatch.status)}`}>
+                    {getStatusIcon(selectedMatch.status)}
+                    <span className="ml-1 capitalize">{selectedMatch.status.replace('_', ' ')}</span>
+                  </span>
+                </div>
+                {selectedMatch.scheduledTime && (
+                  <div className="flex justify-between">
+                    <span className="font-medium">Scheduled:</span>
+                    <span>{new Date(selectedMatch.scheduledTime).toLocaleString()}</span>
                   </div>
-                ))}
+                )}
+                {(selectedMatch.team1Score !== undefined && selectedMatch.team2Score !== undefined) && (
+                  <div className="flex justify-between">
+                    <span className="font-medium">Final Score:</span>
+                    <span className="font-mono font-bold">
+                      {selectedMatch.team1Score} - {selectedMatch.team2Score}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12 bg-white rounded-lg border">
-          <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No matches found</h3>
-          <p className="text-gray-600">
-            {fixtureId ? 'This tournament has no matches yet.' : 'No matches have been created for this venue.'}
+          </div>
+        )}
+      </EnhancedModal>
+
+      {/* Bulk Update Modal */}
+      <EnhancedModal
+        isOpen={showBulkUpdateModal}
+        onClose={() => setShowBulkUpdateModal(false)}
+        title="Bulk Update Matches"
+        subtitle="Update multiple matches at once"
+        size="md"
+        mobileFullScreen={true}
+        footer={
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => setShowBulkUpdateModal(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                // Handle bulk update logic here
+                addNotification({
+                  type: 'success',
+                  title: 'Bulk Update',
+                  message: 'Match updates will be implemented soon'
+                });
+                setShowBulkUpdateModal(false);
+              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26]"
+            >
+              Apply Updates
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 text-sm">
+            Bulk update functionality for matches is coming soon. This will allow you to update multiple match statuses, schedules, and other properties at once.
           </p>
-          {fixtureId && (
-            <Link href={`/en/volunteer/venues/${venueId}/fixtures`}>
-              <button className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors">
-                Back to Fixtures
-              </button>
-            </Link>
-          )}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-yellow-800 text-sm">
+              <strong>Note:</strong> This feature is currently under development.
+            </p>
+          </div>
         </div>
-      )}
+      </EnhancedModal>
     </div>
   );
 }

@@ -66,7 +66,7 @@ export default function VenueMappingsPage() {
     isLoading: mappingsLoading,
     error: mappingsError,
     refetch: refetchMappings
-  } = api.admin.venues.getVenueLocationMappings.useQuery({
+  } = api.admin.venues.getVenueLevelMappings.useQuery({
     level: selectedLevel,
     eventId: selectedEvent !== 'all' ? selectedEvent : undefined,
     limit: 100

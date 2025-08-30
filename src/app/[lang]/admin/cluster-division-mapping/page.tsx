@@ -21,6 +21,14 @@ import {
   Trash2,
   ArrowRight,
 } from 'lucide-react';
+import { MultiSelect } from '@/components/ui/MultiSelect';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/AdvancedSelect';
 
 interface ClusterDivisionMappingData {
   id: string;
@@ -53,6 +61,839 @@ interface ClusterDivisionMappingData {
   };
 }
 
+// Create Cluster Division Mapping Modal Component
+interface CreateClusterDivisionMappingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedEvent: string;
+  onSuccess: () => void;
+}
+
+function CreateClusterDivisionMappingModal({ isOpen, onClose, selectedEvent, onSuccess }: CreateClusterDivisionMappingModalProps) {
+  const { addNotification } = useNotification();
+  const [selectedState, setSelectedState] = useState<string>('');
+  const [selectedDivisionVenue, setSelectedDivisionVenue] = useState<string>('');
+  const [selectedClusterVenues, setSelectedClusterVenues] = useState<string[]>([]);
+
+  // Get division venues for the event - filtered by state
+  const { data: divisionVenuesData, isLoading: divisionVenuesLoading, error: divisionVenuesError } = api.admin.venues.getVenueLevelMappings.useQuery({
+    eventId: selectedEvent,
+    level: 'division',
+  }, {
+    enabled: !!selectedEvent,
+  });
+
+  // Get cluster venues for the event - filtered by state
+  const { data: clusterVenuesData, isLoading: clusterVenuesLoading, error: clusterVenuesError } = api.admin.venues.getVenueLevelMappings.useQuery({
+    eventId: selectedEvent,
+    level: 'cluster',
+  }, {
+    enabled: !!selectedEvent,
+  });
+
+  // Get all current mappings to filter out already mapped venues
+  const { data: allMappingsData } = api.admin.mappings.getClusterDivisionMappings.useQuery({
+    eventId: selectedEvent,
+  }, {
+    enabled: !!selectedEvent,
+  });
+
+  // Check location-cluster mappings to see if cluster venues are already used there
+  const { data: locationMappingsData } = api.admin.mappings.getLocationClusterMappings.useQuery({
+    eventId: selectedEvent,
+  }, {
+    enabled: !!selectedEvent,
+  });
+
+  // Get states from location service
+  const { data: statesData } = api.location.getStates.useQuery();
+
+  // Reset form when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedState('');
+      setSelectedDivisionVenue('');
+      setSelectedClusterVenues([]);
+    }
+  }, [isOpen]);
+
+  // Validation helpers
+  const isStateSelected = !!selectedState;
+  const isDivisionSelected = !!selectedDivisionVenue;
+  const areClustersSelected = selectedClusterVenues.length > 0;
+  const isFormValid = isStateSelected && isDivisionSelected && areClustersSelected;
+
+  // Division venue options - filtered to exclude already mapped venues
+  const availableDivisionOptions = useMemo(() => {
+    if (!divisionVenuesData || !Array.isArray(divisionVenuesData) || !allMappingsData) return [];
+    
+    // Get already used division venue IDs for current event
+    const usedDivisionIds = allMappingsData.map(m => m.divisionVenueMappingId);
+    
+    return divisionVenuesData.filter(venueMapping => {
+      const venue = venueMapping.venue;
+      const isVenueUsed = usedDivisionIds.includes(venueMapping.id);
+      const stateMatch = venue.state === selectedState;
+      
+      return !isVenueUsed && stateMatch;
+    });
+  }, [divisionVenuesData, allMappingsData, selectedState]);
+
+  // Cluster venue options - filtered to exclude already mapped venues
+  const availableClusterOptions = useMemo(() => {
+    if (!clusterVenuesData || !Array.isArray(clusterVenuesData) || !allMappingsData) return [];
+    
+    // Get already used cluster venue IDs for current event
+    const usedClusterIds = allMappingsData.map(m => m.clusterVenueMappingId);
+    
+    console.log('All cluster mappings:', allMappingsData);
+    console.log('Used cluster IDs:', usedClusterIds);
+    console.log('Available cluster venues before filtering:', clusterVenuesData.length);
+    
+    const availableVenues = clusterVenuesData.filter(venueMapping => {
+      const venue = venueMapping.venue;
+      const isVenueUsed = usedClusterIds.includes(venueMapping.id);
+      const stateMatch = venue.state === selectedState;
+      
+      console.log(`Cluster venue ${venue.name} (${venueMapping.id}):`, {
+        isVenueUsed,
+        stateMatch,
+        state: venue.state,
+        selectedState
+      });
+      
+      return !isVenueUsed && stateMatch;
+    });
+
+    console.log('Available cluster venues after filtering:', availableVenues.length);
+
+    return availableVenues.map(venue => ({
+      label: `${venue.venue.name} - ${venue.venue.district}`,
+      value: venue.id
+    }));
+  }, [clusterVenuesData, allMappingsData, selectedState]);
+
+  // Create mapping mutation - API exists but has wrong input schema
+  const createMappingMutation = api.admin.mappings.createClusterDivisionMapping.useMutation({
+    onSuccess: () => {
+      addNotification('Cluster-Division mappings created successfully', 'success');
+      onSuccess();
+      onClose();
+      // Reset form
+      setSelectedState('');
+      setSelectedDivisionVenue('');
+      setSelectedClusterVenues([]);
+    },
+    onError: (error) => {
+      console.error('Error creating mappings:', error);
+      console.error('Error details:', error.data);
+      console.error('Error message:', error.message);
+      const errorMessage = error.message || 'Failed to create mappings. Server-side API needs to accept state parameter.';
+      addNotification(errorMessage, 'error');
+    },
+  });
+
+  const handleSubmit = async () => {
+    console.log('handleSubmit called with:', {
+      selectedState,
+      selectedDivisionVenue,
+      selectedClusterVenues,
+    });
+
+    // Validation
+    if (!selectedState) {
+      console.log('Validation failed: no state selected');
+      addNotification('Please select a state', 'error');
+      return;
+    }
+
+    if (!selectedDivisionVenue) {
+      console.log('Validation failed: no division venue selected');
+      addNotification('Please select a division venue', 'error');
+      return;
+    }
+
+    if (selectedClusterVenues.length === 0) {
+      console.log('Validation failed: no cluster venues selected');
+      addNotification('Please select at least one cluster venue', 'error');
+      return;
+    }
+
+    // Filter out any undefined values
+    const validClusterVenues = selectedClusterVenues.filter(Boolean);
+    if (validClusterVenues.length === 0) {
+      console.log('Validation failed: no valid cluster venues after filtering');
+      addNotification('Please select valid cluster venues', 'error');
+      return;
+    }
+
+    // Ensure state is not empty
+    if (!selectedState || selectedState.trim() === '') {
+      console.log('Validation failed: state is empty or whitespace');
+      addNotification('State is required but not selected', 'error');
+      return;
+    }
+
+    console.log('Creating mappings with:', {
+      eventId: selectedEvent,
+      divisionVenueMappingId: selectedDivisionVenue,
+      clusterVenueMappingIds: validClusterVenues,
+      state: selectedState,
+    });
+
+    console.log('API exists but schema is wrong - trying without state parameter');
+    console.log('Selected cluster venues to map:', validClusterVenues);
+
+    // Create individual mappings - server now accepts state parameter
+    validClusterVenues.forEach(clusterVenueId => {
+      const payload = {
+        eventId: selectedEvent,
+        divisionVenueMappingId: selectedDivisionVenue,
+        clusterVenueMappingId: clusterVenueId,
+        state: selectedState, // Server now accepts this parameter
+      };
+      
+      console.log('Creating mapping for cluster venue:', clusterVenueId);
+      console.log('Payload with state:', payload);
+      
+      createMappingMutation.mutate(payload);
+    });
+  };
+
+  return (
+    <EnhancedModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Map Clusters to Division Venue"
+      subtitle="Create bulk cluster-division mappings"
+      size="lg"
+      mobileFullScreen={true}
+      scrollableBody={true}
+      className="sm:max-h-[90vh]"
+      footer={
+        <div className="flex flex-row space-x-3 sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
+            disabled={createMappingMutation.isPending}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm disabled:bg-gray-400"
+            disabled={createMappingMutation.isPending || !isFormValid}
+          >
+            {createMappingMutation.isPending ? 'Creating...' : `Create ${selectedClusterVenues.length} Mapping(s)`}
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-6 sm:min-h-[90vh] scrollbar-none">
+        {/* Step 1: State Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">State *</label>
+          <Select value={selectedState} onValueChange={(value) => {
+            console.log('State changed from:', selectedState, 'to:', value);
+            setSelectedState(value);
+            setSelectedDivisionVenue('');
+            setSelectedClusterVenues([]);
+          }}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select state" />
+            </SelectTrigger>
+            <SelectContent>
+              {(statesData || []).map((state) => (
+                <SelectItem key={state} value={state}>
+                  {state}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Step 2: Division Venue Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Division Venue *</label>
+          {divisionVenuesLoading ? (
+            <div className="px-3 py-2 border border-gray-300 rounded-lg">
+              <div className="animate-pulse flex items-center space-x-2">
+                <div className="h-4 bg-gray-200 rounded w-4"></div>
+                <div className="h-4 bg-gray-200 rounded flex-1"></div>
+              </div>
+            </div>
+          ) : divisionVenuesError ? (
+            <div className="px-3 py-2 border border-red-300 rounded-lg text-red-500">
+              Error loading division venues: {divisionVenuesError.message}
+            </div>
+          ) : (
+            <Select 
+              value={selectedDivisionVenue} 
+              onValueChange={(value) => {
+                setSelectedDivisionVenue(value);
+                setSelectedClusterVenues([]); // Reset cluster selection when division changes
+              }} 
+              disabled={!isStateSelected}
+            >
+              <SelectTrigger className={!isStateSelected ? 'bg-gray-100 cursor-not-allowed' : ''}>
+                <SelectValue placeholder={!isStateSelected ? "Select state first" : "Select division venue"} />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDivisionOptions.length === 0 ? (
+                  <SelectItem value="no-venues" disabled>
+                    {!isStateSelected
+                      ? 'Select state first to see available venues'
+                      : `No available division venues in ${selectedState}`
+                    }
+                  </SelectItem>
+                ) : (
+                  availableDivisionOptions.map((venue) => (
+                    <SelectItem key={venue.id} value={venue.id}>
+                      {venue.venue.name} - {venue.venue.district}, {venue.venue.state}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          )}
+          <div className="text-xs text-gray-500 mt-1">
+            {!isStateSelected 
+              ? 'Select state first to see available venues'
+              : isDivisionSelected
+                ? `Selected: ${availableDivisionOptions.find(v => v.id === selectedDivisionVenue)?.venue.name}`
+                : availableDivisionOptions.length > 0
+                  ? `${availableDivisionOptions.length} division venue(s) available in ${selectedState}`
+                  : `No available division venues in ${selectedState}`
+            }
+          </div>
+        </div>
+
+        {/* Step 3: Cluster Venues Multi-Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Cluster Venues *
+          </label>
+          {clusterVenuesLoading && isStateSelected ? (
+            <div className="px-3 py-2 border border-gray-300 rounded-lg">
+              <div className="animate-pulse flex items-center space-x-2">
+                <div className="h-4 bg-gray-200 rounded w-4"></div>
+                <div className="h-4 bg-gray-200 rounded flex-1"></div>
+              </div>
+            </div>
+          ) : clusterVenuesError ? (
+            <div className="px-3 py-2 border border-red-300 rounded-lg text-red-500">
+              Error loading cluster venues: {clusterVenuesError.message}
+            </div>
+          ) : (
+            <MultiSelect
+              options={availableClusterOptions}
+              value={selectedClusterVenues}
+              onValueChange={setSelectedClusterVenues}
+              placeholder={
+                !isStateSelected 
+                  ? "Select state first" 
+                  : !isDivisionSelected 
+                    ? "Select division venue first"
+                    : "Select cluster venues..."
+              }
+              disabled={!isStateSelected || !isDivisionSelected}
+            />
+          )}
+          <div className="text-xs text-gray-500 mt-1">
+            {!isStateSelected 
+              ? 'Select state first'
+              : !isDivisionSelected
+                ? 'Select division venue first to see available clusters'
+                : areClustersSelected
+                  ? `${selectedClusterVenues.length} cluster venue(s) selected`
+                  : availableClusterOptions.length > 0
+                    ? `${availableClusterOptions.length} cluster venue(s) available in ${selectedState}`
+                    : `No available cluster venues in ${selectedState}`
+            }
+          </div>
+        </div>
+      </div>
+    </EnhancedModal>
+  );
+}
+
+// Edit Cluster Division Mapping Modal Component
+interface EditClusterDivisionMappingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  mapping: ClusterDivisionMappingData;
+  selectedEvent: string;
+  onSuccess: () => void;
+}
+
+function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEvent, onSuccess }: EditClusterDivisionMappingModalProps) {
+  const { addNotification } = useNotification();
+  
+  // Edit mode state - initialize with mapping data like location mapping
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedState, setSelectedState] = useState<string>(mapping?.divisionVenueMapping?.venue?.state || '');
+  const [selectedDivisionVenue, setSelectedDivisionVenue] = useState<string>(mapping?.divisionVenueMappingId || '');
+  const [selectedClusterVenues, setSelectedClusterVenues] = useState<string[]>(
+    mapping?.clusterVenueMappingId ? [mapping.clusterVenueMappingId] : []
+  );
+
+  // Get all current mappings to find related clusters and filter venues
+  const { data: allMappingsData } = api.admin.mappings.getClusterDivisionMappings.useQuery({
+    eventId: selectedEvent,
+  }, {
+    enabled: !!selectedEvent && isEditMode,
+  });
+
+  // Update selectedClusterVenues when entering edit mode to show all related clusters
+  useEffect(() => {
+    if (allMappingsData && isEditMode && mapping) {
+      console.log('=== UPDATING CLUSTER VENUES FROM MAPPINGS DATA ===');
+      
+      // Find all mappings with the same division venue (this represents the "group" that was created together)
+      const relatedMappings = allMappingsData
+        .filter(m => m.divisionVenueMappingId === mapping.divisionVenueMappingId);
+      
+      if (relatedMappings.length > 0) {
+        // Extract all cluster venue IDs from the related mappings
+        const relatedClusterIds = relatedMappings
+          .map(m => m.clusterVenueMappingId)
+          .filter(Boolean);
+        
+        console.log('Found related mappings for division venue:', mapping.divisionVenueMappingId);
+        console.log('Related cluster venue IDs:', relatedClusterIds);
+        
+        // Update selectedClusterVenues array
+        setSelectedClusterVenues(relatedClusterIds);
+      }
+    }
+  }, [allMappingsData, isEditMode, mapping]);
+
+  // Reset form data when entering edit mode - separate useEffect like location-mapping
+  useEffect(() => {
+    if (isEditMode && mapping) {
+      console.log('=== INITIALIZING FORM DATA FOR EDIT MODE ===');
+      console.log('Mapping data:', {
+        state: mapping.divisionVenueMapping.venue.state,
+        divisionVenue: mapping.divisionVenueMappingId,
+        divisionVenueName: mapping.divisionVenueMapping.venue.name
+      });
+      
+      // Set basic form fields
+      setSelectedState(mapping.divisionVenueMapping.venue.state);
+      setSelectedDivisionVenue(mapping.divisionVenueMappingId);
+    }
+  }, [isEditMode, mapping]);
+
+  // Get division venues for the event - filtered by state
+  const { data: divisionVenuesData, isLoading: divisionVenuesLoading, error: divisionVenuesError } = api.admin.venues.getVenueLevelMappings.useQuery({
+    eventId: selectedEvent,
+    level: 'division',
+  }, {
+    enabled: !!selectedEvent && (isEditMode),
+  });
+
+  // Get cluster venues for the event - filtered by state
+  const { data: clusterVenuesData, isLoading: clusterVenuesLoading, error: clusterVenuesError } = api.admin.venues.getVenueLevelMappings.useQuery({
+    eventId: selectedEvent,
+    level: 'cluster',
+  }, {
+    enabled: !!selectedEvent && (isEditMode),
+  });
+
+  // Get states from location service
+  const { data: statesData } = api.location.getStates.useQuery();
+
+  // Location options for cluster venues - filtered to exclude already mapped venues
+  const availableClusterOptions = useMemo(() => {
+    if (!clusterVenuesData || !Array.isArray(clusterVenuesData) || !allMappingsData) return [];
+    
+    // Get already used cluster venue IDs for current event (excluding current mapping)
+    const usedClusterIds = allMappingsData
+      .filter(m => m.divisionVenueMappingId !== mapping.divisionVenueMappingId) // Exclude current mapping group
+      .map(m => m.clusterVenueMappingId);
+    
+    const availableVenues = clusterVenuesData.filter(venueMapping => {
+      const venue = venueMapping.venue;
+      const isVenueUsed = usedClusterIds.includes(venueMapping.id);
+      const stateMatch = venue.state === selectedState;
+      
+      return !isVenueUsed && stateMatch;
+    });
+
+    // When editing, always include currently selected cluster venues
+    if (isEditMode && selectedClusterVenues.length > 0) {
+      selectedClusterVenues.forEach(clusterVenueId => {
+        const currentVenue = clusterVenuesData.find(v => v.id === clusterVenueId);
+        if (currentVenue && !availableVenues.find(v => v.id === clusterVenueId)) {
+          availableVenues.push(currentVenue);
+        }
+      });
+    }
+
+    return availableVenues.map(venue => ({
+      label: `${venue.venue.name} - ${venue.venue.district}`,
+      value: venue.id
+    }));
+  }, [clusterVenuesData, allMappingsData, mapping.divisionVenueMappingId, isEditMode, selectedClusterVenues, selectedState]);
+
+  // Filtered division venues based on availability
+  const filteredDivisionVenues = useMemo(() => {
+    if (!divisionVenuesData || !Array.isArray(divisionVenuesData) || !allMappingsData) return [];
+    
+    // Get already used division venue IDs for current event (excluding current mapping)
+    const usedDivisionIds = allMappingsData
+      .filter(m => m.id !== mapping.id) // Allow keeping same division venue when editing
+      .map(m => m.divisionVenueMappingId);
+    
+    const availableVenues = divisionVenuesData.filter(venueMapping => {
+      const venue = venueMapping.venue;
+      const isVenueUsed = usedDivisionIds.includes(venueMapping.id);
+      const stateMatch = venue.state === selectedState;
+      
+      return !isVenueUsed && stateMatch;
+    });
+
+    // When editing, always include the current division venue
+    if (isEditMode && selectedDivisionVenue) {
+      const currentVenue = divisionVenuesData.find(v => v.id === selectedDivisionVenue);
+      if (currentVenue && !availableVenues.find(v => v.id === selectedDivisionVenue)) {
+        availableVenues.unshift(currentVenue); // Add current venue at the beginning
+      }
+    }
+
+    return availableVenues;
+  }, [divisionVenuesData, allMappingsData, mapping.id, isEditMode, selectedDivisionVenue, selectedState]);
+
+  // Update mapping mutation using new API
+  const updateMappingMutation = api.admin.mappings.updateClusterDivisionMapping.useMutation({
+    onSuccess: () => {
+      addNotification('Cluster-Division mapping updated successfully', 'success');
+      setIsEditMode(false);
+      onSuccess();
+    },
+    onError: (error) => {
+      console.error('Error updating mapping:', error);
+      const errorMessage = error.message || 'Failed to update mapping. Please try again.';
+      addNotification(errorMessage, 'error');
+    },
+  });
+
+  // Delete all related mappings mutation
+  const deleteAllMappingsMutation = api.admin.mappings.deleteClusterDivisionMapping.useMutation({
+    onSuccess: () => {
+      addNotification('All related mappings deleted successfully', 'success');
+      setShowDeleteConfirm(false);
+      onSuccess();
+    },
+    onError: (error) => {
+      console.error('Error deleting mappings:', error);
+      const errorMessage = error.message || 'Failed to delete mappings. Please try again.';
+      addNotification(errorMessage, 'error');
+    },
+  });
+
+  const handleDeleteAllMappings = async () => {
+    if (!allMappingsData || !mapping) return;
+
+    try {
+      // Find all related mappings (same division venue)
+      const relatedMappingIds = allMappingsData
+        .filter(m => 
+          m.divisionVenueMappingId === mapping.divisionVenueMappingId &&
+          m.id // Ensure mapping has valid ID
+        )
+        .map(m => m.id)
+        .filter(Boolean); // Remove any undefined IDs
+      
+      if (relatedMappingIds.length > 0) {
+        await deleteAllMappingsMutation.mutateAsync({
+          mappingIds: relatedMappingIds
+        });
+      }
+    } catch (error) {
+      console.error('Failed to delete mappings:', error);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedDivisionVenue || selectedClusterVenues.length === 0) {
+      addNotification('Please select a division venue and at least one cluster venue', 'error');
+      return;
+    }
+
+    // Ensure state is not empty
+    if (!selectedState || selectedState.trim() === '') {
+      addNotification('State is required but not selected', 'error');
+      return;
+    }
+
+    console.log('Edit modal - updating with state:', selectedState, 'Type:', typeof selectedState);
+
+    try {
+      // Use the new update API
+      await updateMappingMutation.mutateAsync({
+        eventId: selectedEvent,
+        divisionVenueMappingId: selectedDivisionVenue,
+        clusterVenueMappingIds: selectedClusterVenues.filter(Boolean),
+        state: selectedState,
+      });
+    } catch (error) {
+      console.error('Failed to update mappings:', error);
+    }
+  };
+
+  return (
+    <EnhancedModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditMode ? "Edit Cluster-Division Mapping" : "View Cluster-Division Mapping"}
+      subtitle={isEditMode ? "Modify cluster-division venue assignments" : "View mapping details"}
+      size="lg"
+      mobileFullScreen={true}
+      scrollableBody={true}
+      className="sm:max-h-[90vh]"
+      footer={
+        <div className="flex flex-col sm:flex-row sm:justify-between space-y-3 sm:space-y-0">
+          {/* Delete button - completely on the left on desktop */}
+          <div className="order-3 sm:order-1">
+            {isEditMode && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleteAllMappingsMutation.isPending}
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm"
+              >
+                Delete All Mappings
+              </button>
+            )}
+          </div>
+          
+          {/* Cancel and Update/Edit buttons - connected on desktop */}
+          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 order-1 sm:order-2">
+            {isEditMode ? (
+              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0">
+                {/* Mobile: Update first, Cancel second | Desktop: Cancel first, Update second */}
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={updateMappingMutation.isPending}
+                  className="w-full sm:w-auto px-4 py-2 bg-[#F28C38] text-white rounded-lg sm:rounded-l-none sm:border-l-0 hover:bg-[#E67A26] transition-colors font-medium text-sm order-1 sm:order-2"
+                >
+                  {updateMappingMutation.isPending ? 'Updating...' : 'Update Mapping'}
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={updateMappingMutation.isPending || deleteAllMappingsMutation.isPending}
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm order-2 sm:order-1 rounded-lg sm:rounded-r-none"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-row space-x-3 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditMode(true)}
+                  className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      }
+    >
+      <div className="space-y-6 sm:min-h-[50vh] scrollbar-none">
+        {!isEditMode ? (
+          // View Mode - Show all related mappings (1 division -> multiple clusters)
+          <>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Division Venue Mapping Details</h3>
+              
+              {/* Division Venue Info */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Division Venue</label>
+                <div className="bg-white p-4 rounded-lg border">
+                  <div className="font-medium text-gray-900">{mapping.divisionVenueMapping.venue.name}</div>
+                  <div className="text-sm text-gray-500 mt-1">{mapping.divisionVenueMapping.venue.address}</div>
+                  <div className="text-sm text-gray-500">
+                    {mapping.divisionVenueMapping.venue.district}, {mapping.divisionVenueMapping.venue.state}
+                  </div>
+                  <div className="text-xs text-blue-600 mt-2">
+                    Max Teams: {mapping.divisionVenueMapping.maxTeams}
+                  </div>
+                </div>
+              </div>
+
+              {/* All Mapped Cluster Venues */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mapped Cluster Venues {allMappingsData && (
+                    <span className="text-xs text-gray-500 font-normal">
+                      ({allMappingsData.filter(m => m.divisionVenueMappingId === mapping.divisionVenueMappingId).length} venues)
+                    </span>
+                  )}
+                </label>
+                <div className="space-y-3">
+                  {allMappingsData?.filter(m => m.divisionVenueMappingId === mapping.divisionVenueMappingId).map((relatedMapping) => (
+                    <div key={relatedMapping.id} className="bg-white p-3 rounded-lg border">
+                      <div className="font-medium text-gray-900">{relatedMapping.clusterVenueMapping.venue.name}</div>
+                      <div className="text-sm text-gray-500">{relatedMapping.clusterVenueMapping.venue.address}</div>
+                      <div className="text-sm text-gray-500">
+                        {relatedMapping.clusterVenueMapping.venue.district}, {relatedMapping.clusterVenueMapping.venue.state}
+                      </div>
+                      <div className="text-xs text-green-600 mt-1">
+                        Max Teams: {relatedMapping.clusterVenueMapping.maxTeams}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="text-xs text-blue-700">
+                  <strong>Note:</strong> This mapping group was created together. When editing, you can modify all cluster venues assigned to this division venue at once.
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          // Edit Mode
+          <>
+            {/* State Selection - Read Only */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">State *</label>
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700">
+                {selectedState || 'No state selected'}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">State cannot be changed when editing</div>
+            </div>
+
+            {/* Division Venue Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Division Venue *</label>
+              {divisionVenuesLoading ? (
+                <div className="px-3 py-2 border border-gray-300 rounded-lg">
+                  <div className="animate-pulse flex items-center space-x-2">
+                    <div className="h-4 bg-gray-200 rounded w-4"></div>
+                    <div className="h-4 bg-gray-200 rounded flex-1"></div>
+                  </div>
+                </div>
+              ) : divisionVenuesError ? (
+                <div className="px-3 py-2 border border-red-300 rounded-lg text-red-500">
+                  Error loading division venues: {divisionVenuesError.message}
+                </div>
+              ) : (
+                <Select value={selectedDivisionVenue} onValueChange={(value) => {
+                  console.log('Division venue changed to:', value);
+                  setSelectedDivisionVenue(value);
+                  setSelectedClusterVenues([]);
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select division venue" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredDivisionVenues.length === 0 ? (
+                      <SelectItem value="no-venues" disabled>
+                        No available division venues in {selectedState}
+                      </SelectItem>
+                    ) : (
+                      filteredDivisionVenues.map((venue) => (
+                        <SelectItem key={venue.id} value={venue.id}>
+                          {venue.venue.name} - {venue.venue.district}, {venue.venue.state}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+              <div className="text-xs text-gray-500 mt-1">
+                Division venues in {selectedState} that are not already mapped
+              </div>
+            </div>
+
+            {/* Cluster Venues Multi-Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cluster Venues *
+              </label>
+              {clusterVenuesLoading ? (
+                <div className="px-3 py-2 border border-gray-300 rounded-lg">
+                  <div className="animate-pulse flex items-center space-x-2">
+                    <div className="h-4 bg-gray-200 rounded w-4"></div>
+                    <div className="h-4 bg-gray-200 rounded flex-1"></div>
+                  </div>
+                </div>
+              ) : clusterVenuesError ? (
+                <div className="px-3 py-2 border border-red-300 rounded-lg text-red-500">
+                  Error loading cluster venues: {clusterVenuesError.message}
+                </div>
+              ) : (
+                <MultiSelect
+                  options={availableClusterOptions}
+                  value={selectedClusterVenues}
+                  onValueChange={setSelectedClusterVenues}
+                  placeholder="Select cluster venues..."
+                  disabled={!selectedState || !selectedDivisionVenue}
+                />
+              )}
+              <div className="text-xs text-gray-500 mt-1">
+                Only showing cluster venues that are not already mapped to other divisions
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Delete Division-Cluster Mapping Group</h3>
+            <p className="text-sm text-gray-600 mb-2">
+              This will permanently delete <strong>all {allMappingsData?.filter(m => m.divisionVenueMappingId === mapping.divisionVenueMappingId).length || 0} cluster venues</strong> mapped to <strong>{mapping.divisionVenueMapping.venue.name}</strong>.
+            </p>
+            <p className="text-sm text-red-600 mb-4">
+              This action cannot be undone.
+            </p>
+            <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleteAllMappingsMutation.isPending}
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAllMappings}
+                disabled={deleteAllMappingsMutation.isPending}
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm"
+              >
+                {deleteAllMappingsMutation.isPending ? 'Deleting...' : 'Delete All Mappings'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </EnhancedModal>
+  );
+}
+
 export default function ClusterDivisionMappingPage({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = React.use(params);
   const router = useRouter();
@@ -63,6 +904,7 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
   const [selectedMappings, setSelectedMappings] = useState<Set<string | number>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedMapping, setSelectedMapping] = useState<ClusterDivisionMappingData | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
 
@@ -80,20 +922,37 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
     }
   }, [user, userProfile, authLoading, router, lang]);
 
-  // Get events
-  const { data: eventsData } = api.admin.events.getEvents.useQuery({
-    limit: 100,
-    status: 'upcoming',
+  // Get events (ongoing = registration_open, registration_closed, active)
+  const { data: eventsData, isLoading: eventsLoading } = api.admin.events.getEvents.useQuery({
+    limit: 1,
+    status: 'ongoing',
   });
 
-  // Set default event
-  useEffect(() => {
-    if (eventsData?.events && eventsData.events.length > 0 && !selectedEvent) {
-      setSelectedEvent(eventsData.events[0].id);
-    }
-  }, [eventsData, selectedEvent]);
+  // Get cluster-division mappings for selected event
+  const { data: mappingsData, isLoading: mappingsLoading } = api.admin.mappings.getClusterDivisionMappings.useQuery({
+    eventId: selectedEvent,
+  }, {
+    enabled: !!selectedEvent,
+  });
 
-  const loading = authLoading;
+  // Set selected event from ongoing events
+  useEffect(() => {
+    console.log('Events data:', eventsData);
+    if (eventsData?.events && eventsData.events.length > 0) {
+      console.log('Setting selectedEvent to:', eventsData.events[0].id);
+      setSelectedEvent(eventsData.events[0].id);
+    } else {
+      console.log('No events found or events data is empty');
+    }
+  }, [eventsData]);
+
+  console.log('Parent selectedEvent:', selectedEvent);
+  
+  // Debug: Check what APIs are available
+  console.log('Available admin.mappings APIs:', Object.keys(api.admin.mappings));
+  console.log('Available admin APIs:', Object.keys(api.admin));
+
+  const loading = authLoading || eventsLoading || mappingsLoading;
 
   // Table columns
   const columns: Column<ClusterDivisionMappingData>[] = [
@@ -180,31 +1039,18 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
   // Header actions
   const headerActions = (
     <div className="flex items-center space-x-3">
-      <select
-        value={selectedEvent}
-        onChange={(e) => setSelectedEvent(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-      >
-        <option value="">Select Event</option>
-        {eventsData?.events.map((event) => (
-          <option key={event.id} value={event.id}>
-            {event.name}
-          </option>
-        ))}
-      </select>
-
       <button
         onClick={() => setShowCreateModal(true)}
         className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
         disabled={!selectedEvent || loading}
       >
         <Plus className="w-4 h-4 mr-2" />
-        Map Cluster to Division
+        Map Clusters to Division
       </button>
     </div>
   );
 
-  if (loading && !selectedEvent) {
+  if (authLoading) {
     return <PageLoader />;
   }
 
@@ -212,7 +1058,7 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <AdvancedTable<ClusterDivisionMappingData>
-          data={[]}
+          data={mappingsData || []}
           columns={columns}
           loading={loading}
           tableParams={tableParams}
@@ -221,8 +1067,6 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
           onSelectedRowsChange={setSelectedMappings}
           filterFields={filterFields}
           headerActions={headerActions}
-          title="Cluster to Division Venue Mapping"
-          subtitle="Map cluster venues to division venues for tournament progression"
           emptyState={{
             icon: MapPin,
             title: 'No mappings found',
@@ -230,24 +1074,40 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
           }}
           searchable
           searchPlaceholder="Search cluster venues, division venues, or locations..."
+          onRowClick={(mapping) => {
+            setSelectedMapping(mapping);
+            setShowEditModal(true);
+          }}
         />
 
         {/* Create Mapping Modal */}
         {showCreateModal && (
-          <EnhancedModal
+          <CreateClusterDivisionMappingModal
             isOpen={showCreateModal}
             onClose={() => setShowCreateModal(false)}
-            title="Map Cluster to Division Venue"
-            subtitle="Assign cluster venues to division venues for tournament progression"
-            size="lg"
-          >
-            <div className="space-y-6">
-              <div className="text-center py-8 text-gray-500">
-                <Building className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>Cluster-Division mapping functionality will be implemented based on the tournament logic.</p>
-              </div>
-            </div>
-          </EnhancedModal>
+            selectedEvent={selectedEvent}
+            onSuccess={() => {
+              // The mutation's onSuccess already handles the notification and modal close
+              // Data will be automatically refetched due to tRPC's cache invalidation
+            }}
+          />
+        )}
+        {/* Edit Mapping Modal */}
+        {showEditModal && selectedMapping && (
+          <EditClusterDivisionMappingModal
+            isOpen={showEditModal}
+            onClose={() => {
+              setShowEditModal(false);
+              setSelectedMapping(null);
+            }}
+            mapping={selectedMapping}
+            selectedEvent={selectedEvent}
+            onSuccess={() => {
+              // Data will be automatically refetched due to tRPC's cache invalidation
+              setShowEditModal(false);
+              setSelectedMapping(null);
+            }}
+          />
         )}
       </div>
     </div>

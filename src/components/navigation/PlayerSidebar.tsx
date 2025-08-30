@@ -48,7 +48,7 @@ export default function PlayerSidebar({
   
   const pathname = usePathname();
   const { lang } = useParams();
-  const { user, userProfile, logout } = useAuth();
+  const { user, userProfile, profileImage, logout } = useAuth();
 
   // Admin detection - check if admin is accessing player routes
   const isAdminAccessing = userProfile?.role === 'admin' && !pathname.includes('/admin/');
@@ -202,24 +202,24 @@ export default function PlayerSidebar({
         fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
         lg:translate-x-0 lg:fixed lg:top-0 lg:bottom-0 lg:flex-shrink-0 lg:transition-[width] lg:duration-300 lg:ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${isDesktopCollapsed ? 'lg:w-20' : 'lg:w-80'} w-80
+        ${isDesktopCollapsed ? 'lg:w-16' : 'lg:w-64'} w-64
         ${className}
       `}>
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className={`flex items-center border-b border-gray-200 h-20 ${
-            isDesktopCollapsed ? 'justify-center px-4' : 'justify-between px-6'
+          <div className={`flex items-center border-b border-gray-200 h-16 ${
+            isDesktopCollapsed ? 'justify-center px-3' : 'justify-between px-4'
           }`}>
             {showContent && (
               <div className="flex items-center animate-fade-in">
-                <div className="w-8 h-8 bg-[#F28C38] rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Users className="w-5 h-5 text-white" />
+                <div className="w-7 h-7 bg-[#F28C38] rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Users className="w-4 h-4 text-white" />
                 </div>
-                <div className="ml-3">
-                  <h2 className="text-lg font-semibold text-gray-900">
+                <div className="ml-2">
+                  <h2 className="text-sm font-semibold text-gray-900">
                     {isAdminAccessing ? 'Admin Panel' : 'Player Panel'}
                   </h2>
-                  <p className="text-sm text-gray-600">Isha Gramotsavam</p>
+                  <p className="text-xs text-gray-600">Isha Gramotsavam</p>
                 </div>
               </div>
             )}
@@ -258,15 +258,15 @@ export default function PlayerSidebar({
               isDesktopCollapsed ? 'justify-center px-2' : 'px-4'
             }`}>
               <div className="flex items-center">
-                {userProfile.profileImages?.profilePhotoPath ? (
+                {profileImage ? (
                   <img 
-                    src={userProfile.profileImages.profilePhotoPath} 
+                    src={profileImage} 
                     alt={`${userProfile.firstName} ${userProfile.lastName}`}
-                    className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="w-10 h-10 bg-[#3A7F3F] rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-medium text-sm">
+                  <div className="w-8 h-8 bg-[#3A7F3F] rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-medium text-xs">
                       {userProfile.firstName?.charAt(0)}{userProfile.lastName?.charAt(0)}
                     </span>
                   </div>
@@ -284,7 +284,7 @@ export default function PlayerSidebar({
           )}
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <nav className="flex-1 p-4 space-y-2 overflow-y-auto scrollbar-none hover:scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {navigation.map(item => renderNavItem(item))}
           </nav>
 

@@ -422,6 +422,7 @@ export const adminVenuesRouter = createTRPCRouter({
   // Venue Location Mappings (existing functionality)
   getVenueLevelMappings: protectedProcedure
     .input(z.object({
+      eventId: z.string().optional(),
       level: z.enum(['all', 'cluster', 'division', 'state']).default('all'),
       district: z.string().optional(),
       taluk: z.string().optional(),
@@ -431,15 +432,20 @@ export const adminVenuesRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
+      console.log('getVenueLevelMappings input:', input);
+
       const where: any = {};
       
+      if (input.eventId) {
+        where.eventId = input.eventId;
+      }
+      
       if (input.level !== 'all') {
-        where.venue = { level: input.level };
+        where.level = input.level;
       }
       
       if (input.district) {
         where.venue = { 
-          ...where.venue,
           district: { contains: input.district, mode: 'insensitive' }
         };
       }
@@ -451,19 +457,26 @@ export const adminVenuesRouter = createTRPCRouter({
         };
       }
 
+      console.log('Query where clause:', JSON.stringify(where, null, 2));
+
       const mappings = await db.venueLevelMapping.findMany({
         where,
         include: {
           venue: true,
         },
         orderBy: [
-          { venue: { level: 'asc' } },
+          { level: 'asc' },
           { venue: { district: 'asc' } },
           { venue: { name: 'asc' } },
         ],
       });
 
-      return mappings;
+      console.log('Found mappings:', mappings.length);
+      console.log('Mappings:', mappings);
+
+      return {
+        venueLevelMappings: mappings
+      };
     }),
 
   createVenueLevelMapping: protectedProcedure

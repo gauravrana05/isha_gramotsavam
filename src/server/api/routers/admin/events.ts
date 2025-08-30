@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 import { db } from "@/lib/db";
+import { calculateEventStatus, validateEventDates } from '@/lib/eventStatus';
 
 export const adminEventsRouter = createTRPCRouter({
   // Get Sports
@@ -90,10 +91,9 @@ export const adminEventsRouter = createTRPCRouter({
     .input(z.object({
       id: z.string(),
       name: z.string().min(1).optional(),
-      category: z.enum(['individual', 'team']).optional(),
       description: z.string().optional(),
-      maxPlayers: z.number().optional(),
-      minPlayers: z.number().optional(),
+      mainPlayersCount: z.number().optional(),
+      maxSubstitutes: z.number().optional(),
       isActive: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
@@ -193,16 +193,12 @@ export const adminEventsRouter = createTRPCRouter({
         ];
       }
 
-      const now = new Date();
       if (input.status === 'upcoming') {
-        where.startDate = { gt: now };
+        where.status = 'draft';
       } else if (input.status === 'ongoing') {
-        where.AND = [
-          { startDate: { lte: now } },
-          { endDate: { gte: now } },
-        ];
+        where.status = { in: ['registration_open', 'registration_closed', 'active'] };
       } else if (input.status === 'completed') {
-        where.endDate = { lt: now };
+        where.status = { in: ['completed', 'cancelled'] };
       }
 
       const [events, totalCount] = await Promise.all([
@@ -241,20 +237,42 @@ export const adminEventsRouter = createTRPCRouter({
     .input(z.object({
       name: z.string().min(1),
       description: z.string().optional(),
-      sportId: z.string(),
-      venueId: z.string(),
-      startDate: z.date(),
-      endDate: z.date(),
-      maxTeams: z.number().optional(),
-      registrationDeadline: z.date().optional(),
+      registrationStartDate: z.string(),
+      registrationEndDate: z.string(),
+      startDate: z.string(),
+      endDate: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
+      // Convert string dates to Date objects
+      const registrationStartDate = new Date(input.registrationStartDate + 'T00:00:00.000Z');
+      const registrationEndDate = new Date(input.registrationEndDate + 'T00:00:00.000Z');
+      const startDate = new Date(input.startDate + 'T00:00:00.000Z');
+      const endDate = new Date(input.endDate + 'T00:00:00.000Z');
+
+      // Validate date logic
+      const validationError = validateEventDates(registrationStartDate, registrationEndDate, startDate, endDate);
+      if (validationError) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: validationError });
+      }
+
+      // Calculate status based on dates
+      const status = calculateEventStatus(registrationStartDate, registrationEndDate, startDate, endDate);
+
       const event = await db.event.create({
-        data: input,
+        data: {
+          name: input.name,
+          description: input.description,
+          registrationStartDate,
+          registrationEndDate,
+          startDate,
+          endDate,
+          status,
+          createdBy: ctx.user.id,
+        },
         include: {
           createdByUser: {
             select: {
@@ -274,19 +292,56 @@ export const adminEventsRouter = createTRPCRouter({
       id: z.string(),
       name: z.string().min(1).optional(),
       description: z.string().optional(),
-      sportId: z.string().optional(),
-      venueId: z.string().optional(),
-      startDate: z.date().optional(),
-      endDate: z.date().optional(),
-      maxTeams: z.number().optional(),
-      registrationDeadline: z.date().optional(),
+      registrationStartDate: z.string().optional(),
+      registrationEndDate: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      status: z.enum(['draft', 'registration_open', 'registration_closed', 'active', 'completed', 'cancelled']).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const { id, ...updateData } = input;
+      const { id, ...inputData } = input;
+      
+      // Get current event data
+      const currentEvent = await db.event.findUnique({ where: { id } });
+      if (!currentEvent) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Event not found' });
+      }
+
+      // Convert string dates to Date objects and merge with current data
+      const updateData: any = {};
+      Object.entries(inputData).forEach(([key, value]) => {
+        if (value !== undefined) {
+          if (key.includes('Date') && typeof value === 'string') {
+            updateData[key] = new Date(value + 'T00:00:00.000Z');
+          } else {
+            updateData[key] = value;
+          }
+        }
+      });
+
+      // Get final date values (updated or current)
+      const registrationStartDate = updateData.registrationStartDate || currentEvent.registrationStartDate;
+      const registrationEndDate = updateData.registrationEndDate || currentEvent.registrationEndDate;
+      const startDate = updateData.startDate || currentEvent.startDate;
+      const endDate = updateData.endDate || currentEvent.endDate;
+
+      // Validate date logic if any dates are being updated
+      if (updateData.registrationStartDate || updateData.registrationEndDate || updateData.startDate || updateData.endDate) {
+        const validationError = validateEventDates(registrationStartDate, registrationEndDate, startDate, endDate);
+        if (validationError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: validationError });
+        }
+      }
+
+      // Calculate status based on dates (unless manually setting to cancelled or already cancelled)
+      if (inputData.status !== 'cancelled' && currentEvent.status !== 'cancelled') {
+        updateData.status = calculateEventStatus(registrationStartDate, registrationEndDate, startDate, endDate);
+      }
+
       const event = await db.event.update({
         where: { id },
         data: updateData,
@@ -301,6 +356,40 @@ export const adminEventsRouter = createTRPCRouter({
       });
 
       return event;
+    }),
+
+  // Refresh Event Statuses
+  refreshEventStatuses: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      // Get all non-cancelled events
+      const events = await db.event.findMany({
+        where: {
+          status: { not: 'cancelled' }
+        }
+      });
+
+      // Update each event's status
+      const updatePromises = events.map(event => {
+        const newStatus = calculateEventStatus(
+          event.registrationStartDate,
+          event.registrationEndDate,
+          event.startDate,
+          event.endDate
+        );
+
+        return db.event.update({
+          where: { id: event.id },
+          data: { status: newStatus }
+        });
+      });
+
+      await Promise.all(updatePromises);
+
+      return { updated: events.length };
     }),
 
   // Delete Event

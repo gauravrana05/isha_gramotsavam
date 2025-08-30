@@ -51,7 +51,7 @@ export default function CaptainSidebar({
   
   const pathname = usePathname();
   const { lang,teamId } = useParams();
-  const { user, userProfile, logout } = useAuth();
+  const { user, userProfile, profileImage, logout } = useAuth();
 
   // Admin detection - check if admin is accessing captain routes
   const isAdminAccessing = userProfile?.role === 'admin' && !pathname.includes('/admin/');
@@ -120,8 +120,10 @@ export default function CaptainSidebar({
         {item.href ? (
           <Link
             href={item.href}
-            className={`flex items-center px-4 text-sm font-medium rounded-lg transition-colors h-12 ${
-              depth > 0 ? 'ml-6' : ''
+            className={`flex items-center text-xs font-medium rounded-lg transition-colors h-9 ${
+              isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
+            } ${
+              depth > 0 ? (isDesktopCollapsed ? '' : 'ml-4') : ''
             } ${
               itemIsActive
                 ? 'bg-[#F28C38] text-white shadow-sm'
@@ -130,12 +132,14 @@ export default function CaptainSidebar({
             onClick={() => setIsMobileOpen(false)}
             title={isDesktopCollapsed ? item.name : undefined}
           >
-            <item.icon className={`w-5 h-5 ${depth > 0 ? 'mr-2' : 'mr-3'} flex-shrink-0`} />
+            <item.icon className={`w-4 h-4 flex-shrink-0 ${
+              isDesktopCollapsed ? '' : (depth > 0 ? 'mr-2' : 'mr-2')
+            }`} />
             {showContent && (
               <div className="flex items-center w-full animate-fade-in">
                 <span className="flex-1">{item.name}</span>
                 {item.badge && (
-                  <span className="ml-auto bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full">
+                  <span className="ml-auto bg-red-100 text-red-600 text-xs px-1.5 py-0.5 rounded-full">
                     {item.badge}
                   </span>
                 )}
@@ -145,24 +149,28 @@ export default function CaptainSidebar({
         ) : (
           <button
             onClick={() => !isDesktopCollapsed && toggleExpanded(item.name)}
-            className={`w-full flex items-center px-4 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-12 ${
-              depth > 0 ? 'ml-6' : ''
+            className={`w-full flex items-center text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9 ${
+              isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
+            } ${
+              depth > 0 ? (isDesktopCollapsed ? '' : 'ml-4') : ''
             }`}
             title={isDesktopCollapsed ? item.name : undefined}
           >
-            <item.icon className={`w-5 h-5 ${depth > 0 ? 'mr-2' : 'mr-3'} flex-shrink-0`} />
+            <item.icon className={`w-4 h-4 flex-shrink-0 ${
+              isDesktopCollapsed ? '' : (depth > 0 ? 'mr-2' : 'mr-2')
+            }`} />
             {showContent && (
               <div className="flex items-center w-full animate-fade-in">
                 <span className="flex-1 text-left">{item.name}</span>
                 {hasChildren && (
                   isExpanded ? (
-                    <ChevronDown className="w-4 h-4" />
+                    <ChevronDown className="w-3 h-3" />
                   ) : (
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-3 h-3" />
                   )
                 )}
                 {item.badge && (
-                  <span className="ml-2 bg-red-100 text-red-600 text-xs px-2 py-1 rounded-full">
+                  <span className="ml-2 bg-red-100 text-red-600 text-xs px-1.5 py-0.5 rounded-full">
                     {item.badge}
                   </span>
                 )}
@@ -186,9 +194,9 @@ export default function CaptainSidebar({
       <div className="lg:hidden">
         <button
           onClick={() => setIsMobileOpen(true)}
-          className="fixed top-4 left-4 z-50 p-2 rounded-md bg-white shadow-lg border border-gray-200"
+          className="fixed top-4 left-4 z-50 p-2 rounded-md bg-white shadow-lg border border-gray-200 hover:bg-gray-50 transition-colors"
         >
-          <Menu className="w-6 h-6 text-gray-700" />
+          <Menu className="w-5 h-5 text-gray-700" />
         </button>
       </div>
 
@@ -205,40 +213,40 @@ export default function CaptainSidebar({
         fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
         lg:translate-x-0 lg:fixed lg:top-0 lg:bottom-0 lg:flex-shrink-0 lg:transition-[width] lg:duration-300 lg:ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${isDesktopCollapsed ? 'lg:w-20' : 'lg:w-80'} w-80
+        ${isDesktopCollapsed ? 'lg:w-16' : 'lg:w-64'} w-64
         ${className}
       `}>
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className={`flex items-center border-b border-gray-200 h-20 ${
-            isDesktopCollapsed ? 'justify-center px-4' : 'justify-between px-6'
+          <div className={`flex items-center border-b border-gray-200 h-16 ${
+            isDesktopCollapsed ? 'justify-center px-3' : 'justify-between px-3'
           }`}>
             {showContent && (
               <div className="flex items-center animate-fade-in">
-                <div className="w-8 h-8 bg-[#F28C38] rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Users className="w-5 h-5 text-white" />
+                <div className="w-7 h-7 bg-[#F28C38] rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Users className="w-4 h-4 text-white" />
                 </div>
-                <div className="ml-3">
-                  <h2 className="text-lg font-semibold text-gray-900">
+                <div className="ml-2">
+                  <h2 className="text-sm font-semibold text-gray-900">
                     {isAdminAccessing ? 'Admin Panel' : 'Captain Panel'}
                   </h2>
-                  <p className="text-sm text-gray-600">Isha Gramotsavam</p>
+                  <p className="text-xs text-gray-600">Isha Gramotsavam</p>
                 </div>
               </div>
             )}
             
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1">
               {/* Desktop toggle button */}
               {onDesktopToggle && (
                 <button
                   onClick={onDesktopToggle}
-                  className="hidden lg:block p-2 rounded-md hover:bg-gray-100 transition-colors"
+                  className="hidden lg:block p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                   title={isDesktopCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
                   {isDesktopCollapsed ? (
-                    <ChevronRightIcon className="w-5 h-5 text-gray-500" />
+                    <ChevronRightIcon className="w-4 h-4 text-gray-500" />
                   ) : (
-                    <ChevronLeft className="w-5 h-5 text-gray-500" />
+                    <ChevronLeft className="w-4 h-4 text-gray-500" />
                   )}
                 </button>
               )}
@@ -249,7 +257,7 @@ export default function CaptainSidebar({
                   onClick={() => setIsMobileOpen(false)}
                   className="lg:hidden p-1 rounded-md hover:bg-gray-100"
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="w-4 h-4 text-gray-500" />
                 </button>
               )}
             </div>
@@ -257,26 +265,26 @@ export default function CaptainSidebar({
 
           {/* User Info */}
           {userProfile && (
-            <div className={`border-b border-gray-200 bg-gray-50 h-20 flex items-center ${
-              isDesktopCollapsed ? 'justify-center px-2' : 'px-4'
+            <div className={`border-b border-gray-200 bg-gray-50 h-16 flex items-center ${
+              isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
             }`}>
               <div className="flex items-center">
-                {userProfile.profileImages?.profilePhotoPath ? (
+                {profileImage ? (
                   <img 
-                    src={userProfile.profileImages.profilePhotoPath} 
+                    src={profileImage} 
                     alt={`${userProfile.firstName} ${userProfile.lastName}`}
-                    className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="w-10 h-10 bg-[#3A7F3F] rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-medium text-sm">
+                  <div className="w-8 h-8 bg-[#3A7F3F] rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-medium text-xs">
                       {userProfile.firstName?.charAt(0)}{userProfile.lastName?.charAt(0)}
                     </span>
                   </div>
                 )}
                 {showContent && (
-                  <div className="ml-3 animate-fade-in">
-                    <p className="text-sm font-medium text-gray-900">
+                  <div className="ml-2 animate-fade-in">
+                    <p className="text-xs font-medium text-gray-900">
                       {userProfile.firstName} {userProfile.lastName}
                     </p>
                     <p className="text-xs text-gray-600 capitalize">{userProfile.role}</p>
@@ -287,32 +295,32 @@ export default function CaptainSidebar({
           )}
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-none hover:scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {navigation.map(item => renderNavItem(item))}
           </nav>
 
           {/* Footer Actions */}
-          <div className="border-t border-gray-200 p-4 space-y-2">
+          <div className="border-t border-gray-200 p-3 space-y-1">
             {/* Back to Admin Dashboard - only show when admin is accessing */}
             {isAdminAccessing && (
               <Link
                 href={`/${lang}/admin/dashboard`}
-                className="flex items-center px-4 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-12"
+                className="flex items-center px-3 text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9"
                 onClick={() => setIsMobileOpen(false)}
                 title={isDesktopCollapsed ? 'Back to Admin Dashboard' : undefined}
               >
-                <Settings className="w-5 h-5 mr-3 flex-shrink-0" />
+                <Settings className="w-4 h-4 flex-shrink-0" />
                 {showContent && <span className="animate-fade-in">Back to Admin Dashboard</span>}
               </Link>
             )}
             
             <Link
               href={`/${lang}/captain/profile`}
-              className="flex items-center px-4 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-12"
+              className="flex items-center px-3 text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9"
               onClick={() => setIsMobileOpen(false)}
               title={isDesktopCollapsed ? (isAdminAccessing ? 'Captain Profile' : 'Profile') : undefined}
             >
-              <User className="w-5 h-5 mr-3 flex-shrink-0" />
+              <User className="w-4 h-4 flex-shrink-0" />
               {showContent && (
                 <span className="animate-fade-in">
                   {isAdminAccessing ? 'Captain Profile' : 'Profile'}
@@ -331,10 +339,10 @@ export default function CaptainSidebar({
                   // Handle logout error silently
                 }
               }}
-              className="w-full flex items-center px-4 text-sm font-medium text-red-700 rounded-lg hover:bg-red-50 hover:text-red-900 transition-colors h-12"
+              className="w-full flex items-center px-3 text-xs font-medium text-red-700 rounded-lg hover:bg-red-50 hover:text-red-900 transition-colors h-9"
               title={isDesktopCollapsed ? 'Sign Out' : undefined}
             >
-              <LogOut className="w-5 h-5 mr-3 flex-shrink-0" />
+              <LogOut className="w-4 h-4 flex-shrink-0" />
               {showContent && <span className="animate-fade-in">Sign Out</span>}
             </button>
           </div>

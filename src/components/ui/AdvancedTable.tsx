@@ -270,6 +270,7 @@ export const AdvancedTable = <T,>({
   onTableParamsChange,
   onSelectedRowsChange,
   filterFields,
+  getRowActions,
   
   className,
   ...domProps

@@ -285,6 +285,225 @@ export const venueAssignmentRouter = createTRPCRouter({
 
       return filteredTeams;
     }),
+
+  // Assign volunteers to venue
+  assignVolunteersToVenue: protectedProcedure
+    .input(z.object({
+      volunteerIds: z.array(z.string().uuid()),
+      venueLevelMappingId: z.string().uuid(),
+      eventId: z.string().uuid().optional(), // If not provided, will use the first ongoing event
+      volunteerType: z.enum(['general_volunteer', 'technical_volunteer', 'verification_volunteer']).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      try {
+        // Get eventId - use provided or find the first ongoing event
+        let eventId = input.eventId;
+        if (!eventId) {
+          const ongoingEvent = await db.event.findFirst({
+            where: {
+              status: {
+                in: ['active', 'registration_open', 'registration_closed']
+              }
+            },
+            select: { id: true }
+          });
+          
+          if (!ongoingEvent) {
+            throw new TRPCError({ 
+              code: 'NOT_FOUND', 
+              message: 'No ongoing event found for volunteer assignment' 
+            });
+          }
+          
+          eventId = ongoingEvent.id;
+        }
+
+        // Verify venue mapping exists
+        const venueMapping = await db.venueLevelMapping.findUnique({
+          where: { id: input.venueLevelMappingId },
+          include: { venue: true }
+        });
+
+        if (!venueMapping || !venueMapping.venue?.isActive) {
+          throw new TRPCError({ 
+            code: 'NOT_FOUND', 
+            message: 'Venue mapping not found or inactive' 
+          });
+        }
+
+        // Verify all volunteers exist and have volunteer roles
+        const volunteers = await db.user.findMany({
+          where: { 
+            id: { in: input.volunteerIds },
+            role: { in: ['general_volunteer', 'technical_volunteer', 'verification_volunteer'] }
+          }
+        });
+
+        if (volunteers.length !== input.volunteerIds.length) {
+          throw new TRPCError({ 
+            code: 'BAD_REQUEST', 
+            message: 'Some volunteers not found or do not have volunteer roles' 
+          });
+        }
+
+        // Check for existing assignments and prepare new ones
+        const existingAssignments = await db.volunteerAssignment.findMany({
+          where: {
+            volunteerId: { in: input.volunteerIds },
+            eventId: eventId,
+            deletedAt: null
+          }
+        });
+
+        const existingVolunteerIds = existingAssignments.map(a => a.volunteerId);
+        const newVolunteerIds = input.volunteerIds.filter(id => !existingVolunteerIds.includes(id));
+
+        // Create new assignments for volunteers without existing assignments
+        const assignments = await Promise.all(
+          newVolunteerIds.map(async (volunteerId) => {
+            const volunteer = volunteers.find(v => v.id === volunteerId);
+            const assignmentType = input.volunteerType || (volunteer?.role as any) || 'general_volunteer';
+            
+            // Update user role based on assignment type
+            if (assignmentType === 'technical_volunteer' && volunteer?.role !== 'technical_volunteer') {
+              await db.user.update({
+                where: { id: volunteerId },
+                data: { role: 'technical_volunteer' }
+              });
+            }
+            
+            return db.volunteerAssignment.create({
+              data: {
+                eventId: eventId!,
+                volunteerId: volunteerId,
+                venueLevelMappingId: input.venueLevelMappingId,
+                volunteerType: assignmentType,
+                contactPhone: volunteer?.phone,
+                assignedBy: ctx.user.id,
+                status: 'assigned'
+              },
+              include: {
+                volunteerUser: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    phone: true
+                  }
+                },
+                venueLevelMapping: {
+                  select: {
+                    level: true,
+                    venue: {
+                      select: {
+                        name: true,
+                        district: true,
+                        taluk: true
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          })
+        );
+
+        return {
+          success: true,
+          message: `Successfully assigned ${assignments.length} volunteer(s) to ${venueMapping.venue.name}`,
+          data: {
+            newAssignments: assignments.length,
+            existingAssignments: existingAssignments.length,
+            totalRequested: input.volunteerIds.length,
+            venueName: venueMapping.venue.name,
+            assignments: assignments
+          }
+        };
+      } catch (error) {
+        console.error('Volunteer assignment error:', error);
+        console.error('Input data:', input);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({ 
+          code: 'INTERNAL_SERVER_ERROR', 
+          message: `Failed to assign volunteers to venue: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        });
+      }
+    }),
+
+  // Delete volunteer assignment and revert role if needed
+  deleteVolunteerAssignment: protectedProcedure
+    .input(z.object({
+      assignmentId: z.string().uuid(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      try {
+        // Get the assignment to be deleted
+        const assignment = await db.volunteerAssignment.findUnique({
+          where: { id: input.assignmentId },
+          include: {
+            volunteerUser: true,
+            venueLevelMapping: {
+              include: { venue: true }
+            }
+          }
+        });
+
+        if (!assignment) {
+          throw new TRPCError({ 
+            code: 'NOT_FOUND', 
+            message: 'Volunteer assignment not found' 
+          });
+        }
+
+        // Delete the assignment
+        await db.volunteerAssignment.update({
+          where: { id: input.assignmentId },
+          data: { deletedAt: new Date() }
+        });
+
+        // Check if volunteer has any other technical assignments
+        const otherTechnicalAssignments = await db.volunteerAssignment.count({
+          where: {
+            volunteerId: assignment.volunteerId,
+            volunteerType: 'technical_volunteer',
+            deletedAt: null,
+            id: { not: input.assignmentId }
+          }
+        });
+
+        // If no other technical assignments and current user is technical_volunteer, revert to general_volunteer
+        if (otherTechnicalAssignments === 0 && assignment.volunteerUser.role === 'technical_volunteer') {
+          await db.user.update({
+            where: { id: assignment.volunteerId },
+            data: { role: 'general_volunteer' }
+          });
+        }
+
+        return {
+          success: true,
+          message: `Successfully removed volunteer assignment from ${assignment.venueLevelMapping.venue.name}`,
+          data: {
+            assignmentId: input.assignmentId,
+            volunteerName: `${assignment.volunteerUser.firstName} ${assignment.volunteerUser.lastName}`,
+            venueName: assignment.venueLevelMapping.venue.name,
+            roleReverted: otherTechnicalAssignments === 0 && assignment.volunteerUser.role === 'technical_volunteer'
+          }
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({ 
+          code: 'INTERNAL_SERVER_ERROR', 
+          message: 'Failed to delete volunteer assignment' 
+        });
+      }
+    }),
 });
 
 /**

@@ -8,6 +8,7 @@ import { sportsRouter } from './routers/sports'
 import { volunteersRouter } from './routers/volunteers'
 import { adminRouter } from './routers/admin'
 import { locationRouter } from './routers/location'
+import { verificationRouter } from './routers/verification'
 
 /**
  * This is the primary router for your server.
@@ -24,6 +25,7 @@ export const appRouter = createTRPCRouter({
   volunteers: volunteersRouter,
   admin: adminRouter,
   location: locationRouter,
+  verification: verificationRouter,
 })
 
 // Export type definition of API

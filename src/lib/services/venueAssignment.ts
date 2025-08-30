@@ -58,17 +58,17 @@ export async function assignVenueToTeam(
       };
     }
 
-    // Tier 1: Try direct taluk-to-venue mapping
-    const talukMapping = await findVenueByTalukMapping(teamLocation, eventId);
-    if (talukMapping) {
-      const assignment = await createVenueAssignment(teamId, eventId, talukMapping, assignedByUserId, 'auto_assigned');
+    // Enhanced venue assignment with district/taluk mapping priority
+    const locationMapping = await findVenueByLocationMapping(teamLocation, eventId);
+    if (locationMapping) {
+      const assignment = await createVenueAssignment(teamId, eventId, locationMapping, assignedByUserId, 'auto_assigned');
       if (assignment) {
         return {
           success: true,
-          message: `Team assigned to ${talukMapping.venueName} via taluk mapping`,
+          message: `Team assigned to ${locationMapping.venueName} via location mapping`,
           assignment: {
-            venueId: talukMapping.venueId,
-            venueName: talukMapping.venueName,
+            venueId: locationMapping.venueId,
+            venueName: locationMapping.venueName,
             assignmentLevel: 'cluster',
             assignmentMethod: 'auto_assigned'
           }
@@ -76,7 +76,7 @@ export async function assignVenueToTeam(
       }
     }
 
-    // Tier 2: District-level cluster venues
+    // Fallback: District-level cluster venues (if no specific mappings)
     const districtVenues = await findVenuesByDistrict(teamLocation, eventId);
     
     if (districtVenues.length === 1) {
@@ -132,15 +132,102 @@ export async function assignVenueToTeam(
 /**
  * Tier 1: Find venue by direct taluk mapping
  */
-async function findVenueByTalukMapping(location: TeamLocationData, eventId: string) {
+async function findVenueByLocationMapping(location: TeamLocationData, eventId: string) {
   try {
-    // Use TalukClusterMapping to find direct taluk-to-venue mapping
-    const talukMapping = await db.talukClusterMapping.findFirst({
+    // Priority 1: Check district mapping first
+    const districtMapping = await db.locationClusterMapping.findFirst({
       where: {
         eventId,
+        locationType: 'district',
+        locationName: location.district,
+        state: location.state,
+      },
+      include: {
+        venueLocationMapping: {
+          include: {
+            venue: {
+              select: { 
+                id: true, 
+                name: true, 
+                isActive: true,
+                capacity: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (districtMapping?.venueLocationMapping?.venue?.isActive) {
+      const currentAssignments = await db.teamVenueAssignment.count({
+        where: {
+          eventId,
+          clusterVenueMappingId: districtMapping.clusterVenueMappingId
+        }
+      });
+
+      const maxCapacity = districtMapping.venueLocationMapping.venue.capacity || districtMapping.venueLocationMapping.maxTeams || 50;
+      if (currentAssignments < maxCapacity) {
+        return {
+          venueId: districtMapping.venueLocationMapping.venue.id,
+          venueName: districtMapping.venueLocationMapping.venue.name,
+          mappingId: districtMapping.clusterVenueMappingId,
+          maxTeams: maxCapacity
+        };
+      }
+    }
+
+    // Priority 2: Check if only one cluster venue in district
+    const clusterVenues = await db.venueLevelMapping.findMany({
+      where: {
+        eventId,
+        level: 'cluster',
+        isActive: true,
+        venue: {
+          district: location.district,
+          state: location.state,
+          isActive: true,
+        }
+      },
+      include: {
+        venue: {
+          select: { 
+            id: true, 
+            name: true, 
+            capacity: true
+          }
+        }
+      }
+    });
+
+    if (clusterVenues.length === 1) {
+      const venue = clusterVenues[0];
+      const currentAssignments = await db.teamVenueAssignment.count({
+        where: {
+          eventId,
+          clusterVenueMappingId: venue.id
+        }
+      });
+
+      const maxCapacity = venue.venue.capacity || venue.maxTeams || 50;
+      if (currentAssignments < maxCapacity) {
+        return {
+          venueId: venue.venue.id,
+          venueName: venue.venue.name,
+          mappingId: venue.id,
+          maxTeams: maxCapacity
+        };
+      }
+    }
+
+    // Priority 3: Check taluk mapping
+    const talukMapping = await db.locationClusterMapping.findFirst({
+      where: {
+        eventId,
+        locationType: 'taluk',
+        locationName: location.taluk,
         district: location.district,
         state: location.state,
-        taluk: location.taluk
       },
       include: {
         venueLocationMapping: {
@@ -159,7 +246,6 @@ async function findVenueByTalukMapping(location: TeamLocationData, eventId: stri
     });
 
     if (talukMapping?.venueLocationMapping?.venue?.isActive) {
-      // Check venue capacity
       const currentAssignments = await db.teamVenueAssignment.count({
         where: {
           eventId,
@@ -168,20 +254,19 @@ async function findVenueByTalukMapping(location: TeamLocationData, eventId: stri
       });
 
       const maxCapacity = talukMapping.venueLocationMapping.venue.capacity || talukMapping.venueLocationMapping.maxTeams || 50;
-      if (currentAssignments >= maxCapacity) {
-        return null; // Venue at capacity
+      if (currentAssignments < maxCapacity) {
+        return {
+          venueId: talukMapping.venueLocationMapping.venue.id,
+          venueName: talukMapping.venueLocationMapping.venue.name,
+          mappingId: talukMapping.clusterVenueMappingId,
+          maxTeams: maxCapacity
+        };
       }
-
-      return {
-        venueId: talukMapping.venueLocationMapping.venue.id,
-        venueName: talukMapping.venueLocationMapping.venue.name,
-        mappingId: talukMapping.clusterVenueMappingId,
-        maxTeams: maxCapacity
-      };
     }
+
     return null;
   } catch (error) {
-    console.error('Taluk mapping search error:', error);
+    console.error('Location mapping search error:', error);
     return null;
   }
 }

@@ -23,10 +23,12 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
     const [isOpen, setIsOpen] = React.useState(false);
     const [searchTerm, setSearchTerm] = React.useState("");
     const dropdownRef = React.useRef<HTMLDivElement>(null);
+    const containerRef = React.useRef<HTMLDivElement>(null);
 
-    // Filter options based on search term
+    // Filter options based on search term and exclude already selected items
     const filteredOptions = options.filter(option =>
-      option.label.toLowerCase().includes(searchTerm.toLowerCase())
+      option.label.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      !value.includes(option.value)
     );
 
     // Handle option toggle
@@ -52,7 +54,7 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
     // Close dropdown when clicking outside
     React.useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
           setIsOpen(false);
         }
       };
@@ -65,7 +67,7 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
     const selectedLabels = value.map(v => options.find(opt => opt.value === v)?.label).filter(Boolean);
 
     return (
-      <div ref={ref} className={cn("relative", className)}>
+      <div ref={containerRef} className={cn("relative", className)}>
         <div
           ref={dropdownRef}
           className={cn(
@@ -106,7 +108,9 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
                 className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                autoFocus
               />
             </div>
             <div className="max-h-48 overflow-y-auto p-1">
@@ -114,15 +118,13 @@ export const MultiSelect = React.forwardRef<HTMLDivElement, MultiSelectProps>(
                 filteredOptions.map((option) => (
                   <div
                     key={option.value}
-                    className={cn(
-                      "relative flex w-full cursor-pointer select-none items-center rounded-sm py-2 pl-8 pr-2 text-sm outline-none hover:bg-blue-50 hover:text-blue-900",
-                      value.includes(option.value) && "bg-blue-50 text-blue-900"
-                    )}
-                    onClick={() => toggleOption(option.value)}
+                    className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-2 px-3 text-sm outline-none hover:bg-blue-50 hover:text-blue-900"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleOption(option.value);
+                    }}
                   >
-                    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                      {value.includes(option.value) && <Check className="h-4 w-4" />}
-                    </span>
                     {option.label}
                   </div>
                 ))

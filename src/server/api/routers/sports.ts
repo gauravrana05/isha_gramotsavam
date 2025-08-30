@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createTRPCRouter, publicProcedure } from '../trpc'
+import { createTRPCRouter, publicProcedure, protectedProcedure } from '../trpc'
 import { db } from '@/lib/db'
 import { TRPCError } from '@trpc/server'
 
@@ -172,5 +172,29 @@ export const sportsRouter = createTRPCRouter({
           message: 'Failed to fetch sports for gender',
         })
       }
+    }),
+
+  // Update Sport
+  updateSport: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      name: z.string().min(1).optional(),
+      description: z.string().optional(),
+      mainPlayersCount: z.number().optional(),
+      maxSubstitutes: z.number().optional(),
+      isActive: z.boolean().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      const { id, ...updateData } = input;
+      const sport = await db.sport.update({
+        where: { id },
+        data: updateData,
+      });
+
+      return sport;
     }),
 })

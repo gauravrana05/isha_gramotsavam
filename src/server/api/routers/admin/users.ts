@@ -90,6 +90,33 @@ export const adminUsersRouter = createTRPCRouter({
             userVerifications: true,
             profileComplete: true,
             createdAt: true,
+            // volunteerAssignmentsAsVolunteer: {
+            //   where: {
+            //     event: {
+            //       status: {
+            //         in: ['active', 'registration_open', 'registration_closed']
+            //       }
+            //     },
+            //     deletedAt: null
+            //   },
+            //   select: {
+            //     id: true,
+            //     venueLevelMapping: {
+            //       select: {
+            //         id: true,
+            //         level: true,
+            //         venue: {
+            //           select: {
+            //             id: true,
+            //             name: true,
+            //             district: true,
+            //             taluk: true
+            //           }
+            //         }
+            //       }
+            //     }
+            //   }
+            // }
           },
           orderBy: {
             [input.sortBy]: input.sortOrder
@@ -102,21 +129,31 @@ export const adminUsersRouter = createTRPCRouter({
 
       return {
         success: true,
-        users: users.map(user => ({
-          id: user.id,
-          uid: user.id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          phoneNumber: user.phone,
-          email: user.email,
-          role: user.role,
-          gender: user.gender,
-          panchayat: user.panchayat,
-          district: user.district,
-          state: user.state,
-          isProfileComplete: user.profileComplete,
-          createdAt: user.createdAt?.toISOString() || null,
-        })),
+        users: users.map(user => {
+          // Get the first venue assignment for ongoing events
+          // const venueAssignment = user.volunteerAssignmentsAsVolunteer?.[0];
+          // const venueData = venueAssignment?.venueLevelMapping;
+          
+          return {
+            id: user.id,
+            uid: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            phoneNumber: user.phone,
+            email: user.email,
+            role: user.role,
+            gender: user.gender,
+            panchayat: user.panchayat,
+            district: user.district,
+            state: user.state,
+            isProfileComplete: user.profileComplete,
+            createdAt: user.createdAt?.toISOString() || null,
+            // venueAssignment: venueData ? `${venueData.venue.name} - ${venueData.level}` : null,
+            // venueAssignmentId: venueAssignment?.id || null,
+            venueAssignment: null,
+            venueAssignmentId: null,
+          };
+        }),
         pagination: {
           total,
           hasMore: input.offset + input.limit < total,
@@ -238,6 +275,61 @@ export const adminUsersRouter = createTRPCRouter({
         user: {
           id: user.id,
           // isVerified: user.is_verified, // TODO: Clarify mapping for is_verified
+        }
+      };
+    }),
+
+  // Create User (for volunteers)
+  createUser: protectedProcedure
+    .input(z.object({
+      firstName: z.string().min(1).max(100),
+      lastName: z.string().min(1).max(100),
+      phone: z.string().min(10).max(20),
+      email: z.string().email().optional(),
+      gender: z.enum(['M', 'F', 'O']),
+      role: z.enum(['general_volunteer', 'technical_volunteer', 'verification_volunteer']),
+      whatsappNumber: z.string().min(10).max(20).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      // Check if user with phone number already exists
+      const existingUser = await db.user.findUnique({
+        where: { phone: input.phone }
+      });
+
+      if (existingUser) {
+        throw new TRPCError({ 
+          code: 'CONFLICT', 
+          message: 'A user with this phone number already exists' 
+        });
+      }
+
+      const user = await db.user.create({
+        data: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          phone: input.phone,
+          email: input.email,
+          gender: input.gender,
+          role: input.role,
+          whatsappNumber: input.whatsappNumber || input.phone,
+          profileComplete: false, // Will be completed when they add more details
+        }
+      });
+
+      return {
+        success: true,
+        message: 'Volunteer created successfully',
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+          email: user.email,
+          role: user.role,
         }
       };
     }),

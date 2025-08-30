@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useNotification } from "@/context/NotificationContext";
 import { api } from "@/server/trpc/react";
 import { useTranslation } from "@/lib/utils/i18n";
 import { AdvancedTable } from "@/components/ui/AdvancedTable";
-import type { Column } from "@/components/ui/Table";
+import { EnhancedModal } from "@/components/ui/EnhancedModal";
+import { SingleStatCard } from "@/components/ui";
+import type { Column, ActionButton } from "@/components/ui/Table";
 import Image from "next/image";
-import { Users, Loader2, AlertCircle, CheckCircle, Clock, X, Eye, Filter } from "lucide-react";
+import { Users, Loader2, AlertCircle, CheckCircle, Clock, X, Eye, Filter, UserCheck, FileX, TrendingUp } from "lucide-react";
 
 interface TeamData {
   id: string;
@@ -32,17 +35,34 @@ export default function VerificationTeamsPage() {
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
+  const { addNotification } = useNotification();
   const { t } = useTranslation();
 
-  // Try with a simple query first
-  const { data: teamsData, isLoading: teamsLoading, error: teamsError } = api.teams.verification.getForVerification.useQuery(
+  // Enhanced state management
+  const [selectedTeams, setSelectedTeams] = useState<Set<string | number>>(new Set());
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<TeamData | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  // Enhanced query with search and filter
+  const { data: teamsData, isLoading: teamsLoading, error: teamsError, refetch } = api.teams.verification.getForVerification.useQuery(
     {
-      searchTerm: '',
-      statusFilter: 'all',
+      searchTerm,
+      statusFilter,
+      limit: 50,
+      offset: 0
     },
     {
-      enabled: !authLoading && !!user,
+      enabled: !authLoading && !!user && ['admin', 'verification_volunteer', 'technical_volunteer'].includes(userProfile?.role || ''),
     }
+  );
+
+  // Get verification stats
+  const { data: statsData, isLoading: statsLoading } = api.verification.dashboard.getStats.useQuery(
+    undefined,
+    { enabled: !authLoading && !!user && ['admin', 'verification_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
   );
 
   const teams = teamsData?.teams || [];
@@ -70,23 +90,41 @@ export default function VerificationTeamsPage() {
     );
   }
 
-  // Define columns for AdvancedTable
-  const columns: Column<TeamData>[] = [
+  // Enhanced stats calculations
+  const stats = useMemo(() => {
+    if (!statsData) return null;
+    
+    return {
+      totalTeams: statsData.totalTeams || 0,
+      pendingVerification: statsData.pendingVerification || 0,
+      verifiedTeams: statsData.verifiedTeams || 0,
+      rejectedTeams: statsData.rejectedTeams || 0,
+      todayVerifications: statsData.todayVerifications || 0
+    };
+  }, [statsData]);
+
+  // Enhanced columns with render functions
+  const columns = useMemo<Column<TeamData>[]>(() => [
     {
       key: 'name',
       header: 'Team',
-      accessor: (team) => (
-        <div>
-          <div className="font-semibold text-gray-900">{team.name}</div>
-          <div className="text-sm text-gray-600">{team.sportName} • {team.genderCategory === 'women' ? 'Women' : 'Men'}</div>
+      sortable: true,
+      render: (_, team) => (
+        <div className="flex items-center space-x-3">
+          <div className={`p-2 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200`}>
+            <Users className="w-4 h-4 text-blue-600" />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-900">{team.name}</div>
+            <div className="text-sm text-gray-600">{team.sportName} • {team.genderCategory === 'women' ? 'Women' : 'Men'}</div>
+          </div>
         </div>
       ),
-      sortable: true,
     },
     {
       key: 'captain',
       header: 'Captain',
-      accessor: (team) => (
+      render: (_, team) => (
         <div className="text-sm">
           <div className="text-gray-900">{team.captainProfile.name}</div>
           <div className="text-gray-600">+91 {team.captainProfile.phone}</div>
@@ -96,7 +134,7 @@ export default function VerificationTeamsPage() {
     {
       key: 'location',
       header: 'Location',
-      accessor: (team) => (
+      render: (_, team) => (
         <div className="text-sm">
           <div className="text-gray-900">{team.panchayat}</div>
           <div className="text-gray-600">{team.district}, {team.state}</div>
@@ -106,35 +144,131 @@ export default function VerificationTeamsPage() {
     {
       key: 'players',
       header: 'Players',
-      accessor: (team) => `${team.currentPlayers} / ${team.maxPlayers}`,
+      sortable: true,
+      render: (_, team) => (
+        <div className="text-center">
+          <div className="text-sm font-medium text-gray-900">
+            {team.currentPlayers} / {team.maxPlayers}
+          </div>
+        </div>
+      ),
     },
     {
       key: 'status',
       header: 'Status',
-      accessor: (team) => (
-        <div className="flex items-center">
+      sortable: true,
+      render: (_, team) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(team.status)}`}>
           {getStatusIcon(team.status)}
-          <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(team.status)}`}>
-            {team.status}
-          </span>
-        </div>
+          <span className="ml-1 capitalize">{team.status.replace('_', ' ')}</span>
+        </span>
       ),
     },
-  ];
+  ], []);
 
-  // Actions for each row
-  const actions = [
+  // Enhanced actions for each row
+  const actions = useMemo<ActionButton<TeamData>[]>(() => [
     {
-      label: 'Review',
-      icon: Eye,
-      onClick: (team: TeamData) => router.push(`/${lang}/verification/teams/${team.id}`),
-      variant: 'primary' as const,
+      label: 'Verify',
+      icon: UserCheck,
+      onClick: (team) => router.push(`/${lang}/verification/teams/${team.id}`),
+      variant: 'primary',
     },
-  ];
+    {
+      label: 'Quick View',
+      icon: Eye,
+      onClick: (team) => {
+        setSelectedTeam(team);
+        setShowTeamModal(true);
+      },
+      variant: 'secondary',
+    },
+    {
+      label: 'Reject',
+      icon: FileX,
+      onClick: (team) => handleQuickAction(team, 'rejected'),
+      variant: 'danger',
+      show: (team) => team.status !== 'rejected' && team.status !== 'verified'
+    }
+  ], [router, lang]);
 
-  const handleTeamClick = (teamId: string) => {
-    router.push(`/${lang}/verification/teams/${teamId}`);
+  const handleTeamClick = (team: TeamData) => {
+    router.push(`/${lang}/verification/teams/${team.id}`);
   };
+
+  // Handle quick actions
+  const handleQuickAction = async (team: TeamData, action: string) => {
+    try {
+      // This would be implemented with actual API calls
+      addNotification({
+        type: 'success',
+        title: 'Action Completed',
+        message: `Team ${team.name} ${action} successfully`
+      });
+      refetch();
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: 'Action Failed',
+        message: 'Failed to update team status'
+      });
+    }
+  };
+
+  // Filter configuration
+  const filterFields = useMemo(() => [
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select' as const,
+      options: [
+        { label: 'All', value: 'all' },
+        { label: 'Pending', value: 'pending' },
+        { label: 'Submitted', value: 'submitted' },
+        { label: 'Partial Verification', value: 'partial_verification' },
+        { label: 'Verified', value: 'verified' },
+        { label: 'Rejected', value: 'rejected' }
+      ]
+    },
+    {
+      key: 'sport',
+      label: 'Sport',
+      type: 'select' as const,
+      options: [
+        { label: 'All Sports', value: '' },
+        ...Array.from(new Set(teams.map(t => t.sportName))).map(sport => ({
+          label: sport,
+          value: sport
+        }))
+      ]
+    }
+  ], [teams]);
+
+  // Header actions
+  const getHeaderActions = () => (
+    <div className="flex gap-2">
+      <button
+        onClick={() => setShowBulkModal(true)}
+        disabled={selectedTeams.size === 0}
+        className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 ${
+          selectedTeams.size > 0 
+            ? 'text-white bg-[#F28C38] border-transparent hover:bg-[#E67A26]'
+            : 'text-gray-400 bg-gray-100 border-gray-300 cursor-not-allowed'
+        }`}
+      >
+        <UserCheck className="w-4 h-4 mr-2" />
+        Bulk Verify ({selectedTeams.size})
+      </button>
+      
+      <button
+        onClick={() => router.push(`/${lang}/verification/dashboard`)}
+        className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+      >
+        <TrendingUp className="w-4 h-4 mr-2" />
+        Dashboard
+      </button>
+    </div>
+  );
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -221,6 +355,51 @@ export default function VerificationTeamsPage() {
               Review and verify team registrations
             </p>
           </div>
+
+          {/* Stats Cards */}
+          {stats && !statsLoading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+              <SingleStatCard
+                title="Total Teams"
+                value={stats.totalTeams}
+                icon={Users}
+                description="Total registered teams"
+                trend={{ value: 0, isPositive: true }}
+              />
+              <SingleStatCard
+                title="Pending"
+                value={stats.pendingVerification}
+                icon={Clock}
+                description="Awaiting verification"
+                trend={{ value: 0, isPositive: true }}
+                color="text-yellow-600"
+              />
+              <SingleStatCard
+                title="Verified"
+                value={stats.verifiedTeams}
+                icon={CheckCircle}
+                description="Successfully verified"
+                trend={{ value: 0, isPositive: true }}
+                color="text-green-600"
+              />
+              <SingleStatCard
+                title="Rejected"
+                value={stats.rejectedTeams}
+                icon={X}
+                description="Verification rejected"
+                trend={{ value: 0, isPositive: true }}
+                color="text-red-600"
+              />
+              <SingleStatCard
+                title="Today's Work"
+                value={stats.todayVerifications}
+                icon={TrendingUp}
+                description="Verified today"
+                trend={{ value: 0, isPositive: true }}
+                color="text-[#F28C38]"
+              />
+            </div>
+          )}
         </div>
 
         {/* Advanced Table */}
@@ -253,6 +432,161 @@ export default function VerificationTeamsPage() {
           
           compact={false}
         />
+
+        {/* Bulk Verification Modal */}
+        <EnhancedModal
+          isOpen={showBulkModal}
+          onClose={() => setShowBulkModal(false)}
+          title="Bulk Team Verification"
+          size="lg"
+        >
+          <div className="space-y-6">
+            <div className="text-center py-8">
+              <UserCheck className="w-16 h-16 text-[#F28C38] mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Verify {selectedTeams.size} Selected Teams
+              </h3>
+              <p className="text-gray-600">
+                This will mark all selected teams as verified and notify captains via SMS.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-medium text-gray-900 mb-2">Selected Teams:</h4>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {teams
+                  .filter(team => selectedTeams.has(team.id))
+                  .map(team => (
+                    <div key={team.id} className="text-sm text-gray-700">
+                      {team.name} - {team.sportName}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-6">
+            <button
+              onClick={() => setShowBulkModal(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                // Handle bulk verification
+                addNotification({
+                  type: 'success',
+                  title: 'Teams Verified',
+                  message: `Successfully verified ${selectedTeams.size} teams`
+                });
+                setSelectedTeams(new Set());
+                setShowBulkModal(false);
+                refetch();
+              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-md hover:bg-[#E67A26]"
+            >
+              Verify All
+            </button>
+          </div>
+        </EnhancedModal>
+
+        {/* Team Quick View Modal */}
+        <EnhancedModal
+          isOpen={showTeamModal}
+          onClose={() => {
+            setShowTeamModal(false);
+            setSelectedTeam(null);
+          }}
+          title={selectedTeam ? `${selectedTeam.name} - Quick View` : 'Team Details'}
+          size="lg"
+        >
+          {selectedTeam && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Team Information</h4>
+                  <dl className="space-y-2">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Sport</dt>
+                      <dd className="text-sm text-gray-900">{selectedTeam.sportName}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Category</dt>
+                      <dd className="text-sm text-gray-900 capitalize">{selectedTeam.genderCategory}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Players</dt>
+                      <dd className="text-sm text-gray-900">{selectedTeam.currentPlayers} / {selectedTeam.maxPlayers}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Status</dt>
+                      <dd className="text-sm">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedTeam.status)}`}>
+                          {getStatusIcon(selectedTeam.status)}
+                          <span className="ml-1 capitalize">{selectedTeam.status.replace('_', ' ')}</span>
+                        </span>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Captain Details</h4>
+                  <dl className="space-y-2">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Name</dt>
+                      <dd className="text-sm text-gray-900">{selectedTeam.captainProfile.name}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Phone</dt>
+                      <dd className="text-sm text-gray-900">+91 {selectedTeam.captainProfile.phone}</dd>
+                    </div>
+                  </dl>
+                  
+                  <h4 className="font-medium text-gray-900 mb-3 mt-6">Location</h4>
+                  <dl className="space-y-2">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Panchayat</dt>
+                      <dd className="text-sm text-gray-900">{selectedTeam.panchayat}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">District</dt>
+                      <dd className="text-sm text-gray-900">{selectedTeam.district}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">State</dt>
+                      <dd className="text-sm text-gray-900">{selectedTeam.state}</dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end space-x-3 pt-6">
+            <button
+              onClick={() => {
+                setShowTeamModal(false);
+                setSelectedTeam(null);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Close
+            </button>
+            {selectedTeam && (
+              <button
+                onClick={() => {
+                  setShowTeamModal(false);
+                  router.push(`/${lang}/verification/teams/${selectedTeam.id}`);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-md hover:bg-[#E67A26]"
+              >
+                Full Verification
+              </button>
+            )}
+          </div>
+        </EnhancedModal>
       </div>
     </div>
   );

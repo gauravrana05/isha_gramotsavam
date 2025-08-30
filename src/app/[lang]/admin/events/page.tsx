@@ -68,7 +68,7 @@ export default function AdminEventsPage() {
     registrationEndDate: '',
     startDate: '',
     endDate: '',
-    status: 'draft' as const,
+    status: 'draft' as const, // Keep for edit mode
   });
 
   // tRPC query with enhanced parameters
@@ -109,7 +109,8 @@ export default function AdminEventsPage() {
     },
     onError: (error) => {
       console.error('Error creating event:', error);
-      addNotification('Failed to create event. Please try again.', 'error');
+      const errorMessage = error.message || 'Failed to create event. Please try again.';
+      addNotification(errorMessage, 'error');
     },
   });
 
@@ -125,7 +126,8 @@ export default function AdminEventsPage() {
     },
     onError: (error) => {
       console.error('Error updating event:', error);
-      addNotification('Failed to update event. Please try again.', 'error');
+      const errorMessage = error.message || 'Failed to update event. Please try again.';
+      addNotification(errorMessage, 'error');
     },
   });
 
@@ -290,7 +292,7 @@ export default function AdminEventsPage() {
       registrationEndDate: '',
       startDate: '',
       endDate: '',
-      status: 'draft',
+      status: 'draft' as const, // Keep for edit mode
     });
   };
 
@@ -332,11 +334,11 @@ export default function AdminEventsPage() {
       const eventData = {
         name: formData.name,
         description: formData.description || undefined,
-        registrationStartDate: formatDateToISO(formData.registrationStartDate),
-        registrationEndDate: formatDateToISO(formData.registrationEndDate),
-        startDate: formatDateToISO(formData.startDate),
-        endDate: formatDateToISO(formData.endDate),
-        status: formData.status,
+        registrationStartDate: formData.registrationStartDate || new Date().toISOString().split('T')[0],
+        registrationEndDate: formData.registrationEndDate || new Date().toISOString().split('T')[0],
+        startDate: formData.startDate || new Date().toISOString().split('T')[0],
+        endDate: formData.endDate || new Date().toISOString().split('T')[0],
+        ...(isEditMode && { status: formData.status }), // Include status only for edit mode
       };
 
       if (isEditMode && eventToEdit) {
@@ -578,28 +580,31 @@ export default function AdminEventsPage() {
             </div>
           </div>
 
-          {/* Status */}
-          <div>
-            <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-              Status
-            </label>
-            <Select
-              value={formData.status}
-              onValueChange={(value) => handleSelectChange(value, 'status')}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select event status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="registration_open">Registration Open</SelectItem>
-                <SelectItem value="registration_closed">Registration Closed</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Status - Only show for edit mode */}
+          {isEditMode && (
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
+                Status {!isEditMode && <span className="text-xs text-gray-500">(Auto-calculated based on dates)</span>}
+              </label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => handleSelectChange(value, 'status')}
+                disabled={!isEditMode}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select event status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="registration_open">Registration Open</SelectItem>
+                  <SelectItem value="registration_closed">Registration Closed</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </EnhancedModal>
 

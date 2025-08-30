@@ -8,6 +8,7 @@ import { api } from '@/server/trpc/react';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import type { Column } from '@/components/ui/Table';
 import { Modal } from '@/components/ui/Modal';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import DocumentPreview from '@/components/documents/DocumentPreview';
 import { TableControls } from '@/components/ui/TableControls';
 import FilterSidebar, { type ActiveFilter, type FilterField } from '@/components/ui/FilterSidebar';
@@ -619,23 +620,45 @@ export default function MatchDayTeamsPage() {
     </tr>
   );
 
-  // Player Modal Component - Exactly like individual team page
+  // Player Modal Component - Enhanced with EnhancedModal
   const PlayerModal = ({ player, onClose }: { player: any; onClose: () => void }) => (
-    <>
+    <EnhancedModal
+      isOpen={!!player}
+      onClose={onClose}
+      title="Player Details"
+      subtitle={`${player?.name} - Complete Information`}
+      size="lg"
+      mobileFullScreen={true}
+      scrollableBody={true}
+      footer={
+        player?.verificationStatus !== 'approved' ? (
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <button
+              onClick={async () => {
+                await handlePlayerStatusChange(player, 'approved');
+                onClose();
+              }}
+              className="flex-1 sm:flex-initial sm:px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium py-2 text-sm transition-colors flex items-center justify-center"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Approve Player
+            </button>
+            <button
+              onClick={async () => {
+                await handlePlayerStatusChange(player, 'rejected');
+                onClose();
+              }}
+              className="flex-1 sm:flex-initial sm:px-4 text-red-600 border border-red-300 hover:bg-red-50 rounded-lg font-medium py-2 text-sm transition-colors flex items-center justify-center"
+            >
+              <XCircle className="w-4 h-4 mr-2" />
+              Reject Player
+            </button>
+          </div>
+        ) : undefined
+      }
+    >
       {player && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Player Details</h3>
-              <button 
-                onClick={onClose}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-6">
+        <div className="space-y-6">
               {/* Player Basic Info */}
               <div>
                 <h4 className="font-medium text-gray-900 mb-3">Basic Information</h4>
@@ -826,38 +849,11 @@ export default function MatchDayTeamsPage() {
                 </div>
               </div>
 
-              
-
-              {/* Action Buttons - Changed to Approve */}
-              {player.verificationStatus !== 'approved' && (
-                <div className="flex space-x-3">
-                  <button
-                    onClick={async () => {
-                      await handlePlayerStatusChange(player, 'approved');
-                      onClose();
-                    }}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Approve Player
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await handlePlayerStatusChange(player, 'rejected');
-                      onClose();
-                    }}
-                    className="flex-1 text-red-600 border border-red-300 hover:bg-red-50 px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center"
-                  >
-                    <XCircle className="w-4 h-4 mr-2" />
-                    Reject Player
-                  </button>
-                </div>
-              )}
             </div>
           </div>
-        </div>
-      )}
-    </>
+        )}
+      </div>
+    </EnhancedModal>
   );
 
   return (
@@ -1050,31 +1046,25 @@ export default function MatchDayTeamsPage() {
       />
 
       {/* Image Preview Modal */}
-      {previewImage && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] flex flex-col">
-            <div className="border-b px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{previewImage?.label || 'Image Preview'}</h3>
-              <button 
-                onClick={() => setPreviewImage(null)}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close preview"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 overflow-auto flex-1 flex items-center justify-center">
-              {previewImage?.url && (
-                <img 
-                  src={previewImage?.url} 
-                  alt={previewImage?.label || 'Preview'} 
-                  className="max-h-[70vh] max-w-full object-contain"
-                />
-              )}
-            </div>
-          </div>
+      <EnhancedModal
+        isOpen={!!previewImage}
+        onClose={() => setPreviewImage(null)}
+        title={previewImage?.label || 'Image Preview'}
+        subtitle="Document preview"
+        size="xl"
+        mobileFullScreen={true}
+        scrollableBody={true}
+      >
+        <div className="flex items-center justify-center">
+          {previewImage?.url && (
+            <img 
+              src={previewImage.url} 
+              alt={previewImage.label || 'Preview'} 
+              className="max-h-[70vh] max-w-full object-contain"
+            />
+          )}
         </div>
-      )}
+      </EnhancedModal>
 
       {/* Filter Sidebar */}
       <FilterSidebar

@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '@/server/trpc/react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useNotification } from '@/context/NotificationContext';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
-import type { Column } from '@/components/ui/Table';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
+import type { Column, ActionButton } from '@/components/ui/Table';
 import { 
   Trophy, 
   Users, 
@@ -26,9 +28,21 @@ import {
 
 export default function FixturesPage() {
   const params = useParams();
-  const { venueId } = params as { venueId: string; lang: string };
+  const { venueId, lang } = params as { venueId: string; lang: string };
   const { user, loading: authLoading } = useAuth();
+  const { addNotification } = useNotification();
+  const router = useRouter();
   const eventId = 'isha_gramotsavam_2025';
+
+  // State for modals and selections
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedSportForCreation, setSelectedSportForCreation] = useState<{
+    sportId: string;
+    genderCategory: string;
+    sportName: string;
+    teamCount: number;
+  } | null>(null);
+  const [selectedFixtures, setSelectedFixtures] = useState<Set<string | number>>(new Set());
 
   const { data: checkedInTeamsResult, isLoading: teamsLoading, error: teamsError } = api.volunteers.venue.getVenueCheckedInTeams.useQuery(
     { venueId, eventId },
@@ -161,6 +175,89 @@ export default function FixturesPage() {
     }
   ];
 
+  // Available sports for tournament creation
+  const availableSportsForCreation = useMemo(() => {
+    if (!checkedInTeamsResult?.success || !checkedInTeamsResult.teamsBySport) {
+      return [];
+    }
+
+    return Object.entries(checkedInTeamsResult.teamsBySport)
+      .map(([sportKey, sportTeams]) => {
+        const [sportId, genderCategory] = sportKey.split('_');
+        const firstTeam = (sportTeams as any)?.[0];
+        const sportName = firstTeam?.sportName || firstTeam?.displayName || sportId.replace('_', ' ');
+        const teamCount = (sportTeams as any)?.length || 0;
+        
+        // Check if tournament already exists
+        const existingFixture = (fixtures || []).find(f => 
+          f.sportId === sportId && f.genderCategory === genderCategory
+        );
+        
+        return {
+          sportId,
+          genderCategory,
+          sportName,
+          teamCount,
+          hasExisting: !!existingFixture,
+          existingFixture,
+          canCreate: teamCount >= 2
+        };
+      })
+      .filter(sport => sport.canCreate && !sport.hasExisting);
+  }, [checkedInTeamsResult, fixtures]);
+
+  // Fixture actions
+  const fixtureActions = useMemo<ActionButton<any>[]>(() => [
+    {
+      label: 'View Details',
+      icon: Eye,
+      onClick: (fixture) => router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${fixture.id}`),
+      variant: 'secondary'
+    },
+    {
+      label: 'Live Matches',
+      icon: Play,
+      onClick: (fixture) => router.push(`/${lang}/volunteer/venues/${venueId}/matches?fixture=${fixture.id}`),
+      variant: 'primary',
+      show: (fixture: any) => fixture.status === 'in_progress'
+    },
+    {
+      label: 'Upload Media',
+      icon: Camera,
+      onClick: (fixture) => router.push(`/${lang}/volunteer/venues/${venueId}/media/upload?fixtureId=${fixture.id}`),
+      variant: 'secondary'
+    }
+  ], [router, lang, venueId]);
+
+  // Handle tournament creation
+  const handleCreateTournament = (sport: typeof selectedSportForCreation) => {
+    if (sport) {
+      router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/create-draw?sport=${sport.sportId}&gender=${sport.genderCategory}`);
+    }
+  };
+
+  // Header actions for creating tournaments
+  const getHeaderActions = () => {
+    if (availableSportsForCreation.length === 0) {
+      return null;
+    }
+
+    return (
+      <button
+        onClick={() => setShowCreateModal(true)}
+        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+      >
+        <Plus className="w-4 h-4 mr-2" />
+        Create Tournament
+      </button>
+    );
+  };
+
+  // Header actions for selected fixtures
+  const getHeaderActionsSingle = (selectedItems: any[]) => {
+    return null; // No bulk actions needed for fixtures currently
+  };
+
   if (authLoading || loading) {
     return (
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
@@ -243,110 +340,122 @@ export default function FixturesPage() {
         </div>
       </div>
 
-      {/* Create New Tournaments */}
-      {checkedInTeamsResult?.success && checkedInTeamsResult.teamsBySport && Object.keys(checkedInTeamsResult.teamsBySport).length > 0 && (
-        <div className="bg-white rounded-lg border shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Create New Tournament</h2>
-          <div className="space-y-3">
-            {Object.entries(checkedInTeamsResult.teamsBySport).map(([sportKey, sportTeams]) => {
-              const [sportId, genderCategory] = sportKey.split('_');
-              const existingFixture = (fixtures || []).find(f => 
-                f.sportId === sportId && f.genderCategory === genderCategory
-              );
-              
-              // Get sport name from the first team in this sport group
-              const firstTeam = (sportTeams as any)?.[0];
-              const sportName = firstTeam?.sportName || firstTeam?.displayName || sportId.replace('_', ' ');
-              
-              return (
-                <div key={sportKey} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center">
-                    <Trophy className="w-5 h-5 text-gray-400 mr-3" />
-                    <div>
-                      <h3 className="font-medium text-gray-900 capitalize">
-                        {sportName} - {genderCategory}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {(sportTeams as any)?.length} teams checked in
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {existingFixture ? (
-                    <Link href={`/en/volunteer/venues/${venueId}/fixtures/${existingFixture.id}`}>
-                      <button className="flex items-center px-3 py-2 text-sm text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-md border border-indigo-200">
-                        <Eye className="w-4 h-4 mr-1" />
-                        View Tournament
-                      </button>
-                    </Link>
-                  ) : (sportTeams as any)?.length >= 2 ? (
-                    <Link href={`/en/volunteer/venues/${venueId}/fixtures/create-draw?sport=${sportId}&gender=${genderCategory}`}>
-                      <button className="flex items-center px-3 py-2 text-sm text-white bg-[#F28C38] hover:bg-[#E67A26] rounded-md">
-                        <Plus className="w-4 h-4 mr-1" />
-                        Create Draw
-                      </button>
-                    </Link>
-                  ) : (
-                    <div className="text-sm text-gray-500 px-3 py-2 bg-gray-100 rounded-md">
-                      Need 2+ teams
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Active Fixtures */}
       <AdvancedTable
         data={fixtures || []}
         columns={getFixtureColumns()}
-        searchable
+        actions={fixtureActions}
+        loading={loading}
+        searchable={true}
         searchPlaceholder="Search tournaments..."
-        filterable
+        filterable={true}
         filters={getFixtureFilters()}
-        sortable
-        pagination={{ enabled: true, pageSize: 25 }}
+        sortable={true}
+        selectable={true}
+        selectedRows={selectedFixtures}
+        onSelectionChange={setSelectedFixtures}
         keyExtractor={(fixture) => fixture.id}
+        headerActions={getHeaderActions()}
+        headerActionsSingle={getHeaderActionsSingle}
         emptyState={{
           icon: Trophy,
           title: 'No tournaments created yet',
-          description: 'Check in teams first, then create tournaments from the options above.'
+          description: availableSportsForCreation.length > 0 
+            ? 'Create tournaments from checked-in teams using the button above.'
+            : 'Check in teams first before creating tournaments.'
         }}
-        actions={[
-          {
-            label: 'View Bracket',
-            icon: Eye,
-            onClick: (fixture) => window.location.href = `/en/volunteer/venues/${venueId}/fixtures/${fixture.id}`,
-            variant: 'primary'
-          },
-          {
-            label: 'Edit',
-            icon: Edit,
-            onClick: (fixture: any) => window.location.href = `/en/volunteer/venues/${venueId}/fixtures/${fixture.id}/edit`,
-            variant: 'secondary',
-            // @ts-expect-error: 'show' is not a valid property on ActionButton, but used for conditional rendering
-            show: (fixture: any) => fixture.status !== 'completed'
-          },
-          {
-            label: 'Live Matches',
-            icon: Play,
-            onClick: (fixture: any) => window.location.href = `/en/volunteer/venues/${venueId}/matches?fixture=${fixture.id}`,
-            variant: 'success',
-            // @ts-expect-error: 'show' is not a valid property on ActionButton, but used for conditional rendering
-            show: (fixture: any) => fixture.status === 'in_progress'
-          },
-          {
-            label: 'Upload Media',
-            icon: Camera,
-            onClick: (fixture) => window.location.href = `/en/volunteer/venues/${venueId}/media/upload?fixtureId=${fixture.id}`,
-            variant: 'secondary'
-          }
-        ]}
-        persistState
-        stateKey="venue-fixtures"
+        pagination={{ enabled: true, pageSize: 25 }}
+        persistState={false}
       />
+
+      {/* Tournament Creation Modal */}
+      <EnhancedModal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          setSelectedSportForCreation(null);
+        }}
+        title="Create New Tournament"
+        subtitle="Select a sport to create a tournament bracket"
+        size="lg"
+        mobileFullScreen={true}
+        scrollableBody={true}
+        footer={
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => {
+                setShowCreateModal(false);
+                setSelectedSportForCreation(null);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            {selectedSportForCreation && (
+              <button
+                onClick={() => {
+                  handleCreateTournament(selectedSportForCreation);
+                  setShowCreateModal(false);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26]"
+              >
+                Create Tournament
+              </button>
+            )}
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 text-sm mb-4">
+            Select a sport and gender category to create a tournament. Only sports with 2 or more checked-in teams are available.
+          </p>
+          
+          {availableSportsForCreation.length === 0 ? (
+            <div className="text-center py-8">
+              <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 font-medium">No sports available for tournament creation</p>
+              <p className="text-gray-400 text-sm mt-2">
+                Sports need at least 2 checked-in teams to create a tournament
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {availableSportsForCreation.map((sport) => (
+                <div
+                  key={`${sport.sportId}_${sport.genderCategory}`}
+                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                    selectedSportForCreation?.sportId === sport.sportId && 
+                    selectedSportForCreation?.genderCategory === sport.genderCategory
+                      ? 'border-[#F28C38] bg-orange-50'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setSelectedSportForCreation(sport)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Trophy className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <h3 className="font-medium text-gray-900 capitalize">
+                          {sport.sportName} - {sport.genderCategory}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {sport.teamCount} teams checked in
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-green-600">
+                        Ready to create
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </EnhancedModal>
     </div>
   );
 }
