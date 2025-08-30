@@ -65,7 +65,7 @@ export default function AdminDashboard() {
     isLoading: dashboardLoading,
     error: dashboardError,
     refetch: refetchDashboard
-  } = api.admin.getDashboardOverview.useQuery({
+  } = api.admin.dashboard.getDashboardOverview.useQuery({
     level: 'all',
     includeDetailed: true,
     refreshCache: true // Enable cache refresh for real-time data
@@ -82,7 +82,7 @@ export default function AdminDashboard() {
     isLoading: tournamentLoading,
     error: tournamentError,
     refetch: refetchTournament
-  } = api.admin.getTournamentOverview.useQuery({
+  } = api.admin.dashboard.getTournamentOverview.useQuery({
     level: 'all',
     status: 'all'
   }, {

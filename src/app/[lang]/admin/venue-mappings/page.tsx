@@ -66,7 +66,7 @@ export default function VenueMappingsPage() {
     isLoading: mappingsLoading,
     error: mappingsError,
     refetch: refetchMappings
-  } = api.admin.getVenueLocationMappings.useQuery({
+  } = api.admin.venues.getVenueLocationMappings.useQuery({
     level: selectedLevel,
     eventId: selectedEvent !== 'all' ? selectedEvent : undefined,
     limit: 100
@@ -77,7 +77,7 @@ export default function VenueMappingsPage() {
   const {
     data: eventsData,
     isLoading: eventsLoading
-  } = api.admin.getEvents.useQuery({
+  } = api.admin.events.getEvents.useQuery({
     limit: 50,
     status: 'all',
     includeStats: false
@@ -86,7 +86,7 @@ export default function VenueMappingsPage() {
   });
 
   // Delete mapping mutation
-  const deleteMappingMutation = api.admin.deleteVenueLocationMapping.useMutation({
+  const deleteMappingMutation = api.admin.venues.deleteVenueLocationMapping.useMutation({
     onSuccess: () => {
       refetchMappings();
     },

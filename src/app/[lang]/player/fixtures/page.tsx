@@ -74,7 +74,7 @@ export default function PlayerFixturesPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
 
   // Get teams using tRPC
-  const { data: teams = [], isLoading: teamsLoading, error: teamsError } = api.teams.getMyTeams.useQuery(
+  const { data: teams = [], isLoading: teamsLoading, error: teamsError } = api.teams.management.getMyTeams.useQuery(
     undefined,
     {
       enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'player',
@@ -82,7 +82,7 @@ export default function PlayerFixturesPage() {
   );
 
   // Get fixtures using tRPC
-  const { data: fixtures = [], isLoading: fixturesLoading, error: fixturesError } = api.teams.getMyTeamFixtures.useQuery(
+  const { data: fixtures = [], isLoading: fixturesLoading, error: fixturesError } = api.teams.management.getMyTeamFixtures.useQuery(
     undefined,
     {
       enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'player',

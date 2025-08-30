@@ -30,14 +30,14 @@ export default function FixturesPage() {
   const { user, loading: authLoading } = useAuth();
   const eventId = 'isha_gramotsavam_2025';
 
-  const { data: checkedInTeamsResult, isLoading: teamsLoading, error: teamsError } = api.volunteers.getVenueCheckedInTeams.useQuery(
+  const { data: checkedInTeamsResult, isLoading: teamsLoading, error: teamsError } = api.volunteers.venue.getVenueCheckedInTeams.useQuery(
     { venueId, eventId },
     {
       enabled: !authLoading && !!user && !!venueId,
     }
   );
 
-  const { data: fixtures, isLoading: fixturesLoading, error: fixturesError } = api.volunteers.getVenueFixtures.useQuery(
+  const { data: fixtures, isLoading: fixturesLoading, error: fixturesError } = api.volunteers.venue.getVenueFixtures.useQuery(
     { venueId },
     {
       enabled: !authLoading && !!user && !!venueId,

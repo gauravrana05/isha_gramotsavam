@@ -92,14 +92,14 @@ export default function AdminTeamsPage() {
     isLoading: teamsLoading, 
     error: teamsError,
     refetch: refetchTeams
-  } = api.admin.getAdminTeams.useQuery(tableParams, {
+  } = api.admin.teams.getAdminTeams.useQuery(tableParams, {
     enabled: !!user && userProfile?.role === 'admin'
   });
 
   const { 
     data: statsData, 
     isLoading: statsLoading 
-  } = api.admin.getAdminTeamStats.useQuery({}, {
+  } = api.admin.teams.getAdminTeamStats.useQuery({}, {
     enabled: !!user && userProfile?.role === 'admin'
   });
 
@@ -210,7 +210,7 @@ export default function AdminTeamsPage() {
 
   const formRef = useRef<HTMLFormElement>(null); // Add formRef
 
-  const createTeamMutation = api.admin.createTeam.useMutation({
+  const createTeamMutation = api.admin.teams.createTeam.useMutation({
     onSuccess: (data) => {
       refetchTeams();
       
@@ -249,7 +249,7 @@ export default function AdminTeamsPage() {
     },
   });
 
-  const deleteTeamMutation = api.admin.deleteTeam.useMutation({
+  const deleteTeamMutation = api.admin.teams.deleteTeam.useMutation({
     onSuccess: () => {
       refetchTeams();
       addNotification('Team deleted successfully!', 'success');

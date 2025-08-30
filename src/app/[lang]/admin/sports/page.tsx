@@ -71,12 +71,12 @@ export default function AdminSportsPage() {
     isLoading: sportsLoading,
     error: sportsError,
     refetch: refetchSports
-  } = api.admin.getSports.useQuery(queryParams, {
+  } = api.admin.events.getSports.useQuery(queryParams, {
     enabled: !!user && userProfile?.role === 'admin'
   });
 
   // Mutations
-  const createSportMutation = api.admin.createSport.useMutation({
+  const createSportMutation = api.admin.events.createSport.useMutation({
     onSuccess: (data) => {
       refetchSports();
       addNotification('Sport created successfully!', 'success');
@@ -88,7 +88,7 @@ export default function AdminSportsPage() {
     },
   });
 
-  const updateSportMutation = api.admin.updateSport.useMutation({
+  const updateSportMutation = api.admin.events.updateSport.useMutation({
     onSuccess: (data) => {
       refetchSports();
       addNotification('Sport updated successfully!', 'success');
@@ -100,7 +100,7 @@ export default function AdminSportsPage() {
     },
   });
 
-  const deleteSportMutation = api.admin.deleteSport.useMutation({
+  const deleteSportMutation = api.admin.events.deleteSport.useMutation({
     onSuccess: async () => {
       setSelectedSports(new Set());
       await refetchSports();

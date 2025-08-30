@@ -56,7 +56,7 @@ export default function AdminUsersPage() {
     data: usersData,
     isLoading: usersLoading,
     error: usersError
-  } = api.admin.getUsers.useQuery({
+  } = api.admin.users.getUsers.useQuery({
     limit: 100,
     offset: 0,
     role: 'all',

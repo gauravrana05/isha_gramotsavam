@@ -26,7 +26,7 @@ export default function FixtureDetailPage() {
   const venueId = params?.venueId as string;
   const fixtureId = params?.fixtureId as string;
   // Get fixture details using tRPC
-  const { data: fixture, isLoading: fixtureLoading, error: fixtureError } = api.volunteers.getFixtureDetails.useQuery(
+  const { data: fixture, isLoading: fixtureLoading, error: fixtureError } = api.volunteers.venue.getFixtureDetails.useQuery(
     { fixtureId },
     {
       enabled: !authLoading && !!user && !!fixtureId,
@@ -45,7 +45,7 @@ export default function FixtureDetailPage() {
   }, [fixture]);
 
   // Get team details using tRPC
-  const { data: teams = {}, isLoading: teamsLoading } = api.volunteers.getTeamsByIds.useQuery(
+  const { data: teams = {}, isLoading: teamsLoading } = api.volunteers.verification.getTeamsByIds.useQuery(
     { teamIds: uniqueTeamIds },
     {
       enabled: !authLoading && !!user && uniqueTeamIds.length > 0,

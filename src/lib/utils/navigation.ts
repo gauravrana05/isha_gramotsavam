@@ -90,7 +90,7 @@ export const useRedirect = (allowedRoles?: string[]) => {
   const lang = params?.lang;
 
   // Fetch volunteer assignments. This query is only enabled for volunteers.
-  const { data: assignmentsData, isLoading: assignmentsLoading } = api.volunteers.getMyAssignments.useQuery(
+  const { data: assignmentsData, isLoading: assignmentsLoading } = api.volunteers.assignments.getMyAssignments.useQuery(
     undefined,
     {
       enabled: !loading && !!user && (user.role === 'general_volunteer' || user.role === 'technical_volunteer'),

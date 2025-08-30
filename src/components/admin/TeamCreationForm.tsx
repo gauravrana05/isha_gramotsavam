@@ -83,7 +83,7 @@ export const TeamCreationForm: React.FC<TeamCreationFormProps> = ({
   );
 
   // tRPC query for sports
-  const { data: sportsData, isLoading: sportsLoading } = api.admin.getSports.useQuery({
+  const { data: sportsData, isLoading: sportsLoading } = api.admin.events.getSports.useQuery({
     includeTeamCounts: false,
     includeGenderCategories: true,
   });

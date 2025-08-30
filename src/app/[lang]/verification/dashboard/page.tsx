@@ -33,7 +33,7 @@ export default function VerificationDashboardPage() {
 
   const { data: userProfile, isLoading: userProfileLoading, error: userProfileError } = api.users.getVerificationProfile.useQuery();
 
-  const { data: teamsData, isLoading: teamsLoading, error: teamsError } = api.teams.getForVerification.useQuery(
+  const { data: teamsData, isLoading: teamsLoading, error: teamsError } = api.teams.verification.getForVerification.useQuery(
     {
       searchTerm,
       statusFilter,

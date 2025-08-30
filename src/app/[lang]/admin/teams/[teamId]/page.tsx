@@ -46,12 +46,12 @@ export default function AdminTeamDetailPage() {
     isLoading: teamLoading,
     error: teamError,
     refetch: refetchTeam
-  } = api.admin.getTeamById.useQuery({ teamId: teamId as string }, {
+  } = api.admin.teams.getTeamById.useQuery({ teamId: teamId as string }, {
     enabled: !!user && userProfile?.role === 'admin' && !!teamId
   });
 
   // Player management mutations
-  const addPlayerMutation = api.admin.addPlayerToTeam.useMutation({
+  const addPlayerMutation = api.admin.teams.addPlayerToTeam.useMutation({
     onSuccess: () => {
       refetchTeam();
       addNotification('Player added successfully!', 'success');
@@ -62,7 +62,7 @@ export default function AdminTeamDetailPage() {
     }
   });
 
-  const removePlayerMutation = api.admin.removePlayerFromTeam.useMutation({
+  const removePlayerMutation = api.admin.teams.removePlayerFromTeam.useMutation({
     onSuccess: () => {
       refetchTeam();
       addNotification('Player removed successfully!', 'success');

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
 import { 
   AdvancedTable,
@@ -10,85 +11,165 @@ import {
   PageLoader,
   Button,
   type Column,
-  type ActionButton,
 } from '@/components/ui';
+import { StatusSelector } from '@/components/ui/StatusSelector';
+import { VenueCreateModal } from '@/components/admin/VenueCreateModal';
+import { VenueDetailModal } from '@/components/admin/VenueDetailModal';
 import { 
   Plus, 
   MapPin,
   Users,
-  Edit,
-  Eye,
-  Loader2
+  Building,
+  Loader2,
+  Trash2
 } from 'lucide-react';
 
 interface VenueData {
   id: string;
   name: string;
-  address: string;
+  panchayat: string | null;
+  taluk: string | null;
   district: string;
   state: string;
   capacity: number | null;
-  status: string;
-  assignedTeams: number;
-  createdAt: string | null;
+  contactPerson: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  facilities: string | null;
+  isActive: boolean;
+  createdAt: string;
+  _count: {
+    teams: number;
+    events: number;
+  };
 }
 
 export default function VenuesManagement() {
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
+  const { addNotification } = useNotification();
+  // State
+  const [selectedVenues, setSelectedVenues] = useState<string[]>([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
-  // tRPC query
+  // tRPC queries
   const {
     data: venuesData,
     isLoading: venuesLoading,
-    error: venuesError
-  } = api.admin.getVenues.useQuery({
+    error: venuesError,
+    refetch: refetchVenues
+  } = api.admin.venues.getVenues.useQuery({
     limit: 100,
-    status: 'all'
+    status: statusFilter,
+    searchQuery: searchQuery || undefined,
   }, {
     enabled: !!user && userProfile?.role === 'admin'
   });
 
+  const updateStatusMutation = api.admin.venues.updateVenueStatus.useMutation({
+    onSuccess: () => {
+      addNotification('Venue status updated successfully', 'success');
+      refetchVenues();
+    },
+    onError: (error) => {
+      addNotification(error.message || 'Failed to update venue status', 'error');
+    },
+  });
+
+  const deleteVenuesMutation = api.admin.venues.deleteVenues.useMutation({
+    onSuccess: (data) => {
+      addNotification(`${data.deleted} venue(s) deleted successfully`, 'success');
+      setSelectedVenues([]);
+      refetchVenues();
+    },
+    onError: (error) => {
+      addNotification(error.message || 'Failed to delete venues', 'error');
+    },
+  });
+
+  // Auth check
   useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
+    if (!authLoading && (!user || userProfile?.role !== 'admin')) {
+      router.push(`/${lang}/dashboard`);
     }
+  }, [user, userProfile, authLoading, router, lang]);
 
-    if (userProfile?.role !== 'admin') {
-      router.push(`/${lang}/player/dashboard`);
-      return;
-    }
-  }, [user, userProfile, authLoading, lang, router]);
-
-  const loading = venuesLoading;
-  const error = venuesError?.message || '';
-  const venues = venuesData?.venues || [];
-
-  // Define table columns for AdvancedTable
-  const columns: Column<VenueData>[] = useMemo(() => [
+  // Loading skeleton columns
+  const columnSkeleton: Column<VenueData>[] = [
     {
       key: 'name',
-      header: 'Venue Name',
-      accessor: 'name',
-      sortable: true,
-      minWidth: 200,
-      render: (_, venue) => (
+      header: 'Venue Details',
+      render: () => (
         <div>
-          <div className="text-sm font-medium text-gray-900">{venue.name}</div>
-          <div className="text-sm text-gray-500">{venue.address}</div>
+          <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
+          <div className="h-3 bg-gray-100 rounded animate-pulse w-3/4"></div>
         </div>
       ),
     },
     {
       key: 'location',
       header: 'Location',
-      accessor: 'district',
-      sortable: true,
-      minWidth: 150,
+      render: () => (
+        <div>
+          <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
+          <div className="h-3 bg-gray-100 rounded animate-pulse w-1/2"></div>
+        </div>
+      ),
+    },
+    {
+      key: 'contact',
+      header: 'Contact',
+      render: () => (
+        <div>
+          <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
+          <div className="h-3 bg-gray-100 rounded animate-pulse w-2/3"></div>
+        </div>
+      ),
+    },
+    {
+      key: 'capacity',
+      header: 'Capacity',
+      render: () => <div className="h-4 bg-gray-200 rounded animate-pulse w-16"></div>,
+    },
+    {
+      key: 'teams',
+      header: 'Teams',
+      render: () => <div className="h-4 bg-gray-200 rounded animate-pulse w-12"></div>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: () => <div className="h-6 bg-gray-200 rounded animate-pulse w-20"></div>,
+    },
+  ];
+
+  // Table columns
+  const columns: Column<VenueData>[] = [
+    {
+      key: 'name',
+      header: 'Venue Details',
+      render: (_, venue) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900">{venue.name}</div>
+          <div className="text-sm text-gray-500">
+            {venue.panchayat && `${venue.panchayat}, `}{venue.taluk}
+          </div>
+          {venue.facilities && (
+            <div className="text-xs text-gray-400 truncate max-w-xs">
+              {venue.facilities}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'location',
+      header: 'Location',
       render: (_, venue) => (
         <div>
           <div className="text-sm text-gray-900">{venue.district}</div>
@@ -97,154 +178,275 @@ export default function VenuesManagement() {
       ),
     },
     {
-      key: 'capacity',
-      header: 'Capacity',
-      accessor: 'capacity',
-      sortable: true,
-      minWidth: 100,
+      key: 'contact',
+      header: 'Contact',
       render: (_, venue) => (
-        <span className="text-sm text-gray-900">
-          {venue.capacity ? venue.capacity.toLocaleString() : 'N/A'}
-        </span>
+        <div>
+          {venue.contactPerson && (
+            <div className="text-sm font-medium text-gray-900">{venue.contactPerson}</div>
+          )}
+          {venue.contactPhone && (
+            <div className="text-sm text-gray-600">{venue.contactPhone}</div>
+          )}
+          {venue.contactEmail && (
+            <div className="text-xs text-gray-500 truncate max-w-xs">{venue.contactEmail}</div>
+          )}
+        </div>
       ),
     },
     {
-      key: 'assignedTeams',
-      header: 'Teams Assigned',
-      accessor: 'assignedTeams',
-      sortable: true,
-      minWidth: 120,
+      key: 'capacity',
+      header: 'Capacity',
       render: (_, venue) => (
-        <div className="flex items-center space-x-1">
-          <Users className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-900">{venue.assignedTeams}</span>
+        <div className="text-sm text-gray-900">
+          {venue.capacity ? venue.capacity.toLocaleString() : 'N/A'}
+        </div>
+      ),
+    },
+    {
+      key: 'teams',
+      header: 'Teams',
+      render: (_, venue) => (
+        <div className="text-center">
+          <div className="text-sm font-medium text-gray-900">{venue._count.teams}</div>
+          <div className="text-xs text-gray-500">assigned</div>
         </div>
       ),
     },
     {
       key: 'status',
       header: 'Status',
-      accessor: 'status',
-      sortable: true,
-      minWidth: 100,
       render: (_, venue) => (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          venue.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-        }`}>
-          {venue.status === 'active' ? 'Active' : 'Inactive'}
-        </span>
+        <StatusSelector
+          value={venue.isActive ? 'active' : 'inactive'}
+          onChange={(status) => {
+            updateStatusMutation.mutate({
+              venueId: venue.id,
+              isActive: status === 'active'
+            });
+          }}
+          options={[
+            { value: 'active', label: 'Active', color: 'green' },
+            { value: 'inactive', label: 'Inactive', color: 'red' },
+          ]}
+          disabled={updateStatusMutation.isLoading}
+        />
       ),
     },
-    {
-      key: 'createdAt',
-      header: 'Created',
-      accessor: 'createdAt',
-      sortable: true,
-      minWidth: 120,
-      render: (_, venue) => (
-        <span className="text-sm text-gray-500">
-          {venue.createdAt ? new Date(venue.createdAt).toLocaleDateString() : 'N/A'}
-        </span>
-      ),
-    }
-  ], []);
+  ];
 
-  // Define action buttons for AdvancedTable
-  const actions: ActionButton<VenueData>[] = useMemo(() => [
-    {
-      label: 'View',
-      icon: Eye,
-      onClick: (venue) => router.push(`/${lang}/admin/venues/${venue.id}`),
-      variant: 'primary',
-    },
-    {
-      label: 'Edit',
-      icon: Edit,
-      onClick: (venue) => router.push(`/${lang}/admin/venues/${venue.id}/edit`),
-      variant: 'secondary',
-    }
-  ], [router, lang]);
+  // Header actions based on selection
+  const headerActionsNone = (
+    <Button
+      onClick={() => setShowCreateModal(true)}
+      className="bg-[#4A2F1D] text-white hover:bg-[#3A251A]"
+      icon={<Plus className="w-4 h-4" />}
+    >
+      Add Venue
+    </Button>
+  );
 
-  if (authLoading || loading) {
-    return <PageLoader title="Loading venues..." variant="minimal" />;
+  const headerActionsSingle = (
+    <Button
+      onClick={() => {
+        setSelectedVenueId(selectedVenues[0]);
+        setShowDetailModal(true);
+      }}
+      className="bg-[#4A2F1D] text-white hover:bg-[#3A251A]"
+    >
+      Edit Venue
+    </Button>
+  );
+
+  const headerActionsMultiple = (
+    <Button
+      onClick={() => {
+        if (confirm(`Are you sure you want to delete ${selectedVenues.length} venue(s)?`)) {
+          deleteVenuesMutation.mutate({ venueIds: selectedVenues });
+        }
+      }}
+      className="bg-red-600 text-white hover:bg-red-700"
+      icon={<Trash2 className="w-4 h-4" />}
+      disabled={deleteVenuesMutation.isLoading}
+    >
+      {deleteVenuesMutation.isLoading ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        `Remove ${selectedVenues.length} Venues`
+      )}
+    </Button>
+  );
+
+  // Stats calculations
+  const stats = useMemo(() => {
+    if (!venuesData?.venues) return null;
+
+    const venues = venuesData.venues;
+    const totalVenues = venues.length;
+    const activeVenues = venues.filter(v => v.isActive).length;
+    const totalTeams = venues.reduce((sum, v) => sum + v._count.teams, 0);
+    const totalEvents = venues.reduce((sum, v) => sum + v._count.events, 0);
+
+    return {
+      totalVenues,
+      activeVenues,
+      totalTeams,
+      totalEvents,
+    };
+  }, [venuesData]);
+
+  // Handle row click
+  const handleRowClick = (venue: VenueData) => {
+    setSelectedVenueId(venue.id);
+    setShowDetailModal(true);
+  };
+
+  // Loading state
+  if (authLoading || venuesLoading) {
+    return <PageLoader />;
   }
 
-  if (!user || userProfile?.role !== 'admin') {
-    return null;
+  // Error state
+  if (venuesError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Venues</h2>
+          <p className="text-gray-600 mb-4">{venuesError.message}</p>
+          <Button onClick={() => refetchVenues()}>Try Again</Button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Venues Management</h1>
-          <p className="text-gray-600 text-sm">Manage tournament venues and locations</p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Venues Management</h1>
+          <p className="text-gray-600 mt-2">Manage tournament venues and their assignments</p>
         </div>
-        
-        <Button
-          onClick={() => router.push(`/${lang}/admin/venues/create`)}
-          leftIcon={Plus}
-          variant="primary"
-          size="sm"
-        >
-          Add Venue
-        </Button>
+
+        {/* Stats Cards */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <SingleStatCard
+              stat={{
+                title: "Total Venues",
+                value: stats.totalVenues,
+                icon: Building,
+                color: "info"
+              }}
+            />
+            <SingleStatCard
+              stat={{
+                title: "Active Venues",
+                value: stats.activeVenues,
+                icon: MapPin,
+                color: "success"
+              }}
+            />
+            <SingleStatCard
+              stat={{
+                title: "Teams Assigned",
+                value: stats.totalTeams,
+                icon: Users,
+                color: "secondary"
+              }}
+            />
+            <SingleStatCard
+              stat={{
+                title: "Events Hosted",
+                value: stats.totalEvents,
+                icon: Building,
+                color: "primary"
+              }}
+            />
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Search Venues
+              </label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, district, or location..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A2F1D] focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status Filter
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A2F1D] focus:border-transparent"
+              >
+                <option value="all">All Venues</option>
+                <option value="active">Active Only</option>
+                <option value="inactive">Inactive Only</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="bg-white rounded-lg shadow-sm">
+          <AdvancedTable
+            data={venuesData?.venues || []}
+            columns={venuesLoading ? columnSkeleton : columns}
+            loading={venuesLoading}
+            selection={{
+              selectedItems: selectedVenues,
+              onSelectionChange: setSelectedVenues,
+              getItemId: (venue) => venue.id,
+            }}
+            headerActions={{
+              none: headerActionsNone,
+              single: headerActionsSingle,
+              multiple: headerActionsMultiple,
+            }}
+            onRowClick={handleRowClick}
+            emptyState={{
+              title: 'No venues found',
+              description: 'Get started by adding your first venue.',
+              action: (
+                <Button
+                  onClick={() => setShowCreateModal(true)}
+                  className="bg-[#4A2F1D] text-white hover:bg-[#3A251A]"
+                  icon={<Plus className="w-4 h-4" />}
+                >
+                  Add Venue
+                </Button>
+              ),
+            }}
+          />
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      {venues.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SingleStatCard
-            stat={{
-              label: "Total Venues",
-              value: venues.length.toString(),
-              icon: MapPin,
-              color: "info"
-            }}
-          />
-          <SingleStatCard
-            stat={{
-              label: "Active Venues",
-              value: venues.filter((v) => v.status === 'active').length.toString(),
-              icon: MapPin,
-              color: "success"
-            }}
-          />
-          <SingleStatCard
-            stat={{
-              label: "Total Team Assignments",
-              value: venues.reduce((sum, venue) => sum + venue.assignedTeams, 0).toString(),
-              icon: Users,
-              color: "primary"
-            }}
-          />
-        </div>
-      )}
+      {/* Modals */}
+      <VenueCreateModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => refetchVenues()}
+      />
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-600">{error}</p>
-        </div>
-      )}
-
-      {/* AdvancedTable */}
-      <AdvancedTable<VenueData>
-        data={venues}
-        columns={columns}
-        actions={actions}
-        loading={loading}
-        searchable={true}
-        searchPlaceholder="Search venues..."
-        filterable={false}
-        sortable={true}
-        keyExtractor={(venue) => venue.id}
-        emptyState={{
-          icon: MapPin,
-          title: 'No venues found',
-          description: 'No venues have been added yet.'
+      <VenueDetailModal
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedVenueId(null);
         }}
+        venueId={selectedVenueId}
+        onSuccess={() => refetchVenues()}
       />
     </div>
   );

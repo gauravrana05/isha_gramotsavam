@@ -25,7 +25,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
     data: teamsData, 
     isLoading: teamsLoading, 
     error: teamsError 
-  } = api.volunteers.getVenueTeams.useQuery(
+  } = api.volunteers.venue.getVenueTeams.useQuery(
     { venueId },
     { enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
   );
@@ -33,7 +33,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
   const { 
     data: checkedInTeamsData, 
     isLoading: checkedInLoading 
-  } = api.volunteers.getVenueCheckedInTeams.useQuery(
+  } = api.volunteers.venue.getVenueCheckedInTeams.useQuery(
     { venueId },
     { enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
   );
@@ -41,7 +41,7 @@ export default function TechnicalVolunteerVenueDashboard({ params }: PageProps) 
   const { 
     data: fixturesData, 
     isLoading: fixturesLoading 
-  } = api.volunteers.getVenueFixtures.useQuery(
+  } = api.volunteers.venue.getVenueFixtures.useQuery(
     { venueId },
     { enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
   );

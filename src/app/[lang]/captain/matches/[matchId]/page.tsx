@@ -68,7 +68,7 @@ export default function CaptainMatchDetailPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
 
   // Get match details using tRPC
-  const { data: match, isLoading: matchLoading, error: matchError } = api.teams.getMyTeamMatches.useQuery(
+  const { data: match, isLoading: matchLoading, error: matchError } = api.teams.management.getMyTeamMatches.useQuery(
     undefined,
     {
       enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'captain',

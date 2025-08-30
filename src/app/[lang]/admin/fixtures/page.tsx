@@ -50,7 +50,7 @@ export default function AdminFixturesPage() {
     data: fixturesData,
     isLoading: fixturesLoading,
     error: fixturesError
-  } = api.admin.getFixtures.useQuery({
+  } = api.admin.events.getFixtures.useQuery({
     limit: 100,
     status: 'all',
     level: 'all'

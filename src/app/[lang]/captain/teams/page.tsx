@@ -108,11 +108,11 @@ export default function MyTeamPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // tRPC query to fetch the captain's team
-  const { data: teamData, isLoading: loading, error, refetch: refetchTeamData } = api.teams.getMyTeam.useQuery(undefined, {
+  const { data: teamData, isLoading: loading, error, refetch: refetchTeamData } = api.teams.management.getMyTeam.useQuery(undefined, {
     enabled: !!user,
   });
 
-  const removePlayerMutation = api.teams.removePlayer.useMutation();
+  const removePlayerMutation = api.teams.players.removePlayer.useMutation();
 
   const handleRemovePlayer = async (playerId: string) => {
     if (!teamData || !user) return;

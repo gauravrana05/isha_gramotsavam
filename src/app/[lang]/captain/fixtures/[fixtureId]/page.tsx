@@ -85,7 +85,7 @@ export default function CaptainFixtureDetailPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
 
   // Get fixture details using tRPC
-  const { data: fixture, isLoading: fixtureLoading, error: fixtureError } = api.teams.getMyTeamFixtures.useQuery(
+  const { data: fixture, isLoading: fixtureLoading, error: fixtureError } = api.teams.management.getMyTeamFixtures.useQuery(
     undefined,
     {
       enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'captain',

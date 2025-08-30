@@ -69,7 +69,7 @@ export default function BulkTeamAssignmentPage() {
   const {
     data: eventsData,
     isLoading: eventsLoading
-  } = api.admin.getEvents.useQuery({
+  } = api.admin.events.getEvents.useQuery({
     limit: 50,
     status: 'active',
     includeStats: false
@@ -81,7 +81,7 @@ export default function BulkTeamAssignmentPage() {
     data: teamsData,
     isLoading: teamsLoading,
     refetch: refetchTeams
-  } = api.admin.getAdminTeams.useQuery({
+  } = api.admin.teams.getAdminTeams.useQuery({
     limit: 200,
     status: 'verified'
   }, {
@@ -89,7 +89,7 @@ export default function BulkTeamAssignmentPage() {
   });
 
   // Auto assign venue mutation
-  const autoAssignMutation = api.admin.autoAssignTeamVenue.useMutation();
+  const autoAssignMutation = api.admin.venues.autoAssignTeamVenue.useMutation();
 
   useEffect(() => {
     if (authLoading) return;

@@ -46,7 +46,7 @@ export default function TeamRegistrationPage() {
   const userProfile = profileDataQuery.data; // For backward compatibility with existing code
   
   // tRPC mutations
-  const createTeamMutation = api.teams.createAndPromoteCaptain.useMutation();
+  const createTeamMutation = api.teams.management.createAndPromoteCaptain.useMutation();
   
   // Get sport parameter
   const sportName = Array.isArray(sport) ? sport[0] : sport ?? "sportName";

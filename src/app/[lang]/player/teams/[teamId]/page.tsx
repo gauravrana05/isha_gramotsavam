@@ -79,7 +79,7 @@ export default function PlayerTeamDetailsPage() {
   const teamIdStr: string = Array.isArray(teamId) ? teamId[0] : teamId;
 
   // Use tRPC to fetch specific team data for the player
-  const { data: teamData, isLoading, error } = api.teams.getPlayerTeamById.useQuery(
+  const { data: teamData, isLoading, error } = api.teams.players.getPlayerTeamById.useQuery(
     { id: teamIdStr },
     { enabled: !!user?.id }
   );

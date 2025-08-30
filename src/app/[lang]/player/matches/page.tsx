@@ -87,7 +87,7 @@ export default function PlayerMatchesPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
 
   // Get teams using tRPC
-  const { data: teams = [], isLoading: teamsLoading, error: teamsError } = api.teams.getMyTeams.useQuery(
+  const { data: teams = [], isLoading: teamsLoading, error: teamsError } = api.teams.management.getMyTeams.useQuery(
     undefined,
     {
       enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'player',
@@ -95,7 +95,7 @@ export default function PlayerMatchesPage() {
   );
 
   // Get matches using tRPC
-  const { data: matches = [], isLoading: matchesLoading, error: matchesError } = api.teams.getMyTeamMatches.useQuery(
+  const { data: matches = [], isLoading: matchesLoading, error: matchesError } = api.teams.management.getMyTeamMatches.useQuery(
     undefined,
     {
       enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'player',

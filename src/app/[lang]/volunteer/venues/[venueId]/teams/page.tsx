@@ -51,7 +51,7 @@ export default function MatchDayTeamsPage() {
     isLoading: teamsLoading, 
     error: teamsError,
     refetch: refetchTeams
-  } = api.volunteers.getVenueTeams.useQuery(
+  } = api.volunteers.venue.getVenueTeams.useQuery(
     { venueId },
     { enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
   );

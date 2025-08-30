@@ -35,7 +35,7 @@ export default function VerificationTeamsPage() {
   const { t } = useTranslation();
 
   // Try with a simple query first
-  const { data: teamsData, isLoading: teamsLoading, error: teamsError } = api.teams.getForVerification.useQuery(
+  const { data: teamsData, isLoading: teamsLoading, error: teamsError } = api.teams.verification.getForVerification.useQuery(
     {
       searchTerm: '',
       statusFilter: 'all',

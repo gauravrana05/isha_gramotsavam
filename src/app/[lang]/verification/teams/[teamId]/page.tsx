@@ -77,7 +77,7 @@ export default function TeamVerificationPage() {
 
   const teamIdStr = Array.isArray(teamId) ? teamId[0] : teamId;
 
-  const { data: teamDetailsData, isLoading: teamLoading, error: teamError } = api.teams.getForVerificationDetail.useQuery(
+  const { data: teamDetailsData, isLoading: teamLoading, error: teamError } = api.teams.verification.getForVerificationDetail.useQuery(
     { teamId: teamIdStr || '' },
     { 
       enabled: !authLoading && !!user && !!teamIdStr,
@@ -101,7 +101,7 @@ export default function TeamVerificationPage() {
 
   // Data loading is now handled by tRPC query above
 
-  const verifyPlayerMutation = api.teams.verifyPlayer.useMutation({
+  const verifyPlayerMutation = api.teams.verification.verifyPlayer.useMutation({
     onSuccess: () => {
       showSuccess('Player verified successfully!');
     },
@@ -110,7 +110,7 @@ export default function TeamVerificationPage() {
     },
   });
 
-  const verifyPlayersBulkMutation = api.teams.verifyPlayersBulk.useMutation({
+  const verifyPlayersBulkMutation = api.teams.verification.verifyPlayersBulk.useMutation({
     onSuccess: () => {
       showSuccess('Players verified successfully!');
       setSelectedPlayers(new Set());

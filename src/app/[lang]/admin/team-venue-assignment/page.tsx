@@ -74,7 +74,7 @@ export default function TeamVenueAssignmentPage() {
   const {
     data: eventsData,
     isLoading: eventsLoading
-  } = api.admin.getEvents.useQuery({
+  } = api.admin.events.getEvents.useQuery({
     limit: 50,
     status: 'active',
     includeStats: false
@@ -85,7 +85,7 @@ export default function TeamVenueAssignmentPage() {
   const {
     data: teamsData,
     isLoading: teamsLoading
-  } = api.admin.getAdminTeams.useQuery({
+  } = api.admin.teams.getAdminTeams.useQuery({
     limit: 100,
     status: 'verified'
   }, {
@@ -97,7 +97,7 @@ export default function TeamVenueAssignmentPage() {
     data: venueRoutingData,
     isLoading: routingLoading,
     refetch: refetchRouting
-  } = api.admin.getAvailableVenuesForTeam.useQuery({
+  } = api.admin.venues.getAvailableVenuesForTeam.useQuery({
     teamId: selectedTeam,
     eventId: selectedEvent,
     level: 'cluster'
@@ -106,7 +106,7 @@ export default function TeamVenueAssignmentPage() {
   });
 
   // Auto assign venue mutation
-  const autoAssignMutation = api.admin.autoAssignTeamVenue.useMutation({
+  const autoAssignMutation = api.admin.venues.autoAssignTeamVenue.useMutation({
     onSuccess: (result) => {
       alert(`Successfully assigned team to ${result.assignment.venueMapping?.venueName}!`);
       refetchRouting();

@@ -49,7 +49,7 @@ export default function CreateVenueMappingPage() {
   const {
     data: eventsData,
     isLoading: eventsLoading
-  } = api.admin.getEvents.useQuery({
+  } = api.admin.events.getEvents.useQuery({
     limit: 100,
     status: 'all',
     includeStats: false
@@ -60,7 +60,7 @@ export default function CreateVenueMappingPage() {
   const {
     data: venuesData,
     isLoading: venuesLoading
-  } = api.admin.getVenues.useQuery({
+  } = api.admin.venues.getVenues.useQuery({
     limit: 200,
     status: 'all'
   }, {
@@ -68,7 +68,7 @@ export default function CreateVenueMappingPage() {
   });
 
   // Create mapping mutation
-  const createMappingMutation = api.admin.createVenueLocationMapping.useMutation({
+  const createMappingMutation = api.admin.venues.createVenueLocationMapping.useMutation({
     onSuccess: (result) => {
       alert(`Successfully created venue mapping for ${result.mapping.venueName}!`);
       router.push(`/${lang}/admin/venue-mappings`);

@@ -27,7 +27,7 @@ export default function MatchesPage() {
   const fixtureId = searchParams?.get('fixture') || undefined;
 
   // Get matches using tRPC
-  const { data: matches = [], isLoading: matchesLoading, error: matchesError } = api.volunteers.getVenueMatches.useQuery(
+  const { data: matches = [], isLoading: matchesLoading, error: matchesError } = api.volunteers.venue.getVenueMatches.useQuery(
     { venueId, fixtureId },
     {
       enabled: !authLoading && !!user && !!venueId,
@@ -35,7 +35,7 @@ export default function MatchesPage() {
   );
 
   // Get fixture details if fixtureId is provided
-  const { data: fixture, isLoading: fixtureLoading, error: fixtureError } = api.volunteers.getFixtureDetails.useQuery(
+  const { data: fixture, isLoading: fixtureLoading, error: fixtureError } = api.volunteers.venue.getFixtureDetails.useQuery(
     { fixtureId: fixtureId! },
     {
       enabled: !authLoading && !!user && !!fixtureId,

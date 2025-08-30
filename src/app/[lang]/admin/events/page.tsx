@@ -77,7 +77,7 @@ export default function AdminEventsPage() {
     isPending: eventsLoading,
     error: eventsError,
     refetch: refetchEvents
-  } = api.admin.getEvents.useQuery({
+  } = api.admin.events.getEvents.useQuery({
     limit: 100,
     status: 'all',
     includeStats: true
@@ -86,7 +86,7 @@ export default function AdminEventsPage() {
   });
 
   // Delete event mutation
-  const deleteEventMutation = api.admin.deleteEvent.useMutation({
+  const deleteEventMutation = api.admin.events.deleteEvent.useMutation({
     onSuccess: () => {
       refetchEvents();
       addNotification('Event deleted successfully', 'success');
@@ -98,7 +98,7 @@ export default function AdminEventsPage() {
   });
 
   // Create event mutation
-  const createEventMutation = api.admin.createEvent.useMutation({
+  const createEventMutation = api.admin.events.createEvent.useMutation({
     onSuccess: () => {
       refetchEvents();
       setShowCreateModal(false);
@@ -114,7 +114,7 @@ export default function AdminEventsPage() {
   });
 
   // Update event mutation
-  const updateEventMutation = api.admin.updateEvent.useMutation({
+  const updateEventMutation = api.admin.events.updateEvent.useMutation({
     onSuccess: () => {
       refetchEvents();
       setShowCreateModal(false);

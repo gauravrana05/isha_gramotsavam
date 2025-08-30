@@ -62,7 +62,7 @@ export default function TalukMappingsPage() {
     isLoading: mappingsLoading,
     error: mappingsError,
     refetch: refetchMappings
-  } = api.admin.getTalukClusterMappings.useQuery({
+  } = api.admin.mappings.getTalukClusterMappings.useQuery({
     eventId: selectedEvent !== 'all' ? selectedEvent : undefined,
     district: selectedDistrict !== 'all' ? selectedDistrict : undefined,
     limit: 200
@@ -73,7 +73,7 @@ export default function TalukMappingsPage() {
   const {
     data: eventsData,
     isLoading: eventsLoading
-  } = api.admin.getEvents.useQuery({
+  } = api.admin.events.getEvents.useQuery({
     limit: 50,
     status: 'all',
     includeStats: false
@@ -82,7 +82,7 @@ export default function TalukMappingsPage() {
   });
 
   // Delete mapping mutation
-  const deleteMappingMutation = api.admin.deleteTalukClusterMapping.useMutation({
+  const deleteMappingMutation = api.admin.mappings.deleteTalukClusterMapping.useMutation({
     onSuccess: () => {
       refetchMappings();
     },

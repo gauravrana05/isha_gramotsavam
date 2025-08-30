@@ -143,7 +143,7 @@ export default function CaptainPlayerManagement() {
   const teamIdStr: string = Array.isArray(teamId) ? teamId[0] : teamId;
 
   // tRPC queries
-  const teamQuery = api.teams.getById.useQuery(
+  const teamQuery = api.teams.management.getById.useQuery(
     {
       id: teamIdStr,
       includePhotos: false,
@@ -153,21 +153,21 @@ export default function CaptainPlayerManagement() {
     { enabled: !!teamIdStr }
   );
 
-  const addPlayerMutation = api.teams.addPlayer.useMutation({
+  const addPlayerMutation = api.teams.players.addPlayer.useMutation({
     onSuccess: () => {
       // Invalidate and refetch the team data
       utils.teams.getById.invalidate();
       utils.teams.getById.invalidate({ id: teamIdStr });
     },
   });
-  const removePlayerMutation = api.teams.removePlayer.useMutation({
+  const removePlayerMutation = api.teams.players.removePlayer.useMutation({
     onSuccess: () => {
       // Invalidate and refetch the team data
       utils.teams.getById.invalidate();
       utils.teams.getById.invalidate({ id: teamIdStr });
     },
   });
-  const makeCaptainMutation = api.teams.makeCaptain.useMutation();
+  const makeCaptainMutation = api.teams.players.makeCaptain.useMutation();
   const submitTeamMutation = api.teams.verify.useMutation();
   const utils = api.useUtils();
 

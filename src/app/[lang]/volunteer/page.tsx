@@ -20,7 +20,7 @@ export default function VolunteerMainPage() {
     data: assignmentsData, 
     isLoading: assignmentsLoading, 
     error: assignmentsError 
-  } = api.volunteers.getMyAssignments.useQuery(
+  } = api.volunteers.assignments.getMyAssignments.useQuery(
     undefined,
     { 
       enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(user?.role || ''),
