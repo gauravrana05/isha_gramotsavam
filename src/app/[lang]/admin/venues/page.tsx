@@ -27,19 +27,19 @@ import {
 interface VenueData {
   id: string;
   name: string;
+  address: string;
   panchayat: string | null;
   taluk: string | null;
   district: string;
   state: string;
-  capacity: number | null;
-  contactPerson: string | null;
-  contactPhone: string | null;
-  contactEmail: string | null;
-  facilities: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  // Level mapping data
+  levels?: ('cluster' | 'division' | 'final')[];
+  eventName?: string;
+  eventId?: string;
 }
 
 export default function AdminVenuesPage() {
@@ -98,9 +98,9 @@ export default function AdminVenuesPage() {
       const searchLower = tableParams.search.toLowerCase();
       filteredVenues = filteredVenues.filter(venue => 
         venue.name.toLowerCase().includes(searchLower) ||
+        venue.address.toLowerCase().includes(searchLower) ||
         venue.district.toLowerCase().includes(searchLower) ||
-        venue.state.toLowerCase().includes(searchLower) ||
-        (venue.contactPerson && venue.contactPerson.toLowerCase().includes(searchLower))
+        venue.state.toLowerCase().includes(searchLower)
       );
     }
 
@@ -190,13 +190,15 @@ export default function AdminVenuesPage() {
       header: 'Venue Name',
       sortable: true,
       render: (_, venue) => (
-        <div>
-          <div className="font-medium text-gray-900">{venue.name}</div>
-          {venue.facilities && (
-            <div className="text-sm text-gray-500 truncate max-w-xs">
-              {venue.facilities}
-            </div>
-          )}
+        <div className="font-medium text-gray-900">{venue.name}</div>
+      ),
+    },
+    {
+      key: 'address',
+      header: 'Address',
+      render: (_, venue) => (
+        <div className="text-sm text-gray-900 max-w-xs truncate">
+          {venue.address}
         </div>
       ),
     },
@@ -216,29 +218,35 @@ export default function AdminVenuesPage() {
       ),
     },
     {
-      key: 'capacity',
-      header: 'Capacity',
-      sortable: true,
+      key: 'levels',
+      header: 'Levels',
       render: (_, venue) => (
-        <div className="flex items-center space-x-1">
-          <Users className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-900">
-            {venue.capacity ? venue.capacity.toLocaleString() : 'N/A'}
-          </span>
+        <div className="flex flex-wrap gap-1">
+          {venue.levels && venue.levels.length > 0 ? (
+            venue.levels.map((level) => (
+              <span
+                key={level}
+                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  level === 'cluster' ? 'bg-blue-100 text-blue-700' :
+                  level === 'division' ? 'bg-green-100 text-green-700' :
+                  'bg-purple-100 text-purple-700'
+                }`}
+              >
+                {level.charAt(0).toUpperCase() + level.slice(1)}
+              </span>
+            ))
+          ) : (
+            <span className="text-gray-400 italic text-sm">No levels</span>
+          )}
         </div>
       ),
     },
     {
-      key: 'contact',
-      header: 'Contact',
+      key: 'event',
+      header: 'Current Event',
       render: (_, venue) => (
-        <div>
-          {venue.contactPerson && (
-            <div className="text-sm font-medium text-gray-900">{venue.contactPerson}</div>
-          )}
-          {venue.contactPhone && (
-            <div className="text-sm text-gray-600">{venue.contactPhone}</div>
-          )}
+        <div className="text-sm text-gray-900">
+          {venue.eventName || <span className="text-gray-400 italic">No event</span>}
         </div>
       ),
     },
@@ -254,16 +262,6 @@ export default function AdminVenuesPage() {
         }`}>
           {venue.isActive ? 'Active' : 'Inactive'}
         </span>
-      ),
-    },
-    {
-      key: 'createdAt',
-      header: 'Created',
-      sortable: true,
-      render: (_, venue) => (
-        <div className="text-sm text-gray-500">
-          {new Date(venue.createdAt).toLocaleDateString()}
-        </div>
       ),
     },
   ];
@@ -345,13 +343,13 @@ export default function AdminVenuesPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <AdvancedTable<VenueData>
-          data={venues}
+          data={(venues || []) as VenueData[]}
           columns={columns}
           loading={loading}
           onDataLoad={handleDataLoad}
           searchable={true}
           searchPlaceholder="Search venues..."
-          searchFields={['name', 'district', 'state', 'contactPerson']}
+          searchFields={['name', 'district', 'state']}
           filterable={true}
           filters={filterFields}
           sortable={true} 
@@ -375,7 +373,7 @@ export default function AdminVenuesPage() {
                 className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete Selected ({selectedVenues.size})
+                Delete ({selectedVenues.size})
               </button>
             )
           }
@@ -409,17 +407,23 @@ export default function AdminVenuesPage() {
               type="button"
               onClick={() => setShowCreateModal(false)}
               className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-              disabled={createVenueMutation.isLoading}
+              disabled={createVenueMutation.isPending}
             >
               Cancel
             </button>
             <button
-              type="submit"
-              form="venue-form"
+              type="button"
+              onClick={() => {
+                console.log('Create button clicked, calling form submit');
+                if ((window as any).venueFormSubmit) {
+                  (window as any).venueFormSubmit();
+                } else {
+                  console.error('venueFormSubmit not found');
+                }
+              }}
               className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
-              disabled={createVenueMutation.isLoading}
             >
-              {createVenueMutation.isLoading ? (
+              {createVenueMutation.isPending ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block" />
                   Creating...
@@ -435,7 +439,8 @@ export default function AdminVenuesPage() {
           <VenueForm
             onSubmit={handleCreateSubmit}
             onCancel={() => setShowCreateModal(false)}
-            isLoading={createVenueMutation.isLoading}
+            isLoading={createVenueMutation.isPending}
+            onFormSubmit={() => {}}
           />
         </div>
       </EnhancedModal>
@@ -465,7 +470,7 @@ export default function AdminVenuesPage() {
                     setVenueToEdit(null);
                   }}
                   className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                  disabled={updateVenueMutation.isLoading}
+                  disabled={updateVenueMutation.isPending}
                 >
                   Cancel
                 </button>
@@ -473,9 +478,9 @@ export default function AdminVenuesPage() {
                   type="submit"
                   form="venue-edit-form"
                   className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
-                  disabled={updateVenueMutation.isLoading}
+                  disabled={updateVenueMutation.isPending}
                 >
-                  {updateVenueMutation.isLoading ? (
+                  {updateVenueMutation.isPending ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block" />
                       Updating...
@@ -490,7 +495,11 @@ export default function AdminVenuesPage() {
                 <button
                   onClick={() => {
                     setIsEditMode(true);
-                    setVenueToEdit(selectedVenue);
+                    setVenueToEdit({
+                      ...selectedVenue,
+                      levels: selectedVenue.levels || [],
+                      eventId: selectedVenue.eventId || '',
+                    });
                   }}
                   className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
                 >
@@ -502,7 +511,7 @@ export default function AdminVenuesPage() {
           }
         >
           <VenueForm
-            initialData={selectedVenue}
+            initialData={isEditMode ? venueToEdit : selectedVenue}
             onSubmit={handleUpdateSubmit}
             onCancel={() => {
               setShowViewModal(false);
@@ -510,11 +519,15 @@ export default function AdminVenuesPage() {
               setVenueToEdit(null);
               setSelectedVenue(null);
             }}
-            isLoading={updateVenueMutation.isLoading}
+            isLoading={updateVenueMutation.isPending}
             isEditMode={isEditMode}
             onEdit={() => {
               setIsEditMode(true);
-              setVenueToEdit(selectedVenue);
+              setVenueToEdit({
+                ...selectedVenue,
+                levels: selectedVenue.levels || [],
+                eventId: selectedVenue.eventId || '',
+              });
             }}
           />
         </EnhancedModal>
@@ -538,16 +551,16 @@ export default function AdminVenuesPage() {
                 setVenueToDelete(null);
               }}
               className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-              disabled={deleteVenuesMutation.isLoading}
+              disabled={deleteVenuesMutation.isPending}
             >
               Cancel
             </button>
             <button
               onClick={handleDelete}
               className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-              disabled={deleteVenuesMutation.isLoading}
+              disabled={deleteVenuesMutation.isPending}
             >
-              {deleteVenuesMutation.isLoading ? (
+              {deleteVenuesMutation.isPending ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block" />
                   Deleting...

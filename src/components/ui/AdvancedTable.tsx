@@ -268,8 +268,9 @@ export const AdvancedTable = <T,>({
   className,
   ...domProps
 }: AdvancedTableProps<T>) => {
-  // Separate DOM props from component-specific props (removed selectedRows and onSelectionChange as they're needed)
-  const { ...restDomProps } = domProps;
+  // All props are already destructured in the function parameters above
+  // No need for additional destructuring - just use restDomProps from domProps
+  const restDomProps = domProps;
   // Saved views state (localStorage) - only initialize if stateKey is provided
   const savedViewsKey = stateKey ? `table:views:${stateKey}` : undefined;
   const [views, setViews] = useState<{ label: string; value: string; state: Partial<TableState> }[]>([]);

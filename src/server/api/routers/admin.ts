@@ -8,6 +8,7 @@ import { adminTeamsRouter } from "./admin/teams";
 import { adminEventsRouter } from "./admin/events";
 import { adminVenuesRouter } from "./admin/venues";
 import { adminMappingsRouter } from "./admin/mappings";
+import { venueAssignmentRouter } from "./admin/venueAssignment";
 
 export const adminRouter = createTRPCRouter({
   dashboard: adminDashboardRouter,
@@ -16,10 +17,11 @@ export const adminRouter = createTRPCRouter({
   events: adminEventsRouter,
   venues: adminVenuesRouter,
   mappings: adminMappingsRouter,
+  venueAssignment: venueAssignmentRouter,
 });
 
 // Router Statistics:
 // Before: 1 file with 2,891 lines and 38 endpoints
-// After: 6 focused files with ~300-800 lines each
+// After: 7 focused files with ~300-800 lines each
 // Total reduction: 85% in single-file complexity
 // Benefits: Better maintainability, parallel development, clearer domain separation

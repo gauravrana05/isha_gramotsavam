@@ -1,492 +1,487 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
 import { 
   AdvancedTable,
-  SingleStatCard,
   PageLoader,
-  Button,
   type Column,
-  type ActionButton,
+  type FilterField,
+  type TableParams,
 } from '@/components/ui';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { 
   MapPin,
   Users,
-  Target,
-  Zap,
-  Eye,
+  Building,
   CheckCircle,
-  AlertTriangle,
+  XCircle,
   Clock,
-  Building2,
-  Navigation,
-  Layers,
-  Loader2
+  Phone,
 } from 'lucide-react';
 
-interface TeamVenueData {
+interface TeamAssignmentData {
   id: string;
   name: string;
-  district: string;
-  taluk: string;
-  state: string;
-  sportName: string;
-  status: string;
-  currentVenueAssignment?: {
-    venueId: string;
-    venueName: string;
-    assignmentLevel: string;
-    assignedAt: string | null;
-  };
-}
-
-interface AvailableVenueData {
-  mappingId: string;
-  venue: {
-    id: string;
+  captain: {
     name: string;
+    phone: string;
     district: string;
     state: string;
+    taluk: string;
+    panchayat: string;
   };
-  level: string;
-  maxTeams: number;
-  assignedTeamsCount: number;
-  availableCapacity: number;
-  isAtCapacity: boolean;
-  routingTier: number;
-  routingReason: string;
+  assignment: {
+    id: string;
+    level: 'cluster' | 'division' | 'final';
+    assignmentMethod: 'auto_assigned' | 'manual_assigned';
+    clusterVenueMapping?: {
+      venue: {
+        id: string;
+        name: string;
+        district: string;
+        state: string;
+      };
+    };
+    divisionVenueMapping?: {
+      venue: {
+        id: string;
+        name: string;
+        district: string;
+        state: string;
+      };
+    };
+    finalVenueMapping?: {
+      venue: {
+        id: string;
+        name: string;
+        district: string;
+        state: string;
+      };
+    };
+  } | null;
 }
 
-export default function TeamVenueAssignmentPage() {
+export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ lang: string }> }) {
+  const { lang } = React.use(params);
   const router = useRouter();
-  const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
+  const { addNotification } = useNotification();
 
+  // State management
+  const [selectedTeams, setSelectedTeams] = useState<Set<string | number>>(new Set());
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<TeamAssignmentData | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
-  const [selectedTeam, setSelectedTeam] = useState<string>('');
-  const [showRoutingLogic, setShowRoutingLogic] = useState(false);
-  const [availableVenues, setAvailableVenues] = useState<AvailableVenueData[]>([]);
 
-  // tRPC queries
-  const {
-    data: eventsData,
-    isLoading: eventsLoading
-  } = api.admin.events.getEvents.useQuery({
-    limit: 50,
-    status: 'active',
-    includeStats: false
-  }, {
-    enabled: !!user && userProfile?.role === 'admin'
+  // Table state
+  const [tableParams, setTableParams] = useState<TableParams>({
+    pagination: { page: 1, pageSize: 50 },
+    sorting: { field: 'name', direction: 'asc' },
+    filters: {},
   });
 
-  const {
-    data: teamsData,
-    isLoading: teamsLoading
-  } = api.admin.teams.getAdminTeams.useQuery({
+  // Auth check
+  useEffect(() => {
+    if (!authLoading && (!user || user.role !== 'admin')) {
+      router.push(`/${lang}/auth/login`);
+    }
+  }, [user, userProfile, authLoading, router, lang]);
+
+  // Get events for filter - use 'upcoming' instead of 'active'
+  const { data: eventsData } = api.admin.events.getEvents.useQuery({
     limit: 100,
-    status: 'verified'
-  }, {
-    enabled: !!user && userProfile?.role === 'admin'
+    status: 'upcoming',
   });
 
-  // Get available venues for selected team
+  // Get team assignments
   const {
-    data: venueRoutingData,
-    isLoading: routingLoading,
-    refetch: refetchRouting
-  } = api.admin.venues.getAvailableVenuesForTeam.useQuery({
-    teamId: selectedTeam,
+    data: teamAssignmentsData,
+    isLoading: assignmentsLoading,
+    error: assignmentsError,
+    refetch: refetchAssignments
+  } = api.admin.venueAssignment.getTeamAssignments.useQuery({
     eventId: selectedEvent,
-    level: 'cluster'
+    status: tableParams.filters.status as 'all' | 'assigned' | 'unassigned' || 'all',
+    district: tableParams.filters.district as string,
   }, {
-    enabled: !!selectedTeam && !!selectedEvent
+    enabled: !!selectedEvent,
   });
 
-  // Auto assign venue mutation
-  const autoAssignMutation = api.admin.venues.autoAssignTeamVenue.useMutation({
-    onSuccess: (result) => {
-      alert(`Successfully assigned team to ${result.assignment.venueMapping?.venueName}!`);
-      refetchRouting();
-      setSelectedTeam('');
+  // Mutations
+  const manualAssignMutation = api.admin.venueAssignment.manualAssignVenue.useMutation({
+    onSuccess: () => {
+      addNotification('Venue manually assigned successfully', 'success');
+      setSelectedTeams(new Set());
+      refetchAssignments();
     },
     onError: (error) => {
-      alert(error.message || 'Failed to assign venue');
-    }
+      addNotification(error.message || 'Failed to assign venue', 'error');
+    },
   });
 
+  // Set default event
   useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
+    if (eventsData?.events && eventsData.events.length > 0 && !selectedEvent) {
+      setSelectedEvent(eventsData.events[0].id);
     }
+  }, [eventsData, selectedEvent]);
 
-    if (userProfile?.role !== 'admin') {
-      router.push(`/${lang}/player/dashboard`);
-      return;
-    }
-  }, [user, userProfile, authLoading, lang, router]);
+  // Memoized data processing
+  const teams = useMemo(() => {
+    return teamAssignmentsData || [];
+  }, [teamAssignmentsData]);
 
-  useEffect(() => {
-    if (venueRoutingData?.availableVenues) {
-      setAvailableVenues(venueRoutingData.availableVenues);
-    }
-  }, [venueRoutingData]);
+  const loading = authLoading || assignmentsLoading;
 
-  const loading = eventsLoading || teamsLoading;
-  const events = eventsData?.events || [];
-  const teams = teamsData?.teams || [];
-
-  const handleAutoAssign = (teamId: string, forceMappingId?: string) => {
-    if (!selectedEvent) {
-      alert('Please select an event first');
-      return;
-    }
-
-    autoAssignMutation.mutate({
-      teamId,
-      eventId: selectedEvent,
-      level: 'cluster',
-      forceVenueMappingId: forceMappingId
-    });
-  };
-
-  // Team table columns
-  const teamColumns: Column<TeamVenueData>[] = useMemo(() => [
+  // Table columns
+  const columns: Column<TeamAssignmentData>[] = [
     {
-      key: 'team',
-      header: 'Team Details',
-      accessor: 'name',
+      key: 'name',
+      header: 'Team',
       sortable: true,
-      minWidth: 200,
       render: (_, team) => (
-        <div>
-          <div className="text-sm font-medium text-gray-900">{team.name}</div>
-          <div className="text-sm text-gray-500">{team.sportName}</div>
-          <div className="text-xs text-gray-400">{team.taluk}, {team.district}</div>
+        <div className="font-medium text-gray-900">
+          {team.name}
+        </div>
+      ),
+    },
+    {
+      key: 'captain',
+      header: 'Captain',
+      render: (_, team) => (
+        <div className="text-sm">
+          <div className="font-medium text-gray-900">{team.captain.name}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'phone',
+      header: 'Captain Phone',
+      render: (_, team) => (
+        <div className="text-sm text-gray-900">
+          {team.captain.phone || 'N/A'}
         </div>
       ),
     },
     {
       key: 'location',
-      header: 'Team Location',
-      accessor: 'district',
-      sortable: true,
-      minWidth: 150,
+      header: 'Location',
       render: (_, team) => (
-        <div className="text-sm">
-          <div className="font-medium text-gray-900">{team.district}</div>
-          <div className="text-gray-500">{team.taluk}</div>
-          <div className="text-xs text-gray-400">{team.state}</div>
+        <div className="text-sm text-gray-600">
+          <div>{team.captain.panchayat}, {team.captain.taluk}</div>
+          <div>{team.captain.district}, {team.captain.state}</div>
         </div>
       ),
     },
     {
-      key: 'assignment',
-      header: 'Current Assignment',
-      accessor: 'currentVenueAssignment',
-      minWidth: 180,
+      key: 'venue',
+      header: 'Venue',
       render: (_, team) => {
-        if (!team.currentVenueAssignment) {
+        if (!team.assignment) {
+          return <span className="text-gray-400 text-sm">Not Assigned</span>;
+        }
+
+        const venue = team.assignment.clusterVenueMapping?.venue || 
+                     team.assignment.divisionVenueMapping?.venue || 
+                     team.assignment.finalVenueMapping?.venue;
+
+        return (
+          <div className="text-sm">
+            <div className="font-medium text-gray-900">{venue?.name}</div>
+            <div className="text-gray-500">{venue?.district}, {venue?.state}</div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'assignment',
+      header: 'Assignment',
+      render: (_, team) => {
+        if (!team.assignment) {
           return (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800">
-              <AlertTriangle className="w-3 h-3 mr-1" />
-              Not Assigned
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+              Manual
             </span>
           );
         }
 
         return (
-          <div>
-            <div className="text-sm font-medium text-gray-900">{team.currentVenueAssignment.venueName}</div>
-            <div className="text-xs text-gray-500 capitalize">{team.currentVenueAssignment.assignmentLevel}</div>
-            {team.currentVenueAssignment.assignedAt && (
-              <div className="text-xs text-gray-400">
-                {new Date(team.currentVenueAssignment.assignedAt).toLocaleDateString()}
-              </div>
-            )}
-          </div>
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+            team.assignment.assignmentMethod === 'auto_assigned' 
+              ? 'bg-green-100 text-green-700' 
+              : 'bg-orange-100 text-orange-700'
+          }`}>
+            {team.assignment.assignmentMethod === 'auto_assigned' ? 'Auto' : 'Manual'}
+          </span>
         );
       },
     },
     {
       key: 'status',
       header: 'Status',
-      accessor: 'status',
-      sortable: true,
-      minWidth: 120,
       render: (_, team) => {
-        const hasAssignment = !!team.currentVenueAssignment;
-        
-        return (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
-            hasAssignment
-              ? 'bg-green-100 text-green-800'
-              : 'bg-yellow-100 text-yellow-800'
-          }`}>
-            {hasAssignment ? (
-              <>
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Assigned
-              </>
-            ) : (
-              <>
-                <Clock className="w-3 h-3 mr-1" />
-                Pending
-              </>
-            )}
-          </span>
-        );
-      },
-    }
-  ], []);
-
-  const teamActionButtons: ActionButton<TeamVenueData>[] = useMemo(() => [
-    {
-      label: 'View Routing',
-      icon: <Navigation className="w-4 h-4" />,
-      onClick: (team) => {
-        setSelectedTeam(team.id);
-        setShowRoutingLogic(true);
-      },
-      variant: 'secondary'
-    },
-    {
-      label: 'Auto Assign',
-      icon: <Zap className="w-4 h-4" />,
-      onClick: (team) => handleAutoAssign(team.id),
-      variant: 'primary',
-      disabled: (team) => !!team.currentVenueAssignment || !selectedEvent
-    }
-  ], [selectedEvent]);
-
-  // Available venues table columns
-  const venueColumns: Column<AvailableVenueData>[] = useMemo(() => [
-    {
-      key: 'tier',
-      header: 'Routing Tier',
-      accessor: 'routingTier',
-      sortable: true,
-      minWidth: 120,
-      render: (_, venue) => (
-        <div className="flex items-center">
-          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold mr-2 ${
-            venue.routingTier === 1 ? 'bg-green-100 text-green-800' :
-            venue.routingTier === 2 ? 'bg-blue-100 text-blue-800' :
-            'bg-gray-100 text-gray-800'
-          }`}>
-            {venue.routingTier}
-          </span>
-          <div>
-            <div className="text-sm font-medium text-gray-900">Tier {venue.routingTier}</div>
-            <div className="text-xs text-gray-500">
-              {venue.routingTier === 1 ? 'Direct Mapping' :
-               venue.routingTier === 2 ? 'District Level' :
-               'Fallback'}
+        if (!team.assignment) {
+          return (
+            <div className="flex items-center">
+              <Clock className="w-4 h-4 text-orange-500 mr-2" />
+              <span className="text-orange-600 text-sm font-medium">Pending</span>
             </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'venue',
-      header: 'Venue Details',
-      accessor: 'venue.name',
-      sortable: true,
-      minWidth: 200,
-      render: (_, venue) => (
-        <div>
-          <div className="text-sm font-medium text-gray-900 flex items-center">
-            <Building2 className="w-4 h-4 mr-2 text-gray-400" />
-            {venue.venue.name}
-          </div>
-          <div className="text-sm text-gray-500">{venue.venue.district}, {venue.venue.state}</div>
-        </div>
-      ),
-    },
-    {
-      key: 'capacity',
-      header: 'Capacity',
-      accessor: 'maxTeams',
-      sortable: true,
-      minWidth: 140,
-      render: (_, venue) => {
-        const utilizationPercent = Math.round((venue.assignedTeamsCount / venue.maxTeams) * 100);
-        
-        return (
-          <div className="text-sm">
-            <div className="font-medium text-gray-900">
-              {venue.assignedTeamsCount} / {venue.maxTeams}
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className="w-12 h-2 rounded-full bg-gray-200">
-                <div 
-                  className={`h-2 rounded-full ${
-                    venue.isAtCapacity ? 'bg-red-400' :
-                    utilizationPercent >= 75 ? 'bg-yellow-400' :
-                    'bg-green-400'
-                  }`}
-                  style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
-                />
-              </div>
-              <span className="text-xs text-gray-500">{utilizationPercent}%</span>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'reasoning',
-      header: 'Routing Logic',
-      accessor: 'routingReason',
-      minWidth: 250,
-      render: (_, venue) => (
-        <div className="text-sm text-gray-600">
-          {venue.routingReason}
-        </div>
-      ),
-    }
-  ], []);
-
-  const venueActionButtons: ActionButton<AvailableVenueData>[] = useMemo(() => [
-    {
-      label: 'Assign Manually',
-      icon: <Target className="w-4 h-4" />,
-      onClick: (venue) => {
-        if (selectedTeam) {
-          handleAutoAssign(selectedTeam, venue.mappingId);
+          );
         }
-      },
-      variant: 'primary',
-      disabled: (venue) => venue.isAtCapacity || !selectedTeam
-    }
-  ], [selectedTeam]);
 
-  if (authLoading || loading) {
-    return <PageLoader title="Loading team venue assignment..." />;
+        return (
+          <div className="flex items-center">
+            <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
+            <span className="text-green-600 text-sm font-medium">Assigned</span>
+          </div>
+        );
+      },
+    },
+  ];
+
+  // Filter fields
+  const filterFields: FilterField[] = [
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { value: 'all', label: 'All Teams' },
+        { value: 'assigned', label: 'Assigned' },
+        { value: 'unassigned', label: 'Pending' },
+      ],
+      placeholder: 'Filter by status...',
+    },
+    {
+      key: 'district',
+      label: 'District',
+      type: 'text',
+      placeholder: 'Filter by district...',
+    },
+  ];
+
+  // Header actions - only show when teams are selected
+  const headerActions = selectedTeams.size > 0 ? (
+    <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-2">
+        <select
+          value={selectedEvent}
+          onChange={(e) => setSelectedEvent(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+        >
+          <option value="">Select Event</option>
+          {eventsData?.events.map((event) => (
+            <option key={event.id} value={event.id}>
+              {event.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <button
+        onClick={() => {
+          // Handle bulk venue assignment
+          console.log('Assign venues to selected teams:', Array.from(selectedTeams));
+        }}
+        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+        disabled={!selectedEvent || loading}
+      >
+        <MapPin className="w-4 h-4 mr-2" />
+        Assign Venue ({selectedTeams.size})
+      </button>
+    </div>
+  ) : (
+    <div className="flex items-center space-x-3">
+      <select
+        value={selectedEvent}
+        onChange={(e) => setSelectedEvent(e.target.value)}
+        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+      >
+        <option value="">Select Event</option>
+        {eventsData?.events.map((event) => (
+          <option key={event.id} value={event.id}>
+            {event.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+
+  // Row click handler
+  const handleRowClick = (team: TeamAssignmentData) => {
+    setSelectedTeam(team);
+    setShowViewModal(true);
+  };
+
+  if (loading && !selectedEvent) {
+    return <PageLoader />;
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">3-Tier Team Venue Assignment</h1>
-        <p className="text-gray-600 text-sm">Intelligent venue assignment using taluk→district→fallback routing</p>
-      </div>
-
-      {/* Event Selection */}
-      <div className="mb-6 bg-white rounded-lg shadow-sm border p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Select Event</h3>
-            <p className="text-sm text-gray-500">Choose an event to manage team venue assignments</p>
-          </div>
-          <div className="w-64">
-            <select
-              value={selectedEvent}
-              onChange={(e) => setSelectedEvent(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select an event...</option>
-              {events.map(event => (
-                <option key={event.id} value={event.id}>{event.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Routing Logic Explanation */}
-      <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start">
-          <Layers className="w-5 h-5 text-blue-500 mt-0.5 mr-3" />
-          <div>
-            <h3 className="font-semibold text-blue-900">3-Tier Venue Assignment Logic</h3>
-            <div className="text-sm text-blue-700 mt-1 space-y-1">
-              <p><strong>Tier 1:</strong> Direct taluk → cluster venue mapping (highest priority)</p>
-              <p><strong>Tier 2:</strong> District-level cluster venues (single = auto, multiple = manual selection)</p>
-              <p><strong>Tier 3:</strong> Fallback to any available cluster venue</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Teams Table */}
-      <div className="mb-8 bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Teams Requiring Venue Assignment</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Verified teams that need venue assignments
-          </p>
-        </div>
-
-        <AdvancedTable<TeamVenueData>
-          data={teams.filter(team => !team.currentVenueAssignment)}
-          columns={teamColumns}
-          actions={teamActionButtons}
-          loading={teamsLoading}
-          
-          searchable={true}
-          searchPlaceholder="Search teams by name, district, taluk..."
-          
-          sortable={true}
-          defaultSort={[{ key: 'district', direction: 'asc' }, { key: 'taluk', direction: 'asc' }]}
-          
-          pagination={{ enabled: true, pageSize: 10 }}
-          
-          keyExtractor={(team) => team.id}
-          stickyHeader={true}
-          
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <AdvancedTable<TeamAssignmentData>
+          data={(teams || []) as TeamAssignmentData[]}
+          columns={columns}
+          loading={loading}
+          error={assignmentsError?.message}
+          tableParams={tableParams}
+          onTableParamsChange={setTableParams}
+          selectedRows={selectedTeams}
+          onSelectedRowsChange={setSelectedTeams}
+          filterFields={filterFields}
+          headerActions={headerActions}
+          onRowClick={handleRowClick}
+          title="Team Venue Assignments"
+          subtitle="Manage venue assignments for teams in tournaments"
           emptyState={{
             icon: Users,
-            title: 'All teams have venue assignments',
-            description: 'Great! All verified teams have been assigned to venues.'
+            title: 'No teams found',
+            description: selectedEvent ? 'No teams found for the selected event and filters.' : 'Please select an event to view team assignments.',
           }}
+          searchable
+          searchPlaceholder="Search teams, captains, or venues..."
         />
-      </div>
 
-      {/* Available Venues for Selected Team */}
-      {selectedTeam && availableVenues.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Available Venues</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Routing options for selected team (showing tier priority order)
-                </p>
+        {/* Team Details Modal */}
+        {showViewModal && selectedTeam && (
+          <EnhancedModal
+            isOpen={showViewModal}
+            onClose={() => {
+              setShowViewModal(false);
+              setSelectedTeam(null);
+            }}
+            title="Team Details"
+            subtitle={`${selectedTeam.name} - Assignment Information`}
+            size="lg"
+          >
+            <div className="space-y-6">
+              {/* Team Information */}
+              <div className="bg-gray-50 p-6 rounded-lg">
+                <h4 className="font-semibold text-gray-900 mb-4">Team Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Team Name</label>
+                    <p className="text-sm text-gray-900">{selectedTeam.name}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <div className="flex items-center">
+                      {selectedTeam.assignment ? (
+                        <>
+                          <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
+                          <span className="text-green-600 text-sm font-medium">Assigned</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock className="w-4 h-4 text-orange-500 mr-2" />
+                          <span className="text-orange-600 text-sm font-medium">Pending</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              {venueRoutingData?.teamDetails && (
-                <div className="text-sm text-gray-600">
-                  Team Location: {venueRoutingData.teamDetails.taluk}, {venueRoutingData.teamDetails.district}
+
+              {/* Captain Information */}
+              <div className="bg-gray-50 p-6 rounded-lg">
+                <h4 className="font-semibold text-gray-900 mb-4">Captain Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <p className="text-sm text-gray-900">{selectedTeam.captain.name}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <div className="flex items-center">
+                      <Phone className="w-4 h-4 text-gray-400 mr-2" />
+                      <p className="text-sm text-gray-900">{selectedTeam.captain.phone || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Panchayat</label>
+                    <p className="text-sm text-gray-900">{selectedTeam.captain.panchayat}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Taluk</label>
+                    <p className="text-sm text-gray-900">{selectedTeam.captain.taluk}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+                    <p className="text-sm text-gray-900">{selectedTeam.captain.district}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                    <p className="text-sm text-gray-900">{selectedTeam.captain.state}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Venue Assignment */}
+              {selectedTeam.assignment ? (
+                <div className="bg-green-50 p-6 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-4">Venue Assignment</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Venue Name</label>
+                      <p className="text-sm text-gray-900">
+                        {selectedTeam.assignment.clusterVenueMapping?.venue?.name || 
+                         selectedTeam.assignment.divisionVenueMapping?.venue?.name || 
+                         selectedTeam.assignment.finalVenueMapping?.venue?.name}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Assignment Method</label>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        selectedTeam.assignment.assignmentMethod === 'auto_assigned' 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-orange-100 text-orange-700'
+                      }`}>
+                        {selectedTeam.assignment.assignmentMethod === 'auto_assigned' ? 'Auto Assigned' : 'Manual Assignment'}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tournament Level</label>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        selectedTeam.assignment.level === 'cluster' ? 'bg-blue-100 text-blue-700' :
+                        selectedTeam.assignment.level === 'division' ? 'bg-green-100 text-green-700' :
+                        'bg-purple-100 text-purple-700'
+                      }`}>
+                        {selectedTeam.assignment.level.charAt(0).toUpperCase() + selectedTeam.assignment.level.slice(1)}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Venue Location</label>
+                      <p className="text-sm text-gray-900">
+                        {selectedTeam.assignment.clusterVenueMapping?.venue?.district || 
+                         selectedTeam.assignment.divisionVenueMapping?.venue?.district || 
+                         selectedTeam.assignment.finalVenueMapping?.venue?.district}, {' '}
+                        {selectedTeam.assignment.clusterVenueMapping?.venue?.state || 
+                         selectedTeam.assignment.divisionVenueMapping?.venue?.state || 
+                         selectedTeam.assignment.finalVenueMapping?.venue?.state}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-orange-50 p-6 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-2">Venue Assignment</h4>
+                  <div className="flex items-center">
+                    <Clock className="w-5 h-5 text-orange-500 mr-2" />
+                    <p className="text-sm text-orange-700">
+                      This team is pending venue assignment. The assignment will be made manually by an administrator.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
-          </div>
-
-          <AdvancedTable<AvailableVenueData>
-            data={availableVenues}
-            columns={venueColumns}
-            actions={venueActionButtons}
-            loading={routingLoading}
-            
-            sortable={true}
-            defaultSort={[{ key: 'routingTier', direction: 'asc' }]}
-            
-            keyExtractor={(venue) => venue.mappingId}
-            stickyHeader={true}
-            
-            emptyState={{
-              icon: MapPin,
-              title: 'No available venues',
-              description: 'No venues with capacity available for this team.'
-            }}
-          />
-        </div>
-      )}
+          </EnhancedModal>
+        )}
+      </div>
     </div>
   );
 }

@@ -13,7 +13,7 @@ export const adminVenuesRouter = createTRPCRouter({
       status: z.enum(['all', 'active', 'inactive']).default('all'),
       district: z.string().optional(),
       searchQuery: z.string().optional(),
-      sortBy: z.enum(['name', 'district', 'createdAt', 'capacity']).default('createdAt'),
+      sortBy: z.enum(['name', 'district', 'createdAt']).default('createdAt'),
       sortOrder: z.enum(['asc', 'desc']).default('desc'),
     }))
     .query(async ({ input, ctx }) => {
@@ -48,7 +48,15 @@ export const adminVenuesRouter = createTRPCRouter({
         db.venue.findMany({
           where,
           include: {
-            venueLocationMappings: true,
+            venueLevelMappings: {
+              include: {
+                event: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
           },
           orderBy: { [input.sortBy]: input.sortOrder },
           skip: input.offset,
@@ -57,12 +65,15 @@ export const adminVenuesRouter = createTRPCRouter({
         db.venue.count({ where }),
       ]);
 
-      // Add counts as 0 for now (can be calculated later if needed)
+      // Add counts and extract levels from level mappings
       const venuesWithCounts = venues.map(venue => ({
         ...venue,
+        levels: venue.venueLevelMappings?.map(mapping => mapping.level) || [],
+        eventName: venue.venueLevelMappings?.[0]?.event?.name || null,
+        eventId: venue.venueLevelMappings?.[0]?.eventId || null,
         _count: {
           teams: 0,
-          events: 0,
+          events: venue.venueLevelMappings?.length || 0,
         },
       }));
 
@@ -77,32 +88,52 @@ export const adminVenuesRouter = createTRPCRouter({
   createVenue: protectedProcedure
     .input(z.object({
       name: z.string().min(1).max(200),
-      capacity: z.number().optional(),
+      address: z.string().min(1).max(500),
       panchayat: z.string().max(100).optional(),
       taluk: z.string().max(100).optional(),
       district: z.string().min(1).max(100),
       state: z.string().min(1).max(100),
       pincode: z.string().max(10).optional(),
-      contactPhone: z.string().max(20).optional(),
-      contactEmail: z.string().email().optional(),
-      contactPerson: z.string().max(100).optional(),
-      facilities: z.string().optional(),
       isActive: z.boolean().default(true),
+      // Level mapping fields
+      eventId: z.string().min(1),
+      levels: z.array(z.enum(['cluster', 'division', 'final'])).min(1),
+      maxTeams: z.number().min(1).default(100),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const venue = await db.venue.create({
-        data: input,
-        include: {
-          venueLocationMappings: true,
-        },
+      const { eventId, levels, maxTeams, ...venueData } = input;
+
+      // Create venue and level mappings in a transaction
+      const result = await db.$transaction(async (tx) => {
+        // Create the venue
+        const venue = await tx.venue.create({
+          data: venueData,
+        });
+
+        // Create level mappings for each selected level
+        const levelMappings = await Promise.all(
+          levels.map(level => 
+            tx.venueLevelMapping.create({
+              data: {
+                eventId,
+                venueId: venue.id,
+                level,
+                maxTeams,
+                isActive: true,
+              },
+            })
+          )
+        );
+
+        return { venue, levelMappings };
       });
 
       return {
-        ...venue,
+        ...result.venue,
         _count: {
           teams: 0,
           events: 0,
@@ -115,38 +146,82 @@ export const adminVenuesRouter = createTRPCRouter({
     .input(z.object({
       id: z.string(),
       name: z.string().min(1).max(200).optional(),
-      capacity: z.number().optional(),
+      address: z.string().max(500).optional(),
       panchayat: z.string().max(100).optional(),
       taluk: z.string().max(100).optional(),
       district: z.string().min(1).max(100).optional(),
       state: z.string().min(1).max(100).optional(),
       pincode: z.string().max(10).optional(),
-      contactPhone: z.string().max(20).optional(),
-      contactEmail: z.string().email().optional(),
-      contactPerson: z.string().max(100).optional(),
-      facilities: z.string().optional(),
       isActive: z.boolean().optional(),
+      // Level mapping fields
+      eventId: z.string().optional(),
+      levels: z.array(z.enum(['cluster', 'division', 'final'])).optional(),
+      maxTeams: z.number().min(1).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const { id, ...updateData } = input;
+      const { id, eventId, levels, maxTeams, ...venueData } = input;
 
-      const venue = await db.venue.update({
+      // Update venue and level mappings in a transaction
+      const result = await db.$transaction(async (tx) => {
+        // Update the venue
+        const venue = await tx.venue.update({
+          where: { id },
+          data: venueData,
+        });
+
+        // If levels and eventId are provided, update level mappings
+        if (levels && eventId) {
+          // Delete existing level mappings for this venue
+          await tx.venueLevelMapping.deleteMany({
+            where: { venueId: id },
+          });
+
+          // Create new level mappings
+          await Promise.all(
+            levels.map(level => 
+              tx.venueLevelMapping.create({
+                data: {
+                  eventId,
+                  venueId: id,
+                  level,
+                  maxTeams: maxTeams || 100,
+                  isActive: true,
+                },
+              })
+            )
+          );
+        }
+
+        return venue;
+      });
+
+      // Return venue with level mappings
+      const updatedVenue = await db.venue.findUnique({
         where: { id },
-        data: updateData,
         include: {
-          venueLocationMappings: true,
+          venueLevelMappings: {
+            include: {
+              event: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
         },
       });
 
       return {
-        ...venue,
+        ...updatedVenue,
+        levels: updatedVenue?.venueLevelMappings?.map(mapping => mapping.level) || [],
+        eventName: updatedVenue?.venueLevelMappings?.[0]?.event?.name || null,
         _count: {
           teams: 0,
-          events: 0,
+          events: updatedVenue?.venueLevelMappings?.length || 0,
         },
       };
     }),
@@ -166,7 +241,7 @@ export const adminVenuesRouter = createTRPCRouter({
         where: {
           id: { in: input.venueIds },
           deletedAt: null, // Only check non-deleted venues
-          venueLocationMappings: { some: {} },
+          venueLevelMappings: { some: {} },
         },
         select: { id: true, name: true },
       });
@@ -205,7 +280,7 @@ export const adminVenuesRouter = createTRPCRouter({
         where: { id: input.venueId },
         data: { isActive: input.isActive },
         include: {
-          venueLocationMappings: true,
+          venueLevelMappings: true,
         },
       });
 
@@ -231,7 +306,7 @@ export const adminVenuesRouter = createTRPCRouter({
       const venue = await db.venue.findUnique({
         where: { id: input.id },
         include: {
-          venueLocationMappings: true,
+          venueLevelMappings: true,
         },
       });
 
@@ -279,7 +354,7 @@ export const adminVenuesRouter = createTRPCRouter({
       const venues = await db.venue.findMany({
         where,
         include: {
-          venueLocationMappings: true,
+          venueLevelMappings: true,
         },
         orderBy: { name: 'asc' },
       });
@@ -321,7 +396,7 @@ export const adminVenuesRouter = createTRPCRouter({
           district: team.captain.district,
         },
         include: {
-          venueLocationMappings: true,
+          venueLevelMappings: true,
         },
         orderBy: [
           { name: 'asc' },
@@ -351,7 +426,7 @@ export const adminVenuesRouter = createTRPCRouter({
     }),
 
   // Venue Location Mappings (existing functionality)
-  getVenueLocationMappings: protectedProcedure
+  getVenueLevelMappings: protectedProcedure
     .input(z.object({
       level: z.enum(['all', 'cluster', 'division', 'state']).default('all'),
       district: z.string().optional(),
@@ -382,7 +457,7 @@ export const adminVenuesRouter = createTRPCRouter({
         };
       }
 
-      const mappings = await db.venueLocationMapping.findMany({
+      const mappings = await db.venueLevelMapping.findMany({
         where,
         include: {
           venue: true,
@@ -397,7 +472,7 @@ export const adminVenuesRouter = createTRPCRouter({
       return mappings;
     }),
 
-  createVenueLocationMapping: protectedProcedure
+  createVenueLevelMapping: protectedProcedure
     .input(z.object({
       venueId: z.string(),
       district: z.string(),
@@ -410,7 +485,7 @@ export const adminVenuesRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const mapping = await db.venueLocationMapping.create({
+      const mapping = await db.venueLevelMapping.create({
         data: input,
         include: {
           venue: true,
@@ -420,7 +495,7 @@ export const adminVenuesRouter = createTRPCRouter({
       return mapping;
     }),
 
-  updateVenueLocationMapping: protectedProcedure
+  updateVenueLevelMapping: protectedProcedure
     .input(z.object({
       id: z.string(),
       district: z.string().optional(),
@@ -434,7 +509,7 @@ export const adminVenuesRouter = createTRPCRouter({
       }
 
       const { id, ...updateData } = input;
-      const mapping = await db.venueLocationMapping.update({
+      const mapping = await db.venueLevelMapping.update({
         where: { id },
         data: updateData,
         include: {
@@ -445,7 +520,7 @@ export const adminVenuesRouter = createTRPCRouter({
       return mapping;
     }),
 
-  deleteVenueLocationMapping: protectedProcedure
+  deleteVenueLevelMapping: protectedProcedure
     .input(z.object({
       id: z.string(),
     }))
@@ -454,7 +529,7 @@ export const adminVenuesRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      await db.venueLocationMapping.delete({
+      await db.venueLevelMapping.delete({
         where: { id: input.id },
       });
 

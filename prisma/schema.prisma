@@ -40,8 +40,8 @@ model ClusterDivisionMapping {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   // Relations
-  clusterVenueMapping  VenueLocationMapping @relation("ClusterToDivision", fields: [clusterVenueMappingId], references: [id], onDelete: Cascade)
-  divisionVenueMapping VenueLocationMapping @relation("DivisionToCluster", fields: [divisionVenueMappingId], references: [id], onDelete: Cascade)
+  clusterVenueMapping  VenueLevelMapping @relation("ClusterToDivision", fields: [clusterVenueMappingId], references: [id], onDelete: Cascade)
+  divisionVenueMapping VenueLevelMapping @relation("DivisionToCluster", fields: [divisionVenueMappingId], references: [id], onDelete: Cascade)
   event                Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   // Constraints
@@ -75,7 +75,7 @@ model Event {
   teamVenueAssignments  TeamVenueAssignment[]
   teams                 Team[]
   userRoles             UserRoleAssignment[]
-  venueLocationMappings VenueLocationMapping[]
+  venueLocationMappings VenueLevelMapping[]
   volunteerAssignments  VolunteerAssignment[]
 
   @@map("events")
@@ -157,7 +157,7 @@ model Fixture {
 
   event                Event? @relation(fields: [eventId], references: [id])
   sport                Sport @relation(fields: [sportId], references: [id])
-  venueLocationMapping VenueLocationMapping @relation(fields: [venueLocationMappingId], references: [id])
+  venueLocationMapping VenueLevelMapping @relation(fields: [venueLocationMappingId], references: [id])
   matches              Match[]
 
   @@index([eventId, sportId, venueLocationMappingId, genderCategory, level])
@@ -201,7 +201,7 @@ model Match {
   event                Event? @relation(fields: [eventId], references: [id])
   fixture              Fixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
   sport                Sport @relation(fields: [sportId], references: [id])
-  venueLocationMapping VenueLocationMapping @relation(fields: [venueLocationMappingId], references: [id])
+  venueLocationMapping VenueLevelMapping @relation(fields: [venueLocationMappingId], references: [id])
   team1                Team? @relation("MatchTeam1", fields: [team1Id], references: [id])
   team2                Team? @relation("MatchTeam2", fields: [team2Id], references: [id])
   winner               Team? @relation("MatchWinner", fields: [winnerId], references: [id])
@@ -327,7 +327,7 @@ model TalukClusterMapping {
   deletedAt             DateTime? @db.Timestamptz(6) @map("deleted_at")
 
   // Relations
-  venueLocationMapping VenueLocationMapping @relation(fields: [clusterVenueMappingId], references: [id], onDelete: Cascade)
+  venueLocationMapping VenueLevelMapping @relation(fields: [clusterVenueMappingId], references: [id], onDelete: Cascade)
   event                Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, district, taluk])
@@ -408,9 +408,9 @@ model TeamVenueAssignment {
 
   // Relations
   assignedByUser          User @relation(fields: [assignedBy], references: [id])
-  clusterVenueMapping     VenueLocationMapping @relation("TeamVenueAssignmentClusterVenue", fields: [clusterVenueMappingId], references: [id])
-  divisionVenueMapping    VenueLocationMapping? @relation("TeamVenueAssignmentDivisionVenue", fields: [divisionVenueMappingId], references: [id])
-  finalVenueMapping       VenueLocationMapping? @relation("TeamVenueAssignmentFinalVenue", fields: [finalVenueMappingId], references: [id])
+  clusterVenueMapping     VenueLevelMapping @relation("TeamVenueAssignmentClusterVenue", fields: [clusterVenueMappingId], references: [id])
+  divisionVenueMapping    VenueLevelMapping? @relation("TeamVenueAssignmentDivisionVenue", fields: [divisionVenueMappingId], references: [id])
+  finalVenueMapping       VenueLevelMapping? @relation("TeamVenueAssignmentFinalVenue", fields: [finalVenueMappingId], references: [id])
   event                   Event @relation(fields: [eventId], references: [id])
   team                    Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
@@ -459,7 +459,7 @@ model Team {
   verifiedByUser               User? @relation("TeamsVerifiedBy", fields: [verifiedBy], references: [id])
   event                        Event? @relation(fields: [eventId], references: [id])
   sport                        Sport @relation(fields: [sportId], references: [id])
-  venueLocationMapping         VenueLocationMapping? @relation(fields: [tournamentNumberVenueMappingId], references: [id])
+  venueLocationMapping         VenueLevelMapping? @relation(fields: [tournamentNumberVenueMappingId], references: [id])
 
   @@index([eventId])
   @@index([sportId])
@@ -557,12 +557,12 @@ model UserVerification {
   @@index([verifiedBy])
 }
 
-model VenueLocationMapping {
+model VenueLevelMapping {
   id          String @id @default(uuid()) @db.Uuid
   eventId     String @map("event_id") @db.Uuid
   venueId     String @map("venue_id") @db.Uuid
   level       TournamentLevel
-  maxTeams    Int? @map("max_teams")
+  maxTeams    Int? @map("max_teams") @default(100)
   isActive    Boolean @map("is_active") @default(true)
 
   createdAt DateTime @map("created_at") @default(now()) @db.Timestamptz(6)
@@ -586,22 +586,22 @@ model VenueLocationMapping {
   venue                Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
   volunteerAssignments VolunteerAssignment[]
 
-  @@map("venue_location_mappings")
+  @@map("venue_level_mappings")
+  @@unique([eventId, venueId, level], map: "venue_level_mappings_unique")
+  @@index([eventId], map: "idx_venue_level_mappings_event_id")
+  @@index([venueId], map: "idx_venue_level_mappings_venue_id")
+  @@index([level], map: "idx_venue_level_mappings_level")
 }
 
 model Venue {
   id            String @id @default(uuid()) @db.Uuid
   name          String @db.VarChar(200)
-  capacity      Int?
+  address       String? @db.VarChar(500)
   panchayat     String? @db.VarChar(100)
   taluk         String? @db.VarChar(100)
   district      String @db.VarChar(100)
   state         String @db.VarChar(100)
   pincode       String? @db.VarChar(10)
-  contactPhone  String? @map("contact_phone") @db.VarChar(20)
-  contactEmail  String? @map("contact_email") @db.VarChar(255)
-  contactPerson String? @map("contact_person") @db.VarChar(100)
-  facilities    String?
   isActive      Boolean @default(true) @map("is_active")
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -609,7 +609,7 @@ model Venue {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   // Relations
-  venueLocationMappings VenueLocationMapping[]
+  venueLevelMappings VenueLevelMapping[]
 
   @@map("venues")
 
@@ -641,7 +641,7 @@ model VolunteerAssignment {
   assignedByUser       User @relation("VolunteerAssignmentsAssignedBy", fields: [assignedBy], references: [id])
   volunteerUser        User @relation("VolunteerAssignmentsAsVolunteer", fields: [volunteerId], references: [id], onDelete: Cascade)
   event                Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  venueLocationMapping VenueLocationMapping @relation(fields: [venueLocationMappingId], references: [id], onDelete: Cascade)
+  venueLocationMapping VenueLevelMapping @relation(fields: [venueLocationMappingId], references: [id], onDelete: Cascade)
 
   // Composite uniqueness
   @@unique([eventId, volunteerId, venueLocationMappingId], map: "volunteer_assignments_unique")

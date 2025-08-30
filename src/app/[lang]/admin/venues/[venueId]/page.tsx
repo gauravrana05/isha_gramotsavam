@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/config';
-import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
+// import { db } from '@/lib/firebase/config';
+// import { doc, getDoc, getDocs, collection } from 'firebase/firestore';
 import Container from '@/components/ui/Container';
 import Button from '@/components/ui/Button';
 import { ArrowLeft, Edit, MapPin, Users, Phone, Mail, Trophy, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';

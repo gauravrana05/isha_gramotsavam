@@ -8,28 +8,31 @@ import { api } from '@/server/trpc/react';
 
 const venueSchema = z.object({
   name: z.string().min(1, 'Venue name is required').max(200),
-  capacity: z.number().min(1).optional(),
+  address: z.string().min(1, 'Address is required').max(500),
   panchayat: z.string().max(100).optional(),
   taluk: z.string().max(100).optional(),
   district: z.string().min(1, 'District is required').max(100),
   state: z.string().min(1, 'State is required').max(100),
   pincode: z.string().max(10).optional(),
-  contactPhone: z.string().max(20).optional(),
-  contactEmail: z.string().email('Invalid email').optional(),
-  contactPerson: z.string().max(100).optional(),
-  facilities: z.string().optional(),
   isActive: z.boolean(),
+  // Level mapping fields
+  eventId: z.string().min(1, 'Event is required'),
+  levels: z.array(z.enum(['cluster', 'division', 'final'])).min(1, 'At least one level is required'),
+  maxTeams: z.number().min(1).default(100),
 });
 
 export type VenueFormValues = z.infer<typeof venueSchema>;
 
 interface VenueFormProps {
-  initialData?: Partial<VenueFormValues>;
+  initialData?: Partial<VenueFormValues> & {
+    levels?: ('cluster' | 'division' | 'final')[];
+  };
   onSubmit: (values: VenueFormValues) => void;
   onCancel: () => void;
   isLoading?: boolean;
   isEditMode?: boolean;
   onEdit?: () => void;
+  onFormSubmit?: () => void;
 }
 
 export const VenueForm: React.FC<VenueFormProps> = ({
@@ -39,20 +42,20 @@ export const VenueForm: React.FC<VenueFormProps> = ({
   isLoading = false,
   isEditMode = false,
   onEdit,
+  onFormSubmit,
 }) => {
   const [formData, setFormData] = useState<VenueFormValues>({
     name: '',
-    capacity: undefined,
+    address: '',
     panchayat: '',
     taluk: '',
     district: '',
     state: '',
     pincode: '',
-    contactPhone: '',
-    contactEmail: '',
-    contactPerson: '',
-    facilities: '',
     isActive: true,
+    eventId: '',
+    levels: [],
+    maxTeams: 100,
     ...initialData,
   });
 
@@ -87,6 +90,12 @@ export const VenueForm: React.FC<VenueFormProps> = ({
     { state: formData.state, district: formData.district, taluk: formData.taluk || '' },
     { enabled: !!formData.state && !!formData.district && !!formData.taluk }
   );
+
+  // Events query
+  const { data: eventsData } = api.admin.events.getEvents.useQuery({
+    limit: 100,
+    status: 'all',
+  });
 
   // Update location data when queries return
   useEffect(() => {
@@ -124,18 +133,18 @@ export const VenueForm: React.FC<VenueFormProps> = ({
     if (initialData) {
       setFormData({
         name: '',
-        capacity: undefined,
+        address: '',
         panchayat: '',
         taluk: '',
         district: '',
         state: '',
         pincode: '',
-        contactPhone: '',
-        contactEmail: '',
-        contactPerson: '',
-        facilities: '',
         isActive: true,
+        maxTeams: 100,
         ...initialData,
+        // Extract levels and eventId from venue level mappings if available
+        levels: initialData.levels || [],
+        eventId: initialData.eventId || (initialData as any).venueLevelMappings?.[0]?.eventId || '',
       });
     }
   }, [initialData]);
@@ -162,12 +171,15 @@ export const VenueForm: React.FC<VenueFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted with data:', formData);
     
     try {
       const validatedData = venueSchema.parse(formData);
+      console.log('Validation passed:', validatedData);
       setErrors({});
       onSubmit(validatedData);
     } catch (error) {
+      console.log('Validation failed:', error);
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
         error.issues.forEach((issue) => {
@@ -187,12 +199,18 @@ export const VenueForm: React.FC<VenueFormProps> = ({
     }
   };
 
+  // Expose handleSubmit to parent
+  useEffect(() => {
+    if (onFormSubmit) {
+      (window as any).venueFormSubmit = () => handleSubmit({ preventDefault: () => {} } as any);
+    }
+  }, [onFormSubmit, handleSubmit]);
+
   const isViewMode = initialData && !isEditMode;
   const formId = isEditMode ? 'venue-edit-form' : 'venue-form';
 
   return (
-    <div className="space-y-8">
-      <form id={formId} onSubmit={handleSubmit} className="space-y-8">
+    <form id={formId} onSubmit={handleSubmit} className="space-y-8">
           {/* Basic Information */}
           <div className="space-y-6">
             <h3 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">
@@ -221,40 +239,27 @@ export const VenueForm: React.FC<VenueFormProps> = ({
                   </>
                 )}
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Capacity
-                </label>
-                {isViewMode ? (
-                  <p className="text-gray-900 py-2">{formData.capacity || 'Not specified'}</p>
-                ) : (
-                  <input
-                    type="number"
-                    value={formData.capacity || ''}
-                    onChange={(e) => handleInputChange('capacity', e.target.value ? parseInt(e.target.value) : undefined)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A2F1D] focus:border-transparent"
-                    placeholder="Enter capacity"
-                    min="1"
-                  />
-                )}
-              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Facilities
+                Address *
               </label>
               {isViewMode ? (
-                <p className="text-gray-900 py-2">{formData.facilities || 'No facilities specified'}</p>
+                <p className="text-gray-900 py-2">{formData.address}</p>
               ) : (
-                <textarea
-                  value={formData.facilities}
-                  onChange={(e) => handleInputChange('facilities', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A2F1D] focus:border-transparent"
-                  placeholder="Describe available facilities"
-                  rows={3}
-                />
+                <>
+                  <textarea
+                    value={formData.address}
+                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#4A2F1D] focus:border-transparent ${
+                      errors.address ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Enter complete address"
+                    rows={3}
+                  />
+                  {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
+                </>
               )}
             </div>
           </div>
@@ -321,9 +326,10 @@ export const VenueForm: React.FC<VenueFormProps> = ({
                     <Select
                       value={formData.district}
                       onValueChange={(value) => handleLocationChange('district', value)}
+                      disabled={!formData.state}
                     >
                       <SelectTrigger className={`w-full ${errors.district ? 'border-red-500' : ''}`}>
-                        <SelectValue placeholder="Select district" />
+                        <SelectValue placeholder={formData.state ? "Select district" : "Select state first"} />
                       </SelectTrigger>
                       <SelectContent>
                         {locationData.districts.map((district) => (
@@ -392,69 +398,85 @@ export const VenueForm: React.FC<VenueFormProps> = ({
             </div>
           </div>
 
-          {/* Contact Information */}
+          {/* Level Selection */}
           <div className="space-y-6">
             <h3 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">
-              Contact Information
+              Level & Event Assignment
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contact Person
-                </label>
-                {isViewMode ? (
-                  <p className="text-gray-900 py-2">{formData.contactPerson || 'Not specified'}</p>
-                ) : (
-                  <input
-                    type="text"
-                    value={formData.contactPerson}
-                    onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A2F1D] focus:border-transparent"
-                    placeholder="Enter contact person name"
-                  />
-                )}
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Event *
+              </label>
+              {isViewMode ? (
+                <p className="text-gray-900 py-2">
+                  {eventsData?.events?.find(e => e.id === formData.eventId)?.name || 'Not specified'}
+                </p>
+              ) : (
+                <>
+                  <Select
+                    value={formData.eventId}
+                    onValueChange={(value) => handleInputChange('eventId', value)}
+                  >
+                    <SelectTrigger className={`w-full ${errors.eventId ? 'border-red-500' : ''}`}>
+                      <SelectValue placeholder="Select event" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {eventsData?.events?.map((event) => (
+                        <SelectItem key={event.id} value={event.id}>
+                          {event.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.eventId && <p className="text-red-500 text-sm mt-1">{errors.eventId}</p>}
+                </>
+              )}
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contact Phone
-                </label>
-                {isViewMode ? (
-                  <p className="text-gray-900 py-2">{formData.contactPhone || 'Not specified'}</p>
-                ) : (
-                  <input
-                    type="tel"
-                    value={formData.contactPhone}
-                    onChange={(e) => handleInputChange('contactPhone', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A2F1D] focus:border-transparent"
-                    placeholder="Enter phone number"
-                    maxLength={20}
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contact Email
-                </label>
-                {isViewMode ? (
-                  <p className="text-gray-900 py-2">{formData.contactEmail || 'Not specified'}</p>
-                ) : (
-                  <>
-                    <input
-                      type="email"
-                      value={formData.contactEmail}
-                      onChange={(e) => handleInputChange('contactEmail', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#4A2F1D] focus:border-transparent ${
-                        errors.contactEmail ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                      placeholder="Enter email address"
-                    />
-                    {errors.contactEmail && <p className="text-red-500 text-sm mt-1">{errors.contactEmail}</p>}
-                  </>
-                )}
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tournament Levels *
+              </label>
+              {isViewMode ? (
+                <div className="flex flex-wrap gap-2">
+                  {formData.levels?.map((level) => (
+                    <span
+                      key={level}
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                    >
+                      {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </span>
+                  )) || <p className="text-gray-500">No levels selected</p>}
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-4">
+                    {['cluster', 'division', 'final'].map((level) => (
+                      <div key={level} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={level}
+                          checked={formData.levels?.includes(level as any) || false}
+                          onChange={(e) => {
+                            const currentLevels = formData.levels || [];
+                            if (e.target.checked) {
+                              handleInputChange('levels', [...currentLevels, level]);
+                            } else {
+                              handleInputChange('levels', currentLevels.filter(l => l !== level));
+                            }
+                          }}
+                          className="w-4 h-4 text-[#4A2F1D] border-gray-300 rounded focus:ring-[#4A2F1D]"
+                        />
+                        <label htmlFor={level} className="ml-2 text-sm text-gray-700">
+                          {level.charAt(0).toUpperCase() + level.slice(1)}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  {errors.levels && <p className="text-red-500 text-sm mt-1">{errors.levels}</p>}
+                </>
+              )}
             </div>
           </div>
 
@@ -493,6 +515,5 @@ export const VenueForm: React.FC<VenueFormProps> = ({
             </div>
           </div>
         </form>
-    </div>
   );
 };

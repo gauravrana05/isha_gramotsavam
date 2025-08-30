@@ -175,11 +175,16 @@ export const adminEventsRouter = createTRPCRouter({
         db.event.findMany({
           where,
           include: {
-            sport: true,
-            venue: true,
+            createdByUser: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
             _count: {
               select: {
                 fixtures: true,
+                teams: true,
               },
             },
           },
@@ -217,8 +222,12 @@ export const adminEventsRouter = createTRPCRouter({
       const event = await db.event.create({
         data: input,
         include: {
-          sport: true,
-          venue: true,
+          createdByUser: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
         },
       });
 
@@ -248,8 +257,12 @@ export const adminEventsRouter = createTRPCRouter({
         where: { id },
         data: updateData,
         include: {
-          sport: true,
-          venue: true,
+          createdByUser: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
         },
       });
 
@@ -286,8 +299,12 @@ export const adminEventsRouter = createTRPCRouter({
       const event = await db.event.findUnique({
         where: { id: input.id },
         include: {
-          sport: true,
-          venue: true,
+          createdByUser: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
           fixtures: {
             include: {
               team1: true,
@@ -337,9 +354,10 @@ export const adminEventsRouter = createTRPCRouter({
           where,
           include: {
             event: {
-              include: {
-                sport: true,
-                venue: true,
+              select: {
+                id: true,
+                name: true,
+                status: true,
               },
             },
             team1: true,
