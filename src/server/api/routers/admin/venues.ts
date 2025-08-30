@@ -165,11 +165,8 @@ export const adminVenuesRouter = createTRPCRouter({
       const venuesWithMappings = await db.venue.findMany({
         where: {
           id: { in: input.venueIds },
-          OR: [
-            { teams: { some: {} } },
-            { events: { some: {} } },
-            { venueLocationMappings: { some: {} } },
-          ],
+          deletedAt: null, // Only check non-deleted venues
+          venueLocationMappings: { some: {} },
         },
         select: { id: true, name: true },
       });
@@ -183,7 +180,10 @@ export const adminVenuesRouter = createTRPCRouter({
 
       // Soft delete venues
       await db.venue.updateMany({
-        where: { id: { in: input.venueIds } },
+        where: { 
+          id: { in: input.venueIds },
+          deletedAt: null, // Only delete non-deleted venues
+        },
         data: { deletedAt: new Date() },
       });
 

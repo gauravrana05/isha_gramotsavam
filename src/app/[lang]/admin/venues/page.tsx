@@ -1,27 +1,27 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter, useParams} from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
 import { 
   AdvancedTable,
-  SingleStatCard,
   PageLoader,
-  Button,
   type Column,
+  type FilterField,
+  type TableParams,
 } from '@/components/ui';
-import { StatusSelector } from '@/components/ui/StatusSelector';
-import { VenueCreateModal } from '@/components/admin/VenueCreateModal';
-import { VenueDetailModal } from '@/components/admin/VenueDetailModal';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
+import { VenueForm, VenueFormValues } from '@/components/admin/VenueForm';
 import { 
   Plus, 
+  Edit,
+  Trash2, 
   MapPin,
-  Users,
   Building,
-  Loader2,
-  Trash2
+  AlertTriangle,
+  Users
 } from 'lucide-react';
 
 interface VenueData {
@@ -38,58 +38,33 @@ interface VenueData {
   facilities: string | null;
   isActive: boolean;
   createdAt: string;
-  _count: {
-    teams: number;
-    events: number;
-  };
+  updatedAt: string;
+  deletedAt: string | null;
 }
 
-export default function VenuesManagement() {
+export default function AdminVenuesPage() {
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
   const { addNotification } = useNotification();
-  // State
-  const [selectedVenues, setSelectedVenues] = useState<string[]>([]);
+
+  // State management
+  const [selectedVenues, setSelectedVenues] = useState<Set<string | number>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedVenue, setSelectedVenue] = useState<VenueData | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [venueToEdit, setVenueToEdit] = useState<VenueData | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [venueToDelete, setVenueToDelete] = useState<VenueData | null>(null);
 
-  // tRPC queries
-  const {
-    data: venuesData,
-    isLoading: venuesLoading,
-    error: venuesError,
-    refetch: refetchVenues
-  } = api.admin.venues.getVenues.useQuery({
-    limit: 100,
-    status: statusFilter,
-    searchQuery: searchQuery || undefined,
-  }, {
-    enabled: !!user && userProfile?.role === 'admin'
-  });
-
-  const updateStatusMutation = api.admin.venues.updateVenueStatus.useMutation({
-    onSuccess: () => {
-      addNotification('Venue status updated successfully', 'success');
-      refetchVenues();
-    },
-    onError: (error) => {
-      addNotification(error.message || 'Failed to update venue status', 'error');
-    },
-  });
-
-  const deleteVenuesMutation = api.admin.venues.deleteVenues.useMutation({
-    onSuccess: (data) => {
-      addNotification(`${data.deleted} venue(s) deleted successfully`, 'success');
-      setSelectedVenues([]);
-      refetchVenues();
-    },
-    onError: (error) => {
-      addNotification(error.message || 'Failed to delete venues', 'error');
-    },
+  // Table state for client-side operations
+  const [tableParams, setTableParams] = useState<TableParams>({
+    search: '',
+    sort: [],
+    filters: [],
+    page: 1,
+    pageSize: 25,
   });
 
   // Auth check
@@ -99,68 +74,126 @@ export default function VenuesManagement() {
     }
   }, [user, userProfile, authLoading, router, lang]);
 
-  // Loading skeleton columns
-  const columnSkeleton: Column<VenueData>[] = [
-    {
-      key: 'name',
-      header: 'Venue Details',
-      render: () => (
-        <div>
-          <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
-          <div className="h-3 bg-gray-100 rounded animate-pulse w-3/4"></div>
-        </div>
-      ),
+  // tRPC queries - get all venues for client-side filtering
+  const {
+    data: venuesData,
+    isLoading: venuesLoading,
+    error: venuesError,
+    refetch: refetchVenues
+  } = api.admin.venues.getVenues.useQuery({
+    limit: 1000, // Get all venues for client-side filtering
+    status: 'all',
+  }, {
+    enabled: !!user && userProfile?.role === 'admin'
+  });
+
+  // Client-side filtered and processed venues
+  const venues = useMemo(() => {
+    if (!venuesData?.venues) return [];
+
+    let filteredVenues = [...venuesData.venues];
+
+    // Apply client-side filtering for search
+    if (tableParams.search) {
+      const searchLower = tableParams.search.toLowerCase();
+      filteredVenues = filteredVenues.filter(venue => 
+        venue.name.toLowerCase().includes(searchLower) ||
+        venue.district.toLowerCase().includes(searchLower) ||
+        venue.state.toLowerCase().includes(searchLower) ||
+        (venue.contactPerson && venue.contactPerson.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Apply active/inactive status filter
+    const statusFilter = tableParams.filters.find(f => f.key === 'isActive');
+    if (statusFilter && statusFilter.value) {
+      const isActiveFilter = statusFilter.value === 'true';
+      filteredVenues = filteredVenues.filter(venue => 
+        venue.isActive === isActiveFilter
+      );
+    }
+
+    // Apply district filter
+    const districtFilter = tableParams.filters.find(f => f.key === 'district');
+    if (districtFilter && districtFilter.value) {
+      filteredVenues = filteredVenues.filter(venue =>
+        venue.district.toLowerCase().includes(districtFilter.value.toLowerCase())
+      );
+    }
+
+    // Apply state filter
+    const stateFilter = tableParams.filters.find(f => f.key === 'state');
+    if (stateFilter && stateFilter.value) {
+      filteredVenues = filteredVenues.filter(venue =>
+        venue.state.toLowerCase().includes(stateFilter.value.toLowerCase())
+      );
+    }
+
+    return filteredVenues;
+  }, [venuesData, tableParams.search, tableParams.filters]);
+
+  const loading = venuesLoading || authLoading;
+
+  const createVenueMutation = api.admin.venues.createVenue.useMutation({
+    onSuccess: () => {
+      addNotification('Venue created successfully', 'success');
+      setShowCreateModal(false);
+      refetchVenues();
     },
-    {
-      key: 'location',
-      header: 'Location',
-      render: () => (
-        <div>
-          <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
-          <div className="h-3 bg-gray-100 rounded animate-pulse w-1/2"></div>
-        </div>
-      ),
+    onError: (error) => {
+      addNotification(error.message || 'Failed to create venue', 'error');
     },
-    {
-      key: 'contact',
-      header: 'Contact',
-      render: () => (
-        <div>
-          <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
-          <div className="h-3 bg-gray-100 rounded animate-pulse w-2/3"></div>
-        </div>
-      ),
+  });
+
+  const updateVenueMutation = api.admin.venues.updateVenue.useMutation({
+    onSuccess: () => {
+      addNotification('Venue updated successfully', 'success');
+      setShowViewModal(false);
+      setIsEditMode(false);
+      setVenueToEdit(null);
+      refetchVenues();
     },
-    {
-      key: 'capacity',
-      header: 'Capacity',
-      render: () => <div className="h-4 bg-gray-200 rounded animate-pulse w-16"></div>,
+    onError: (error) => {
+      addNotification(error.message || 'Failed to update venue', 'error');
     },
-    {
-      key: 'teams',
-      header: 'Teams',
-      render: () => <div className="h-4 bg-gray-200 rounded animate-pulse w-12"></div>,
+  });
+
+  const deleteVenuesMutation = api.admin.venues.deleteVenues.useMutation({
+    onSuccess: (data) => {
+      addNotification(`${data.deleted} venue(s) deleted successfully`, 'success');
+      setSelectedVenues(new Set());
+      setShowDeleteConfirm(false);
+      setVenueToDelete(null);
+      refetchVenues();
     },
-    {
-      key: 'status',
-      header: 'Status',
-      render: () => <div className="h-6 bg-gray-200 rounded animate-pulse w-20"></div>,
+    onError: (error) => {
+      addNotification(error.message || 'Failed to delete venues', 'error');
     },
-  ];
+  });
+
+  // Handle data load for filtering
+  const handleDataLoad = useCallback((params: TableParams) => {
+    setTableParams(params);
+  }, []);
+
+  // Handle row click - open view modal
+  const handleRowClick = (venue: VenueData) => {
+    setSelectedVenue(venue);
+    setShowViewModal(true);
+    setIsEditMode(false);
+  };
 
   // Table columns
   const columns: Column<VenueData>[] = [
     {
       key: 'name',
-      header: 'Venue Details',
+      header: 'Venue Name',
+      sortable: true,
       render: (_, venue) => (
         <div>
-          <div className="text-sm font-medium text-gray-900">{venue.name}</div>
-          <div className="text-sm text-gray-500">
-            {venue.panchayat && `${venue.panchayat}, `}{venue.taluk}
-          </div>
+          <div className="font-medium text-gray-900">{venue.name}</div>
           {venue.facilities && (
-            <div className="text-xs text-gray-400 truncate max-w-xs">
+            <div className="text-sm text-gray-500 truncate max-w-xs">
               {venue.facilities}
             </div>
           )}
@@ -170,10 +203,28 @@ export default function VenuesManagement() {
     {
       key: 'location',
       header: 'Location',
+      sortable: true,
       render: (_, venue) => (
         <div>
-          <div className="text-sm text-gray-900">{venue.district}</div>
-          <div className="text-sm text-gray-500">{venue.state}</div>
+          <div className="text-sm text-gray-900">{venue.district}, {venue.state}</div>
+          {(venue.panchayat || venue.taluk) && (
+            <div className="text-sm text-gray-500">
+              {venue.panchayat && `${venue.panchayat}, `}{venue.taluk}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'capacity',
+      header: 'Capacity',
+      sortable: true,
+      render: (_, venue) => (
+        <div className="flex items-center space-x-1">
+          <Users className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-900">
+            {venue.capacity ? venue.capacity.toLocaleString() : 'N/A'}
+          </span>
         </div>
       ),
     },
@@ -188,121 +239,87 @@ export default function VenuesManagement() {
           {venue.contactPhone && (
             <div className="text-sm text-gray-600">{venue.contactPhone}</div>
           )}
-          {venue.contactEmail && (
-            <div className="text-xs text-gray-500 truncate max-w-xs">{venue.contactEmail}</div>
-          )}
         </div>
       ),
     },
     {
-      key: 'capacity',
-      header: 'Capacity',
-      render: (_, venue) => (
-        <div className="text-sm text-gray-900">
-          {venue.capacity ? venue.capacity.toLocaleString() : 'N/A'}
-        </div>
-      ),
-    },
-    {
-      key: 'teams',
-      header: 'Teams',
-      render: (_, venue) => (
-        <div className="text-center">
-          <div className="text-sm font-medium text-gray-900">{venue._count.teams}</div>
-          <div className="text-xs text-gray-500">assigned</div>
-        </div>
-      ),
-    },
-    {
-      key: 'status',
+      key: 'isActive',
       header: 'Status',
+      sortable: true,
       render: (_, venue) => (
-        <StatusSelector
-          value={venue.isActive ? 'active' : 'inactive'}
-          onChange={(status) => {
-            updateStatusMutation.mutate({
-              venueId: venue.id,
-              isActive: status === 'active'
-            });
-          }}
-          options={[
-            { value: 'active', label: 'Active', color: 'green' },
-            { value: 'inactive', label: 'Inactive', color: 'red' },
-          ]}
-          disabled={updateStatusMutation.isLoading}
-        />
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          venue.isActive 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {venue.isActive ? 'Active' : 'Inactive'}
+        </span>
+      ),
+    },
+    {
+      key: 'createdAt',
+      header: 'Created',
+      sortable: true,
+      render: (_, venue) => (
+        <div className="text-sm text-gray-500">
+          {new Date(venue.createdAt).toLocaleDateString()}
+        </div>
       ),
     },
   ];
 
-  // Header actions based on selection
-  const headerActionsNone = (
-    <Button
-      onClick={() => setShowCreateModal(true)}
-      className="bg-[#4A2F1D] text-white hover:bg-[#3A251A]"
-      icon={<Plus className="w-4 h-4" />}
-    >
-      Add Venue
-    </Button>
-  );
+  // Filter fields
+  const filterFields: FilterField[] = [
+    {
+      key: 'isActive',
+      label: 'Status',
+      type: 'select',
+      category: 'Status',
+      options: [
+        { label: 'Active', value: 'true' },
+        { label: 'Inactive', value: 'false' }
+      ]
+    },
+    {
+      key: 'district',
+      label: 'District',
+      type: 'text',
+      category: 'Location',
+      placeholder: 'Filter by district...',
+    },
+    {
+      key: 'state',
+      label: 'State',
+      type: 'text',
+      category: 'Location',
+      placeholder: 'Filter by state...',
+    },
+  ];
 
-  const headerActionsSingle = (
-    <Button
-      onClick={() => {
-        setSelectedVenueId(selectedVenues[0]);
-        setShowDetailModal(true);
-      }}
-      className="bg-[#4A2F1D] text-white hover:bg-[#3A251A]"
-    >
-      Edit Venue
-    </Button>
-  );
+  // Handle form submission
+  const handleCreateSubmit = (values: VenueFormValues) => {
+    createVenueMutation.mutate(values);
+  };
 
-  const headerActionsMultiple = (
-    <Button
-      onClick={() => {
-        if (confirm(`Are you sure you want to delete ${selectedVenues.length} venue(s)?`)) {
-          deleteVenuesMutation.mutate({ venueIds: selectedVenues });
-        }
-      }}
-      className="bg-red-600 text-white hover:bg-red-700"
-      icon={<Trash2 className="w-4 h-4" />}
-      disabled={deleteVenuesMutation.isLoading}
-    >
-      {deleteVenuesMutation.isLoading ? (
-        <Loader2 className="w-4 h-4 animate-spin" />
-      ) : (
-        `Remove ${selectedVenues.length} Venues`
-      )}
-    </Button>
-  );
+  const handleUpdateSubmit = (values: VenueFormValues) => {
+    if (!venueToEdit) return;
+    updateVenueMutation.mutate({
+      id: venueToEdit.id,
+      ...values,
+    });
+  };
+  
 
-  // Stats calculations
-  const stats = useMemo(() => {
-    if (!venuesData?.venues) return null;
-
-    const venues = venuesData.venues;
-    const totalVenues = venues.length;
-    const activeVenues = venues.filter(v => v.isActive).length;
-    const totalTeams = venues.reduce((sum, v) => sum + v._count.teams, 0);
-    const totalEvents = venues.reduce((sum, v) => sum + v._count.events, 0);
-
-    return {
-      totalVenues,
-      activeVenues,
-      totalTeams,
-      totalEvents,
-    };
-  }, [venuesData]);
-
-  // Handle row click
-  const handleRowClick = (venue: VenueData) => {
-    setSelectedVenueId(venue.id);
-    setShowDetailModal(true);
+  const handleDelete = () => {
+    if (venueToDelete) {
+      deleteVenuesMutation.mutate({ venueIds: [venueToDelete.id] });
+    } else if (selectedVenues.size > 0) {
+      deleteVenuesMutation.mutate({ venueIds: Array.from(selectedVenues) as string[] });
+    }
   };
 
   // Loading state
-  if (authLoading || venuesLoading) {
+  if (authLoading) {
     return <PageLoader />;
   }
 
@@ -313,7 +330,12 @@ export default function VenuesManagement() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Venues</h2>
           <p className="text-gray-600 mb-4">{venuesError.message}</p>
-          <Button onClick={() => refetchVenues()}>Try Again</Button>
+          <button 
+            onClick={() => refetchVenues()}
+            className="px-4 py-2 bg-[#4A2F1D] text-white rounded-lg hover:bg-[#3A251A]"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -322,132 +344,238 @@ export default function VenuesManagement() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Venues Management</h1>
-          <p className="text-gray-600 mt-2">Manage tournament venues and their assignments</p>
-        </div>
-
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <SingleStatCard
-              stat={{
-                title: "Total Venues",
-                value: stats.totalVenues,
-                icon: Building,
-                color: "info"
-              }}
-            />
-            <SingleStatCard
-              stat={{
-                title: "Active Venues",
-                value: stats.activeVenues,
-                icon: MapPin,
-                color: "success"
-              }}
-            />
-            <SingleStatCard
-              stat={{
-                title: "Teams Assigned",
-                value: stats.totalTeams,
-                icon: Users,
-                color: "secondary"
-              }}
-            />
-            <SingleStatCard
-              stat={{
-                title: "Events Hosted",
-                value: stats.totalEvents,
-                icon: Building,
-                color: "primary"
-              }}
-            />
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search Venues
-              </label>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, district, or location..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A2F1D] focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status Filter
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A2F1D] focus:border-transparent"
+        <AdvancedTable<VenueData>
+          data={venues}
+          columns={columns}
+          loading={loading}
+          onDataLoad={handleDataLoad}
+          searchable={true}
+          searchPlaceholder="Search venues..."
+          searchFields={['name', 'district', 'state', 'contactPerson']}
+          filterable={true}
+          filters={filterFields}
+          sortable={true} 
+          selectable={true}
+          selectedRows={selectedVenues}
+          onSelectionChange={setSelectedVenues}
+          onRowClick={handleRowClick}
+          keyExtractor={(venue) => venue.id}
+          headerActions={
+            selectedVenues.size === 0 ? (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
               >
-                <option value="all">All Venues</option>
-                <option value="active">Active Only</option>
-                <option value="inactive">Inactive Only</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white rounded-lg shadow-sm">
-          <AdvancedTable
-            data={venuesData?.venues || []}
-            columns={venuesLoading ? columnSkeleton : columns}
-            loading={venuesLoading}
-            selection={{
-              selectedItems: selectedVenues,
-              onSelectionChange: setSelectedVenues,
-              getItemId: (venue) => venue.id,
-            }}
-            headerActions={{
-              none: headerActionsNone,
-              single: headerActionsSingle,
-              multiple: headerActionsMultiple,
-            }}
-            onRowClick={handleRowClick}
-            emptyState={{
-              title: 'No venues found',
-              description: 'Get started by adding your first venue.',
-              action: (
-                <Button
-                  onClick={() => setShowCreateModal(true)}
-                  className="bg-[#4A2F1D] text-white hover:bg-[#3A251A]"
-                  icon={<Plus className="w-4 h-4" />}
-                >
-                  Add Venue
-                </Button>
-              ),
-            }}
-          />
-        </div>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Venue
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Selected ({selectedVenues.size})
+              </button>
+            )
+          }
+          emptyState={{
+            icon: Building,
+            title: 'No venues found',
+            description: 'Get started by adding your first venue.',
+          }}
+          noSearchResultsEmptyState={{
+            icon: Building,
+            title: 'No matching venues',
+            description: 'Try adjusting your search or filters to find what you\'re looking for.',
+          }}
+          pagination={{ enabled: true }}
+          persistState={false}
+        />
       </div>
 
-      {/* Modals */}
-      <VenueCreateModal
+      {/* Create Modal */}
+      <EnhancedModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSuccess={() => refetchVenues()}
-      />
+        title="Create New Venue"
+        subtitle="Create a new venue with location details and contact information"
+        size="lg"
+        mobileFullScreen={true}
+        scrollableBody={true}
+        footer={
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(false)}
+              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              disabled={createVenueMutation.isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="venue-form"
+              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
+              disabled={createVenueMutation.isLoading}
+            >
+              {createVenueMutation.isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block" />
+                  Creating...
+                </>
+              ) : (
+                'Create Venue'
+              )}
+            </button>
+          </div>
+        }
+      >
+        <div id="venue-form">
+          <VenueForm
+            onSubmit={handleCreateSubmit}
+            onCancel={() => setShowCreateModal(false)}
+            isLoading={createVenueMutation.isLoading}
+          />
+        </div>
+      </EnhancedModal>
 
-      <VenueDetailModal
-        isOpen={showDetailModal}
+      {/* View/Edit Modal */}
+      {selectedVenue && (
+        <EnhancedModal
+          isOpen={showViewModal}
+          onClose={() => {
+            setShowViewModal(false);
+            setIsEditMode(false);
+            setVenueToEdit(null);
+            setSelectedVenue(null);
+          }}
+          title={isEditMode ? "Edit Venue" : "Venue Details"}
+          subtitle={isEditMode ? "Update venue details and settings" : `${selectedVenue.name} - Complete Information`}
+          size="lg"
+          mobileFullScreen={true}
+          scrollableBody={true}
+          footer={
+            isEditMode ? (
+              <div className="flex flex-row space-x-3 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditMode(false);
+                    setVenueToEdit(null);
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                  disabled={updateVenueMutation.isLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  form="venue-edit-form"
+                  className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
+                  disabled={updateVenueMutation.isLoading}
+                >
+                  {updateVenueMutation.isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Venue'
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={() => {
+                    setIsEditMode(true);
+                    setVenueToEdit(selectedVenue);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                >
+                  <Edit className="w-4 h-4 mr-2 inline" />
+                  Edit Venue
+                </button>
+              </div>
+            )
+          }
+        >
+          <VenueForm
+            initialData={selectedVenue}
+            onSubmit={handleUpdateSubmit}
+            onCancel={() => {
+              setShowViewModal(false);
+              setIsEditMode(false);
+              setVenueToEdit(null);
+              setSelectedVenue(null);
+            }}
+            isLoading={updateVenueMutation.isLoading}
+            isEditMode={isEditMode}
+            onEdit={() => {
+              setIsEditMode(true);
+              setVenueToEdit(selectedVenue);
+            }}
+          />
+        </EnhancedModal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <EnhancedModal
+        isOpen={showDeleteConfirm}
         onClose={() => {
-          setShowDetailModal(false);
-          setSelectedVenueId(null);
+          setShowDeleteConfirm(false);
+          setVenueToDelete(null);
         }}
-        venueId={selectedVenueId}
-        onSuccess={() => refetchVenues()}
-      />
+        title="Confirm Delete"
+        subtitle="This action cannot be undone"
+        size="sm"
+        footer={
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <button
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                setVenueToDelete(null);
+              }}
+              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              disabled={deleteVenuesMutation.isLoading}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+              disabled={deleteVenuesMutation.isLoading}
+            >
+              {deleteVenuesMutation.isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </button>
+          </div>
+        }
+      >
+        <div className="text-center">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+            <AlertTriangle className="h-6 w-6 text-red-600" />
+          </div>
+          <p className="text-gray-600 mb-4">
+            Are you sure you want to delete{' '}
+            {venueToDelete ? (
+              <strong>"{venueToDelete.name}"</strong>
+            ) : (
+              <strong>{selectedVenues.size} selected venue{selectedVenues.size > 1 ? 's' : ''}</strong>
+            )}?
+          </p>
+          <p className="text-sm text-red-600">
+            This action cannot be undone and will remove all associated data.
+          </p>
+        </div>
+      </EnhancedModal>
     </div>
   );
 }
