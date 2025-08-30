@@ -48,7 +48,7 @@ export const adminDashboardRouter = createTRPCRouter({
       const [totalVenues, activeVenues, venueLocationMappings] = await Promise.all([
         db.venue.count(),
         db.venue.count({ where: { isActive: true } }),
-        db.venueLocationMapping.groupBy({
+        db.venueLevelMapping.groupBy({
           by: ['level'],
           where: { isActive: true },
           _count: { _all: true }

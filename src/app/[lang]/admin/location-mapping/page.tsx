@@ -12,24 +12,24 @@ import {
   type FilterField,
   type TableParams,
 } from '@/components/ui';
+import { MultiSelect } from '@/components/ui/MultiSelect';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { 
   Plus,
   MapPin,
   Building,
   CheckCircle,
-  XCircle,
-  Clock,
-  Edit,
   Trash2,
 } from 'lucide-react';
 
-interface TalukMappingData {
+interface LocationMappingData {
   id: string;
   eventId: string;
-  district: string;
+  locationType: 'district' | 'taluk';
+  locationName: string;
   state: string;
-  taluk: string;
+  district: string | null;
   clusterVenueMappingId: string;
   venueLocationMapping: {
     id: string;
@@ -40,26 +40,11 @@ interface TalukMappingData {
       state: string;
       address: string;
     };
-    level: 'cluster' | 'division' | 'final';
+    level: 'cluster';
     maxTeams: number;
   };
   createdAt: string;
   updatedAt: string;
-}
-
-interface PendingTaluk {
-  state: string;
-  district: string;
-  taluk: string;
-  availableVenues: {
-    id: string;
-    venue: {
-      id: string;
-      name: string;
-      address: string;
-    };
-    maxTeams: number;
-  }[];
 }
 
 export default function LocationMappingPage({ params }: { params: Promise<{ lang: string }> }) {
@@ -71,16 +56,12 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
   // State management
   const [selectedMappings, setSelectedMappings] = useState<Set<string | number>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedMapping, setSelectedMapping] = useState<TalukMappingData | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
-  const [selectedLevel, setSelectedLevel] = useState<'cluster' | 'division' | 'final'>('cluster');
-  const [isEditMode, setIsEditMode] = useState(false);
 
   // Table state
   const [tableParams, setTableParams] = useState<TableParams>({
     pagination: { page: 1, pageSize: 50 },
-    sorting: { field: 'district', direction: 'asc' },
+    sorting: { field: 'locationName', direction: 'asc' },
     filters: {},
   });
 
@@ -94,38 +75,29 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
   // Get events
   const { data: eventsData } = api.admin.events.getEvents.useQuery({
     limit: 100,
-    status: 'upcoming',
+    status: 'ongoing',
   });
 
-  // Get existing taluk mappings
+  // Get existing location mappings
   const {
-    data: talukMappingsData,
+    data: locationMappingsData,
     isLoading: mappingsLoading,
     error: mappingsError,
     refetch: refetchMappings
-  } = api.admin.mappings.getTalukClusterMappings.useQuery({
+  } = api.admin.mappings.getLocationClusterMappings.useQuery({
     eventId: selectedEvent,
-    district: tableParams.filters.district as string,
+    locationType: tableParams.filters.locationType as 'district' | 'taluk' | undefined,
     state: tableParams.filters.state as string,
-  }, {
-    enabled: !!selectedEvent,
-  });
-
-  // Get pending taluks for mapping
-  const {
-    data: pendingTaluksData,
-    isLoading: pendingLoading,
-  } = api.admin.mappings.getPendingTalukMappings.useQuery({
-    eventId: selectedEvent,
-    level: selectedLevel,
+    district: tableParams.filters.district as string,
+    locationName: tableParams.filters.locationName as string,
   }, {
     enabled: !!selectedEvent,
   });
 
   // Mutations
-  const createMappingMutation = api.admin.mappings.createTalukClusterMapping.useMutation({
+  const createMappingMutation = api.admin.mappings.createLocationClusterMapping.useMutation({
     onSuccess: () => {
-      addNotification('Taluk mapping created successfully', 'success');
+      addNotification('Location mapping created successfully', 'success');
       setShowCreateModal(false);
       refetchMappings();
     },
@@ -134,22 +106,9 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
     },
   });
 
-  const updateMappingMutation = api.admin.mappings.updateTalukClusterMapping.useMutation({
+  const deleteMappingsMutation = api.admin.mappings.deleteLocationClusterMappings.useMutation({
     onSuccess: () => {
-      addNotification('Taluk mapping updated successfully', 'success');
-      setShowViewModal(false);
-      setIsEditMode(false);
-      setSelectedMapping(null);
-      refetchMappings();
-    },
-    onError: (error) => {
-      addNotification(error.message || 'Failed to update mapping', 'error');
-    },
-  });
-
-  const deleteMappingsMutation = api.admin.mappings.deleteTalukClusterMappings.useMutation({
-    onSuccess: () => {
-      addNotification('Taluk mappings deleted successfully', 'success');
+      addNotification('Location mappings deleted successfully', 'success');
       setSelectedMappings(new Set());
       refetchMappings();
     },
@@ -167,27 +126,44 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
 
   // Memoized data processing
   const mappings = useMemo(() => {
-    return talukMappingsData || [];
-  }, [talukMappingsData]);
+    return locationMappingsData || [];
+  }, [locationMappingsData]);
 
   const loading = authLoading || mappingsLoading;
 
   // Table columns
-  const columns: Column<TalukMappingData>[] = [
+  const columns: Column<LocationMappingData>[] = [
+    {
+      key: 'locationType',
+      header: 'Type',
+      sortable: true,
+      render: (_, mapping) => (
+        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+          mapping.locationType === 'district' 
+            ? 'bg-purple-100 text-purple-700' 
+            : 'bg-green-100 text-green-700'
+        }`}>
+          {mapping.locationType === 'district' ? 'District' : 'Taluk'}
+        </span>
+      ),
+    },
     {
       key: 'location',
       header: 'Location',
       sortable: true,
       render: (_, mapping) => (
         <div className="text-sm">
-          <div className="font-medium text-gray-900">{mapping.taluk}</div>
-          <div className="text-gray-500">{mapping.district}, {mapping.state}</div>
+          <div className="font-medium text-gray-900">{mapping.locationName}</div>
+          <div className="text-gray-500">
+            {mapping.locationType === 'taluk' && mapping.district && `${mapping.district}, `}
+            {mapping.state}
+          </div>
         </div>
       ),
     },
     {
       key: 'venue',
-      header: 'Assigned Venue',
+      header: 'Assigned Cluster Venue',
       render: (_, mapping) => (
         <div className="text-sm">
           <div className="font-medium text-gray-900">{mapping.venueLocationMapping.venue.name}</div>
@@ -196,19 +172,6 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
             {mapping.venueLocationMapping.venue.district}, {mapping.venueLocationMapping.venue.state}
           </div>
         </div>
-      ),
-    },
-    {
-      key: 'level',
-      header: 'Level',
-      render: (_, mapping) => (
-        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-          mapping.venueLocationMapping.level === 'cluster' ? 'bg-blue-100 text-blue-700' :
-          mapping.venueLocationMapping.level === 'division' ? 'bg-green-100 text-green-700' :
-          'bg-purple-100 text-purple-700'
-        }`}>
-          {mapping.venueLocationMapping.level.charAt(0).toUpperCase() + mapping.venueLocationMapping.level.slice(1)}
-        </span>
       ),
     },
     {
@@ -235,6 +198,16 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
   // Filter fields
   const filterFields: FilterField[] = [
     {
+      key: 'locationType',
+      label: 'Location Type',
+      type: 'select',
+      options: [
+        { value: '', label: 'All Types' },
+        { value: 'district', label: 'District' },
+        { value: 'taluk', label: 'Taluk' },
+      ],
+    },
+    {
       key: 'state',
       label: 'State',
       type: 'text',
@@ -246,41 +219,24 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
       type: 'text',
       placeholder: 'Filter by district...',
     },
+    {
+      key: 'locationName',
+      label: 'Location Name',
+      type: 'text',
+      placeholder: 'Filter by location name...',
+    },
   ];
 
   // Header actions
   const headerActions = (
     <div className="flex items-center space-x-3">
-      <select
-        value={selectedEvent}
-        onChange={(e) => setSelectedEvent(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-      >
-        <option value="">Select Event</option>
-        {eventsData?.events.map((event) => (
-          <option key={event.id} value={event.id}>
-            {event.name}
-          </option>
-        ))}
-      </select>
-
-      <select
-        value={selectedLevel}
-        onChange={(e) => setSelectedLevel(e.target.value as 'cluster' | 'division' | 'final')}
-        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-      >
-        <option value="cluster">Cluster Level</option>
-        <option value="division">Division Level</option>
-        <option value="final">Final Level</option>
-      </select>
-
       <button
         onClick={() => setShowCreateModal(true)}
         className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
         disabled={!selectedEvent || loading}
       >
         <Plus className="w-4 h-4 mr-2" />
-        Map Taluk
+        Map Locations
       </button>
 
       {selectedMappings.size > 0 && (
@@ -303,24 +259,7 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
   );
 
   // Row actions
-  const getRowActions = (mapping: TalukMappingData) => [
-    {
-      label: 'View Details',
-      onClick: () => {
-        setSelectedMapping(mapping);
-        setShowViewModal(true);
-      },
-      icon: MapPin,
-    },
-    {
-      label: 'Edit Mapping',
-      onClick: () => {
-        setSelectedMapping(mapping);
-        setIsEditMode(true);
-        setShowViewModal(true);
-      },
-      icon: Edit,
-    },
+  const getRowActions = (mapping: LocationMappingData) => [
     {
       label: 'Delete',
       onClick: () => {
@@ -342,8 +281,8 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <AdvancedTable<TalukMappingData>
-          data={(mappings || []) as TalukMappingData[]}
+        <AdvancedTable<LocationMappingData>
+          data={(mappings || []) as LocationMappingData[]}
           columns={columns}
           loading={loading}
           error={mappingsError?.message}
@@ -354,15 +293,13 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
           filterFields={filterFields}
           headerActions={headerActions}
           getRowActions={getRowActions}
-          title="Location Mapping"
-          subtitle="Map taluks to cluster venues for tournament organization"
           emptyState={{
             icon: MapPin,
             title: 'No mappings found',
-            description: selectedEvent ? 'No taluk mappings found for the selected event and filters.' : 'Please select an event to view location mappings.',
+            description: selectedEvent ? 'No location mappings found for the selected filters.' : 'Please select an event to view location mappings.',
           }}
           searchable
-          searchPlaceholder="Search taluks, venues, or locations..."
+          searchPlaceholder="Search locations, venues, or addresses..."
         />
 
         {/* Create Mapping Modal */}
@@ -370,8 +307,8 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
           <EnhancedModal
             isOpen={showCreateModal}
             onClose={() => setShowCreateModal(false)}
-            title="Create Taluk Mapping"
-            subtitle="Map a taluk to a cluster venue"
+            title="Map Taluk to Cluster Venue"
+            subtitle="Assign taluks to cluster venues"
             size="lg"
             footer={
               <div className="flex flex-row space-x-3 sm:justify-end">
@@ -395,6 +332,7 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
               ) : pendingTaluksData && pendingTaluksData.length > 0 ? (
                 <div className="space-y-4">
                   <h4 className="font-medium text-gray-900">Pending Taluk Mappings</h4>
+                  <p className="text-sm text-gray-600">Districts with multiple cluster venues need taluk-level mapping</p>
                   <div className="space-y-3 max-h-96 overflow-y-auto">
                     {pendingTaluksData.map((pendingTaluk, index) => (
                       <div key={`${pendingTaluk.state}-${pendingTaluk.district}-${pendingTaluk.taluk}`} className="border border-gray-200 rounded-lg p-4">
@@ -409,7 +347,7 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
                         </div>
                         
                         <div className="space-y-2">
-                          <p className="text-sm font-medium text-gray-700">Available Venues:</p>
+                          <p className="text-sm font-medium text-gray-700">Available Cluster Venues:</p>
                           {pendingTaluk.availableVenues.map((venue) => (
                             <button
                               key={venue.id}
@@ -445,56 +383,29 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   <Building className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>All taluks are already mapped for this event.</p>
+                  <p>All taluks are already mapped to cluster venues for this event.</p>
                 </div>
               )}
             </div>
           </EnhancedModal>
         )}
 
-        {/* View/Edit Mapping Modal */}
+        {/* View Mapping Modal */}
         {showViewModal && selectedMapping && (
           <EnhancedModal
             isOpen={showViewModal}
             onClose={() => {
               setShowViewModal(false);
-              setIsEditMode(false);
               setSelectedMapping(null);
             }}
-            title={isEditMode ? "Edit Mapping" : "Mapping Details"}
-            subtitle={`${selectedMapping.taluk} - ${selectedMapping.district}`}
+            title="Mapping Details"
+            subtitle={`${selectedMapping.taluk} → ${selectedMapping.venueLocationMapping.venue.name}`}
             size="lg"
-            footer={
-              isEditMode ? (
-                <div className="flex flex-row space-x-3 sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditMode(false);
-                    }}
-                    className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                    disabled={updateMappingMutation.isPending}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <div className="flex justify-end space-x-2">
-                  <button
-                    onClick={() => setIsEditMode(true)}
-                    className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                  >
-                    <Edit className="w-4 h-4 mr-2 inline" />
-                    Edit Mapping
-                  </button>
-                </div>
-              )
-            }
           >
             <div className="space-y-6">
               {/* Location Information */}
               <div className="bg-gray-50 p-6 rounded-lg">
-                <h4 className="font-semibold text-gray-900 mb-4">Location Information</h4>
+                <h4 className="font-semibold text-gray-900 mb-4">Taluk Information</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Taluk</label>
@@ -519,8 +430,8 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
               </div>
 
               {/* Venue Information */}
-              <div className="bg-green-50 p-6 rounded-lg">
-                <h4 className="font-semibold text-gray-900 mb-4">Assigned Venue</h4>
+              <div className="bg-blue-50 p-6 rounded-lg">
+                <h4 className="font-semibold text-gray-900 mb-4">Assigned Cluster Venue</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Venue Name</label>
@@ -538,12 +449,8 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tournament Level</label>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      selectedMapping.venueLocationMapping.level === 'cluster' ? 'bg-blue-100 text-blue-700' :
-                      selectedMapping.venueLocationMapping.level === 'division' ? 'bg-green-100 text-green-700' :
-                      'bg-purple-100 text-purple-700'
-                    }`}>
-                      {selectedMapping.venueLocationMapping.level.charAt(0).toUpperCase() + selectedMapping.venueLocationMapping.level.slice(1)}
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                      Cluster
                     </span>
                   </div>
                   <div>

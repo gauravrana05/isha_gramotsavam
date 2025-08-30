@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
@@ -50,6 +50,7 @@ interface AddPlayerModalProps {
   canAddMain: boolean;
   canAddSubstitute: boolean;
   canAddPlayer: boolean;
+  editingPlayer?: any; // Player being edited
 }
 
 export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
@@ -59,7 +60,8 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
   teamData,
   canAddMain,
   canAddSubstitute,
-  canAddPlayer
+  canAddPlayer,
+  editingPlayer
 }) => {
   // Form state
   const [playerFormData, setPlayerFormData] = useState<PlayerFormData>({
@@ -77,9 +79,40 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchCompleted, setSearchCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [conflictMessage, setConflictMessage] = useState<string>('');
 
   // tRPC utils for user search
   const utils = api.useUtils();
+
+  // Populate form data when editing player
+  useEffect(() => {
+    if (editingPlayer) {
+      setPlayerFormData({
+        phone: editingPlayer.phone || '',
+        firstName: editingPlayer.firstName || '',
+        lastName: editingPlayer.lastName || '',
+        dob: editingPlayer.dateOfBirth ? new Date(editingPlayer.dateOfBirth).toISOString().split('T')[0] : '',
+        whatsappNumber: editingPlayer.whatsappNumber || '',
+        position: editingPlayer.position || 'main',
+        gender: editingPlayer.gender || 'M'
+      });
+      setPlayerExists(false); // Don't treat as "found player" when editing
+      setSearchCompleted(true);
+    } else {
+      // Reset form for new player
+      setPlayerFormData({
+        phone: '',
+        firstName: '',
+        lastName: '',
+        dob: '',
+        whatsappNumber: '',
+        position: 'main',
+        gender: 'M'
+      });
+      setPlayerExists(false);
+      setSearchCompleted(false);
+    }
+  }, [editingPlayer]);
 
   // Helper functions
   const normalizePhone = (phone: string): string => {
@@ -139,36 +172,36 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
     if (phone.length === 10) {
       setIsSearching(true);
       try {
-        let user = null;
+        console.log('Searching for phone:', phone);
+        const result = await utils.admin.users.searchUserByPhone.fetch({ phone });
+        console.log('Search result:', result);
         
-        // First try with +91 prefix
-        const normalizedPhone = normalizePhone(phone);
-        console.log('Searching for phone:', normalizedPhone);
-        user = await utils.users.getByPhone.fetch({ phone: normalizedPhone });
-        console.log('User result (with prefix):', user);
-        
-        // If not found, try with just the 10-digit format
-        if (!user && phone.replace(/\D/g, '').length === 10) {
-          const digitsOnly = phone.replace(/\D/g, '');
-          console.log('Searching for phone (digits only):', digitsOnly);
-          user = await utils.users.getByPhone.fetch({ phone: digitsOnly });
-          console.log('User result (digits only):', user);
-        }
-
-        console.log('Final user result:', user);
-        if (user) {
-          // User exists - pre-fill form with user data
+        if (result.success && result.user) {
+          // User found and available
           setPlayerExists(true);
+          setConflictMessage('');
           setPlayerFormData(prev => ({
             ...prev,
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            dob: user.dateOfBirth ? user.dateOfBirth.split('T')[0] : '',
+            firstName: result.user.firstName || '',
+            lastName: result.user.lastName || '',
+            dob: result.user.dateOfBirth ? result.user.dateOfBirth.split('T')[0] : '',
+            whatsappNumber: phone,
+          }));
+        } else if (!result.success && result.conflict) {
+          // User found but already in a team - prevent adding
+          setPlayerExists(false);
+          setConflictMessage(result.conflict.message);
+          setPlayerFormData(prev => ({
+            ...prev,
+            firstName: '',
+            lastName: '',
+            dob: '',
             whatsappNumber: phone,
           }));
         } else {
           // User doesn't exist - clear form for new user entry
           setPlayerExists(false);
+          setConflictMessage('');
           setPlayerFormData(prev => ({
             ...prev,
             firstName: '',
@@ -196,6 +229,7 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
       // Reset when phone number is not complete
       setPlayerExists(false);
       setSearchCompleted(false);
+      setConflictMessage('');
       if (phone.length === 0) {
         setPlayerFormData(prev => ({
           ...prev,
@@ -207,7 +241,7 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
         }));
       }
     }
-  }, [utils.users.getByPhone]);
+  }, [utils.admin.users.searchUserByPhone]);
 
   // Handle form submission
   const handleSubmit = async () => {
@@ -283,10 +317,10 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
       {searchCompleted && (
         <button
           onClick={handleSubmit}
-          disabled={!isFormValid || isSubmitting}
+          disabled={!isFormValid || isSubmitting || !!conflictMessage}
           className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] hover:bg-[#E67A26] disabled:bg-gray-400 text-white py-2 sm:py-2 px-6 rounded-lg font-medium transition-colors text-sm sm:text-sm"
         >
-          {isSubmitting ? 'Adding...' : 'Add Player'}
+          {isSubmitting ? (editingPlayer ? 'Updating...' : 'Adding...') : (editingPlayer ? 'Update Player' : 'Add Player')}
         </button>
       )}
     </div>
@@ -296,7 +330,7 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
     <EnhancedModal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Add New Player"
+      title={editingPlayer ? "Edit Player" : "Add New Player"}
       size={searchCompleted ? 'lg' : 'base'}
       mobileFullScreen={searchCompleted}
       dynamicHeight={true}
@@ -315,10 +349,15 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
             placeholder="Enter 10-digit mobile number"
             value={playerFormData.phone}
             onChange={(e) => {
-              const phone = e.target.value.replace(/[^\d]/g, '').slice(0, 10);
-              handlePhoneSearch(phone);
+              if (!editingPlayer) {
+                const phone = e.target.value.replace(/[^\d]/g, '').slice(0, 10);
+                handlePhoneSearch(phone);
+              }
             }}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
+            disabled={!!editingPlayer}
+            className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent ${
+              editingPlayer ? 'bg-gray-100 cursor-not-allowed' : ''
+            }`}
           />
           {isSearching && (
             <p className="mt-1 text-sm text-gray-500 flex items-center">
@@ -326,10 +365,13 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
               Searching for player...
             </p>
           )}
-          {!isSearching && playerExists && (
+          {!isSearching && playerExists && !editingPlayer && (
             <p className="mt-1 text-sm text-[#3A7F3F]">✓ Player found in system</p>
           )}
-          {!isSearching && playerFormData.phone.length === 10 && !playerExists && (
+          {!isSearching && conflictMessage && !editingPlayer && (
+            <p className="mt-1 text-sm text-red-600">⚠️ {conflictMessage}</p>
+          )}
+          {!isSearching && playerFormData.phone.length === 10 && !playerExists && !conflictMessage && !editingPlayer && (
             <p className="mt-1 text-sm text-gray-600">New player - fill in details below</p>
           )}
         </div>
@@ -347,7 +389,6 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
                   value={playerFormData.firstName}
                   onChange={(e) => setPlayerFormData(prev => ({ ...prev, firstName: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
-                  disabled={playerExists}
                 />
               </div>
               <div>
@@ -359,7 +400,6 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
                   value={playerFormData.lastName}
                   onChange={(e) => setPlayerFormData(prev => ({ ...prev, lastName: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
-                  disabled={playerExists}
                 />
               </div>
             </div>
@@ -373,7 +413,6 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
                 value={playerFormData.dob}
                 onChange={(e) => setPlayerFormData(prev => ({ ...prev, dob: e.target.value }))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
-                disabled={playerExists}
               />
             </div>
 
@@ -404,9 +443,14 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
               </label>
               <Select
                 value={playerFormData.position}
-                onValueChange={(value) => setPlayerFormData(prev => ({ ...prev, position: value as 'main' | 'substitute' }))}
+                onValueChange={(value) => {
+                  if (!editingPlayer) {
+                    setPlayerFormData(prev => ({ ...prev, position: value as 'main' | 'substitute' }));
+                  }
+                }}
+                disabled={!!editingPlayer}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className={`w-full ${editingPlayer ? 'bg-gray-100 cursor-not-allowed' : ''}`}>
                   <SelectValue placeholder="Select Position" />
                 </SelectTrigger>
                 <SelectContent>

@@ -8,25 +8,59 @@ export const adminEventsRouter = createTRPCRouter({
   getSports: protectedProcedure
     .input(z.object({
       includeInactive: z.boolean().default(false),
+      includeTeamCounts: z.boolean().default(false),
+      includeGenderCategories: z.boolean().default(false),
     }))
     .query(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const sports = await db.sport.findMany({
-        where: input.includeInactive ? {} : { isActive: true },
-        include: {
-          _count: {
-            select: {
-              teams: true,
-            },
+      const includeClause: any = {};
+      
+      if (input.includeTeamCounts) {
+        includeClause._count = {
+          select: {
+            teams: true,
           },
-        },
+        };
+      }
+
+      if (input.includeGenderCategories) {
+        includeClause.sportGenderCategories = {
+          select: {
+            genderCategory: true,
+          },
+        };
+      }
+
+      const whereClause: any = {
+        deletedAt: null, // Exclude soft deleted sports
+      };
+
+      if (!input.includeInactive) {
+        whereClause.isActive = true;
+      }
+
+      const sports = await db.sport.findMany({
+        where: whereClause,
+        include: includeClause,
         orderBy: { name: 'asc' },
       });
 
-      return sports;
+      // Transform the data to include gender categories in a more usable format
+      const transformedSports = sports.map((sport: any) => {
+        const result: any = { ...sport };
+        
+        if (input.includeGenderCategories && sport.sportGenderCategories) {
+          result.genderCategories = sport.sportGenderCategories.map((gc: any) => gc.genderCategory);
+          delete result.sportGenderCategories;
+        }
+        
+        return result;
+      });
+
+      return transformedSports;
     }),
 
   // Create Sport

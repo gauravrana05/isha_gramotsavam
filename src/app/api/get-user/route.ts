@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { db, ensureConnection } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
@@ -10,6 +10,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Ensure database connection before query
+    await ensureConnection();
+    
     const user = await db.user.findFirst({
       where: { phone: phone },
     });

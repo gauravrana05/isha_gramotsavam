@@ -241,11 +241,18 @@ export const venueAssignmentRouter = createTRPCRouter({
         include: {
           captainUser: {
             select: {
-              name: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
               district: true,
               state: true,
               taluk: true,
               panchayat: true,
+            },
+          },
+          sport: {
+            select: {
+              name: true,
             },
           },
           teamVenueAssignments: {
@@ -276,12 +283,7 @@ export const venueAssignmentRouter = createTRPCRouter({
         return true;
       });
 
-      return filteredTeams.map(team => ({
-        id: team.id,
-        name: team.name,
-        captain: team.captainUser,
-        assignment: team.teamVenueAssignments[0] || null,
-      }));
+      return filteredTeams;
     }),
 });
 

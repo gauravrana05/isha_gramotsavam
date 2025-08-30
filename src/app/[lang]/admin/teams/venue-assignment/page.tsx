@@ -1,628 +1,646 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
-import { AdvancedTable } from '@/components/ui/AdvancedTable';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import type { Column } from '@/components/ui/Table';
-import type { FilterField } from '@/components/ui/FilterSidebar';
-import VenueAssignmentModal from './VenueAssignmentModal';
+import { useNotification } from '@/context/NotificationContext';
+import { api } from '@/server/trpc/react';
+import {
+  AdvancedTable,
+  PageLoader,
+  type Column,
+  type FilterField,
+  type TableParams,
+} from '@/components/ui';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { 
-  Users, 
-  MapPin, 
-  Trophy, 
-  CheckCircle, 
-  AlertTriangle,
-  Clock,
-  Loader2,
-  Settings,
+  RefreshCw,
+  MapPin,
+  Users,
+  Building,
+  Phone,
+  User,
+  Trophy,
   Target,
-  RefreshCw
+  CheckCircle,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react';
 
-interface TeamAssignment {
-  assignmentId: string;
-  teamId: string;
-  teamName: string;
-  teamLocation: {
-    state: string;
-    district: string;
-    panchayat: string;
+interface TeamAssignmentData {
+  id: string;
+  name: string;
+  genderCategory: string;
+  captainUser?: {
+    firstName: string | null;
+    lastName: string | null;
+    phone: string;
+    district: string | null;
+    state: string | null;
+    taluk: string | null;
+    panchayat: string | null;
   };
-  venueId?: string;
-  venueName?: string;
-  venueType?: 'cluster' | 'division';
-  assignmentLevel?: 'cluster' | 'division';
-  status: 'assigned' | 'confirmed' | 'checked_in' | 'pending_manual_assignment';
-  assignedBy?: string;
-  isAutoAssigned: boolean;
-  assignedAt?: string;
-  queuedAt?: string;
-  reason?: string;
-  sportName?: string;
-  genderCategory?: string;
-  currentLevel?: 'cluster' | 'division';
-  isPending: boolean;
+  sport?: {
+    name: string;
+  };
+  teamVenueAssignments: Array<{
+    id: string;
+    level: string;
+    assignmentMethod: 'auto_assigned' | 'manual_assigned';
+    assignedAt: Date;
+    clusterVenueMapping?: {
+      venue: { name: string };
+    };
+    divisionVenueMapping?: {
+      venue: { name: string };
+    };
+    finalVenueMapping?: {
+      venue: { name: string };
+    };
+  }>;
 }
 
-export default function VenueAssignmentPage() {
-  const [assignments, setAssignments] = useState<TeamAssignment[]>([]);
-  const [venues, setVenues] = useState<{id: string, name: string, type: string}[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [selectedAssignment, setSelectedAssignment] = useState<TeamAssignment | null>(null);
-  const [showVenueAssignModal, setShowVenueAssignModal] = useState(false);
-  
+export default function AdminTeamVenueAssignmentPage() {
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
+  const { addNotification } = useNotification();
 
+  // State management
+  const [selectedTeams, setSelectedTeams] = useState<Set<string | number>>(new Set());
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<TeamAssignmentData | null>(null);
+
+  // Table state for client-side operations
+  const [tableParams, setTableParams] = useState<TableParams>({
+    search: '',
+    sort: [],
+    filters: [],
+    page: 1,
+    pageSize: 25,
+  });
+
+  // Auth check
   useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
+    if (!authLoading && (!user || userProfile?.role !== 'admin')) {
+      router.push(`/${lang}/dashboard`);
     }
+  }, [user, userProfile, authLoading, router, lang]);
 
-    if (userProfile?.role !== 'admin') {
-      router.push(`/${lang}/player/dashboard`);
-      return;
-    }
+  // tRPC query - hardcoded event ID for now
+  const eventId = "3034186f-c73d-4862-bcfb-bd05336420c2";
+  const {
+    data: teamsData,
+    isLoading: teamsLoading,
+    error: teamsError,
+    refetch: refetchTeams
+  } = api.admin.venueAssignment.getTeamAssignments.useQuery({
+    eventId,
+    status: 'all',
+  }, {
+    enabled: !!user && userProfile?.role === 'admin'
+  });
 
-    loadData();
-  }, [user, userProfile, authLoading, lang, router]);
+  // Client-side filtered and processed teams
+  const teams = useMemo(() => {
+    if (!teamsData) return [];
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      await Promise.all([
-        loadAssignments(),
-        loadVenues()
-      ]);
-    } catch (err) {
-      setError('Failed to load venue assignment data');
-    } finally {
-      setLoading(false);
-    }
-  };
+    let filteredTeams = [...teamsData];
 
-  const loadAssignments = async () => {
-    try {
-      const assignmentData: TeamAssignment[] = [];
-      
-      // 1. Get assigned teams from teamVenueAssignment
-      const assignmentsQuery = query(
-        collection(db, 'teamVenueAssignment'),
-        orderBy('assignedAt', 'desc')
+    // Apply client-side filtering for search
+    if (tableParams.search) {
+      const searchLower = tableParams.search.toLowerCase();
+      filteredTeams = filteredTeams.filter(team => 
+        team.name.toLowerCase().includes(searchLower) ||
+        `${team.captainUser?.firstName || ''} ${team.captainUser?.lastName || ''}`.toLowerCase().includes(searchLower) ||
+        team.captainUser?.phone?.includes(searchLower) ||
+        team.captainUser?.district?.toLowerCase().includes(searchLower)
       );
+    }
 
-      const assignmentsSnapshot = await getDocs(assignmentsQuery);
-      
-      for (const doc of assignmentsSnapshot.docs) {
-        const data = doc.data();
-        
-        // Get team details
-        const teamDoc = await getDocs(query(collection(db, 'teams'), where('__name__', '==', data.teamId)));
-        const teamData = teamDoc.docs[0]?.data();
-        
-        if (teamData) {
-          assignmentData.push({
-            assignmentId: doc.id,
-            teamId: data.teamId,
-            teamName: data.teamName || teamData.name,
-            teamLocation: {
-              state: teamData.state || '',
-              district: teamData.district || '',
-              panchayat: teamData.panchayat || ''
-            },
-            venueId: data.clusterVenueId || data.divisionVenueId || data.venueId,
-            venueName: data.clusterVenueName || data.divisionVenueName || data.venueName,
-            venueType: data.clusterVenueId ? 'cluster' : 'division',
-            assignmentLevel: data.assignmentLevel || (data.clusterVenueId ? 'cluster' : 'division'),
-            status: data.status || 'assigned',
-            assignedBy: data.assignedBy || 'unknown',
-            isAutoAssigned: data.assignedBy === 'system_auto' || data.autoMapped === true,
-            assignedAt: data.assignedAt?.toDate?.()?.toISOString() || '',
-            sportName: teamData.sportName,
-            genderCategory: teamData.genderCategory,
-            currentLevel: teamData.currentLevel || 'cluster',
-            isPending: false
-          });
-        }
+    // Apply status filter
+    const statusFilter = tableParams.filters.find(f => f.key === 'status');
+    if (statusFilter && statusFilter.value) {
+      if (statusFilter.value === 'assigned') {
+        filteredTeams = filteredTeams.filter(team => team.teamVenueAssignments.length > 0);
+      } else if (statusFilter.value === 'pending') {
+        filteredTeams = filteredTeams.filter(team => team.teamVenueAssignments.length === 0);
       }
-      
-      // 2. Get pending teams from manualVenueAssignmentQueue
-      const pendingQuery = query(
-        collection(db, 'manualVenueAssignmentQueue'),
-        orderBy('queuedAt', 'desc')
-      );
+    }
 
-      const pendingSnapshot = await getDocs(pendingQuery);
-      
-      for (const doc of pendingSnapshot.docs) {
-        const data = doc.data();
-        
-        // Get team details
-        const teamDoc = await getDocs(query(collection(db, 'teams'), where('__name__', '==', data.teamId)));
-        const teamData = teamDoc.docs[0]?.data();
-        
-        if (teamData) {
-          assignmentData.push({
-            assignmentId: doc.id,
-            teamId: data.teamId,
-            teamName: data.teamName || teamData.name,
-            teamLocation: data.teamLocation || {
-              state: teamData.state || '',
-              district: teamData.district || '',
-              panchayat: teamData.panchayat || ''
-            },
-            status: 'pending_manual_assignment',
-            isAutoAssigned: false,
-            queuedAt: data.queuedAt?.toDate?.()?.toISOString() || '',
-            reason: data.reason || 'Unknown reason',
-            sportName: teamData.sportName,
-            genderCategory: teamData.genderCategory,
-            currentLevel: teamData.currentLevel || 'cluster',
-            isPending: true
-          });
-        }
-      }
-      
-      // Sort all data by date (assigned/queued)
-      assignmentData.sort((a, b) => {
-        const aDate = new Date(a.assignedAt || a.queuedAt || 0);
-        const bDate = new Date(b.assignedAt || b.queuedAt || 0);
-        return bDate.getTime() - aDate.getTime();
+    // Apply assignment method filter
+    const assignmentFilter = tableParams.filters.find(f => f.key === 'assignmentMethod');
+    if (assignmentFilter && assignmentFilter.value && statusFilter?.value !== 'pending') {
+      filteredTeams = filteredTeams.filter(team => {
+        const assignment = team.teamVenueAssignments[0];
+        return assignment?.assignmentMethod === assignmentFilter.value;
       });
-      
-      setAssignments(assignmentData);
-    } catch (error) {
-      setError('Failed to load team assignments');
     }
+
+    return filteredTeams;
+  }, [teamsData, tableParams.search, tableParams.filters]);
+
+  const loading = teamsLoading || authLoading;
+
+  // Handle data load for filtering
+  const handleDataLoad = useCallback((params: TableParams) => {
+    setTableParams(params);
+  }, []);
+
+  // Handle row click - open detail modal
+  const handleRowClick = (team: TeamAssignmentData) => {
+    setSelectedTeam(team);
+    setShowDetailModal(true);
   };
 
-  const loadVenues = async () => {
-    try {
-      const venuesSnapshot = await getDocs(
-        query(collection(db, 'venues'), where('isActive', '==', true))
-      );
-      
-      const venuesData = venuesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name,
-        type: doc.data().type
-      }));
-      
-      setVenues(venuesData);
-    } catch (error) {
-      // Failed to load venues
-    }
-  };
-
-
-
-  // Calculate statistics
-  const stats = {
-    totalAssignments: assignments.length,
-    assignedTeams: assignments.filter(a => !a.isPending).length,
-    pendingTeams: assignments.filter(a => a.isPending).length,
-    clusterAssignments: assignments.filter(a => a.assignmentLevel === 'cluster' && !a.isPending).length,
-    divisionAssignments: assignments.filter(a => a.assignmentLevel === 'division' && !a.isPending).length,
-    autoAssignments: assignments.filter(a => a.isAutoAssigned && !a.isPending).length,
-    manualAssignments: assignments.filter(a => !a.isAutoAssigned && !a.isPending).length
-  };
-
-  const columns: Column<TeamAssignment>[] = [
+  // Column skeleton for loading state
+  const columnSkeleton: Column<TeamAssignmentData>[] = [
     {
-      key: 'teamName',
+      key: 'team',
+      header: 'Team',
+      render: () => (
+        <div>
+          <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
+          <div className="h-3 bg-gray-100 rounded animate-pulse w-3/4"></div>
+        </div>
+      ),
+    },
+    {
+      key: 'captain',
+      header: 'Captain',
+      render: () => <div className="h-4 bg-gray-200 rounded animate-pulse"></div>,
+    },
+    {
+      key: 'captainPhone',
+      header: 'Captain Phone',
+      render: () => <div className="h-4 bg-gray-200 rounded animate-pulse w-24"></div>,
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      render: () => (
+        <div>
+          <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
+          <div className="h-3 bg-gray-100 rounded animate-pulse w-1/2"></div>
+        </div>
+      ),
+    },
+    {
+      key: 'venue',
+      header: 'Venue',
+      render: () => <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>,
+    },
+    {
+      key: 'assignment',
+      header: 'Assignment',
+      render: () => <div className="h-6 bg-gray-200 rounded animate-pulse w-16"></div>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: () => <div className="h-6 bg-gray-200 rounded animate-pulse w-20"></div>,
+    },
+  ];
+
+  // Table columns
+  const columns: Column<TeamAssignmentData>[] = [
+    {
+      key: 'team',
       header: 'Team',
       sortable: true,
-      render: (value, item) => {
-        if (!item) return null;
-        return (
-          <div>
-            <div className="font-medium text-gray-900 flex items-center">
-              {item.teamName}
-              {item.isPending && (
-                <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                  Pending
-                </span>
-              )}
-            </div>
-            <div className="text-sm text-gray-500">
-              {item.sportName} • {item.genderCategory}
-            </div>
+      render: (_, team) => (
+        <div>
+          <div className="font-medium text-gray-900">{team.name}</div>
+          <div className="text-sm text-gray-500">
+            {team.sport?.name} • {team.genderCategory}
           </div>
-        );
-      }
+        </div>
+      ),
     },
     {
-      key: 'teamLocation',
-      header: 'Team Location',
+      key: 'captain',
+      header: 'Captain',
       sortable: true,
-      render: (value, item) => {
-        if (!item) return null;
-        return (
-          <div className="text-sm">
-            <div>{item.teamLocation.panchayat}</div>
-            <div className="text-gray-500">{item.teamLocation.district}, {item.teamLocation.state}</div>
+      render: (_, team) => (
+        <div className="flex items-center">
+          <User className="w-4 h-4 text-gray-400 mr-2" />
+          <div className="font-medium text-gray-900">
+            {team.captainUser?.firstName || ''} {team.captainUser?.lastName || ''}
           </div>
-        );
-      }
+        </div>
+      ),
     },
     {
-      key: 'assignmentLevel',
-      header: 'Level',
-      sortable: true,
-      render: (value, item) => {
-        if (!item || item.isPending) return <span className="text-gray-400">-</span>;
-        const colors = {
-          cluster: 'bg-green-100 text-green-800',
-          division: 'bg-blue-100 text-blue-800'
-        };
-        return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[item.assignmentLevel || 'cluster']}`}>
-            <Trophy className="w-3 h-3 mr-1" />
-            {item.assignmentLevel}
-          </span>
-        );
-      }
+      key: 'captainPhone',
+      header: 'Captain Phone',
+      render: (_, team) => (
+        <div className="flex items-center text-sm text-gray-900">
+          <Phone className="w-4 h-4 text-gray-400 mr-2" />
+          {team.captainUser?.phone || 'N/A'}
+        </div>
+      ),
     },
     {
-      key: 'venueName',
-      header: 'Venue / Status',
-      sortable: true,
-      render: (value, item) => {
-        if (!item) return null;
-        
-        if (item.isPending) {
+      key: 'location',
+      header: 'Location',
+      render: (_, team) => (
+        <div className="text-sm">
+          <div className="font-medium text-gray-900">{team.captainUser?.panchayat || 'N/A'}</div>
+          <div className="text-gray-500">
+            {team.captainUser?.district}, {team.captainUser?.state}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'venue',
+      header: 'Venue',
+      render: (_, team) => {
+        const assignment = team.teamVenueAssignments?.[0];
+        if (!assignment) {
           return (
-            <div>
-              <div className="flex items-center text-yellow-700">
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                <span className="font-medium">Pending Assignment</span>
-              </div>
-              {item.reason && (
-                <div className="text-xs text-gray-500 mt-1">
-                  Reason: {item.reason}
-                </div>
-              )}
+            <div className="flex items-center text-red-600">
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              <span className="italic">Unassigned</span>
             </div>
           );
         }
         
+        const venue = assignment.clusterVenueMapping?.venue || 
+                     assignment.divisionVenueMapping?.venue ||
+                     assignment.finalVenueMapping?.venue;
+        
         return (
-          <div className="flex items-center">
-            <MapPin className="w-4 h-4 text-gray-400 mr-2" />
-            <span>{item.venueName}</span>
+          <div className="flex items-center text-sm text-gray-900">
+            <Building className="w-4 h-4 text-gray-400 mr-2" />
+            {venue?.name || 'Unknown Venue'}
           </div>
         );
-      }
+      },
     },
     {
-      key: 'assignedBy',
-      header: 'Assignment Type',
-      sortable: true,
-      render: (value, item) => {
-        if (!item) return null;
-        
-        if (item.isPending) {
+      key: 'assignment',
+      header: 'Assignment',
+      render: (_, team) => {
+        const assignment = team.teamVenueAssignments?.[0];
+        if (!assignment) {
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-              <Clock className="w-3 h-3 mr-1" />
-              Pending
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+              Manual Required
             </span>
           );
         }
         
+        const isAuto = assignment.assignmentMethod === 'auto_assigned';
         return (
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            item.isAutoAssigned 
+            isAuto 
               ? 'bg-green-100 text-green-800' 
               : 'bg-blue-100 text-blue-800'
           }`}>
-            {item.isAutoAssigned ? (
+            {isAuto ? (
               <>
-                <CheckCircle className="w-3 h-3 mr-1" />
+                <Target className="w-3 h-3 mr-1" />
                 Auto
               </>
             ) : (
               <>
-                <Settings className="w-3 h-3 mr-1" />
+                <Users className="w-3 h-3 mr-1" />
                 Manual
               </>
             )}
           </span>
         );
-      }
+      },
     },
     {
       key: 'status',
       header: 'Status',
       sortable: true,
-      render: (value, item) => {
-        if (!item) return null;
-        const statusColors = {
-          assigned: 'bg-yellow-100 text-yellow-800',
-          confirmed: 'bg-blue-100 text-blue-800',
-          checked_in: 'bg-green-100 text-green-800',
-          pending_manual_assignment: 'bg-orange-100 text-orange-800'
-        };
-        const statusIcons = {
-          assigned: Clock,
-          confirmed: CheckCircle,
-          checked_in: Trophy,
-          pending_manual_assignment: AlertTriangle
-        };
-        const Icon = statusIcons[item.status] || AlertTriangle;
-        
+      render: (_, team) => {
+        const hasAssignment = team.teamVenueAssignments?.length > 0;
         return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[item.status] || 'bg-gray-100 text-gray-800'}`}>
-            <Icon className="w-3 h-3 mr-1" />
-            {item.status.replace('_', ' ')}
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            hasAssignment 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-yellow-100 text-yellow-800'
+          }`}>
+            {hasAssignment ? (
+              <>
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Assigned
+              </>
+            ) : (
+              <>
+                <Clock className="w-3 h-3 mr-1" />
+                Pending
+              </>
+            )}
           </span>
         );
-      }
+      },
     },
-    {
-      key: 'assignedAt',
-      header: 'Date',
-      sortable: true,
-      render: (value, item) => {
-        if (!item) return null;
-        
-        if (item.isPending && item.queuedAt) {
-          return (
-            <div className="text-sm">
-              <div className="text-gray-900">Queued:</div>
-              <div className="text-gray-500">{new Date(item.queuedAt).toLocaleDateString()}</div>
-            </div>
-          );
-        }
-        
-        if (item.assignedAt) {
-          return (
-            <div className="text-sm">
-              <div className="text-gray-900">Assigned:</div>
-              <div className="text-gray-500">{new Date(item.assignedAt).toLocaleDateString()}</div>
-            </div>
-          );
-        }
-        
-        return <span className="text-gray-400">-</span>;
-      }
-    }
   ];
 
-  const filters: FilterField[] = [
-    {
-      key: 'assignmentLevel',
-      label: 'Level',
-      type: 'select',
-      options: [
-        { label: 'Cluster', value: 'cluster' },
-        { label: 'Division', value: 'division' }
-      ]
-    },
-    {
-      key: 'isAutoAssigned',
-      label: 'Assignment Type',
-      type: 'select',
-      options: [
-        { label: 'Auto Assigned', value: 'true' },
-        { label: 'Manual Assignment', value: 'false' }
-      ]
-    },
+  // Filter fields
+  const filterFields: FilterField[] = [
     {
       key: 'status',
-      label: 'Status',
+      label: 'Assignment Status',
       type: 'select',
+      category: 'Status',
       options: [
         { label: 'Assigned', value: 'assigned' },
-        { label: 'Confirmed', value: 'confirmed' },
-        { label: 'Checked In', value: 'checked_in' }
+        { label: 'Pending', value: 'pending' }
       ]
     },
     {
-      key: 'teamLocation.state',
-      label: 'State',
-      type: 'text'
+      key: 'assignmentMethod',
+      label: 'Assignment Method',
+      type: 'select',
+      category: 'Assignment',
+      options: [
+        { label: 'Auto Assigned', value: 'auto_assigned' },
+        { label: 'Manual Assignment', value: 'manual_assigned' }
+      ]
     },
-    {
-      key: 'teamLocation.district',
-      label: 'District',
-      type: 'text'
-    }
   ];
 
-  if (authLoading || loading) {
+  // Header actions based on selection
+  const getHeaderActions = () => {
+    if (selectedTeams.size === 0) {
+      return undefined; // No action when no selection
+    }
+    
     return (
-      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
-      </div>
+      <button
+        onClick={() => {
+          addNotification('Venue assignment feature coming soon', 'info');
+        }}
+        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+      >
+        <MapPin className="w-4 h-4 mr-2" />
+        Assign Venue ({selectedTeams.size})
+      </button>
     );
+  };
+
+  // Statistics
+  const stats = useMemo(() => {
+    if (!teams.length) return null;
+
+    const assignedTeams = teams.filter(t => t.teamVenueAssignments.length > 0);
+    const pendingTeams = teams.filter(t => t.teamVenueAssignments.length === 0);
+    const autoAssigned = assignedTeams.filter(t => t.teamVenueAssignments[0]?.assignmentMethod === 'auto_assigned');
+    const manualAssigned = assignedTeams.filter(t => t.teamVenueAssignments[0]?.assignmentMethod === 'manual_assigned');
+
+    return {
+      total: teams.length,
+      assigned: assignedTeams.length,
+      pending: pendingTeams.length,
+      autoAssigned: autoAssigned.length,
+      manualAssigned: manualAssigned.length,
+    };
+  }, [teams]);
+
+  // Loading state
+  if (authLoading) {
+    return <PageLoader />;
   }
 
-  if (error) {
+  // Error state
+  if (teamsError) {
     return (
-      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()}>
-            Retry
-          </Button>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Team Assignments</h2>
+          <p className="text-gray-600 mb-4">{teamsError.message}</p>
+          <button 
+            onClick={() => refetchTeams()}
+            className="px-4 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26]"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-fira">Team Venue Assignment</h1>
-          <p className="text-gray-600 text-sm font-fira">
-            Manage team assignments to cluster and division venues
-          </p>
-          <p className="mt-1 text-xs text-green-600 font-fira">
-            ✓ Teams are automatically advanced when tournaments complete
-          </p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Team Venue Assignment</h1>
+            <p className="text-gray-600 mt-2">Manage venue assignments for tournament teams</p>
+          </div>
+          
+          <button
+            onClick={() => refetchTeams()}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </button>
         </div>
-        
-        <Button
-          onClick={() => window.location.reload()}
-          variant="secondary"
-        >
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+
+        {/* Stats Cards */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex items-center">
+                <Users className="w-8 h-8 text-blue-600 mr-3" />
+                <div>
+                  <p className="text-sm text-gray-600">Total Teams</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex items-center">
+                <CheckCircle className="w-8 h-8 text-green-600 mr-3" />
+                <div>
+                  <p className="text-sm text-gray-600">Assigned</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.assigned}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex items-center">
+                <Clock className="w-8 h-8 text-yellow-600 mr-3" />
+                <div>
+                  <p className="text-sm text-gray-600">Pending</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex items-center">
+                <Target className="w-8 h-8 text-green-500 mr-3" />
+                <div>
+                  <p className="text-sm text-gray-600">Auto Assigned</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.autoAssigned}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex items-center">
+                <Users className="w-8 h-8 text-blue-500 mr-3" />
+                <div>
+                  <p className="text-sm text-gray-600">Manual</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.manualAssigned}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="bg-white rounded-lg shadow-sm">
+          <AdvancedTable<TeamAssignmentData>
+            data={teams || []}
+            columns={loading ? columnSkeleton : columns}
+            loading={loading}
+            onDataLoad={handleDataLoad}
+            searchable={true}
+            searchPlaceholder="Search teams, captains, locations..."
+            searchFields={['name', 'captainUser.firstName', 'captainUser.lastName', 'captainUser.phone']}
+            filterable={true}
+            filters={filterFields}
+            sortable={true}
+            selectable={true}
+            selectedRows={selectedTeams}
+            onSelectionChange={setSelectedTeams}
+            onRowClick={handleRowClick}
+            keyExtractor={(team) => team.id}
+            headerActions={getHeaderActions()}
+            emptyState={{
+              icon: MapPin,
+              title: 'No team assignments found',
+              description: 'Team venue assignments will appear here once teams are verified.',
+            }}
+            noSearchResultsEmptyState={{
+              icon: MapPin,
+              title: 'No matching teams',
+              description: 'Try adjusting your search or filters to find what you\'re looking for.',
+            }}
+            pagination={{ enabled: true }}
+            persistState={false}
+          />
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
-        <Card className="p-4">
-          <div className="flex items-center">
-            <Users className="w-8 h-8 text-[#F28C38] mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Total Teams</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalAssignments}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center">
-            <CheckCircle className="w-8 h-8 text-green-600 mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Assigned</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.assignedTeams}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center">
-            <AlertTriangle className="w-8 h-8 text-yellow-600 mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Pending</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.pendingTeams}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center">
-            <Target className="w-8 h-8 text-green-500 mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Cluster</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.clusterAssignments}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center">
-            <Trophy className="w-8 h-8 text-blue-600 mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Division</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.divisionAssignments}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-4">
-          <div className="flex items-center">
-            <Settings className="w-8 h-8 text-purple-600 mr-3" />
-            <div>
-              <p className="text-sm text-gray-600">Manual</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.manualAssignments}</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Team Assignments Table */}
-      <Card className="p-6">
-        <AdvancedTable
-          data={assignments}
-          columns={columns}
-          loading={loading}
-          
-          searchable={true}
-          searchPlaceholder="Search teams, venues, locations..."
-          searchFields={['teamName', 'venueName']}
-          
-          filterable={true}
-          filters={filters}
-          
-          sortable={true}
-          defaultSort={[{ key: 'assignedAt', direction: 'desc' }]}
-          
-          pagination={{ enabled: true, pageSize: 25 }}
-          
-          persistState={true}
-          stateKey="admin-venue-assignments"
-          
-          actions={[
-            {
-              label: 'Assign/Edit Venue',
-              icon: Settings,
-              onClick: (assignment) => {
-                setSelectedAssignment(assignment);
-                setShowVenueAssignModal(true);
-              },
-              variant: 'secondary',
-              tooltip: 'Assign or edit venue for this team'
-            }
-          ]}
-          
-          emptyState={{
-            icon: MapPin,
-            title: 'No venue assignments found',
-            description: 'Team venue assignments will appear here once teams are verified and assigned'
-          }}
-        />
-      </Card>
-
-      {/* Venue Assignment Modal */}
-      {showVenueAssignModal && selectedAssignment && (
-        <VenueAssignmentModal
-          isOpen={showVenueAssignModal}
+      {/* Team Detail Modal */}
+      {selectedTeam && (
+        <EnhancedModal
+          isOpen={showDetailModal}
           onClose={() => {
-            setShowVenueAssignModal(false);
-            setSelectedAssignment(null);
+            setShowDetailModal(false);
+            setSelectedTeam(null);
           }}
-          assignment={selectedAssignment}
-          venues={venues}
-          onSuccess={() => {
-            setShowVenueAssignModal(false);
-            setSelectedAssignment(null);
-            loadData(); // Refresh data
-            setSuccess('Venue assignment updated successfully');
-            setTimeout(() => setSuccess(''), 3000);
-          }}
-        />
-      )}
+          title="Team Assignment Details"
+          subtitle={`${selectedTeam.name} - Complete Information`}
+          size="lg"
+          mobileFullScreen={true}
+          scrollableBody={true}
+        >
+          <div className="space-y-6">
+            {/* Team Information */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Team Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Team Name</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedTeam.name}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Sport</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedTeam.sport?.name || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Gender Category</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedTeam.genderCategory}</p>
+                </div>
+              </div>
+            </div>
 
-      {/* Success Message */}
-      {success && (
-        <div className="fixed top-4 right-4 z-50">
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg">
-            <div className="flex items-center">
-              <CheckCircle className="w-5 h-5 mr-2" />
-              {success}
+            {/* Captain Information */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Captain Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Name</label>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedTeam.captainUser?.firstName} {selectedTeam.captainUser?.lastName}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedTeam.captainUser?.phone || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Location</label>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedTeam.captainUser?.panchayat}, {selectedTeam.captainUser?.district}, {selectedTeam.captainUser?.state}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Assignment Information */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Venue Assignment</h3>
+              {selectedTeam.teamVenueAssignments.length > 0 ? (
+                <div className="space-y-4">
+                  {selectedTeam.teamVenueAssignments.map((assignment) => {
+                    const venue = assignment.clusterVenueMapping?.venue || 
+                                 assignment.divisionVenueMapping?.venue ||
+                                 assignment.finalVenueMapping?.venue;
+                    
+                    return (
+                      <div key={assignment.id} className="bg-gray-50 rounded-lg p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Venue</label>
+                            <p className="mt-1 text-sm text-gray-900">{venue?.name || 'Unknown Venue'}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Level</label>
+                            <p className="mt-1 text-sm text-gray-900 capitalize">{assignment.level}</p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Assignment Method</label>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {assignment.assignmentMethod === 'auto_assigned' ? 'Auto Assigned' : 'Manual Assignment'}
+                            </p>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">Assigned Date</label>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {new Date(assignment.assignedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="bg-yellow-50 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
+                    <p className="text-sm text-yellow-800">No venue assignment found for this team.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        </EnhancedModal>
       )}
     </div>
   );

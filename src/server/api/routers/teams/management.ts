@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { createTRPCRouter, publicProcedure, protectedProcedure } from '../../trpc'
+import { assignVenueToTeam } from '@/lib/services/venueAssignment'
 import {
   createTeamSchema,
   updateTeamSchema,
@@ -165,6 +166,29 @@ export const teamsManagementRouter = createTRPCRouter({
         },
       })
 
+      // Automatic venue assignment using 3-tier system
+      if (input.eventId) {
+        try {
+          const venueAssignmentResult = await assignVenueToTeam(
+            team.id,
+            {
+              panchayat: input.panchayat || '',
+              district: input.district,
+              state: input.state,
+              taluk: input.taluk || '',
+            },
+            input.eventId,
+            ctx.user.id
+          )
+          
+          // Log assignment result for admin monitoring
+          console.log(`Team ${team.name} venue assignment:`, venueAssignmentResult.message)
+        } catch (error) {
+          // Don't fail team creation if venue assignment fails
+          console.error('Venue assignment failed during team creation:', error)
+        }
+      }
+
       return team
     }),
 
@@ -200,6 +224,29 @@ export const teamsManagementRouter = createTRPCRouter({
 
         return team
       })
+
+      // Automatic venue assignment using 3-tier system (after transaction)
+      if (input.eventId) {
+        try {
+          const venueAssignmentResult = await assignVenueToTeam(
+            result.id,
+            {
+              panchayat: input.panchayat || '',
+              district: input.district,
+              state: input.state,
+              taluk: input.taluk || '',
+            },
+            input.eventId,
+            ctx.user.id
+          )
+          
+          // Log assignment result for admin monitoring
+          console.log(`Team ${result.name} venue assignment:`, venueAssignmentResult.message)
+        } catch (error) {
+          // Don't fail team creation if venue assignment fails
+          console.error('Venue assignment failed during team creation:', error)
+        }
+      }
 
       return result
     }),

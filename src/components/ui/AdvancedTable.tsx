@@ -265,12 +265,17 @@ export const AdvancedTable = <T,>({
   rowHeight,
   viewportHeight,
   
+  // Remove these problematic props that shouldn't go to DOM
+  tableParams,
+  onTableParamsChange,
+  onSelectedRowsChange,
+  filterFields,
+  
   className,
   ...domProps
 }: AdvancedTableProps<T>) => {
   // All props are already destructured in the function parameters above
-  // No need for additional destructuring - just use restDomProps from domProps
-  const restDomProps = domProps;
+  // domProps now contains only valid DOM attributes
   // Saved views state (localStorage) - only initialize if stateKey is provided
   const savedViewsKey = stateKey ? `table:views:${stateKey}` : undefined;
   const [views, setViews] = useState<{ label: string; value: string; state: Partial<TableState> }[]>([]);
@@ -606,7 +611,7 @@ export const AdvancedTable = <T,>({
   }, [headerActions, headerActionsNone, headerActionsSingle, headerActionsMultiple, selectedItems, state.selectedRows.size]);
   
   return (
-    <div className={cn('w-full', className)} {...restDomProps}>
+    <div className={cn('w-full', className)} {...domProps}>
       {/* Header */}
       {(title || subtitle || additionalActions) && (
         <div className="mb-6">

@@ -71,7 +71,7 @@ model Event {
   createdByUser         User @relation("EventsCreated", fields: [createdBy], references: [id])
   fixtures              Fixture[]
   matches               Match[]
-  talukClusterMappings  TalukClusterMapping[]
+  locationClusterMappings LocationClusterMapping[]
   teamVenueAssignments  TeamVenueAssignment[]
   teams                 Team[]
   userRoles             UserRoleAssignment[]
@@ -315,12 +315,18 @@ model SystemConfig {
   @@map("system_config")
 }
 
-model TalukClusterMapping {
+enum LocationType {
+  district
+  taluk
+}
+
+model LocationClusterMapping {
   id                    String @id @default(uuid()) @db.Uuid
   eventId               String @db.Uuid @map("event_id")
-  district              String @db.VarChar(100)
+  locationType          LocationType @map("location_type")
+  locationName          String @db.VarChar(100) @map("location_name")
   state                 String @db.VarChar(100)
-  taluk                 String @db.VarChar(100)
+  district              String? @db.VarChar(100) // null for district mappings, populated for taluk mappings
   clusterVenueMappingId String @db.Uuid @map("cluster_venue_mapping_id")
   createdAt             DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt             DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
@@ -330,10 +336,11 @@ model TalukClusterMapping {
   venueLocationMapping VenueLevelMapping @relation(fields: [clusterVenueMappingId], references: [id], onDelete: Cascade)
   event                Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  @@unique([eventId, district, taluk])
+  @@unique([eventId, locationType, locationName, state, district])
   @@index([eventId])
   @@index([clusterVenueMappingId])
-  @@map("taluk_cluster_mappings")
+  @@index([locationType])
+  @@map("location_cluster_mappings")
 }
 
 model TeamPhoto {
@@ -575,7 +582,7 @@ model VenueLevelMapping {
 
   fixtures Fixture[]
   matches  Match[]
-  talukClusterMappings TalukClusterMapping[]
+  locationClusterMappings LocationClusterMapping[]
 
   teamVenueAssignmentsByCluster TeamVenueAssignment[] @relation("TeamVenueAssignmentClusterVenue")
   teamVenueAssignmentsByDivision TeamVenueAssignment[] @relation("TeamVenueAssignmentDivisionVenue")

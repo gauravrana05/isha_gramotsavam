@@ -6,7 +6,54 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-const Select = SelectPrimitive.Root
+const Select = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root> & {
+    autoSelectSingle?: boolean;
+  }
+>(({ children, autoSelectSingle = true, onValueChange, ...props }, ref) => {
+  const [hasAutoSelected, setHasAutoSelected] = React.useState(false);
+
+  React.useEffect(() => {
+    if (autoSelectSingle && !hasAutoSelected && !props.value) {
+      // Extract SelectItem values from children
+      const extractSelectItems = (children: React.ReactNode): string[] => {
+        const items: string[] = [];
+        React.Children.forEach(children, (child) => {
+          if (React.isValidElement(child)) {
+            if (child.type === SelectItem) {
+              items.push(child.props.value);
+            } else if (child.props?.children) {
+              items.push(...extractSelectItems(child.props.children));
+            }
+          }
+        });
+        return items;
+      };
+
+      const selectItems = extractSelectItems(children);
+      
+      if (selectItems.length === 1 && onValueChange) {
+        onValueChange(selectItems[0]);
+        setHasAutoSelected(true);
+      }
+    }
+  }, [children, autoSelectSingle, hasAutoSelected, props.value, onValueChange]);
+
+  // Reset auto-selection flag when value is cleared
+  React.useEffect(() => {
+    if (!props.value) {
+      setHasAutoSelected(false);
+    }
+  }, [props.value]);
+
+  return (
+    <SelectPrimitive.Root {...props} onValueChange={onValueChange}>
+      {children}
+    </SelectPrimitive.Root>
+  );
+});
+Select.displayName = "Select";
 
 const SelectGroup = SelectPrimitive.Group
 

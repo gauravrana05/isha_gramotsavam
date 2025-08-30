@@ -4,13 +4,14 @@ import { TRPCError } from "@trpc/server";
 import { db } from "@/lib/db";
 
 export const adminMappingsRouter = createTRPCRouter({
-  // Get Taluk Cluster Mappings
-  getTalukClusterMappings: protectedProcedure
+  // Get Location Cluster Mappings
+  getLocationClusterMappings: protectedProcedure
     .input(z.object({
       eventId: z.string(),
-      district: z.string().optional(),
+      locationType: z.enum(['district', 'taluk']).optional(),
       state: z.string().optional(),
-      taluk: z.string().optional(),
+      district: z.string().optional(),
+      locationName: z.string().optional(),
     }))
     .query(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
@@ -21,19 +22,23 @@ export const adminMappingsRouter = createTRPCRouter({
         eventId: input.eventId,
       };
       
-      if (input.district) {
-        where.district = { contains: input.district, mode: 'insensitive' };
+      if (input.locationType) {
+        where.locationType = input.locationType;
       }
       
       if (input.state) {
         where.state = { contains: input.state, mode: 'insensitive' };
       }
       
-      if (input.taluk) {
-        where.taluk = { contains: input.taluk, mode: 'insensitive' };
+      if (input.district) {
+        where.district = { contains: input.district, mode: 'insensitive' };
+      }
+      
+      if (input.locationName) {
+        where.locationName = { contains: input.locationName, mode: 'insensitive' };
       }
 
-      const mappings = await db.talukClusterMapping.findMany({
+      const mappings = await db.locationClusterMapping.findMany({
         where,
         include: {
           venueLocationMapping: {
@@ -50,119 +55,21 @@ export const adminMappingsRouter = createTRPCRouter({
         orderBy: [
           { state: 'asc' },
           { district: 'asc' },
-          { taluk: 'asc' },
+          { locationName: 'asc' },
         ],
       });
 
       return mappings;
     }),
 
-  // Get pending taluk mappings (taluks that need mapping)
-  getPendingTalukMappings: protectedProcedure
+  // Create Location Cluster Mapping (Bulk)
+  createLocationClusterMapping: protectedProcedure
     .input(z.object({
       eventId: z.string(),
-      level: z.enum(['cluster', 'division', 'final']).default('cluster'),
-    }))
-    .query(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
-      // Get all venue level mappings for this event and level grouped by district
-      const venueLevelMappings = await db.venueLevelMapping.findMany({
-        where: {
-          eventId: input.eventId,
-          level: input.level,
-          isActive: true,
-        },
-        include: {
-          venue: true,
-        },
-        orderBy: [
-          { venue: { state: 'asc' } },
-          { venue: { district: 'asc' } },
-          { venue: { name: 'asc' } },
-        ],
-      });
-
-      // Group venues by district
-      const venuesByDistrict = venueLevelMappings.reduce((acc, venueMapping) => {
-        const key = `${venueMapping.venue.state}-${venueMapping.venue.district}`;
-        if (!acc[key]) {
-          acc[key] = {
-            state: venueMapping.venue.state,
-            district: venueMapping.venue.district,
-            venues: [],
-          };
-        }
-        acc[key].venues.push(venueMapping);
-        return acc;
-      }, {} as Record<string, { state: string; district: string; venues: any[] }>);
-
-      // Get existing mappings for this level
-      const existingMappings = await db.talukClusterMapping.findMany({
-        where: {
-          eventId: input.eventId,
-          venueLocationMapping: {
-            level: input.level,
-          },
-        },
-        select: {
-          state: true,
-          district: true,
-          taluk: true,
-        },
-      });
-
-      const mappedTaluks = new Set(
-        existingMappings.map(m => `${m.state}-${m.district}-${m.taluk}`)
-      );
-
-      // For districts with multiple venue level mappings, get all taluks and find unmapped ones
-      const pendingTaluks = [];
-      
-      for (const [key, districtData] of Object.entries(venuesByDistrict)) {
-        if (districtData.venues.length > 1) {
-          // Get all taluks for this district
-          try {
-            const { taluks } = await import('@/lib/services/pincodeService').then(m => 
-              m.pincodeService.getTaluksByDistrict(districtData.state, districtData.district)
-            );
-            
-            // Find unmapped taluks
-            for (const taluk of taluks) {
-              const talukKey = `${districtData.state}-${districtData.district}-${taluk}`;
-              if (!mappedTaluks.has(talukKey)) {
-                pendingTaluks.push({
-                  state: districtData.state,
-                  district: districtData.district,
-                  taluk,
-                  level: input.level,
-                  availableVenues: districtData.venues.map(v => ({
-                    id: v.id,
-                    venue: v.venue,
-                    level: v.level,
-                    maxTeams: v.maxTeams,
-                  })),
-                });
-              }
-            }
-          } catch (error) {
-            console.error(`Failed to get taluks for ${districtData.district}, ${districtData.state}:`, error);
-          }
-        }
-      }
-
-      return pendingTaluks;
-    }),
-
-  // Create Taluk Cluster Mapping
-  createTalukClusterMapping: protectedProcedure
-    .input(z.object({
-      eventId: z.string(),
-      district: z.string(),
+      locationType: z.enum(['district', 'taluk']),
+      locationNames: z.array(z.string()), // Multiple locations
       state: z.string(),
-      taluk: z.string(),
+      district: z.string().optional(), // Required for taluk mappings, null for district mappings
       clusterVenueMappingId: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
@@ -170,92 +77,54 @@ export const adminMappingsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      // Check if mapping already exists
-      const existingMapping = await db.talukClusterMapping.findFirst({
+      const { eventId, locationType, locationNames, state, district, clusterVenueMappingId } = input;
+
+      // Validate district requirement for taluk mappings
+      if (locationType === 'taluk' && !district) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'District is required for taluk mappings' });
+      }
+
+      // Check for existing mappings
+      const existingMappings = await db.locationClusterMapping.findMany({
         where: {
-          eventId: input.eventId,
-          district: input.district,
-          state: input.state,
-          taluk: input.taluk,
+          eventId,
+          locationType,
+          locationName: { in: locationNames },
+          state,
+          district: locationType === 'taluk' ? district : null,
         },
       });
 
-      if (existingMapping) {
+      if (existingMappings.length > 0) {
+        const existingNames = existingMappings.map(m => m.locationName);
         throw new TRPCError({ 
           code: 'CONFLICT', 
-          message: 'Mapping already exists for this taluk' 
+          message: `Mappings already exist for: ${existingNames.join(', ')}` 
         });
       }
 
-      // Verify venue mapping exists
-      const venueMapping = await db.venueLevelMapping.findUnique({
-        where: { id: input.clusterVenueMappingId },
-        include: { venue: true },
+      // Create mappings
+      const mappingData = locationNames.map(locationName => ({
+        eventId,
+        locationType,
+        locationName,
+        state,
+        district: locationType === 'taluk' ? district : null,
+        clusterVenueMappingId,
+      }));
+
+      await db.locationClusterMapping.createMany({
+        data: mappingData,
       });
 
-      if (!venueMapping) {
-        throw new TRPCError({ 
-          code: 'NOT_FOUND', 
-          message: 'Venue mapping not found' 
-        });
-      }
-
-      const mapping = await db.talukClusterMapping.create({
-        data: input,
-        include: {
-          venueLocationMapping: {
-            include: {
-              venue: true,
-            },
-          },
-        },
-      });
-
-      return mapping;
+      return { 
+        success: true, 
+        message: `Created ${locationNames.length} ${locationType} mappings successfully` 
+      };
     }),
 
-  // Update Taluk Cluster Mapping
-  updateTalukClusterMapping: protectedProcedure
-    .input(z.object({
-      id: z.string(),
-      clusterVenueMappingId: z.string(),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
-      // Verify venue mapping exists
-      const venueMapping = await db.venueLevelMapping.findUnique({
-        where: { id: input.clusterVenueMappingId },
-      });
-
-      if (!venueMapping) {
-        throw new TRPCError({ 
-          code: 'NOT_FOUND', 
-          message: 'Venue mapping not found' 
-        });
-      }
-
-      const mapping = await db.talukClusterMapping.update({
-        where: { id: input.id },
-        data: {
-          clusterVenueMappingId: input.clusterVenueMappingId,
-        },
-        include: {
-          venueLocationMapping: {
-            include: {
-              venue: true,
-            },
-          },
-        },
-      });
-
-      return mapping;
-    }),
-
-  // Delete Taluk Cluster Mappings
-  deleteTalukClusterMappings: protectedProcedure
+  // Delete Location Cluster Mappings
+  deleteLocationClusterMappings: protectedProcedure
     .input(z.object({
       mappingIds: z.array(z.string()),
     }))
@@ -264,69 +133,108 @@ export const adminMappingsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      await db.talukClusterMapping.deleteMany({
+      await db.locationClusterMapping.deleteMany({
         where: {
           id: { in: input.mappingIds },
         },
       });
 
-      return { success: true };
+      return { success: true, message: 'Mappings deleted successfully' };
     }),
 
-  // Bulk Create Taluk Mappings
-  bulkCreateTalukMappings: protectedProcedure
+  // Get Cluster Division Mappings (unchanged)
+  getClusterDivisionMappings: protectedProcedure
     .input(z.object({
       eventId: z.string(),
-      mappings: z.array(z.object({
-        district: z.string(),
-        state: z.string(),
-        taluk: z.string(),
-        clusterVenueMappingId: z.string(),
-      })),
-      skipDuplicates: z.boolean().default(true),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      const mappings = await db.clusterDivisionMapping.findMany({
+        where: {
+          eventId: input.eventId,
+        },
+        include: {
+          clusterVenueMapping: {
+            include: {
+              venue: true,
+            },
+          },
+          divisionVenueMapping: {
+            include: {
+              venue: true,
+            },
+          },
+        },
+        orderBy: [
+          { clusterVenueMapping: { venue: { district: 'asc' } } },
+          { clusterVenueMapping: { venue: { name: 'asc' } } },
+        ],
+      });
+
+      return mappings;
+    }),
+
+  // Create Cluster Division Mapping (unchanged)
+  createClusterDivisionMapping: protectedProcedure
+    .input(z.object({
+      eventId: z.string(),
+      clusterVenueMappingId: z.string(),
+      divisionVenueMappingId: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const results = {
-        created: 0,
-        skipped: 0,
-        errors: [] as string[],
-      };
+      // Check if mapping already exists
+      const existingMapping = await db.clusterDivisionMapping.findFirst({
+        where: {
+          eventId: input.eventId,
+          clusterVenueMappingId: input.clusterVenueMappingId,
+        },
+      });
 
-      for (const mapping of input.mappings) {
-        try {
-          // Check if mapping already exists if skipDuplicates is true
-          if (input.skipDuplicates) {
-            const existingMapping = await db.talukClusterMapping.findFirst({
-              where: {
-                eventId: input.eventId,
-                district: mapping.district,
-                state: mapping.state,
-                taluk: mapping.taluk,
-              },
-            });
-
-            if (existingMapping) {
-              results.skipped++;
-              continue;
-            }
-          }
-
-          await db.talukClusterMapping.create({
-            data: {
-              eventId: input.eventId,
-              ...mapping,
-            },
-          });
-          results.created++;
-        } catch (error) {
-          results.errors.push(`Failed to create mapping for ${mapping.taluk}: ${error}`);
-        }
+      if (existingMapping) {
+        throw new TRPCError({ 
+          code: 'CONFLICT', 
+          message: 'Cluster venue is already mapped to a division venue' 
+        });
       }
 
-      return results;
+      const mapping = await db.clusterDivisionMapping.create({
+        data: input,
+        include: {
+          clusterVenueMapping: {
+            include: { venue: true },
+          },
+          divisionVenueMapping: {
+            include: { venue: true },
+          },
+        },
+      });
+
+      return mapping;
+    }),
+
+  // Delete Cluster Division Mappings (unchanged)
+  deleteClusterDivisionMappings: protectedProcedure
+    .input(z.object({
+      mappingIds: z.array(z.string()),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      await db.clusterDivisionMapping.deleteMany({
+        where: {
+          id: { in: input.mappingIds },
+        },
+      });
+
+      return { success: true };
     }),
 });

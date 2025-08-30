@@ -30,18 +30,67 @@ import {
 import { 
   AdvancedTable,
   StatsCard,
-  StatusBadge,
   PageLoader,
   type Column,
   type ActionButton,
   type FilterField,
   type ExportConfig,
   type TableParams,
-  type StatItem
 } from '@/components/ui';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { TeamCreationForm, TeamCreationFormValues } from '@/components/admin/TeamCreationForm';
+import StatusSelector from '@/components/ui/StatusSelector';
+// Raw backend data structure
+interface RawTeamData {
+  id: string;
+  name: string;
+  description: string | null;
+  sportId: string;
+  captainId: string;
+  captainName: string;
+  genderCategory: string;
+  status: string;
+  panchayat: string;
+  district: string;
+  state: string;
+  taluk: string;
+  pincode: string | null;
+  currentPlayers: number;
+  currentSubstitutes: number;
+  createdAt: any;
+  eventId: string | null;
+  _count: {
+    teamPlayers: number;
+  };
+  captainUser: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    district: string;
+    profileComplete: boolean;
+  };
+  sport: {
+    id: string;
+    name: string;
+    description: string | null;
+  };
+  teamVenueAssignments: Array<{
+    id: string;
+    level: string;
+    assignedAt: string;
+    clusterVenueMapping?: {
+      venue: {
+        id: string;
+        name: string;
+        district: string;
+        taluk: string;
+      };
+    };
+  }>;
+}
 
+// Transformed data structure for frontend
 interface TeamData {
   id: string;
   name: string;
@@ -66,6 +115,39 @@ interface TeamData {
     venueName: string;
     assignmentLevel: string;
     assignedAt: string | null;
+  };
+}
+
+// Transform backend data to frontend format
+function transformTeamData(rawTeam: RawTeamData): TeamData {
+  const venueAssignment = rawTeam.teamVenueAssignments?.[0];
+  const venue = venueAssignment?.clusterVenueMapping?.venue;
+  
+  return {
+    id: rawTeam.id,
+    name: rawTeam.name,
+    sportName: rawTeam.sport?.name || 'Unknown Sport',
+    sportId: rawTeam.sportId,
+    captainProfile: {
+      name: `${rawTeam.captainUser?.firstName || ''} ${rawTeam.captainUser?.lastName || ''}`.trim() || rawTeam.captainName,
+      phone: rawTeam.captainUser?.phone || 'N/A',
+    },
+    panchayat: rawTeam.panchayat,
+    district: rawTeam.district,
+    state: rawTeam.state,
+    genderCategory: rawTeam.genderCategory,
+    currentPlayers: rawTeam._count?.teamPlayers || 0,
+    maxPlayers: rawTeam.currentPlayers + rawTeam.currentSubstitutes || 11, // Use team's configured max players
+    status: rawTeam.status,
+    createdAt: rawTeam.createdAt,
+    eventId: rawTeam.eventId || '',
+    clusterVenue: venue?.name,
+    currentVenueAssignment: venue ? {
+      venueId: venue.id,
+      venueName: venue.name,
+      assignmentLevel: venueAssignment.level,
+      assignedAt: venueAssignment.assignedAt,
+    } : undefined,
   };
 }
 
@@ -121,7 +203,8 @@ export default function AdminTeamsPage() {
   const teams = useMemo(() => {
     if (!teamsData?.teams) return [];
 
-    let filteredTeams = teamsData.teams;
+    // Transform raw backend data to frontend format
+    let filteredTeams = teamsData.teams.map((rawTeam: RawTeamData) => transformTeamData(rawTeam));
 
     // Apply search
     if (tableParams.search) {
@@ -249,6 +332,17 @@ export default function AdminTeamsPage() {
     },
   });
 
+  // Update team status mutation
+  const updateTeamStatusMutation = api.admin.teams.updateTeamStatus.useMutation({
+    onSuccess: () => {
+      addNotification('Team status updated successfully!', 'success');
+      refetchTeams();
+    },
+    onError: (error) => {
+      addNotification(error.message || 'Failed to update team status', 'error');
+    },
+  });
+
   const deleteTeamMutation = api.admin.teams.deleteTeam.useMutation({
     onSuccess: () => {
       refetchTeams();
@@ -283,7 +377,7 @@ export default function AdminTeamsPage() {
   const confirmDelete = async () => {
     if (teamToDelete) {
       try {
-        await deleteTeamMutation.mutateAsync({ id: teamToDelete.id });
+        await deleteTeamMutation.mutateAsync({ teamId: teamToDelete.id });
       } catch (error) {
         console.error('Delete confirmation error:', error);
       }
@@ -370,22 +464,24 @@ export default function AdminTeamsPage() {
       sortable: true,
       render: (_, team) => {
         if (!team) return null;
-        const statusConfig = {
-          'draft': { color: 'gray', icon: AlertCircle },
-          'submitted': { color: 'blue', icon: Clock },
-          'verified': { color: 'green', icon: CheckCircle },
-          'rejected': { color: 'red', icon: XCircle },
-          'checked_in': { color: 'purple', icon: CheckCircle } // Using purple for checked_in, and CheckCircle icon
-        };
-        
-        const config = statusConfig[team.status as keyof typeof statusConfig] || statusConfig.draft;
-        const Icon = config.icon;
         
         return (
-          <StatusBadge 
-            status={team.status} 
-            color={config.color} 
-            icon={<Icon className="w-3 h-3" />}
+          <StatusSelector
+            value={team.status}
+            options={[
+              { value: 'draft', label: 'Draft', color: 'gray' },
+              { value: 'submitted', label: 'Submitted', color: 'yellow' },
+              { value: 'verified', label: 'Verified', color: 'blue' },
+              { value: 'checked_in', label: 'Checked In', color: 'green' },
+              { value: 'rejected', label: 'Rejected', color: 'red' }
+            ]}
+            onChange={(newStatus) => {
+              updateTeamStatusMutation.mutate({
+                teamId: team.id,
+                status: newStatus
+              });
+            }}
+            disabled={updateTeamStatusMutation.isPending}
           />
         );
       }

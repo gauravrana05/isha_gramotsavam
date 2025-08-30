@@ -13,6 +13,7 @@ export interface TeamCreationFormValues {
   district: string;
   state: string;
   taluk: string;
+  captainId?: string; // Optional, will be set when user is found or created
   captainPhone: string;
   captainFirstName: string;
   captainLastName: string;
@@ -89,8 +90,8 @@ export const TeamCreationForm: React.FC<TeamCreationFormProps> = ({
   });
 
   const sports = useMemo(() => {
-    if (!sportsData || !sportsData.sports) return [];
-    return sportsData.sports.filter(sport => sport.isActive !== false);
+    if (!sportsData) return [];
+    return sportsData.filter(sport => sport.isActive !== false);
   }, [sportsData]);
 
   const selectedSport = useMemo(() => {
@@ -170,12 +171,13 @@ export const TeamCreationForm: React.FC<TeamCreationFormProps> = ({
     if (phone.length === 10) {
       setIsSearching(true);
       try {
-        const result = await utils.admin.searchUserByPhone.fetch({ phone });
+        const result = await utils.admin.users.searchUserByPhone.fetch({ phone });
         
         if (result?.user) {
           setPlayerExists(true);
           setFormData(prev => ({
             ...prev,
+            captainId: result.user.id, // Set the captainId
             captainFirstName: result.user.firstName || '',
             captainLastName: result.user.lastName || '',
             captainDob: result.user.dateOfBirth ? new Date(result.user.dateOfBirth).toISOString().split('T')[0] : '',
@@ -212,20 +214,21 @@ export const TeamCreationForm: React.FC<TeamCreationFormProps> = ({
       setIsSearching(false);
       setFormData(prev => ({
         ...prev,
+        captainId: undefined, // Clear captainId when no user found
         captainFirstName: '',
         captainLastName: '',
         captainDob: '',
         captainGender: 'M'
       }));
     }
-  }, [utils.admin.searchUserByPhone]);
+  }, [utils.admin.users.searchUserByPhone]);
 
   const handleInputChange = (field: keyof TeamCreationFormValues, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setFieldErrors(prev => ({ ...prev, [field]: undefined }));
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: Partial<Record<keyof TeamCreationFormValues, string>> = {};
 
@@ -277,14 +280,28 @@ export const TeamCreationForm: React.FC<TeamCreationFormProps> = ({
       return;
     }
 
-    onSubmit(formData);
+    // Get current active event and add to form data
+    try {
+      const eventsData = await api.admin.events.getEvents.query();
+      const activeEvent = eventsData.events.find(event => event.status === 'ongoing');
+      
+      const submissionData = {
+        ...formData,
+        eventId: activeEvent?.id
+      };
+      
+      onSubmit(submissionData);
+    } catch (error) {
+      console.warn('Could not get active event, submitting without eventId:', error);
+      onSubmit(formData);
+    }
   };
 
   return (
     <form ref={formRef} onSubmit={handleFormSubmit} id="team-creation-form" className="space-y-6">
       {/* Team Information */}
       <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+        <h3 className="text-base font-medium text-gray-900 flex items-center gap-2">
           <Users className="w-5 h-5 text-[#F28C38]" />
           Team Information
         </h3>
@@ -357,7 +374,7 @@ export const TeamCreationForm: React.FC<TeamCreationFormProps> = ({
 
       {/* Location */}
       <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+        <h3 className="text-base font-medium text-gray-900 flex items-center gap-2">
           <MapPin className="w-5 h-5 text-[#F28C38]" />
           Team Location
         </h3>
@@ -477,7 +494,7 @@ export const TeamCreationForm: React.FC<TeamCreationFormProps> = ({
 
       {/* Captain Information */}
       <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900">Team Captain</h3>
+        <h3 className="text-base font-medium text-gray-900">Team Captain</h3>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">

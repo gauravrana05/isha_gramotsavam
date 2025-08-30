@@ -77,11 +77,11 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
   const [selectedTeam, setSelectedTeam] = useState<TeamAssignmentData | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
 
-  // Table state
+  // Table state - default to showing only pending (unassigned) teams
   const [tableParams, setTableParams] = useState<TableParams>({
     pagination: { page: 1, pageSize: 50 },
     sorting: { field: 'name', direction: 'asc' },
-    filters: {},
+    filters: { status: 'unassigned' }, // Focus on teams needing manual intervention
   });
 
   // Auth check
@@ -91,10 +91,10 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
     }
   }, [user, userProfile, authLoading, router, lang]);
 
-  // Get events for filter - use 'upcoming' instead of 'active'
+  // Get events for filter - use 'ongoing' for current active events
   const { data: eventsData } = api.admin.events.getEvents.useQuery({
     limit: 100,
-    status: 'upcoming',
+    status: 'ongoing',
   });
 
   // Get team assignments
@@ -132,7 +132,19 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
 
   // Memoized data processing
   const teams = useMemo(() => {
-    return teamAssignmentsData || [];
+    if (!teamAssignmentsData) return [];
+    
+    return teamAssignmentsData.map(team => ({
+      ...team,
+      captain: {
+        name: team.captainUser ? `${team.captainUser.firstName} ${team.captainUser.lastName}` : 'N/A',
+        phone: team.captainUser?.phone || 'N/A',
+        district: team.captainUser?.district || 'N/A',
+        state: team.captainUser?.state || 'N/A',
+        taluk: team.captainUser?.taluk || 'N/A',
+        panchayat: team.captainUser?.panchayat || 'N/A',
+      }
+    }));
   }, [teamAssignmentsData]);
 
   const loading = authLoading || assignmentsLoading;
@@ -163,7 +175,7 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
       header: 'Captain Phone',
       render: (_, team) => (
         <div className="text-sm text-gray-900">
-          {team.captain.phone || 'N/A'}
+          {team.captain.phone}
         </div>
       ),
     },
@@ -267,21 +279,6 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
   // Header actions - only show when teams are selected
   const headerActions = selectedTeams.size > 0 ? (
     <div className="flex items-center space-x-3">
-      <div className="flex items-center space-x-2">
-        <select
-          value={selectedEvent}
-          onChange={(e) => setSelectedEvent(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-        >
-          <option value="">Select Event</option>
-          {eventsData?.events.map((event) => (
-            <option key={event.id} value={event.id}>
-              {event.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <button
         onClick={() => {
           // Handle bulk venue assignment
@@ -294,22 +291,7 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
         Assign Venue ({selectedTeams.size})
       </button>
     </div>
-  ) : (
-    <div className="flex items-center space-x-3">
-      <select
-        value={selectedEvent}
-        onChange={(e) => setSelectedEvent(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-      >
-        <option value="">Select Event</option>
-        {eventsData?.events.map((event) => (
-          <option key={event.id} value={event.id}>
-            {event.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
+  ) : null;
 
   // Row click handler
   const handleRowClick = (team: TeamAssignmentData) => {
@@ -323,6 +305,20 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Information Banner */}
+      <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <CheckCircle className="h-5 w-5 text-blue-400" />
+          </div>
+          <div className="ml-3">
+            <p className="text-sm text-blue-700">
+              Teams are automatically assigned to venues during creation; please assign the team with conflicts manually.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <AdvancedTable<TeamAssignmentData>
           data={(teams || []) as TeamAssignmentData[]}
@@ -333,18 +329,19 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
           onTableParamsChange={setTableParams}
           selectedRows={selectedTeams}
           onSelectedRowsChange={setSelectedTeams}
-          filterFields={filterFields}
+          filters={filterFields}
+          filterable={true}
           headerActions={headerActions}
           onRowClick={handleRowClick}
-          title="Team Venue Assignments"
-          subtitle="Manage venue assignments for teams in tournaments"
-          emptyState={{
-            icon: Users,
-            title: 'No teams found',
-            description: selectedEvent ? 'No teams found for the selected event and filters.' : 'Please select an event to view team assignments.',
-          }}
           searchable
           searchPlaceholder="Search teams, captains, or venues..."
+          emptyState={{
+            icon: CheckCircle,
+            title: 'All teams have venue assignments',
+            description: selectedEvent 
+              ? 'Great! All teams for this event have been automatically assigned to venues. Change filter to "All Teams" to view all assignments.' 
+              : 'Please select an event to view team assignments.',
+          }}
         />
 
         {/* Team Details Modal */}
@@ -399,7 +396,7 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
                     <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                     <div className="flex items-center">
                       <Phone className="w-4 h-4 text-gray-400 mr-2" />
-                      <p className="text-sm text-gray-900">{selectedTeam.captain.phone || 'N/A'}</p>
+                      <p className="text-sm text-gray-900">{selectedTeam.captain.phone}</p>
                     </div>
                   </div>
                   <div>

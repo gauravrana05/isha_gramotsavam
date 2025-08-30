@@ -5,24 +5,39 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
-import { AdvancedTable, StatsCard, PageLoader } from '@/components/ui';
-import { EnhancedModal } from '@/components/ui/EnhancedModal';
+import { AdvancedTable, StatsCard, PageLoader, type Column, type ActionButton } from '@/components/ui';
+import StatusSelector from '@/components/ui/StatusSelector';
+import { AlertModal } from '@/components/ui/Modal';
+import { AddPlayerModal } from '@/components/modals/AddPlayerModal';
+import { PlayerDetailModal } from '@/components/modals/PlayerDetailModal';
 import {
   Users, User, UserCheck, CheckCircle, MapPin,
-  ArrowLeft, UserPlus, Edit, Trash2, Eye
+  ArrowLeft, UserPlus, Edit, Trash2, Eye, X, Loader2
 } from 'lucide-react';
 
 interface TeamPlayer {
   id: string;
+  teamId: string;
   userId: string;
+  position: string;
+  verificationStatus: 'pending' | 'verified' | 'approved' | 'rejected';
   firstName: string;
   lastName: string;
   phone: string;
+  whatsappNumber?: string;
+  dateOfBirth: Date;
   age: number;
-  position: 'main' | 'substitute';
-  verificationStatus: 'pending' | 'verified' | 'rejected';
-  user?: { // Corrected: now 'user'
-    dateOfBirth?: string; // Added dateOfBirth
+  gender: 'M' | 'F';
+  panchayat: string;
+  taluk: string;
+  district: string;
+  state: string;
+  pincode: string;
+  addedAt: Date;
+  addedBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  user?: {
     profileImages?: {
       profilePhotoPath?: string;
       aadhaarFrontPath?: string;
@@ -39,6 +54,121 @@ export default function AdminTeamDetailPage() {
 
   const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayer | null>(null);
   const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
+  const [selectedPlayers, setSelectedPlayers] = useState<Set<string | number>>(new Set());
+  const [editingPlayer, setEditingPlayer] = useState<TeamPlayer | null>(null);
+
+  // Add player mutation
+  const addPlayerMutation = api.admin.teams.addPlayerToTeam.useMutation({
+    onSuccess: () => {
+      addNotification('Player added successfully!', 'success');
+      setShowAddPlayerModal(false);
+      refetchTeam();
+    },
+    onError: (error) => {
+      addNotification(error.message || 'Failed to add player', 'error');
+    },
+  });
+
+  // Update player mutation
+  const updatePlayerMutation = api.admin.teams.updatePlayer.useMutation({
+    onSuccess: () => {
+      addNotification('Player updated successfully!', 'success');
+      setShowAddPlayerModal(false);
+      setEditingPlayer(null);
+      refetchTeam();
+    },
+    onError: (error) => {
+      addNotification(error.message || 'Failed to update player', 'error');
+    },
+  });
+
+  // Update player status mutation
+  const updatePlayerStatusMutation = api.admin.teams.updatePlayerStatus.useMutation({
+    onSuccess: () => {
+      addNotification('Player status updated successfully!', 'success');
+      refetchTeam();
+    },
+    onError: (error) => {
+      addNotification(error.message || 'Failed to update player status', 'error');
+    },
+  });
+
+  // Update team status mutation
+  const updateTeamStatusMutation = api.admin.teams.updateTeamStatus.useMutation({
+    onSuccess: () => {
+      addNotification('Team status updated successfully!', 'success');
+      refetchTeam();
+    },
+    onError: (error) => {
+      addNotification(error.message || 'Failed to update team status', 'error');
+    },
+  });
+
+  // Make captain mutation (using admin API)
+  const makeCaptainMutation = api.admin.teams.makeCaptain.useMutation({
+    onSuccess: (result) => {
+      addNotification(result.message || 'Captain updated successfully!', 'success');
+      refetchTeam();
+      setSelectedPlayer(null); // Close modal
+    },
+    onError: (error) => {
+      addNotification(error.message || 'Failed to update captain', 'error');
+    },
+  });
+
+  // Handle add player from modal
+  const handleAddPlayer = async (playerData: any) => {
+    try {
+      await addPlayerMutation.mutateAsync({
+        teamId: teamId as string,
+        ...playerData
+      });
+    } catch (error) {
+      // Error handled by mutation
+      throw error;
+    }
+  };
+
+  // Handle edit player from modal
+  const handleEditPlayer = async (playerData: any) => {
+    if (!editingPlayer) return;
+    
+    try {
+      await updatePlayerMutation.mutateAsync({
+        teamId: teamId as string,
+        userId: editingPlayer.userId,
+        firstName: playerData.firstName,
+        lastName: playerData.lastName,
+        dateOfBirth: playerData.dateOfBirth,
+        whatsappNumber: playerData.whatsappNumber,
+      });
+    } catch (error) {
+      // Error handled by mutation
+      throw error;
+    }
+  };
+
+  // Handle make captain
+  const handleMakeCaptain = (playerId: string) => {
+    const player = players.find(p => p.id === playerId);
+    if (!player) {
+      addNotification('Player not found', 'error');
+      return;
+    }
+    if (!team) {
+      addNotification('Team data not available', 'error');
+      return;
+    }
+    if (!player.userId) {
+      addNotification('Player user ID not available', 'error');
+      return;
+    }
+
+    makeCaptainMutation.mutate({
+      teamId: team.id,
+      userId: player.userId
+    });
+  };
 
   // Team data fetching
   const {
@@ -48,18 +178,6 @@ export default function AdminTeamDetailPage() {
     refetch: refetchTeam
   } = api.admin.teams.getTeamById.useQuery({ teamId: teamId as string }, {
     enabled: !!user && userProfile?.role === 'admin' && !!teamId
-  });
-
-  // Player management mutations
-  const addPlayerMutation = api.admin.teams.addPlayerToTeam.useMutation({
-    onSuccess: () => {
-      refetchTeam();
-      addNotification('Player added successfully!', 'success');
-      setShowAddPlayerModal(false);
-    },
-    onError: (error) => {
-      addNotification(error.message || 'Failed to add player', 'error');
-    }
   });
 
   const removePlayerMutation = api.admin.teams.removePlayerFromTeam.useMutation({
@@ -94,10 +212,10 @@ export default function AdminTeamDetailPage() {
     );
   }
 
-  const { team } = teamData;
-  const players = team.players || [];
+  const team = teamData;
+  const players = team?.teamPlayers || [];
 
-  // Player Columns (based on captain/teams structure)
+  // Player Columns
   const playerColumns: Column<TeamPlayer>[] = [
     {
       key: 'name',
@@ -105,16 +223,31 @@ export default function AdminTeamDetailPage() {
       sortable: true,
       render: (_, player) => (
         <div>
-          <div className="font-semibold text-[#4A2F1D]">
-            {player.firstName} {player.lastName}
+          <div className="flex items-center space-x-2">
+            <span className="font-semibold text-[#4A2F1D]">
+              {player.firstName} {player.lastName}
+            </span>
+            {team?.captainId === player.userId && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                Captain
+              </span>
+            )}
           </div>
-          <div className="text-sm text-gray-500">{player.phone}</div>
         </div>
+      ),
+    },
+    {
+      key: 'phone',
+      header: 'Mobile',
+      sortable: true,
+      render: (_, player) => (
+        <span className="text-gray-900">{player.phone}</span>
       ),
     },
     {
       key: 'position',
       header: 'Position',
+      sortable: true,
       render: (_, player) => (
         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
           player.position === 'main' 
@@ -129,7 +262,7 @@ export default function AdminTeamDetailPage() {
       key: 'age',
       header: 'Age',
       sortable: true,
-      render: (_, player) => <span>{player.user?.dateOfBirth ? new Date().getFullYear() - new Date(player.user.dateOfBirth).getFullYear() : 'N/A'}</span>,
+      render: (_, player) => <span>{player.age || 'N/A'}</span>,
     },
     {
       key: 'documents',
@@ -152,15 +285,23 @@ export default function AdminTeamDetailPage() {
       key: 'verificationStatus',
       header: 'Status',
       render: (_, player) => (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          player.verificationStatus === 'verified' 
-            ? 'bg-green-100 text-green-800' 
-            : player.verificationStatus === 'pending' 
-            ? 'bg-yellow-100 text-yellow-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {player.verificationStatus}
-        </span>
+        <StatusSelector
+          value={player.verificationStatus}
+          options={[
+            { value: 'pending', label: 'Pending', color: 'yellow' },
+            { value: 'verified', label: 'Verified', color: 'blue' },
+            { value: 'approved', label: 'Approved', color: 'green' },
+            { value: 'rejected', label: 'Rejected', color: 'red' }
+          ]}
+          onChange={(newStatus) => {
+            updatePlayerStatusMutation.mutate({
+              teamId: teamId as string,
+              userId: player.userId,
+              status: newStatus
+            });
+          }}
+          disabled={updatePlayerStatusMutation.isPending}
+        />
       ),
     }
   ];
@@ -176,7 +317,7 @@ export default function AdminTeamDetailPage() {
     {
       label: 'Remove',
       icon: Trash2,
-      onClick: (player) => removePlayerMutation.mutate({ teamId: team.id, teamPlayerId: player.id }),
+      onClick: (player) => removePlayerMutation.mutate({ teamId: team.id, userId: player.userId }),
       variant: 'danger',
       confirm: {
         title: 'Remove Player',
@@ -185,88 +326,117 @@ export default function AdminTeamDetailPage() {
     }
   ];
 
+  // Filter fields for players
+  const playerFilterFields = [
+    {
+      key: 'verificationStatus',
+      label: 'Status',
+      type: 'select' as const,
+      category: 'Status',
+      options: [
+        { label: 'Pending', value: 'pending' },
+        { label: 'Verified', value: 'verified' },
+        { label: 'Approved', value: 'approved' },
+        { label: 'Rejected', value: 'rejected' }
+      ]
+    },
+    {
+      key: 'position',
+      label: 'Position',
+      type: 'select' as const,
+      category: 'Position',
+      options: [
+        { label: 'Main', value: 'main' },
+        { label: 'Substitute', value: 'substitute' }
+      ]
+    },
+    {
+      key: 'gender',
+      label: 'Gender',
+      type: 'select' as const,
+      category: 'Gender',
+      options: [
+        { label: 'Male', value: 'M' },
+        { label: 'Female', value: 'F' }
+      ]
+    }
+  ];
+
+  // Header actions based on selection
+  const getPlayerHeaderActions = () => {
+    if (selectedPlayers.size === 0) {
+      return (
+        <button
+          onClick={() => setShowAddPlayerModal(true)}
+          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+        >
+          <UserPlus className="w-4 h-4 mr-2" />
+          Add Player
+        </button>
+      );
+    }
+
+    if (selectedPlayers.size === 1) {
+      const playerId = Array.from(selectedPlayers)[0];
+      const player = players.find(p => p.id === playerId);
+      
+      return (
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => {
+              if (player) {
+                setEditingPlayer(player);
+                setShowAddPlayerModal(true);
+                setSelectedPlayers(new Set());
+              }
+            }}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Edit
+          </button>
+          <button
+            onClick={() => {
+              if (player) {
+                removePlayerMutation.mutate({ teamId: team.id, userId: player.userId });
+                setSelectedPlayers(new Set());
+              }
+            }}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Remove
+          </button>
+        </div>
+      );
+    }
+
+    return null; // No actions for multiple selection
+  };
+
   return (
     <div className="lg:min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <button
-                onClick={() => router.back()}
-                className="mr-4 p-2 hover:bg-gray-100 rounded-lg"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-[#4A2F1D]">{team.name}</h1>
-                <p className="text-gray-600">{team.sport?.name} - {team.genderCategory}</p>
-                <div className="flex items-center mt-2 text-sm text-gray-500">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  {team.panchayat}, {team.district}, {team.state}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setShowAddPlayerModal(true)}
-                className="bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] flex items-center"
-              >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Add Player
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Team Header */} 
 
-      {/* Stats */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <StatsCard
-          stats={[
-            {
-              label: "Total Players",
-              value: players.length.toString(),
-              icon: Users,
-              color: "info",
-              description: `of ${(team.sport?.mainPlayersCount || 0) + (team.sport?.maxSubstitutes || 0)} max`
-            },
-            {
-              label: "Main Players",
-              value: players.filter(p => p.position === 'main').length.toString(),
-              icon: User,
-              color: "success",
-              description: `of ${team.sport?.mainPlayersCount || 0} required`
-            },
-            {
-              label: "Substitutes",
-              value: players.filter(p => p.position === 'substitute').length.toString(),
-              icon: UserCheck,
-              color: "warning",
-              description: `of ${team.sport?.maxSubstitutes || 0} max`
-            },
-            {
-              label: "Verified Players",
-              value: players.filter(p => p.verificationStatus === 'verified').length.toString(),
-              icon: CheckCircle,
-              color: "primary",
-              description: "players approved"
-            },
-          ]}
-          columns={4}
-        />
+        {/* Stats Cards */}
 
         {/* Players Table */}
         <AdvancedTable<TeamPlayer>
           data={players}
           columns={playerColumns}
-          actions={playerActions}
           loading={teamLoading}
           searchable={true}
           searchPlaceholder="Search players..."
           searchFields={['firstName', 'lastName', 'phone']}
+          filterable={true}
+          filters={playerFilterFields}
+          selectable={true}
+          selectedRows={selectedPlayers}
+          onSelectionChange={setSelectedPlayers}
           onRowClick={setSelectedPlayer}
           keyExtractor={(player) => player.id}
+          headerActions={getPlayerHeaderActions()}
           emptyState={{
             icon: Users,
             title: 'No players added',
@@ -281,25 +451,60 @@ export default function AdminTeamDetailPage() {
         />
       </div>
 
+      {/* Add Player Modal */}
+      <AddPlayerModal
+        isOpen={showAddPlayerModal}
+        onClose={() => {
+          setShowAddPlayerModal(false);
+          setEditingPlayer(null);
+        }}
+        onAddPlayer={editingPlayer ? handleEditPlayer : handleAddPlayer}
+        teamData={team}
+        canAddMain={true}
+        canAddSubstitute={true}
+        canAddPlayer={true}
+        editingPlayer={editingPlayer}
+      />
+
       {/* Player Detail Modal */}
-      {selectedPlayer && (
-        <EnhancedModal
-          isOpen={!!selectedPlayer}
-          onClose={() => setSelectedPlayer(null)}
-          title={`${selectedPlayer.firstName} ${selectedPlayer.lastName}`}
-          subtitle="Player Details"
-          size="lg"
-        >
-          {/* Player detail content - copy from captain/teams */}
-          <div className="p-4">
-            <p><strong>Phone:</strong> {selectedPlayer.phone}</p>
-            <p><strong>Position:</strong> {selectedPlayer.position}</p>
-            <p><strong>Age:</strong> {selectedPlayer.age}</p>
-            <p><strong>Verification Status:</strong> {selectedPlayer.verificationStatus}</p>
-            {/* Add more player details as needed */}
-          </div>
-        </EnhancedModal>
-      )}
+      <PlayerDetailModal
+        isOpen={!!selectedPlayer}
+        onClose={() => setSelectedPlayer(null)}
+        selectedPlayer={selectedPlayer}
+        teamData={team}
+        isReadOnly={false}
+        onRemovePlayer={(playerId) => {
+          const player = players.find(p => p.id === playerId);
+          if (player) {
+            removePlayerMutation.mutate({ teamId: team.id, userId: player.userId });
+          }
+        }}
+        onMakeCaptain={handleMakeCaptain}
+        onDocumentUploadSuccess={async (playerId, documentType, url) => {
+          // Refetch team data to update document status
+          const result = await refetchTeam();
+          
+          // Update selectedPlayer with fresh data if it's the same player
+          if (selectedPlayer && selectedPlayer.id === playerId && result.data) {
+            const updatedPlayer = result.data.teamPlayers?.find(p => p.id === playerId);
+            if (updatedPlayer) {
+              setSelectedPlayer(updatedPlayer);
+            }
+          }
+        }}
+        onProfileComplete={async (playerId, isComplete) => {
+          // Refetch team data to update profile completion status
+          const result = await refetchTeam();
+          
+          // Update selectedPlayer with fresh data if it's the same player
+          if (selectedPlayer && selectedPlayer.id === playerId && result.data) {
+            const updatedPlayer = result.data.teamPlayers?.find(p => p.id === playerId);
+            if (updatedPlayer) {
+              setSelectedPlayer(updatedPlayer);
+            }
+          }
+        }}
+      />
     </div>
   );
 }

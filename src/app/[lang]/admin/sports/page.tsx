@@ -61,7 +61,7 @@ export default function AdminSportsPage() {
   const queryParams = useMemo(() => {
     const params = {
       includeTeamCounts: true,
-      includeGenderCategories: true,
+      includeGenderCategories: true
     };
     return params;
   }, []);
@@ -116,15 +116,15 @@ export default function AdminSportsPage() {
 
   // Transform sports data and apply client-side filtering for gender categories
   const sports = useMemo(() => {
-    if (!sportsData?.sports) {
+    if (!sportsData) {
       return [];
     }
     
-    let transformedSports = sportsData.sports.map((sport: any) => ({
+    let transformedSports = sportsData.map((sport: any) => ({
       ...sport,
-      // Backend already returns genderCategories, no need to transform
+      // Backend already returns genderCategories transformed
       genderCategories: sport.genderCategories || [],
-      teamCount: sport.teamCount || 0,
+      teamCount: sport._count?.teams || 0,
       fixtureCount: sport.fixtureCount || 0,
       matchCount: sport.matchCount || 0,
     }));
@@ -195,10 +195,10 @@ export default function AdminSportsPage() {
       render: (_, sport) => (
         <div className="text-sm">
           <div className="text-gray-900 font-medium">
-            {sport.mainPlayersCount} main
+            {sport.mainPlayersCount || 0} main
           </div>
           <div className="text-gray-500">
-            {sport.maxSubstitutes} substitutes
+            {sport.maxSubstitutes || 0} substitutes
           </div>
         </div>
       ),
@@ -232,7 +232,7 @@ export default function AdminSportsPage() {
       render: (_, sport) => (
         <div className="flex items-center space-x-1">
           <Users className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-900">{sport.teamCount}</span>
+          <span className="text-sm text-gray-900">{sport.teamCount || 0}</span>
         </div>
       ),
     },

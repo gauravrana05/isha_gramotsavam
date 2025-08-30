@@ -11,3 +11,14 @@ export const db =
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+
+// Ensure connection is established
+export async function ensureConnection() {
+  try {
+    await db.$connect();
+    return true;
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    return false;
+  }
+}

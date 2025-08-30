@@ -2,7 +2,6 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 import { db } from "@/lib/db";
-import { assignVenueToTeam } from "@/lib/services/venueAssignment";
 
 export const adminVenuesRouter = createTRPCRouter({
   // Enhanced getVenues with filtering and pagination
@@ -236,20 +235,28 @@ export const adminVenuesRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      // Check for existing venue mappings
-      const venuesWithMappings = await db.venue.findMany({
+      // Check for team assignments only (venues can be deleted if they have active mappings but no team assignments)
+      const venuesWithTeamAssignments = await db.venue.findMany({
         where: {
           id: { in: input.venueIds },
           deletedAt: null, // Only check non-deleted venues
-          venueLevelMappings: { some: {} },
+          venueLevelMappings: {
+            some: {
+              OR: [
+                { teamVenueAssignmentsByCluster: { some: {} } },
+                { teamVenueAssignmentsByDivision: { some: {} } },
+                { teamVenueAssignmentsByFinal: { some: {} } },
+              ]
+            }
+          }
         },
         select: { id: true, name: true },
       });
 
-      if (venuesWithMappings.length > 0) {
+      if (venuesWithTeamAssignments.length > 0) {
         throw new TRPCError({
           code: 'CONFLICT',
-          message: `Cannot delete venues with existing assignments: ${venuesWithMappings.map(v => v.name).join(', ')}`,
+          message: `Cannot delete venues with existing team assignments: ${venuesWithTeamAssignments.map(v => v.name).join(', ')}`,
         });
       }
 
@@ -411,19 +418,6 @@ export const adminVenuesRouter = createTRPCRouter({
       }));
     }),
 
-  // Auto Assign Team Venue (existing functionality)
-  autoAssignTeamVenue: protectedProcedure
-    .input(z.object({
-      teamId: z.string(),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
-      const result = await assignVenueToTeam(input.teamId);
-      return result;
-    }),
 
   // Venue Location Mappings (existing functionality)
   getVenueLevelMappings: protectedProcedure

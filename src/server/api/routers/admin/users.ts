@@ -172,10 +172,15 @@ export const adminUsersRouter = createTRPCRouter({
         });
 
         if (existingTeamMembership) {
-          throw new TRPCError({ 
-            code: 'CONFLICT', 
-            message: `Player is already in team "${existingTeamMembership.team.name}" for ${existingTeamMembership.team.sport.name}` 
-          });
+          return {
+            success: false,
+            user,
+            conflict: {
+              message: `Player is already in team "${existingTeamMembership.team.name}" for ${existingTeamMembership.team.sport.name}`,
+              teamName: existingTeamMembership.team.name,
+              sportName: existingTeamMembership.team.sport.name,
+            }
+          };
         }
       }
 
