@@ -426,7 +426,7 @@ export default function TeamVenueAssignmentPage() {
         <AdvancedTable<TeamVenueData>
           data={teams.filter(team => !team.currentVenueAssignment)}
           columns={teamColumns}
-          actionButtons={teamActionButtons}
+          actions={teamActionButtons}
           loading={teamsLoading}
           
           searchable={true}
@@ -470,7 +470,7 @@ export default function TeamVenueAssignmentPage() {
           <AdvancedTable<AvailableVenueData>
             data={availableVenues}
             columns={venueColumns}
-            actionButtons={venueActionButtons}
+            actions={venueActionButtons}
             loading={routingLoading}
             
             sortable={true}

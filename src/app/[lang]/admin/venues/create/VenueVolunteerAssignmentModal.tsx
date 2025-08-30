@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { db } from '@/lib/firebase/config';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+// import { db } from '@/lib/firebase/config';
+// import { collection, getDocs, query, where } from 'firebase/firestore';
 
 interface Volunteer {
   id: string;

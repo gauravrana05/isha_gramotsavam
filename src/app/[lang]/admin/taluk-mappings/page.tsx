@@ -370,7 +370,7 @@ export default function TalukMappingsPage() {
       <AdvancedTable<TalukMappingData>
         data={mappings}
         columns={columns}
-        actionButtons={actionButtons}
+        actions={actionButtons}
         loading={loading}
         
         searchable={true}

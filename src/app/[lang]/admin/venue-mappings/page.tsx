@@ -419,7 +419,7 @@ export default function VenueMappingsPage() {
       <AdvancedTable<VenueMappingData>
         data={mappings}
         columns={columns}
-        actionButtons={actionButtons}
+        actions={actionButtons}
         loading={loading}
         
         searchable={true}

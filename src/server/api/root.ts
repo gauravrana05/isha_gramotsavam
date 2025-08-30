@@ -8,7 +8,7 @@ import { sportsRouter } from './routers/sports'
 import { playersRouter } from './routers/players'
 import { volunteersRouter } from './routers/volunteers'
 import { adminRouter } from './routers/admin'
-import { locationRouter } from './routers/location'
+import { locationRouter } from './routers/teams/location'
 
 /**
  * This is the primary router for your server.
