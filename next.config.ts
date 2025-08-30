@@ -42,12 +42,7 @@ const nextConfig: NextConfig = {
     // Disable Turbopack for development if it causes issues
     rules: {},
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+
 };
 
 // Only apply PWA in production to avoid Turbopack conflicts

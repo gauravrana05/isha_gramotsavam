@@ -142,27 +142,26 @@ export default function TeamRegistrationPage() {
     try {
       const teamData = {
         name: formData.name,
-        sportName: sportQuery.data.name,
         sportId: sportQuery.data.id,
+        captainName: `${userProfile?.firstName} ${userProfile?.lastName}`,
         description: formData.description,
         panchayat: formData.panchayat,
         taluk: formData.taluk,
         district: formData.district,
         state: formData.state,
-        genderCategory: userProfile?.gender as 'M' | 'F' | 'mixed',
+        genderCategory: userProfile?.gender === 'M' ? 'men' as const : 
+                       userProfile?.gender === 'F' ? 'women' as const : 
+                       'mixed' as const,
       };
       
-      // Use tRPC mutation
-      const result = await createTeamMutation.mutateAsync({ 
-        teamData, 
-        captainId: user?.id 
-      });
+      // Use tRPC mutation - pass team data directly
+      const result = await createTeamMutation.mutateAsync(teamData);
       
       // Refresh user data to get updated role before navigating
       await refreshUser();
       
       // Navigate to team invite page
-      router.push(`/${lang}/captain/teams/${result.teamId}/players/invite`);
+      router.push(`/${lang}/captain/teams/${result.id}/players/invite`);
 
     } catch (err: any) {
       // Error handling removed

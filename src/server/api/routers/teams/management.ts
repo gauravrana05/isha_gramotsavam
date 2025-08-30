@@ -5,6 +5,7 @@ import { createTRPCRouter, publicProcedure, protectedProcedure } from '../../trp
 import { assignVenueToTeam } from '@/lib/services/venueAssignment'
 import {
   createTeamSchema,
+  publicCreateTeamSchema,
   updateTeamSchema,
   getTeamByIdSchema,
   uploadTeamPhotoSchema,
@@ -51,15 +52,18 @@ export const teamsManagementRouter = createTRPCRouter({
                   firstName: true,
                   lastName: true,
                   phone: true,
-                  age: true,
                   gender: true,
                 },
               },
             },
           } : false,
-          venueAssignments: includeVenueAssignments ? {
+          teamVenueAssignments: includeVenueAssignments ? {
             include: {
-              venue: true,
+              clusterVenueMapping: {
+                include: {
+                  venue: true,
+                },
+              },
             },
           } : false,
         },
@@ -144,6 +148,18 @@ export const teamsManagementRouter = createTRPCRouter({
     return teams
   }),
 
+  // Public team registration (for public registration form)
+  register: publicProcedure
+    .input(publicCreateTeamSchema)
+    .mutation(async ({ input }) => {
+      // For public registration, we'll need to handle captain creation differently
+      // This endpoint should be used when the captain is already authenticated
+      throw new TRPCError({
+        code: 'NOT_IMPLEMENTED',
+        message: 'Public team registration requires authentication. Please use the protected endpoint.',
+      })
+    }),
+
   // Create team
   create: protectedProcedure
     .input(createTeamSchema)
@@ -194,7 +210,7 @@ export const teamsManagementRouter = createTRPCRouter({
 
   // Create team and promote user to captain
   createAndPromoteCaptain: protectedProcedure
-    .input(createTeamSchema)
+    .input(publicCreateTeamSchema)
     .mutation(async ({ input, ctx }) => {
       const result = await db.$transaction(async (tx) => {
         // Update user role to captain
@@ -217,9 +233,45 @@ export const teamsManagementRouter = createTRPCRouter({
                 firstName: true,
                 lastName: true,
                 phone: true,
+                age: true,
+                gender: true,
+                panchayat: true,
+                taluk: true,
+                district: true,
+                state: true,
+                pincode: true,
+                dateOfBirth: true,
               },
             },
           },
+        })
+
+        // Add captain as team player
+        await tx.teamPlayer.create({
+          data: {
+            teamId: team.id,
+            userId: ctx.user.id,
+            position: 'player',
+            firstName: team.captainUser.firstName,
+            lastName: team.captainUser.lastName,
+            phone: team.captainUser.phone,
+            dateOfBirth: team.captainUser.dateOfBirth || new Date('1990-01-01'), // Fallback date
+            age: team.captainUser.age || 25, // Fallback age
+            gender: team.captainUser.gender,
+            panchayat: team.captainUser.panchayat || input.panchayat,
+            taluk: team.captainUser.taluk || input.taluk,
+            district: team.captainUser.district || input.district,
+            state: team.captainUser.state || input.state,
+            pincode: team.captainUser.pincode || input.pincode || '000000',
+            addedBy: 'captain',
+            verificationStatus: 'approved', // Captain is auto-approved
+          },
+        })
+
+        // Update team player count
+        await tx.team.update({
+          where: { id: team.id },
+          data: { currentPlayers: 1 },
         })
 
         return team
@@ -245,6 +297,36 @@ export const teamsManagementRouter = createTRPCRouter({
         } catch (error) {
           // Don't fail team creation if venue assignment fails
           console.error('Venue assignment failed during team creation:', error)
+        }
+      } else {
+        // Try to get the current active event for venue assignment
+        try {
+          const activeEvent = await db.event.findFirst({
+            where: {
+              status: {
+                in: ['active', 'registration_open', 'registration_closed']
+              }
+            },
+            select: { id: true }
+          })
+
+          if (activeEvent) {
+            const venueAssignmentResult = await assignVenueToTeam(
+              result.id,
+              {
+                panchayat: input.panchayat || '',
+                district: input.district,
+                state: input.state,
+                taluk: input.taluk || '',
+              },
+              activeEvent.id,
+              ctx.user.id
+            )
+            
+            console.log(`Team ${result.name} venue assignment (auto-event):`, venueAssignmentResult.message)
+          }
+        } catch (error) {
+          console.error('Auto venue assignment failed during team creation:', error)
         }
       }
 

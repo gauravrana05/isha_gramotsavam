@@ -1,407 +1,463 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import {
-  UserPlus,
-  Users,
-  CheckCircle,
-  X,
+import { useAuth } from '@/context/AuthContext';
+import { useNotification } from '@/context/NotificationContext';
+import { api } from '@/server/trpc/react';
+import { 
+  Users, 
+  UserPlus, 
+  CheckCircle, 
+  Clock, 
+  AlertCircle,
+  Eye,
   Edit,
   Trash2,
-  Search,
-  Eye,
-  AlertCircle,
-  Clock,
-  Loader2,
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
+  Loader2
 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-import { AlertModal } from '@/components/ui/Modal';
-import { useAlert } from '@/hooks/useAlert';
-import { api } from '@/server/trpc/react';
-import Image from 'next/image';
-import { PlayerDocumentUpload } from '@/components/players';
-import DocumentPreview from '@/components/documents/DocumentPreview';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
+import Link from 'next/link';
+import { AdvancedTable, SingleStatCard, PageLoader } from '@/components/ui';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
+import type { Column, ActionButton } from '@/components/ui/Table';
 
-// Keep the detailed interfaces from the reference file
-interface TeamPlayer {
+interface TeamPlayerRow {
   id: string;
   userId: string;
-  teamId: string;
   firstName: string;
   lastName: string;
   phone: string;
-  whatsapp_number: string | null;
-  dateOfBirth: Date;
+  whatsappNumber?: string;
   age: number;
-  gender: string;
-  position: 'main' | 'substitute';
-  verificationStatus: 'pending' | 'verified' | 'rejected';
+  gender: 'M' | 'F' | 'O';
+  position: 'player' | 'substitute';
+  verificationStatus: 'pending' | 'approved' | 'rejected';
   panchayat: string;
   taluk: string;
   district: string;
   state: string;
-  pincode: string;
-  added_by: string;
-  createdAt: Date;
-  users?: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    phone: string;
-    role: string;
-    profileComplete: boolean;
-    profileImages: {
-      userId: string;
-      profilePhotoPath: string | null;
-      aadhaarFrontPath: string | null;
-      aadhaarBackPath: string | null;
-      all_images_uploaded: boolean;
-      verified_by: string | null;
-      verified_at: Date | null;
-      createdAt: Date;
-      updatedAt: Date;
-    } | null;
-  };
+  addedAt: string;
 }
 
-interface TeamData {
-  id: string;
-  name: string;
-  sport_id: string;
-  captain_id: string;
-  captain_name: string;
-  genderCategory: string;
-  status: string;
-  panchayat: string;
-  taluk: string;
-  district: string;
-  state: string;
-  pincode: string | null;
-  currentPlayers: number;
-  currentSubstitutes: number;
-  createdAt: Date;
-  updatedAt: Date;
-  sport: {
-    id: string;
-    name: string;
-    mainPlayersCount: number;
-    maxSubstitutes: number;
-  };
-  captainUser: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    phone: string;
-  };
-  teamPlayers: TeamPlayer[];
-}
-
-export default function MyTeamPage() {
+export default function CaptainTeamsPage() {
   const router = useRouter();
   const { lang } = useParams();
-  const { user } = useAuth();
-  const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
+  const { user, userProfile, loading: authLoading } = useAuth();
+  const { addNotification } = useNotification();
 
-  const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayer | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  // State
+  const [selectedPlayers, setSelectedPlayers] = useState<Set<string | number>>(new Set());
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayerRow | null>(null);
 
-  // tRPC query to fetch the captain's team
-  const { data: teamData, isLoading: loading, error, refetch: refetchTeamData } = api.teams.management.getMyTeam.useQuery(undefined, {
-    enabled: !!user,
-  });
+  // Fetch captain's team
+  const { 
+    data: teamData, 
+    isLoading: teamLoading, 
+    error: teamError,
+    refetch: refetchTeam
+  } = api.teams.management.getMyTeam.useQuery(
+    undefined,
+    { enabled: !!user && user.role === 'captain' }
+  );
 
-  const removePlayerMutation = api.teams.players.removePlayer.useMutation();
+  // Fetch team players
+  const { 
+    data: playersData, 
+    isLoading: playersLoading,
+    refetch: refetchPlayers
+  } = api.teams.players.getTeamPlayers.useQuery(
+    { teamId: teamData?.id || '' },
+    { enabled: !!teamData?.id }
+  );
 
-  const handleRemovePlayer = async (playerId: string) => {
-    if (!teamData || !user) return;
-
-    if (!confirm('Are you sure you want to remove this player from the team?')) {
+  // Auth guard
+  useEffect(() => {
+    if (authLoading) return;
+    
+    if (!user) {
+      router.push(`/${lang}/login`);
       return;
     }
 
-    try {
-      await removePlayerMutation.mutateAsync({ teamId: teamData.id, userId: playerId });
-      await refetchTeamData();
-      setSelectedPlayer(null); // Close modal on success
-      showSuccess('Player removed successfully!');
-    } catch (error: any) {
-      showError(`Failed to remove player: ${error.message || 'Unknown error'}`);
+    if (user.role !== 'captain') {
+      router.push(`/${lang}/dashboard`);
+      return;
     }
+
+    if (!userProfile?.profileComplete) {
+      router.push(`/${lang}/profile/complete`);
+      return;
+    }
+  }, [user, userProfile, authLoading, router, lang]);
+
+  // Process players data
+  const players = useMemo(() => {
+    if (!playersData?.players) return [];
+    
+    return playersData.players.map(player => ({
+      id: player.id,
+      userId: player.userId,
+      firstName: player.firstName,
+      lastName: player.lastName,
+      phone: player.phone,
+      whatsappNumber: player.whatsappNumber,
+      age: player.age,
+      gender: player.gender,
+      position: player.position,
+      verificationStatus: player.verificationStatus,
+      panchayat: player.panchayat,
+      taluk: player.taluk,
+      district: player.district,
+      state: player.state,
+      addedAt: player.addedAt
+    }));
+  }, [playersData?.players]);
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    if (!teamData || !players) return null;
+
+    const totalPlayers = players.length;
+    const verifiedPlayers = players.filter(p => p.verificationStatus === 'approved').length;
+    const pendingPlayers = players.filter(p => p.verificationStatus === 'pending').length;
+    const maxPlayers = teamData.sport?.maxPlayersPerTeam || 11;
+
+    return {
+      totalPlayers,
+      verifiedPlayers,
+      pendingPlayers,
+      maxPlayers,
+      isComplete: totalPlayers >= maxPlayers
+    };
+  }, [teamData, players]);
+
+  // Table columns
+  const columns: Column<TeamPlayerRow>[] = useMemo(() => [
+    {
+      key: 'player',
+      header: 'Player',
+      accessor: 'firstName',
+      sortable: true,
+      minWidth: 200,
+      render: (_, player) => (
+        <div className="flex items-center">
+          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mr-3">
+            <Users className="w-5 h-5 text-gray-500" />
+          </div>
+          <div>
+            <div className="font-medium text-gray-900">
+              {player.firstName} {player.lastName}
+            </div>
+            <div className="text-sm text-gray-500">{player.phone}</div>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'details',
+      header: 'Details',
+      accessor: 'age',
+      sortable: true,
+      minWidth: 150,
+      render: (_, player) => (
+        <div className="text-sm">
+          <div className="text-gray-900">Age: {player.age}</div>
+          <div className="text-gray-500">
+            {player.gender === 'M' ? 'Male' : player.gender === 'F' ? 'Female' : 'Other'}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      accessor: 'district',
+      sortable: true,
+      minWidth: 180,
+      render: (_, player) => (
+        <div className="text-sm">
+          <div className="flex items-center text-gray-900">
+            <MapPin className="w-4 h-4 mr-1" />
+            {player.district}
+          </div>
+          <div className="text-gray-500">{player.panchayat}</div>
+        </div>
+      )
+    },
+    {
+      key: 'position',
+      header: 'Position',
+      accessor: 'position',
+      sortable: true,
+      minWidth: 120,
+      render: (position) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          position === 'player' 
+            ? 'bg-blue-100 text-blue-800' 
+            : 'bg-gray-100 text-gray-800'
+        }`}>
+          {position === 'player' ? 'Main' : 'Substitute'}
+        </span>
+      )
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      accessor: 'verificationStatus',
+      sortable: true,
+      minWidth: 120,
+      render: (status) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          status === 'approved' 
+            ? 'bg-green-100 text-green-800' 
+            : status === 'pending'
+            ? 'bg-yellow-100 text-yellow-800'
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {status === 'approved' ? (
+            <>
+              <CheckCircle className="w-3 h-3 mr-1" />
+              Verified
+            </>
+          ) : status === 'pending' ? (
+            <>
+              <Clock className="w-3 h-3 mr-1" />
+              Pending
+            </>
+          ) : (
+            <>
+              <AlertCircle className="w-3 h-3 mr-1" />
+              Rejected
+            </>
+          )}
+        </span>
+      )
+    }
+  ], []);
+
+  const handleRowClick = (player: TeamPlayerRow) => {
+    setSelectedPlayer(player);
+    setShowViewModal(true);
   };
 
-  const players = teamData?.teamPlayers || [];
-  const sportConfig = teamData?.sport || { mainPlayersCount: 0, maxSubstitutes: 0 };
-  const totalSlotsNeeded = sportConfig.mainPlayersCount + sportConfig.maxSubstitutes;
-  const mainPlayersCount = players.filter(p => p.position === 'main').length;
-  const substitutesCount = players.filter(p => p.position === 'substitute').length;
-
-  const isReadOnly = teamData?.status && teamData.status !== 'draft';
-
-  const getPlayerStatusColor = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return 'text-[#3A7F3F] bg-green-50';
-    if (player.verificationStatus === 'rejected') return 'text-red-600 bg-red-50';
-    if (player.users?.profileComplete) return 'text-[#C79016] bg-yellow-50';
-    return 'text-gray-600 bg-gray-50';
-  };
-
-  const getPlayerStatusIcon = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return <CheckCircle className="w-4 h-4" />;
-    if (player.verificationStatus === 'rejected') return <X className="w-4 h-4" />;
-    if (player.users?.profileComplete) return <Clock className="w-4 h-4" />;
-    return <AlertCircle className="w-4 h-4" />;
-  };
-
-  const getPlayerStatusText = (player: TeamPlayer) => {
-    if (player.verificationStatus === 'verified') return 'Verified';
-    if (player.verificationStatus === 'rejected') return 'Rejected';
-    if (player.users?.profileComplete) return 'Pending Review';
-    return 'Docs Incomplete';
-  };
-
-  const filteredPlayers = players.filter(player =>
-    `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    player.phone.includes(searchTerm)
-  );
-
-  if (loading) {
-    return (
-      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
-      </div>
-    );
+  if (authLoading || teamLoading) {
+    return <PageLoader message="Loading team data..." />;
   }
 
-  if (error) {
+  if (teamError || !teamData) {
     return (
-      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
-          <p className="text-gray-600 mb-4">{error.message}</p>
-          <button
-            onClick={() => router.push(`/${lang}/captain/dashboard`)}
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">No Team Found</h1>
+          <p className="text-gray-600 mb-4">You don't have a team yet. Create one to get started.</p>
+          <Link 
+            href={`/${lang}/register/team`}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!teamData) {
-    return (
-      <div className="lg:min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center mb-8">
-            <Image
-              src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg"
-              alt="Isha Logo"
-              width={80}
-              height={80}
-              className="mx-auto"
-            />
-          </div>
-          <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">My Team</h1>
-          <p className="text-gray-600">Manage your team and players</p>
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center mt-8">
-            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Team Found</h3>
-            <p className="text-gray-600 mb-6">You don&apos;t have a team registered yet.</p>
-            <button
-              onClick={() => router.push(`/${lang}/captain/dashboard`)}
-              className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
-            >
-              Back to Dashboard
-            </button>
-          </div>
+            Create Team
+          </Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="lg:min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center mb-8">
-          <Image
-            src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg"
-            alt="Isha Logo"
-            width={80}
-            height={80}
-            className="mx-auto"
-          />
-          <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">{teamData.name}</h1>
-          <p className="text-gray-600">Manage your team and players for {teamData.sport.name}</p>
-        </div>
-
-        {isReadOnly && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center">
-              <AlertCircle className="w-5 h-5 text-blue-600 mr-3" />
-              <div>
-                <h3 className="text-sm font-medium text-blue-800">Team Submitted for Verification</h3>
-                <p className="text-sm text-blue-700 mt-1">
-                  This team is read-only. Status: <span className="font-semibold">{teamData.status}</span>
-                </p>
-              </div>
-            </div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{teamData.name}</h1>
+            <p className="text-gray-600 mt-2">Manage your team players and invitations</p>
           </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-lg p-6 shadow-lg">
-                <p className="text-gray-600 text-sm">Total Players</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{players.length}/{totalSlotsNeeded}</p>
-            </div>
-            <div className="bg-white rounded-lg p-6 shadow-lg">
-                <p className="text-gray-600 text-sm">Main Players</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{mainPlayersCount}/{sportConfig.mainPlayersCount}</p>
-            </div>
-            <div className="bg-white rounded-lg p-6 shadow-lg">
-                <p className="text-gray-600 text-sm">Substitutes</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{substitutesCount}/{sportConfig.maxSubstitutes}</p>
-            </div>
-            <div className="bg-white rounded-lg p-6 shadow-lg">
-                <p className="text-gray-600 text-sm">Profiles Complete</p>
-                <p className="text-2xl font-bold text-[#4A2F1D]">{players.filter(p => p.users?.profileComplete).length}</p>
-            </div>
-        </div>
-
-        <div className="flex justify-end items-center gap-4 mb-6">
-            <div className="relative">
-                <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                    type="text"
-                    placeholder="Search players..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
-                />
-            </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
-          <div className="px-4 sm:px-6 py-4 bg-[#4A2F1D] text-white">
-            <h2 className="text-lg sm:text-xl font-bold">Team Players</h2>
-          </div>
-          {filteredPlayers.length === 0 ? (
-            <div className="p-12 text-center">
-              <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600">No Players Added Yet</h3>
-               <button
-                 onClick={() => router.push(`/${lang}/captain/teams/${teamData.id}/players/invite`)}
-                 className="mt-4 bg-[#F28C38] hover:bg-[#E67A26] text-white px-6 py-3 rounded-lg font-semibold flex items-center space-x-2 transition-colors mx-auto"
-                >
-                 <UserPlus className="w-5 h-5" />
-                 <span>Add First Player</span>
-                </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredPlayers.map((player) => (
-                    <tr key={player.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-semibold text-[#4A2F1D]">{player.firstName} {player.lastName}</div>
-                        <div className="text-sm text-gray-500">{player.phone}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${player.position === 'main' ? 'bg-[#3A7F3F] text-white' : 'bg-[#C79016] text-white'}`}>
-                          {player.position}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{player.age}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex space-x-1">
-                          <div className={`w-4 h-4 rounded-full ${player.users?.profileImages?.profilePhotoPath ? 'bg-green-500' : 'bg-gray-300'}`} title="Profile"></div>
-                          <div className={`w-4 h-4 rounded-full ${player.users?.profileImages?.aadhaarFrontPath ? 'bg-green-500' : 'bg-gray-300'}`} title="Aadhaar Front"></div>
-                          <div className={`w-4 h-4 rounded-full ${player.users?.profileImages?.aadhaarBackPath ? 'bg-green-500' : 'bg-gray-300'}`} title="Aadhaar Back"></div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className={`inline-flex items-center space-x-1 px-2 py-1 text-xs font-semibold rounded-full ${getPlayerStatusColor(player)}`}>
-                          {getPlayerStatusIcon(player)}
-                          <span>{getPlayerStatusText(player)}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                         <div className="flex space-x-2">
-                            <button onClick={() => setSelectedPlayer(player)} className="text-[#F28C38] hover:text-[#E67A26]"><Eye className="w-5 h-5" /></button>
-                            {player.userId !== teamData.captain_id && !isReadOnly && (
-                                <button onClick={() => handleRemovePlayer(player.id)} className="text-red-600 hover:text-red-800"><Trash2 className="w-5 h-5" /></button>
-                            )}
-                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <Link
+            href={`/${lang}/captain/teams/${teamData.id}/players/invite`}
+            className="bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors flex items-center"
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Invite Players
+          </Link>
         </div>
       </div>
 
-      {/* Player Detail Modal */}
-      {selectedPlayer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-xl font-bold text-[#4A2F1D]">{selectedPlayer.firstName} {selectedPlayer.lastName}</h2>
-                  <p className="text-gray-600">{selectedPlayer.phone}</p>
-                </div>
-                <button onClick={() => setSelectedPlayer(null)} className="text-gray-500 hover:text-gray-700">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div>
-                        <h3 className="text-lg font-bold text-[#4A2F1D] mb-4">Player Information</h3>
-                        <div className="space-y-3">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-sm text-gray-600">Age</label><p className="font-semibold">{selectedPlayer.age} years</p></div>
-                                <div><label className="text-sm text-gray-600">Position</label><p className="font-semibold capitalize">{selectedPlayer.position}</p></div>
-                            </div>
-                            <div><label className="text-sm text-gray-600">WhatsApp Number</label><p className="font-semibold">{selectedPlayer.whatsapp_number}</p></div>
-                            <div><label className="text-sm text-gray-600">Panchayat</label><p className="font-semibold">{selectedPlayer.panchayat}</p></div>
-                            <div><label className="text-sm text-gray-600">District</label><p className="font-semibold">{selectedPlayer.district}</p></div>
-                        </div>
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-[#4A2F1D] mb-4">Identity Documents</h3>
-                        <p className="text-sm text-gray-600">Manage player documents on the <button onClick={() => router.push(`/${lang}/captain/teams/${teamData.id}/players/invite`)} className="text-blue-600 hover:underline">Add/Manage Players</button> page.</p>
-                    </div>
-                </div>
-                <div className="mt-8 flex justify-end space-x-4">
-                    <button onClick={() => setSelectedPlayer(null)} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Close</button>
-                    {selectedPlayer.userId !== teamData.captain_id && !isReadOnly && (
-                        <button onClick={() => handleRemovePlayer(selectedPlayer.id)} className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Remove Player</button>
-                    )}
-                </div>
-            </div>
-          </div>
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <SingleStatCard
+            title="Total Players"
+            value={`${stats.totalPlayers}/${stats.maxPlayers}`}
+            icon={Users}
+            color={stats.isComplete ? 'success' : 'warning'}
+            trend={stats.isComplete ? 'Complete' : 'Incomplete'}
+          />
+          
+          <SingleStatCard
+            title="Verified Players"
+            value={stats.verifiedPlayers}
+            icon={CheckCircle}
+            color="success"
+          />
+          
+          <SingleStatCard
+            title="Pending Verification"
+            value={stats.pendingPlayers}
+            icon={Clock}
+            color="warning"
+          />
+          
+          <SingleStatCard
+            title="Team Status"
+            value={teamData.status}
+            icon={teamData.status === 'active' ? CheckCircle : Clock}
+            color={teamData.status === 'active' ? 'success' : 'warning'}
+          />
         </div>
       )}
 
-      <AlertModal isOpen={alertState.isOpen} onClose={hideAlert} message={alertState.message} type={alertState.type} title={alertState.title} />
+      {/* Players Table */}
+      <AdvancedTable<TeamPlayerRow>
+        data={players}
+        columns={columns}
+        loading={playersLoading}
+
+        searchable={true}
+        searchPlaceholder="Search players by name, phone..."
+
+        sortable={true}
+        defaultSort={[{ key: 'firstName', direction: 'asc' }]}
+
+        pagination={{ enabled: true }}
+
+        selectable={true}
+        selectedRows={selectedPlayers}
+        onSelectionChange={setSelectedPlayers}
+        onRowClick={handleRowClick}
+        keyExtractor={(player) => player.id}
+
+        emptyState={{
+          icon: Users,
+          title: 'No players found',
+          description: 'Your team doesn\'t have any players yet.',
+          action: {
+            label: 'Invite Players',
+            onClick: () => router.push(`/${lang}/captain/teams/${teamData.id}/players/invite`)
+          }
+        }}
+      />
+
+      {/* View Player Modal */}
+      {selectedPlayer && (
+        <EnhancedModal
+          isOpen={showViewModal}
+          onClose={() => {
+            setShowViewModal(false);
+            setSelectedPlayer(null);
+          }}
+          title="Player Details"
+          subtitle={`${selectedPlayer.firstName} ${selectedPlayer.lastName}`}
+          size="md"
+        >
+          <div className="space-y-6">
+            {/* Personal Information */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Personal Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Name</label>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedPlayer.firstName} {selectedPlayer.lastName}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Age</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.age}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Gender</label>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedPlayer.gender === 'M' ? 'Male' : selectedPlayer.gender === 'F' ? 'Female' : 'Other'}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Position</label>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedPlayer.position === 'player' ? 'Main Player' : 'Substitute'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Contact Information</h3>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.phone}</p>
+                </div>
+                {selectedPlayer.whatsappNumber && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">WhatsApp</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedPlayer.whatsappNumber}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Location Information */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Location</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">District</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.district}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">State</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.state}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Taluk</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.taluk}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Panchayat</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.panchayat}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Verification Status */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Verification Status</h3>
+              <div className="flex items-center">
+                {selectedPlayer.verificationStatus === 'approved' ? (
+                  <div className="flex items-center text-green-600">
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    <span className="font-medium">Verified</span>
+                  </div>
+                ) : selectedPlayer.verificationStatus === 'pending' ? (
+                  <div className="flex items-center text-yellow-600">
+                    <Clock className="w-5 h-5 mr-2" />
+                    <span className="font-medium">Pending Verification</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-red-600">
+                    <AlertCircle className="w-5 h-5 mr-2" />
+                    <span className="font-medium">Rejected</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </EnhancedModal>
+      )}
     </div>
   );
 }

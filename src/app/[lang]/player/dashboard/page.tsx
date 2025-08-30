@@ -1,329 +1,274 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
-import { api } from "@/server/trpc/react";
-import { useTranslation } from "@/lib/utils/i18n";
-import Image from "next/image";
-import { PageLoader } from "@/components/ui/loaders";
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { api } from '@/server/trpc/react';
 import { 
   Users, 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
-  User,
-  Trophy,
+  Trophy, 
   MapPin,
-  Phone,
   Calendar,
-  Edit,
-  FileText,
-  Upload,
+  Clock,
+  CheckCircle,
+  AlertCircle,
   Eye,
-  UserCheck,
   Loader2,
-  UserRound
-} from "lucide-react";
-
-interface TeamMembership {
-  teamId: string;
-  name: string;
-  sportName: string;
-  sportId: string;
-  captainProfile: {
-    name: string;
-    phone: string;
-    userId: string;
-  };
-  position: string;
-  status: string;
-  verificationStatus: string;
-  joinedAt: string; // Changed to string
-  panchayat: string;
-  district: string;
-  state: string;
-  genderCategory: string;
-  maxPlayers: number;
-  currentPlayers: number;
-  assignedVenue?: {
-    venueId: string;
-    venueName: string;
-    assignmentLevel: string;
-  };
-  checkedIn?: boolean;
-  checkedInAt?: string; // Changed to string
-  checkedInVenue?: string;
-  matchDayStatus?: string;
-}
-
-interface PlayerStats {
-  totalTeams: number;
-  verifiedTeams: number;
-  pendingTeams: number;
-  documentsComplete: boolean;
-}
+  Target,
+  UserCheck,
+  Activity,
+  Award
+} from 'lucide-react';
+import Link from 'next/link';
+import { SingleStatCard } from '@/components/ui';
 
 export default function PlayerDashboard() {
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
-  const { t } = useTranslation();
 
-  // Use tRPC to fetch player dashboard data
-  const { data, isLoading, error } = api.players.getMyDashboardData.useQuery(undefined, {
-    enabled: typeof user === 'object' && user !== null && typeof user.id === 'string' && user.id.length > 0,
-  });
+  // Fetch player's teams
+  const { 
+    data: teamsData, 
+    isLoading: teamsLoading, 
+    error: teamsError 
+  } = api.teams.players.getPlayerTeams.useQuery(
+    { playerId: user?.id || '' },
+    { enabled: !!user && user.role === 'player' }
+  );
 
-  const teams = data?.teams || [];
-  const stats = data?.stats || {
-    totalTeams: 0,
-    verifiedTeams: 0,
-    pendingTeams: 0,
-    documentsComplete: false,
-  };
+  // Fetch upcoming matches for player's teams
+  const { 
+    data: matchesData, 
+    isLoading: matchesLoading 
+  } = api.fixtures.getPlayerUpcomingMatches.useQuery(
+    { playerId: user?.id || '', limit: 5 },
+    { enabled: !!user && !!teamsData }
+  );
 
-  // The useEffect for redirection is removed from here.
-  // This logic should ideally be handled by a higher-order component or the AuthContext itself.
-
-  const handleViewTeam = (teamId: string) => {
-    router.push(`/${lang}/player/teams/${teamId}`);
-  };
-
-  const handleUpdateProfile = () => {
-    router.push(`/${lang}/profile/edit`);
-  };
-
-  const handleUploadDocuments = () => {
-    router.push(`/${lang}/profile`);
-  };
-
-  const getTeamDisplayStatus = (team: TeamMembership) => {
-    // Check if team is checked in (highest priority)
-    if (team.checkedIn || team.matchDayStatus === 'checked_in') {
-      return 'Checked In';
-    }
+  // Auth guard
+  useEffect(() => {
+    if (authLoading) return;
     
-    // Check match day status
-    if (team.matchDayStatus === 'verified') {
-      return 'Match Day Verified';
+    if (!user) {
+      router.push(`/${lang}/login`);
+      return;
     }
-    
-    // Fall back to regular status
-    switch (team.status) {
-      case 'draft': return 'Draft';
-      case 'submitted': return 'Submitted';
-      case 'verified': return 'Verified';
-      case 'rejected': return 'Rejected';
-      default: return team.status || 'Unknown';
-    }
-  };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return <Edit className="w-5 h-5 text-gray-600" />;
-      case 'submitted':
-      case 'pending':
-        return <Clock className="w-5 h-5 text-yellow-600" />;
-      case 'verified':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'rejected':
-        return <AlertCircle className="w-5 h-5 text-red-600" />;
-      default:
-        return <Clock className="w-5 h-5 text-gray-600" />;
+    if (user.role !== 'player') {
+      router.push(`/${lang}/dashboard`);
+      return;
     }
-  };
 
-  const getStatusColor = (team: TeamMembership) => {
-    // Check if team is checked in (highest priority)
-    if (team.checkedIn || team.matchDayStatus === 'checked_in') {
-      return 'bg-green-100 text-green-800';
+    if (!userProfile?.profileComplete) {
+      router.push(`/${lang}/profile/complete`);
+      return;
     }
-    
-    // Check match day status
-    if (team.matchDayStatus === 'verified') {
-      return 'bg-blue-100 text-blue-800';
-    }
-    
-    // Fall back to regular status
-    switch (team.status) {
-      case 'draft':
-        return 'bg-gray-100 text-gray-800';
-      case 'submitted':
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'verified':
-        return 'bg-green-100 text-green-800';
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  }, [user, userProfile, authLoading, router, lang]);
 
-  const getVerificationStatusColor = (status: string) => {
-    switch (status) {
-      case 'verified':
-      case 'approved':
-        return 'bg-green-100 text-green-800';
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-yellow-100 text-yellow-800';
-    }
-  };
+  // Calculate stats
+  const stats = useMemo(() => {
+    if (!teamsData) return null;
 
-  const getVerificationStatusText = (status: string) => {
-    switch (status) {
-      case 'verified':
-      case 'approved':
-        return 'Verified';
-      case 'rejected':
-        return 'Rejected';
-      case 'pending':
-        return 'Pending Review';
-      default:
-        return status || 'Pending';
-    }
-  };
+    const totalTeams = teamsData.teams?.length || 0;
+    const verifiedTeams = teamsData.teams?.filter(team => team.verificationStatus === 'approved').length || 0;
+    const pendingTeams = teamsData.teams?.filter(team => team.verificationStatus === 'pending').length || 0;
+    const upcomingMatches = matchesData?.length || 0;
 
-  if (authLoading || isLoading) {
+    return {
+      totalTeams,
+      verifiedTeams,
+      pendingTeams,
+      upcomingMatches
+    };
+  }, [teamsData, matchesData]);
+
+  if (authLoading || teamsLoading) {
     return (
-      <PageLoader 
-        title={t('loading_player_dashboard', 'Loading Player Dashboard...')}
-        variant="brand"
-        size="lg"
-      />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-2" />
+          <p className="text-gray-600">Loading Player Dashboard...</p>
+        </div>
+      </div>
     );
   }
 
-  if (error) {
+  if (teamsError || !teamsData || !teamsData.teams?.length) {
     return (
-      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('error', 'Error')}</h1>
-          <p className="text-gray-600 mb-4">{error.message}</p>
-          <button 
-            onClick={() => router.push(`/${lang}/player/dashboard`)}
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">No Teams Found</h1>
+          <p className="text-gray-600 mb-4">You're not part of any team yet. Wait for a captain to invite you.</p>
+          <Link 
+            href={`/${lang}/player/teams`}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
-            {t('retry', 'Retry')}
-          </button>
+            View Teams
+          </Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="lg:min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="mb-4">
-            <Image 
-              src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" 
-              alt="Isha Logo" 
-              width={80} 
-              height={80} 
-              className="mx-auto"
-            />
-          </div>
-          <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">
-            {t('player_dashboard', 'Player Dashboard')}
-          </h1>
-          <p className="text-gray-600">
-            {t('welcome_back_player', 'Welcome back, {name}! Track your team memberships and profile.').replace('{name}', userProfile?.firstName || 'Player')}
-          </p>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Player Dashboard</h1>
+          <p className="text-gray-600 mt-2">Track your teams and upcoming matches</p>
         </div>
 
-        {/* Alert for incomplete documents */}
-        {!stats.documentsComplete && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="text-sm font-medium text-yellow-800 font-fira">
-                  {t('complete_your_profile', 'Complete Your Profile')}
-                </h3>
-                <p className="text-sm text-yellow-700 mt-1 font-fira">
-                  {t('upload_documents_message', 'Upload your documents (Profile Photo, Aadhaar Front & Back) to participate in teams.')}
-                </p>
-              </div>
-              <button
-                onClick={handleUploadDocuments}
-                className="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <SingleStatCard
+            title="My Teams"
+            value={stats?.totalTeams || 0}
+            icon={Users}
+            color="primary"
+          />
+          
+          <SingleStatCard
+            title="Verified Teams"
+            value={stats?.verifiedTeams || 0}
+            icon={CheckCircle}
+            color="success"
+          />
+          
+          <SingleStatCard
+            title="Pending Verification"
+            value={stats?.pendingTeams || 0}
+            icon={Clock}
+            color="warning"
+          />
+          
+          <SingleStatCard
+            title="Upcoming Matches"
+            value={stats?.upcomingMatches || 0}
+            icon={Trophy}
+            color="info"
+          />
+        </div>
+
+        {/* Teams Overview */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* My Teams Card */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">My Teams</h2>
+              <Link
+                href={`/${lang}/player/teams`}
+                className="text-[#F28C38] hover:text-[#E67A26] font-medium"
               >
-                {t('upload_documents', 'Upload Documents')}
-              </button>
+                View All
+              </Link>
             </div>
-          </div>
-        )}
-
-        
-
-
-        {/* Team Specifications */}
-        {teams.length > 0 ? (
-          <div className="space-y-6">
-            {/* Team Header */}
-            <div className="bg-white rounded-lg border p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">{teams[0].name}</h2>
-                  <div className="flex flex-col sm:flex-row  sm:items-center gap-4 text-sm text-gray-600">
-                  <span className="flex capitalize items-center gap-1">
-                  {teams[0].genderCategory === 'F' ? <User className='w-4 h-4'/> : teams[0].genderCategory === 'M' ? <UserRound className='w-4 h-4'/> : <Users className='w-4 h-4'/>}
-                    {teams[0].genderCategory === 'F' ? t('women', 'Women') : teams[0].genderCategory === 'M' ? t('men', 'Men') : t('mixed', 'Mixed')}
-                  </span>
-                    
-                    <span className="flex  items-center gap-1">
-                      <Trophy className="w-4 h-4" />
-                      {teams[0].sportName}
+            
+            <div className="space-y-4">
+              {teamsData.teams.slice(0, 3).map((team: any) => (
+                <div key={team.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-200">
+                  <div className="flex items-center">
+                    <Trophy className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>
+                      <p className="font-medium text-gray-900">{team.team.name}</p>
+                      <p className="text-sm text-gray-500">{team.team.sport?.name}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      team.verificationStatus === 'approved' 
+                        ? 'bg-green-100 text-green-800' 
+                        : team.verificationStatus === 'pending'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {team.verificationStatus === 'approved' ? 'Verified' : 
+                       team.verificationStatus === 'pending' ? 'Pending' : 'Rejected'}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      {teams[0].panchayat}, {teams[0].district}
-                    </span>
-                    
                   </div>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  teams[0].status === 'verified' ? 'bg-green-100 text-green-800' :
-                  teams[0].status === 'submitted' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}>
-                  {teams[0].status.charAt(0).toUpperCase() + teams[0].status.slice(1)}
-                </div>
-              </div>
-            </div>
-
-            {/* Team Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-blue-600">{teams[0].position === 'main' ? 'Main' : 'Substitute'}</div>
-                <div className="text-sm text-gray-600">{t('your_position', 'Your Position')}</div>
-              </div>
-              <div className="bg-white rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-purple-600">{teams[0].maxPlayers}</div>
-                <div className="text-sm text-gray-600">{t('main_players', 'Main Players')}</div>
-              </div>
-              <div className="bg-white rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-orange-600">{Math.max(0, teams[0].currentPlayers - teams[0].maxPlayers)}</div>
-                <div className="text-sm text-gray-600">{t('substitutes', 'Substitutes')}</div>
-              </div>
-              <div className="bg-white rounded-lg border p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">📅</div>
-                <div className="text-sm text-gray-600">{t('fixtures_soon', 'Fixtures Soon')}</div>
-              </div>
+              ))}
             </div>
           </div>
-        ) : (
-          <div className="bg-white rounded-lg border p-8 text-center">
-            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('no_team_found', 'No Team Found')}</h3>
-            <p className="text-gray-600">{t('no_team_registered_message', "You don&apos;t have any team registered yet.")}</p>
+
+          {/* Quick Actions Card */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+            
+            <div className="space-y-3">
+              <Link
+                href={`/${lang}/player/teams`}
+                className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <Users className="w-5 h-5 text-[#F28C38] mr-3" />
+                <div>
+                  <p className="font-medium text-gray-900">View My Teams</p>
+                  <p className="text-sm text-gray-500">See all teams you're part of</p>
+                </div>
+              </Link>
+              
+              <Link
+                href={`/${lang}/player/fixtures`}
+                className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <Calendar className="w-5 h-5 text-[#F28C38] mr-3" />
+                <div>
+                  <p className="font-medium text-gray-900">View Fixtures</p>
+                  <p className="text-sm text-gray-500">Check upcoming matches</p>
+                </div>
+              </Link>
+              
+              <Link
+                href={`/${lang}/player/matches`}
+                className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <Trophy className="w-5 h-5 text-[#F28C38] mr-3" />
+                <div>
+                  <p className="font-medium text-gray-900">Match Results</p>
+                  <p className="text-sm text-gray-500">View past results</p>
+                </div>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Upcoming Matches */}
+        {matchesData && matchesData.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Upcoming Matches</h2>
+              <Link
+                href={`/${lang}/player/fixtures`}
+                className="text-[#F28C38] hover:text-[#E67A26] font-medium"
+              >
+                View All
+              </Link>
+            </div>
+            
+            <div className="space-y-3">
+              {matchesData.slice(0, 3).map((match: any) => (
+                <div key={match.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-200">
+                  <div className="flex items-center">
+                    <Calendar className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {match.team1?.name} vs {match.team2?.name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(match.scheduledAt).toLocaleDateString()} at{' '}
+                        {new Date(match.scheduledAt).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-gray-900">{match.venue?.name}</p>
+                    <p className="text-sm text-gray-500">{match.status}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -504,6 +504,7 @@ model User {
   firstName           String? @db.VarChar(100) @map("first_name")
   lastName            String? @db.VarChar(100) @map("last_name")
   dateOfBirth         DateTime? @db.Date @map("date_of_birth")
+  age                 Int?
   gender              Gender?
   whatsappNumber      String? @db.VarChar(20) @map("whatsapp_number")
   instagramHandle     String? @db.VarChar(100) @map("instagram_handle")

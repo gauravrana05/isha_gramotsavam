@@ -487,20 +487,20 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
     }
   }, [isEditMode, mapping]);
 
-  // Get division venues for the event - filtered by state
+  // Get division venues for the event - load when modal is open
   const { data: divisionVenuesData, isLoading: divisionVenuesLoading, error: divisionVenuesError } = api.admin.venues.getVenueLevelMappings.useQuery({
     eventId: selectedEvent,
     level: 'division',
   }, {
-    enabled: !!selectedEvent && (isEditMode),
+    enabled: !!selectedEvent && isOpen,
   });
 
-  // Get cluster venues for the event - filtered by state
+  // Get cluster venues for the event - load when modal is open  
   const { data: clusterVenuesData, isLoading: clusterVenuesLoading, error: clusterVenuesError } = api.admin.venues.getVenueLevelMappings.useQuery({
     eventId: selectedEvent,
     level: 'cluster',
   }, {
-    enabled: !!selectedEvent && (isEditMode),
+    enabled: !!selectedEvent && isOpen,
   });
 
   // Get states from location service
@@ -508,18 +508,42 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
 
   // Location options for cluster venues - filtered to exclude already mapped venues
   const availableClusterOptions = useMemo(() => {
-    if (!clusterVenuesData || !Array.isArray(clusterVenuesData) || !allMappingsData) return [];
+    console.log('🔍 Filtering cluster venues:', {
+      clusterVenuesData: clusterVenuesData?.length,
+      allMappingsData: allMappingsData?.length,
+      selectedState,
+      isEditMode,
+      selectedClusterVenues: selectedClusterVenues.length,
+      clusterVenuesLoading
+    });
+    
+    // Wait for data to load
+    if (clusterVenuesLoading || !clusterVenuesData || !Array.isArray(clusterVenuesData)) {
+      console.log('⏳ Cluster venues still loading or empty');
+      return [];
+    }
+    
+    if (!allMappingsData) {
+      console.log('⏳ All mappings data not available yet');
+      return [];
+    }
     
     // Get already used cluster venue IDs for current event (excluding current mapping)
     const usedClusterIds = allMappingsData
       .filter(m => m.divisionVenueMappingId !== mapping.divisionVenueMappingId) // Exclude current mapping group
       .map(m => m.clusterVenueMappingId);
     
-    const availableVenues = clusterVenuesData.filter(venueMapping => {
+    let availableVenues = clusterVenuesData.filter(venueMapping => {
       const venue = venueMapping.venue;
       const isVenueUsed = usedClusterIds.includes(venueMapping.id);
-      const stateMatch = venue.state === selectedState;
       
+      // In edit mode, don't filter by state initially - let all venues load first
+      if (isEditMode) {
+        return !isVenueUsed;
+      }
+      
+      // In create mode, filter by selected state
+      const stateMatch = selectedState ? venue.state === selectedState : true;
       return !isVenueUsed && stateMatch;
     });
 
@@ -533,26 +557,52 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
       });
     }
 
-    return availableVenues.map(venue => ({
+    const options = availableVenues.map(venue => ({
       label: `${venue.venue.name} - ${venue.venue.district}`,
       value: venue.id
     }));
-  }, [clusterVenuesData, allMappingsData, mapping.divisionVenueMappingId, isEditMode, selectedClusterVenues, selectedState]);
+    
+    console.log('✅ Cluster venue options result:', options.length);
+    return options;
+  }, [clusterVenuesData, clusterVenuesLoading, allMappingsData, mapping.divisionVenueMappingId, isEditMode, selectedClusterVenues, selectedState]);
 
   // Filtered division venues based on availability
   const filteredDivisionVenues = useMemo(() => {
-    if (!divisionVenuesData || !Array.isArray(divisionVenuesData) || !allMappingsData) return [];
+    console.log('🔍 Filtering division venues:', {
+      divisionVenuesData: divisionVenuesData?.length,
+      allMappingsData: allMappingsData?.length,
+      selectedState,
+      isEditMode,
+      divisionVenuesLoading
+    });
+    
+    // Wait for data to load
+    if (divisionVenuesLoading || !divisionVenuesData || !Array.isArray(divisionVenuesData)) {
+      console.log('⏳ Division venues still loading or empty');
+      return [];
+    }
+    
+    if (!allMappingsData) {
+      console.log('⏳ All mappings data not available yet');
+      return [];
+    }
     
     // Get already used division venue IDs for current event (excluding current mapping)
     const usedDivisionIds = allMappingsData
       .filter(m => m.id !== mapping.id) // Allow keeping same division venue when editing
       .map(m => m.divisionVenueMappingId);
     
-    const availableVenues = divisionVenuesData.filter(venueMapping => {
+    let availableVenues = divisionVenuesData.filter(venueMapping => {
       const venue = venueMapping.venue;
       const isVenueUsed = usedDivisionIds.includes(venueMapping.id);
-      const stateMatch = venue.state === selectedState;
       
+      // In edit mode, don't filter by state initially - let all venues load first
+      if (isEditMode) {
+        return !isVenueUsed;
+      }
+      
+      // In create mode, filter by selected state
+      const stateMatch = selectedState ? venue.state === selectedState : true;
       return !isVenueUsed && stateMatch;
     });
 
@@ -564,8 +614,9 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
       }
     }
 
+    console.log('✅ Filtered division venues result:', availableVenues.length);
     return availableVenues;
-  }, [divisionVenuesData, allMappingsData, mapping.id, isEditMode, selectedDivisionVenue, selectedState]);
+  }, [divisionVenuesData, divisionVenuesLoading, allMappingsData, mapping.id, isEditMode, selectedDivisionVenue, selectedState]);
 
   // Update mapping mutation using new API
   const updateMappingMutation = api.admin.mappings.updateClusterDivisionMapping.useMutation({
@@ -656,63 +707,60 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
       scrollableBody={true}
       className="sm:max-h-[90vh]"
       footer={
-        <div className="flex flex-col sm:flex-row sm:justify-between space-y-3 sm:space-y-0">
-          {/* Delete button - completely on the left on desktop */}
-          <div className="order-3 sm:order-1">
-            {isEditMode && (
+        isEditMode ? (
+          // Edit Mode: justify-between layout - Delete on left, Cancel+Update on right
+          <div className="flex flex-col sm:flex-row w-full sm:justify-between space-y-3 sm:space-y-0">
+            {/* Left: Delete button */}
+            <div>
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={deleteAllMappingsMutation.isPending}
-                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm"
+                className="w-full sm:w-auto px-4 py-2 bg-red-400 text-white rounded-lg hover:bg-red-600 transition-colors font-medium text-sm"
               >
                 Delete All Mappings
               </button>
-            )}
+            </div>
+            
+            {/* Right: Cancel + Update buttons */}
+            <div className="flex flex-row space-x-3 pl-4">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={updateMappingMutation.isPending || deleteAllMappingsMutation.isPending}
+                className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={updateMappingMutation.isPending}
+                className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm"
+              >
+                {updateMappingMutation.isPending ? 'Updating...' : 'Update Mapping'}
+              </button>
+            </div>
           </div>
-          
-          {/* Cancel and Update/Edit buttons - connected on desktop */}
-          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 order-1 sm:order-2">
-            {isEditMode ? (
-              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0">
-                {/* Mobile: Update first, Cancel second | Desktop: Cancel first, Update second */}
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={updateMappingMutation.isPending}
-                  className="w-full sm:w-auto px-4 py-2 bg-[#F28C38] text-white rounded-lg sm:rounded-l-none sm:border-l-0 hover:bg-[#E67A26] transition-colors font-medium text-sm order-1 sm:order-2"
-                >
-                  {updateMappingMutation.isPending ? 'Updating...' : 'Update Mapping'}
-                </button>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={updateMappingMutation.isPending || deleteAllMappingsMutation.isPending}
-                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm order-2 sm:order-1 rounded-lg sm:rounded-r-none"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-row space-x-3 sm:justify-end">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsEditMode(true)}
-                  className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm"
-                >
-                  Edit
-                </button>
-              </div>
-            )}
+        ) : (
+          // View Mode: Clean spaced buttons following guide
+          <div className="flex flex-row space-x-3 sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsEditMode(true)}
+              className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm"
+            >
+              Edit
+            </button>
           </div>
-        </div>
+        )
       }
     >
       <div className="space-y-6 sm:min-h-[50vh] scrollbar-none">

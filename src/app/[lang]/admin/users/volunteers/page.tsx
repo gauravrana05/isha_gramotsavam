@@ -59,13 +59,32 @@ interface AddVolunteerModalProps {
   isOpen: boolean;
   onClose: () => void;
   createMutation: any;
+  updateMutation?: any;
   selectedEvent: string;
+  editVolunteer?: AdminVolunteerRow | null;
 }
 
-function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: AddVolunteerModalProps) {
+function AddVolunteerModal({ isOpen, onClose, createMutation, updateMutation, selectedEvent, editVolunteer }: AddVolunteerModalProps) {
   const [sameAsWhatsapp, setSameAsWhatsapp] = useState(true);
   const [isVerificationVolunteer, setIsVerificationVolunteer] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<string>('none');
+
+  const isEditing = !!editVolunteer;
+
+  // Populate form data when editing
+  useEffect(() => {
+    if (editVolunteer && isOpen) {
+      setIsVerificationVolunteer(editVolunteer.role === 'verification_volunteer');
+      setSelectedVenue(editVolunteer.venueAssignmentId || 'none');
+      // WhatsApp same as phone is assumed for existing volunteers
+      setSameAsWhatsapp(true);
+    } else if (!isOpen) {
+      // Reset form when modal closes
+      setIsVerificationVolunteer(false);
+      setSelectedVenue('none');
+      setSameAsWhatsapp(true);
+    }
+  }, [editVolunteer, isOpen]);
 
   // Fetch venue level mappings
   const {
@@ -115,7 +134,16 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: A
         venueAssignmentId: selectedVenue && selectedVenue !== 'none' ? selectedVenue : undefined,
       };
 
-      await createMutation.mutateAsync(volunteerData);
+      if (isEditing && editVolunteer && updateMutation) {
+        // Update existing volunteer
+        await updateMutation.mutateAsync({
+          id: editVolunteer.id,
+          ...volunteerData
+        });
+      } else {
+        // Create new volunteer
+        await createMutation.mutateAsync(volunteerData);
+      }
       
       // Reset form
       if (e.currentTarget) {
@@ -133,8 +161,8 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: A
     <EnhancedModal
       isOpen={isOpen}
       onClose={onClose}
-      title="Add New Volunteer"
-      subtitle="Create a new volunteer account with role assignment"
+      title={isEditing ? "Edit Volunteer" : "Add New Volunteer"}
+      subtitle={isEditing ? "Update volunteer information and role assignment" : "Create a new volunteer account with role assignment"}
       size="lg"
       mobileFullScreen={true}
       scrollableBody={true}
@@ -143,7 +171,7 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: A
           <button
             type="button"
             onClick={onClose}
-            disabled={createMutation.isPending}
+            disabled={createMutation.isPending || (updateMutation?.isPending)}
             className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
           >
             Cancel
@@ -156,10 +184,12 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: A
                 form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
               }
             }}
-            disabled={createMutation.isPending}
+            disabled={createMutation.isPending || (updateMutation?.isPending)}
             className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm"
           >
-            {createMutation.isPending ? 'Adding...' : 'Add Volunteer'}
+            {(createMutation.isPending || updateMutation?.isPending) 
+              ? (isEditing ? 'Updating...' : 'Adding...') 
+              : (isEditing ? 'Update Volunteer' : 'Add Volunteer')}
           </button>
         </div>
       }
@@ -176,6 +206,7 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: A
                 <input 
                   name="firstName" 
                   required 
+                  defaultValue={editVolunteer?.firstName || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Enter first name"
                 />
@@ -186,6 +217,7 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: A
                 <input 
                   name="lastName" 
                   required 
+                  defaultValue={editVolunteer?.lastName || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Enter last name"
                 />
@@ -197,6 +229,7 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: A
               <select 
                 name="gender" 
                 required 
+                defaultValue={editVolunteer?.gender || ''}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Select Gender</option>
@@ -219,9 +252,14 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: A
                   type="tel"
                   required 
                   pattern="[+]?[0-9\s\-\(\)]*"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  defaultValue={editVolunteer?.phoneNumber || ''}
+                  disabled={isEditing} // Don't allow phone number changes when editing
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="+91 9876543210"
                 />
+                {isEditing && (
+                  <p className="mt-1 text-sm text-gray-500">Phone number cannot be changed</p>
+                )}
               </div>
               
               <div>
@@ -256,6 +294,7 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, selectedEvent }: A
                   name="email" 
                   type="email"
                   required 
+                  defaultValue={editVolunteer?.email || ''}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="volunteer@example.com"
                 />
@@ -411,6 +450,20 @@ export default function VolunteersManagement() {
     onError: (error) => {
       console.error('Create volunteer error:', error);
       addNotification(error.message || 'Failed to create volunteer. Please try again.', 'error');
+    },
+  });
+
+  // tRPC mutation for updating volunteers
+  const updateVolunteerMutation = api.admin.users.updateUser.useMutation({
+    onSuccess: (data) => {
+      refetchVolunteers();
+      addNotification('Volunteer updated successfully!', 'success');
+      setIsAddModalOpen(false);
+      setSelectedVolunteer(null);
+    },
+    onError: (error) => {
+      console.error('Update volunteer error:', error);
+      addNotification(error.message || 'Failed to update volunteer. Please try again.', 'error');
     },
   });
 
@@ -665,6 +718,18 @@ export default function VolunteersManagement() {
         keyExtractor={(v) => v.id}
         stickyHeader={true}
 
+        actions={[
+          {
+            label: 'Edit',
+            icon: Edit,
+            onClick: (volunteer) => {
+              setSelectedVolunteer(volunteer);
+              setIsAddModalOpen(true);
+            },
+            variant: 'secondary' as const
+          }
+        ]}
+
         persistState={false}
 
         headerActions={getHeaderActions()}
@@ -741,9 +806,14 @@ export default function VolunteersManagement() {
       {/* Add Volunteer Modal */}
       <AddVolunteerModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setSelectedVolunteer(null);
+        }}
         createMutation={createVolunteerMutation}
+        updateMutation={updateVolunteerMutation}
         selectedEvent={selectedEvent}
+        editVolunteer={selectedVolunteer}
       />
 
       {/* View Volunteer Modal */}

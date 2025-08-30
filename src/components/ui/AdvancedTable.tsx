@@ -757,13 +757,6 @@ export const AdvancedTable = <T,>({
             size={compact ? 'sm' : 'base'}
           />
         )}
-        
-        {/* Results info at bottom */}
-        <div className="flex justify-between items-center py-3 px-4 border-t border-gray-200 bg-gray-50 mt-0">
-          <div className="text-sm text-gray-500">
-            Showing {Math.min((state.page - 1) * state.pageSize + 1, totalItems)}-{Math.min(state.page * state.pageSize, totalItems)} of {totalItems} results
-          </div>
-        </div>
       </div>
       
       {/* Save View Modal - only render when save view functionality is enabled */}

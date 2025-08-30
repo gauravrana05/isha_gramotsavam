@@ -27,6 +27,21 @@ export const createTeamSchema = z.object({
   pincode: z.string().max(10).optional(),
 })
 
+// Public team registration schema (without captainId - will be set from auth context)
+export const publicCreateTeamSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().optional(),
+  eventId: uuidSchema.optional(),
+  sportId: uuidSchema,
+  captainName: z.string().min(1).max(200),
+  genderCategory: genderCategorySchema,
+  panchayat: z.string().min(1).max(100),
+  taluk: z.string().min(1).max(100),
+  district: z.string().min(1).max(100),
+  state: z.string().min(1).max(100),
+  pincode: z.string().max(10).optional(),
+})
+
 export const updateTeamSchema = z.object({
   id: uuidSchema,
   name: z.string().min(1).max(200).optional(),

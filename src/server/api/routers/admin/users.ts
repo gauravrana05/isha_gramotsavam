@@ -90,33 +90,33 @@ export const adminUsersRouter = createTRPCRouter({
             userVerifications: true,
             profileComplete: true,
             createdAt: true,
-            // volunteerAssignmentsAsVolunteer: {
-            //   where: {
-            //     event: {
-            //       status: {
-            //         in: ['active', 'registration_open', 'registration_closed']
-            //       }
-            //     },
-            //     deletedAt: null
-            //   },
-            //   select: {
-            //     id: true,
-            //     venueLevelMapping: {
-            //       select: {
-            //         id: true,
-            //         level: true,
-            //         venue: {
-            //           select: {
-            //             id: true,
-            //             name: true,
-            //             district: true,
-            //             taluk: true
-            //           }
-            //         }
-            //       }
-            //     }
-            //   }
-            // }
+            volunteerAssignmentsAsVolunteer: {
+              where: {
+                event: {
+                  status: {
+                    in: ['active', 'registration_open', 'registration_closed']
+                  }
+                },
+                deletedAt: null
+              },
+              select: {
+                id: true,
+                venueLevelMapping: {
+                  select: {
+                    id: true,
+                    level: true,
+                    venue: {
+                      select: {
+                        id: true,
+                        name: true,
+                        district: true,
+                        taluk: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           orderBy: {
             [input.sortBy]: input.sortOrder
@@ -131,8 +131,8 @@ export const adminUsersRouter = createTRPCRouter({
         success: true,
         users: users.map(user => {
           // Get the first venue assignment for ongoing events
-          // const venueAssignment = user.volunteerAssignmentsAsVolunteer?.[0];
-          // const venueData = venueAssignment?.venueLevelMapping;
+          const venueAssignment = user.volunteerAssignmentsAsVolunteer?.[0];
+          const venueData = venueAssignment?.venueLevelMapping;
           
           return {
             id: user.id,
@@ -148,10 +148,8 @@ export const adminUsersRouter = createTRPCRouter({
             state: user.state,
             isProfileComplete: user.profileComplete,
             createdAt: user.createdAt?.toISOString() || null,
-            // venueAssignment: venueData ? `${venueData.venue.name} - ${venueData.level}` : null,
-            // venueAssignmentId: venueAssignment?.id || null,
-            venueAssignment: null,
-            venueAssignmentId: null,
+            venueAssignment: venueData ? `${venueData.venue.name} - ${venueData.level}` : null,
+            venueAssignmentId: venueAssignment?.id || null,
           };
         }),
         pagination: {
@@ -289,6 +287,7 @@ export const adminUsersRouter = createTRPCRouter({
       gender: z.enum(['M', 'F', 'O']),
       role: z.enum(['general_volunteer', 'technical_volunteer', 'verification_volunteer']),
       whatsappNumber: z.string().min(10).max(20).optional(),
+      venueAssignmentId: z.string().uuid().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
@@ -320,9 +319,148 @@ export const adminUsersRouter = createTRPCRouter({
         }
       });
 
+      // Create venue assignment if provided
+      if (input.venueAssignmentId) {
+        // Get the ongoing event
+        const ongoingEvent = await db.event.findFirst({
+          where: {
+            status: {
+              in: ['active', 'registration_open', 'registration_closed']
+            }
+          },
+          select: { id: true }
+        });
+
+        if (ongoingEvent) {
+          // Verify venue mapping exists
+          const venueMapping = await db.venueLevelMapping.findUnique({
+            where: { id: input.venueAssignmentId },
+            include: { venue: true }
+          });
+
+          if (venueMapping && venueMapping.venue?.isActive) {
+            await db.volunteerAssignment.create({
+              data: {
+                eventId: ongoingEvent.id,
+                volunteerId: user.id,
+                venueLevelMappingId: input.venueAssignmentId,
+                volunteerType: input.role,
+                contactPhone: user.phone,
+                assignedBy: ctx.user.id,
+                status: 'assigned'
+              }
+            });
+          }
+        }
+      }
+
       return {
         success: true,
         message: 'Volunteer created successfully',
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+          email: user.email,
+          role: user.role,
+        }
+      };
+    }),
+
+  // Update User (for volunteers)
+  updateUser: protectedProcedure
+    .input(z.object({
+      id: z.string().uuid(),
+      firstName: z.string().min(1).max(100),
+      lastName: z.string().min(1).max(100),
+      email: z.string().email().optional(),
+      gender: z.enum(['M', 'F', 'O']),
+      role: z.enum(['general_volunteer', 'technical_volunteer', 'verification_volunteer']),
+      venueAssignmentId: z.string().uuid().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      // Update user
+      const user = await db.user.update({
+        where: { id: input.id },
+        data: {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          gender: input.gender,
+          role: input.role,
+        }
+      });
+
+      // Handle venue assignment changes
+      if (input.venueAssignmentId) {
+        // Get the ongoing event
+        const ongoingEvent = await db.event.findFirst({
+          where: {
+            status: {
+              in: ['active', 'registration_open', 'registration_closed']
+            }
+          },
+          select: { id: true }
+        });
+
+        if (ongoingEvent) {
+          // Remove existing assignments for this user and event
+          await db.volunteerAssignment.deleteMany({
+            where: {
+              volunteerId: input.id,
+              eventId: ongoingEvent.id
+            }
+          });
+
+          // Verify venue mapping exists
+          const venueMapping = await db.venueLevelMapping.findUnique({
+            where: { id: input.venueAssignmentId },
+            include: { venue: true }
+          });
+
+          if (venueMapping && venueMapping.venue?.isActive) {
+            await db.volunteerAssignment.create({
+              data: {
+                eventId: ongoingEvent.id,
+                volunteerId: input.id,
+                venueLevelMappingId: input.venueAssignmentId,
+                volunteerType: input.role,
+                contactPhone: user.phone,
+                assignedBy: ctx.user.id,
+                status: 'assigned'
+              }
+            });
+          }
+        }
+      } else {
+        // Remove venue assignment if none selected
+        const ongoingEvent = await db.event.findFirst({
+          where: {
+            status: {
+              in: ['active', 'registration_open', 'registration_closed']
+            }
+          },
+          select: { id: true }
+        });
+
+        if (ongoingEvent) {
+          await db.volunteerAssignment.deleteMany({
+            where: {
+              volunteerId: input.id,
+              eventId: ongoingEvent.id
+            }
+          });
+        }
+      }
+
+      return {
+        success: true,
+        message: 'Volunteer updated successfully',
         user: {
           id: user.id,
           firstName: user.firstName,

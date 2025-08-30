@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { db } from '@/lib/firebase/config';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { api } from '@/server/trpc/react';
 import Container from '@/components/ui/Container';
 import Button from '@/components/ui/Button';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
