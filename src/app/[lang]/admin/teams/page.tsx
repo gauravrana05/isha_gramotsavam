@@ -17,6 +17,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  AlertTriangle,
   User,
   Mail,
   Phone,
@@ -75,6 +76,8 @@ export default function AdminTeamsPage() {
 
   const { addNotification } = useNotification();
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [teamToDelete, setTeamToDelete] = useState<TeamData | null>(null);
   const [tableParams, setTableParams] = useState<TableParams>({
     search: '',
     sort: [],
@@ -87,7 +90,8 @@ export default function AdminTeamsPage() {
   const { 
     data: teamsData, 
     isLoading: teamsLoading, 
-    error: teamsError 
+    error: teamsError,
+    refetch: refetchTeams
   } = api.admin.getAdminTeams.useQuery(tableParams, {
     enabled: !!user && userProfile?.role === 'admin'
   });
@@ -188,10 +192,7 @@ export default function AdminTeamsPage() {
     return (
       <div className="flex items-center gap-2">
         <button
-          onClick={() => {
-            // Logic to delete team
-            console.log("Delete Team button clicked for:", team.name);
-          }}
+          onClick={() => handleDeleteTeam(team)}
           className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
         >
           <Trash2 className="w-4 h-4 mr-2" />
@@ -210,20 +211,82 @@ export default function AdminTeamsPage() {
   const formRef = useRef<HTMLFormElement>(null); // Add formRef
 
   const createTeamMutation = api.admin.createTeam.useMutation({
-    onSuccess: async () => { // Added async
-      await api.admin.getAdminTeams.invalidate(); // Invalidate teams query to refetch data
+    onSuccess: (data) => {
+      refetchTeams();
+      
+      // Display venue assignment status
+      if (data.venueAssignment) {
+        if (data.venueAssignment.venueId) {
+          // Successfully assigned to venue
+          addNotification(
+            `Team created and assigned to ${data.venueAssignment.venueName}!`, 
+            'success'
+          );
+        } else if (data.venueAssignment.requiresManualAssignment) {
+          // Requires manual assignment
+          addNotification(
+            'Team created successfully. Venue assignment requires manual selection.', 
+            'warning'
+          );
+        } else if (data.venueAssignment.failed) {
+          // Assignment failed
+          addNotification(
+            'Team created successfully, but venue assignment failed.', 
+            'warning'
+          );
+        }
+      } else {
+        // No venue assignment info (fallback)
+        addNotification('Team created successfully!', 'success');
+      }
+      
       setShowCreateTeamModal(false);
-      addNotification('Team created successfully!', 'success'); // Add notification
+      resetForm();
     },
     onError: (error) => {
       console.error("Error creating team:", error);
-      addNotification(error.message || 'Failed to create team', 'error'); // Add error notification
+      addNotification(error.message || 'Failed to create team', 'error');
     },
   });
 
-  const handleCreateTeam = () => { // Removed 'values' parameter
+  const deleteTeamMutation = api.admin.deleteTeam.useMutation({
+    onSuccess: () => {
+      refetchTeams();
+      addNotification('Team deleted successfully!', 'success');
+      setShowDeleteConfirm(false);
+      setTeamToDelete(null);
+      setSelectedTeams(new Set());
+    },
+    onError: (error) => {
+      console.error("Error deleting team:", error);
+      addNotification(error.message || 'Failed to delete team', 'error');
+    },
+  });
+
+  const handleCreateTeam = () => {
     if (formRef.current) {
-      formRef.current.requestSubmit(); // Trigger form submission
+      formRef.current.requestSubmit();
+    }
+  };
+
+  const resetForm = () => {
+    if (formRef.current) {
+      formRef.current.reset();
+    }
+  };
+
+  const handleDeleteTeam = (team: TeamData) => {
+    setTeamToDelete(team);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (teamToDelete) {
+      try {
+        await deleteTeamMutation.mutateAsync({ id: teamToDelete.id });
+      } catch (error) {
+        console.error('Delete confirmation error:', error);
+      }
     }
   };
 
@@ -465,10 +528,7 @@ export default function AdminTeamsPage() {
             description: 'No teams have been created yet.',
             action: {
               label: 'Create Team',
-              onClick: () => {
-                // Logic to open create team modal
-                console.log("Create Team button clicked from empty state");
-              }
+              onClick: () => setShowCreateTeamModal(true)
             }
           }}
           noSearchResultsEmptyState={noSearchResultsConfig}
@@ -476,71 +536,93 @@ export default function AdminTeamsPage() {
           persistState={false}
         />
       </div>
-       {/* Stats Cards */}
-       {stats && (
-        <StatsCard
-          stats={[
-            {
-              label: "Total Teams",
-              value: stats.total?.toString() || '0',
-              icon: Users,
-              color: "info", // Changed from "blue" to "info"
-            },
-            {
-              label: "Verified Teams",
-              value: stats.verificationStats?.fullyVerified?.toString() || '0',
-              icon: CheckCircle,
-              color: "success", // Changed from "green" to "success"
-            },
-            {
-              label: "Total Players",
-              value: stats.playerStats?.totalPlayers?.toString() || '0',
-              icon: User,
-              color: "secondary", // Changed from "purple" to "secondary" (using an existing color)
-            },
-            {
-              label: "Average Players/Team",
-              value: stats.playerStats?.averagePlayersPerTeam?.toFixed(1) || '0',
-              icon: Trophy,
-              color: "primary", // Changed from "orange" to "primary"
-            },
-          ]}
-          columns={4} // Assuming 4 columns as per the original grid
-        />
-      )}
 
       {/* Create Team Modal (EnhancedModal) */}
       <EnhancedModal
         isOpen={showCreateTeamModal}
-        onClose={() => setShowCreateTeamModal(false)}
+        onClose={() => {
+          setShowCreateTeamModal(false);
+          resetForm();
+        }}
         title="Create New Team"
         subtitle="Register a new team with captain details"
         size="lg"
         mobileFullScreen={true}
         scrollableBody={true}
         footer={
-          <div className="flex flex-row space-x-3 sm:justify-end">
+          <div className="flex flex-row space-x-2 sm:space-x-3 sm:justify-end px-4 sm:px-6 py-2 sm:py-0">
             <button
-              onClick={() => setShowCreateTeamModal(false)}
-              className="flex-1 sm:flex-initial border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
+              onClick={() => {
+                setShowCreateTeamModal(false);
+                resetForm();
+              }}
+              disabled={createTeamMutation.isPending}
+              className="flex-1 sm:flex-initial sm:px-4 px-3 py-1.5 sm:py-2 border border-gray-300 text-gray-700 rounded-md sm:rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
             >
               Cancel
             </button>
             <button
               onClick={handleCreateTeam}
               disabled={createTeamMutation.isPending}
-              className="flex-1 sm:flex-initial bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm"
+              className="flex-1 sm:flex-initial sm:px-4 px-3 py-1.5 sm:py-2 bg-[#F28C38] text-white rounded-md sm:rounded-lg hover:bg-[#E67A26] transition-colors font-medium text-sm"
             >
               {createTeamMutation.isPending ? 'Creating...' : 'Create Team'}
             </button>
           </div>
         }
       >
-        <TeamCreationForm
-          onSubmit={createTeamMutation.mutate} // Pass mutate directly
-          isLoading={createTeamMutation.isPending}
-          formRef={formRef} // Pass formRef
-        />
+        <div id="team-form">
+          <TeamCreationForm
+            onSubmit={createTeamMutation.mutate}
+            isLoading={createTeamMutation.isPending}
+            formRef={formRef}
+          />
+        </div>
+      </EnhancedModal>
+
+      {/* Delete Confirmation Modal */}
+      <EnhancedModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setTeamToDelete(null);
+        }}
+        title="Confirm Delete"
+        subtitle="This action cannot be undone"
+        size="sm"
+        footer={
+          <div className="flex flex-row space-x-3 sm:justify-end px-6 py-4">
+            <button
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                setTeamToDelete(null);
+              }}
+              disabled={deleteTeamMutation.isPending}
+              className="flex-1 sm:flex-initial sm:px-6 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDelete}
+              disabled={deleteTeamMutation.isPending}
+              className="flex-1 sm:flex-initial sm:px-6 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm"
+            >
+              {deleteTeamMutation.isPending ? 'Deleting...' : 'Delete Team'}
+            </button>
+          </div>
+        }
+      >
+        <div className="text-center py-4">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+            <AlertTriangle className="h-6 w-6 text-red-600" />
+          </div>
+          <p className="text-gray-600 mb-4">
+            Are you sure you want to delete <strong>"{teamToDelete?.name}"</strong>?
+          </p>
+          <p className="text-sm text-red-600">
+            This action cannot be undone and will permanently remove the team and all associated data.
+          </p>
+        </div>
       </EnhancedModal>
     </div>
   );

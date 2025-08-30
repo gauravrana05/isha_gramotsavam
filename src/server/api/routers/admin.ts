@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { db } from "@/lib/db";
+import { assignVenueToTeam } from "@/lib/services/venueAssignment";
 
 export const adminRouter = createTRPCRouter({
   // Dashboard Overview
@@ -577,11 +578,42 @@ export const adminRouter = createTRPCRouter({
           id: true,
           firstName: true,
           lastName: true,
-          dob: true,
+          dateOfBirth: true,
           gender: true,
           phone: true,
         },
       });
+
+      if (user) {
+        // Check if user is already in a team
+        const existingTeamMembership = await db.teamPlayer.findFirst({
+          where: {
+            userId: user.id,
+            team: {
+              deletedAt: null, // Only check active teams
+            },
+          },
+          include: {
+            team: {
+              select: {
+                name: true,
+                sport: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (existingTeamMembership) {
+          throw new TRPCError({ 
+            code: 'CONFLICT', 
+            message: `Player is already in team "${existingTeamMembership.team.name}" for ${existingTeamMembership.team.sport.name}` 
+          });
+        }
+      }
 
       return {
         success: true,
@@ -595,10 +627,11 @@ export const adminRouter = createTRPCRouter({
       description: z.string().optional(),
       sportId: z.string().uuid('Invalid sport ID'),
       genderCategory: z.enum(['men', 'women', 'mixed']),
+      pincode: z.string().length(6, 'Pincode must be 6 digits'),
       panchayat: z.string().min(1, 'Panchayat is required'),
       district: z.string().min(1, 'District is required'),
       state: z.string().min(1, 'State is required'),
-      taluk: z.string().optional(),
+      taluk: z.string().min(1, 'Taluk is required'),
       captainPhone: z.string().min(10, 'Captain phone number must be 10 digits').max(10, 'Captain phone number must be 10 digits'),
       captainFirstName: z.string().min(1, 'Captain first name is required'),
       captainLastName: z.string().min(1, 'Captain last name is required'),
@@ -627,41 +660,79 @@ export const adminRouter = createTRPCRouter({
         where: { phone: input.captainPhone },
       });
 
+      if (captainUser) {
+        // Check if captain is already in a team
+        const existingTeamMembership = await db.teamPlayer.findFirst({
+          where: {
+            userId: captainUser.id,
+            team: {
+              deletedAt: null,
+            },
+          },
+          include: {
+            team: {
+              select: {
+                name: true,
+                sport: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (existingTeamMembership) {
+          throw new TRPCError({ 
+            code: 'CONFLICT', 
+            message: `Captain is already in team "${existingTeamMembership.team.name}" for ${existingTeamMembership.team.sport.name}` 
+          });
+        }
+      }
+
       if (!captainUser) {
         captainUser = await db.user.create({
           data: {
             phone: input.captainPhone,
             firstName: input.captainFirstName,
             lastName: input.captainLastName,
-            dob: new Date(input.captainDob),
+            dateOfBirth: new Date(input.captainDob),
             gender: input.captainGender,
-            role: 'captain', // Assign captain role by default
+            role: 'captain',
             panchayat: input.panchayat,
             district: input.district,
             state: input.state,
-            profileComplete: true, // Mark as complete since all details are provided
+            taluk: input.taluk,
+            pincode: input.pincode,
+            profileComplete: true,
           },
         });
       } else {
-        // Update existing user if details are missing or different
-        const updateData: any = {};
-        if (!captainUser.firstName && input.captainFirstName) updateData.firstName = input.captainFirstName;
-        if (!captainUser.lastName && input.captainLastName) updateData.lastName = input.captainLastName;
-        if (!captainUser.dob && input.captainDob) updateData.dob = new Date(input.captainDob);
-        if (!captainUser.gender && input.captainGender) updateData.gender = input.captainGender;
-        if (captainUser.role !== 'captain') updateData.role = 'captain'; // Ensure captain role
-        if (!captainUser.panchayat && input.panchayat) updateData.panchayat = input.panchayat;
-        if (!captainUser.district && input.district) updateData.district = input.district;
-        if (!captainUser.state && input.state) updateData.state = input.state;
+        // Update existing user with team location and ensure captain role
+        const updateData: any = {
+          role: 'captain',
+          panchayat: input.panchayat,
+          district: input.district,
+          state: input.state,
+          taluk: input.taluk,
+          pincode: input.pincode,
+        };
+        
+        if (!captainUser.firstName) updateData.firstName = input.captainFirstName;
+        if (!captainUser.lastName) updateData.lastName = input.captainLastName;
+        if (!captainUser.dateOfBirth) updateData.dateOfBirth = new Date(input.captainDob);
+        if (!captainUser.gender) updateData.gender = input.captainGender;
         if (!captainUser.profileComplete) updateData.profileComplete = true;
 
-        if (Object.keys(updateData).length > 0) {
-          captainUser = await db.user.update({
-            where: { id: captainUser.id },
-            data: updateData,
-          });
-        }
+        captainUser = await db.user.update({
+          where: { id: captainUser.id },
+          data: updateData,
+        });
       }
+
+      // Get active event - for now using hardcoded ID, should be made dynamic
+      const activeEventId = 'clw000000000000000000000'; // TODO: Make dynamic based on active event
 
       // Create the team
       const team = await db.team.create({
@@ -674,18 +745,102 @@ export const adminRouter = createTRPCRouter({
           district: input.district,
           state: input.state,
           taluk: input.taluk,
-          captainUserId: captainUser.id,
+          pincode: input.pincode,
+          captainId: captainUser.id,
+          captainName: `${captainUser.firstName} ${captainUser.lastName}`,
           status: 'draft', // Initial status
           currentPlayers: 0,
           currentSubstitutes: 0,
-          eventId: 'clw000000000000000000000', // TODO: Make dynamic based on active event
+          eventId: activeEventId,
+        },
+      });
+
+      // Attempt venue assignment using 3-tier logic
+      let venueAssignmentResult;
+      try {
+        venueAssignmentResult = await assignVenueToTeam(
+          team.id,
+          {
+            panchayat: input.panchayat,
+            district: input.district,
+            state: input.state,
+            taluk: input.taluk,
+          },
+          activeEventId,
+          ctx.user.id
+        );
+      } catch (venueError) {
+        console.error('Venue assignment failed:', venueError);
+        venueAssignmentResult = {
+          success: false,
+          message: 'Team created but venue assignment failed'
+        };
+      }
+
+      // Prepare response with venue assignment info
+      const response: any = {
+        success: true,
+        teamId: team.id,
+        message: 'Team created successfully',
+      };
+
+      if (venueAssignmentResult.success && venueAssignmentResult.assignment) {
+        response.venueAssignment = {
+          venueId: venueAssignmentResult.assignment.venueId,
+          venueName: venueAssignmentResult.assignment.venueName,
+          assignmentMethod: venueAssignmentResult.assignment.assignmentMethod,
+          message: venueAssignmentResult.message
+        };
+        response.message = `Team created and assigned to ${venueAssignmentResult.assignment.venueName}`;
+      } else if (venueAssignmentResult.requiresManualAssignment) {
+        response.venueAssignment = {
+          requiresManualAssignment: true,
+          message: venueAssignmentResult.message
+        };
+        response.message = 'Team created successfully. Venue assignment requires manual selection.';
+      } else {
+        response.venueAssignment = {
+          failed: true,
+          message: venueAssignmentResult.message || 'Venue assignment failed'
+        };
+        response.message = 'Team created successfully, but venue assignment failed.';
+      }
+
+      return response;
+    }),
+
+  deleteTeam: protectedProcedure
+    .input(z.object({
+      id: z.string().uuid('Invalid team ID'),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      // Check if team exists
+      const team = await db.team.findUnique({
+        where: { id: input.id },
+        include: {
+          teamPlayers: true,
+        },
+      });
+
+      if (!team) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Team not found' });
+      }
+
+      // Soft delete the team by setting deletedAt
+      await db.team.update({
+        where: { id: input.id },
+        data: {
+          deletedAt: new Date(),
         },
       });
 
       return {
         success: true,
-        teamId: team.id,
-        message: 'Team created successfully',
+        message: 'Team deleted successfully',
       };
     }),
 

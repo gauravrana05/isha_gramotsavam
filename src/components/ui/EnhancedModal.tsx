@@ -106,8 +106,7 @@ const EnhancedModalBackdrop = ({
       'fixed inset-0 z-50 flex items-center justify-center',
       'bg-black bg-opacity-50 backdrop-blur-sm',
       'transition-all duration-300',
-      mobileFullScreen ? 'sm:p-4' : 'p-4',
-      'overflow-y-auto'
+      mobileFullScreen ? 'sm:p-4' : 'p-4'
     )}
     onClick={onClick}
   >
@@ -159,7 +158,7 @@ const EnhancedModalContent = React.forwardRef<HTMLDivElement, EnhancedModalConte
       <div
         ref={ref}
         className={cn(
-          'relative bg-white shadow-xl flex flex-col',
+          'relative bg-white shadow-xl flex flex-col rounded-lg',
           getContentClasses(),
           transition && 'transform transition-all duration-300 ease-in-out',
           transition && 'animate-in fade-in zoom-in-95',
@@ -194,8 +193,8 @@ const EnhancedModalHeader = ({
   }
 
   return (
-    <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
-      <div className="flex-1 min-w-0">
+    <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-start flex-shrink-0">
+      <div className="flex-1 min-w-0 pr-4">
         {title && (
           <h2 className="text-xl font-bold text-[#4A2F1D] truncate">
             {title}
@@ -208,14 +207,14 @@ const EnhancedModalHeader = ({
         )}
       </div>
       
-      <div className="flex items-center gap-2 ml-4">
+      <div className="flex items-center gap-2 flex-shrink-0">
         {headerActions}
         {showCloseButton && (
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors p-1"
+            className="text-gray-500 hover:text-gray-700 transition-colors p-2 hover:bg-gray-100 rounded-full"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         )}
       </div>
@@ -236,6 +235,7 @@ const EnhancedModalBody = ({
   <div 
     className={cn(
       scrollable ? 'flex-1 overflow-y-auto' : 'flex-1',
+      'p-4 sm:p-6',
       className
     )}
   >
@@ -256,6 +256,7 @@ const EnhancedModalFooter = ({
   return (
     <div className={cn(
       'p-4 sm:p-6 bg-white border-t border-gray-200 flex-shrink-0',
+      'flex flex-col sm:flex-row gap-3 sm:gap-4 sm:justify-end',
       className
     )}>
       {children}

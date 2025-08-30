@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { getAdminUsers } from '@/lib/actions/admin/optimizedUserQueries';
-import { addVolunteer } from '@/lib/actions/admin/volunteerManagement';
+// import { getAdminUsers } from '@/lib/actions/admin/optimizedUserQueries';
+// import { addVolunteer } from '@/lib/actions/admin/volunteerManagement';
 import {
   Plus, 
   UserCheck,

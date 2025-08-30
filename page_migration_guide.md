@@ -638,6 +638,62 @@ noSearchResultsEmptyState={{
 
 ## 🐛 Common Issues and Fixes
 
+### Double Scrollbar in Modal with Long Content
+
+**Problem**: Modal shows two scrollbars when content height exceeds screen height - one from the modal container and one from the modal body.
+
+**Symptoms**:
+- Two vertical scrollbars visible on web and mobile
+- Poor user experience with confusing scrolling behavior
+- Content appears to be "trapped" with nested scrolling
+
+**Root Cause**: Double `overflow-y-auto` - one on `EnhancedModalBackdrop` and another on `EnhancedModalBody` when `scrollableBody={true}` is used.
+
+**Solution**: Remove `overflow-y-auto` from `EnhancedModalBackdrop` component:
+
+```tsx
+// ❌ Wrong - causes double scrollbar with modal body
+const EnhancedModalBackdrop = ({ onClick, children, mobileFullScreen = false }) => (
+  <div className={cn(
+    'fixed inset-0 z-50 flex items-center justify-center',
+    'bg-black bg-opacity-50 backdrop-blur-sm',
+    'transition-all duration-300',
+    mobileFullScreen ? 'sm:p-4' : 'p-4',
+    'overflow-y-auto'  // ← Remove this - conflicts with body scrolling
+  )}>
+    {children}
+  </div>
+);
+
+// ✅ Correct - let modal body handle scrolling when scrollableBody={true}
+const EnhancedModalBackdrop = ({ onClick, children, mobileFullScreen = false }) => (
+  <div className={cn(
+    'fixed inset-0 z-50 flex items-center justify-center',
+    'bg-black bg-opacity-50 backdrop-blur-sm',
+    'transition-all duration-300',
+    mobileFullScreen ? 'sm:p-4' : 'p-4'  // ← No overflow-y-auto here
+  )}>
+    {children}
+  </div>
+);
+```
+
+**Why this works**: When `scrollableBody={true}`, the header and footer should be fixed, and only the modal body should scroll. The backdrop's `overflow-y-auto` was creating a second scrolling container.
+
+**Modal Structure for Long Content**:
+```tsx
+<EnhancedModal
+  scrollableBody={true}  // ← Header/footer fixed, body scrolls
+  size="lg"
+  mobileFullScreen={true}
+  // ... other props
+>
+  <div id="form-wrapper">  {/* ← Simple wrapper, no styling */}
+    <YourFormComponent />
+  </div>
+</EnhancedModal>
+```
+
 ### Filter Functionality Not Working
 
 **Problem**: Filters appear to work in the UI but `tableParams.filters` remains empty, causing no actual filtering to occur.
@@ -716,6 +772,43 @@ The form should only reset when the modal actually closes, allowing users to see
 ```
 
 The refresh functionality is automatically available when `onDataLoad` is provided, but the UI button is controlled separately for better UX control.
+
+### Mobile Footer Optimization
+
+**Problem**: Modal footer buttons are too large and take up excessive vertical space on mobile devices.
+
+**Symptoms**:
+- Footer feels bulky on mobile screens
+- Buttons appear disproportionately large
+- Too much vertical space consumed
+
+**Solution**: Use responsive padding and sizing for mobile optimization:
+
+```tsx
+// ✅ Optimized mobile footer
+<EnhancedModal
+  footer={
+    <div className="flex flex-row space-x-2 sm:space-x-3 sm:justify-end px-4 sm:px-6 py-2 sm:py-3">
+      <button
+        className="flex-1 sm:flex-initial sm:px-4 px-3 py-1.5 sm:py-2 border border-gray-300 text-gray-700 rounded-md sm:rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+      >
+        Cancel
+      </button>
+      <button
+        className="flex-1 sm:flex-initial sm:px-4 px-3 py-1.5 sm:py-2 bg-[#F28C38] text-white rounded-md sm:rounded-lg hover:bg-[#E67A26] transition-colors font-medium text-sm"
+      >
+        Submit
+      </button>
+    </div>
+  }
+>
+```
+
+**Key optimizations**:
+- **Container padding**: `py-2` mobile vs `py-3` desktop
+- **Button padding**: `py-1.5` mobile vs `py-2` desktop  
+- **Button spacing**: `space-x-2` mobile vs `space-x-3` desktop
+- **Border radius**: `rounded-md` mobile vs `rounded-lg` desktop
 
 ### Form Reset Issue with Inline defaultValues
 
