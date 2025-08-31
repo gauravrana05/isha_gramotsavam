@@ -11,6 +11,7 @@ import {
   type Column,
   type FilterField,
   type TableParams,
+  type BulkAction,
 } from '@/components/ui';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { 
@@ -71,6 +72,7 @@ interface CreateClusterDivisionMappingModalProps {
 
 function CreateClusterDivisionMappingModal({ isOpen, onClose, selectedEvent, onSuccess }: CreateClusterDivisionMappingModalProps) {
   const { addNotification } = useNotification();
+  const utils = api.useUtils();
   const [selectedState, setSelectedState] = useState<string>('');
   const [selectedDivisionVenue, setSelectedDivisionVenue] = useState<string>('');
   const [selectedClusterVenues, setSelectedClusterVenues] = useState<string[]>([]);
@@ -173,10 +175,14 @@ function CreateClusterDivisionMappingModal({ isOpen, onClose, selectedEvent, onS
     }));
   }, [clusterVenuesData, allMappingsData, selectedState]);
 
-  // Create mapping mutation - API exists but has wrong input schema
-  const createMappingMutation = api.admin.mappings.createClusterDivisionMapping.useMutation({
-    onSuccess: () => {
-      addNotification('Cluster-Division mappings created successfully', 'success');
+  // Create bulk mapping mutation
+  const createBulkMappingMutation = api.admin.mappings.createBulkClusterDivisionMappings.useMutation({
+    onSuccess: async (result) => {
+      addNotification(result.message, 'success');
+      // Invalidate and refetch the cluster-division mappings
+      await utils.admin.mappings.getClusterDivisionMappings.invalidate({
+        eventId: selectedEvent,
+      });
       onSuccess();
       onClose();
       // Reset form
@@ -185,11 +191,8 @@ function CreateClusterDivisionMappingModal({ isOpen, onClose, selectedEvent, onS
       setSelectedClusterVenues([]);
     },
     onError: (error) => {
-      console.error('Error creating mappings:', error);
-      console.error('Error details:', error.data);
-      console.error('Error message:', error.message);
-      const errorMessage = error.message || 'Failed to create mappings. Server-side API needs to accept state parameter.';
-      addNotification(errorMessage, 'error');
+      console.error('Error creating bulk mappings:', error);
+      addNotification(`Failed to create mappings: ${error.message}`, 'error');
     },
   });
 
@@ -234,30 +237,17 @@ function CreateClusterDivisionMappingModal({ isOpen, onClose, selectedEvent, onS
       return;
     }
 
-    console.log('Creating mappings with:', {
+    const payload = {
       eventId: selectedEvent,
       divisionVenueMappingId: selectedDivisionVenue,
       clusterVenueMappingIds: validClusterVenues,
       state: selectedState,
-    });
+    };
 
-    console.log('API exists but schema is wrong - trying without state parameter');
-    console.log('Selected cluster venues to map:', validClusterVenues);
-
-    // Create individual mappings - server now accepts state parameter
-    validClusterVenues.forEach(clusterVenueId => {
-      const payload = {
-        eventId: selectedEvent,
-        divisionVenueMappingId: selectedDivisionVenue,
-        clusterVenueMappingId: clusterVenueId,
-        state: selectedState, // Server now accepts this parameter
-      };
-      
-      console.log('Creating mapping for cluster venue:', clusterVenueId);
-      console.log('Payload with state:', payload);
-      
-      createMappingMutation.mutate(payload);
-    });
+    console.log('Creating bulk mappings with payload:', payload);
+    
+    // Create bulk mappings with single API call
+    createBulkMappingMutation.mutate(payload);
   };
 
   return (
@@ -276,7 +266,7 @@ function CreateClusterDivisionMappingModal({ isOpen, onClose, selectedEvent, onS
             type="button"
             onClick={onClose}
             className="flex-1 sm:flex-initial sm:px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium py-2 text-sm"
-            disabled={createMappingMutation.isPending}
+            disabled={createBulkMappingMutation.isPending}
           >
             Cancel
           </button>
@@ -284,9 +274,9 @@ function CreateClusterDivisionMappingModal({ isOpen, onClose, selectedEvent, onS
             type="button"
             onClick={handleSubmit}
             className="flex-1 sm:flex-initial sm:px-4 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors font-medium py-2 text-sm disabled:bg-gray-400"
-            disabled={createMappingMutation.isPending || !isFormValid}
+            disabled={createBulkMappingMutation.isPending || !isFormValid}
           >
-            {createMappingMutation.isPending ? 'Creating...' : `Create ${selectedClusterVenues.length} Mapping(s)`}
+            {createBulkMappingMutation.isPending ? 'Creating...' : `Create ${selectedClusterVenues.length} Mapping(s)`}
           </button>
         </div>
       }
@@ -430,6 +420,7 @@ interface EditClusterDivisionMappingModalProps {
 
 function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEvent, onSuccess }: EditClusterDivisionMappingModalProps) {
   const { addNotification } = useNotification();
+  const utils = api.useUtils();
   
   // Edit mode state - initialize with mapping data like location mapping
   const [isEditMode, setIsEditMode] = useState(false);
@@ -596,9 +587,13 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
 
   // Update mapping mutation using new API
   const updateMappingMutation = api.admin.mappings.updateClusterDivisionMapping.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       addNotification('Cluster-Division mapping updated successfully', 'success');
       setIsEditMode(false);
+      // Invalidate and refetch the cluster-division mappings
+      await utils.admin.mappings.getClusterDivisionMappings.invalidate({
+        eventId: selectedEvent,
+      });
       onSuccess();
     },
     onError: (error) => {
@@ -610,10 +605,15 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
 
   // Delete all related mappings mutation
   const deleteAllMappingsMutation = api.admin.mappings.deleteClusterDivisionMapping.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       addNotification('All related mappings deleted successfully', 'success');
       setShowDeleteConfirm(false);
+      // Invalidate and refetch the cluster-division mappings
+      await utils.admin.mappings.getClusterDivisionMappings.invalidate({
+        eventId: selectedEvent,
+      });
       onSuccess();
+      onClose();
     },
     onError: (error) => {
       console.error('Error deleting mappings:', error);
@@ -922,6 +922,7 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
   const router = useRouter();
   const { user, userProfile, loading: authLoading } = useAuth();
   const { addNotification } = useNotification();
+  const utils = api.useUtils();
 
   // State management
   const [selectedMappings, setSelectedMappings] = useState<Set<string | number>>(new Set());
@@ -1084,6 +1085,7 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
           data={mappingsData || []}
           columns={columns}
           loading={loading}
+          headerActions={headerActions}
           emptyState={{
             icon: MapPin,
             title: 'No mappings found',

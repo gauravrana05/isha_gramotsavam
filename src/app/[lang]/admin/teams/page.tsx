@@ -168,13 +168,35 @@ export default function AdminTeamsPage() {
     pageSize: 25,
   });
 
+  // Transform TableParams to match backend schema
+  const transformTableParams = (params: TableParams) => {
+    const statusFilter = params.filters.find(f => f.key === 'status');
+    const sportFilter = params.filters.find(f => f.key === 'sport');
+    const venueFilter = params.filters.find(f => f.key === 'venue');
+    const districtFilter = params.filters.find(f => f.key === 'district');
+
+    return {
+      searchQuery: params.search || undefined,
+      limit: params.pageSize,
+      offset: (params.page - 1) * params.pageSize,
+      sortBy: (params.sort[0]?.field as 'name' | 'createdAt' | 'status' | 'sport') || 'createdAt',
+      sortOrder: (params.sort[0]?.direction as 'asc' | 'desc') || 'desc',
+      status: (statusFilter?.value as 'all' | 'draft' | 'submitted' | 'verified' | 'rejected' | 'checked_in') || 'all',
+      sport: sportFilter?.value || undefined,
+      venue: venueFilter?.value || undefined,
+      district: districtFilter?.value || undefined,
+      includePlayerCount: true,
+      includeVenueInfo: true,
+    };
+  };
+
   // tRPC queries
   const { 
     data: teamsData, 
     isLoading: teamsLoading, 
     error: teamsError,
     refetch: refetchTeams
-  } = api.admin.teams.getAdminTeams.useQuery(tableParams, {
+  } = api.admin.teams.getAdminTeams.useQuery(transformTableParams(tableParams), {
     enabled: !!user && userProfile?.role === 'admin'
   });
 
@@ -203,52 +225,13 @@ export default function AdminTeamsPage() {
   const teams = useMemo(() => {
     if (!teamsData?.teams) return [];
 
-    // Transform raw backend data to frontend format
-    let filteredTeams = teamsData.teams.map((rawTeam: RawTeamData) => transformTeamData(rawTeam));
-
-    // Apply search
-    if (tableParams.search) {
-      const searchLower = tableParams.search.toLowerCase();
-      filteredTeams = filteredTeams.filter(team =>
-        team.name.toLowerCase().includes(searchLower) ||
-        team.captainProfile?.name?.toLowerCase().includes(searchLower) ||
-        team.sportName.toLowerCase().includes(searchLower) ||
-        team.panchayat.toLowerCase().includes(searchLower)
-      );
-    }
-
-    // Apply filters
-    tableParams.filters.forEach(filter => {
-      switch (filter.key) {
-        case 'status':
-          if (filter.value !== 'all') {
-            filteredTeams = filteredTeams.filter(team => team.status === filter.value);
-          }
-          break;
-        case 'sport':
-          if (filter.value !== 'all') {
-            filteredTeams = filteredTeams.filter(team => team.sportName === filter.value);
-          }
-          break;
-        case 'district':
-          if (filter.value !== 'all') {
-            filteredTeams = filteredTeams.filter(team => team.district === filter.value);
-          }
-          break;
-        case 'gender':
-          if (filter.value !== 'all') {
-            filteredTeams = filteredTeams.filter(team => team.genderCategory === filter.value);
-          }
-          break;
-      }
-    });
-
-    return filteredTeams;
-  }, [teamsData, tableParams.search, tableParams.filters]);
-  const stats = statsData?.stats || {};
+    // Transform raw backend data to frontend format (filtering now handled by backend)
+    return teamsData.teams.map((rawTeam: RawTeamData) => transformTeamData(rawTeam));
+  }, [teamsData]);
+  const stats = statsData || {};
   const loading = teamsLoading || statsLoading;
   const error = teamsError?.message || '';
-  const hasMore = teamsData?.pagination?.hasMore || false;
+  const hasMore = teamsData?.hasMore || false;
 
   const [selectedTeams, setSelectedTeams] = useState<Set<string | number>>(new Set());
 

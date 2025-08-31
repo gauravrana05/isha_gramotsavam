@@ -120,6 +120,7 @@ export const adminTeamsRouter = createTRPCRouter({
 
   // Get Admin Team Stats
   getAdminTeamStats: protectedProcedure
+    .input(z.object({}))
     .query(async ({ ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });

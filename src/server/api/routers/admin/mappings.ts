@@ -233,6 +233,78 @@ export const adminMappingsRouter = createTRPCRouter({
       return mapping;
     }),
 
+  // Create Bulk Cluster Division Mappings
+  createBulkClusterDivisionMappings: protectedProcedure
+    .input(z.object({
+      eventId: z.string(),
+      clusterVenueMappingIds: z.array(z.string()),
+      divisionVenueMappingId: z.string(),
+      state: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      const { eventId, clusterVenueMappingIds, divisionVenueMappingId, state } = input;
+
+      // Check for existing mappings
+      const existingMappings = await db.clusterDivisionMapping.findMany({
+        where: {
+          eventId,
+          clusterVenueMappingId: { in: clusterVenueMappingIds },
+        },
+        include: {
+          clusterVenueMapping: {
+            include: { venue: true },
+          },
+        },
+      });
+
+      if (existingMappings.length > 0) {
+        const existingClusterNames = existingMappings.map(m => m.clusterVenueMapping.venue.name);
+        throw new TRPCError({ 
+          code: 'CONFLICT', 
+          message: `Cluster venues already mapped: ${existingClusterNames.join(', ')}` 
+        });
+      }
+
+      // Create bulk mappings
+      const mappingData = clusterVenueMappingIds.map(clusterVenueMappingId => ({
+        eventId,
+        clusterVenueMappingId,
+        divisionVenueMappingId,
+        state,
+      }));
+
+      await db.clusterDivisionMapping.createMany({
+        data: mappingData,
+      });
+
+      // Return created mappings with full details
+      const createdMappings = await db.clusterDivisionMapping.findMany({
+        where: {
+          eventId,
+          clusterVenueMappingId: { in: clusterVenueMappingIds },
+          divisionVenueMappingId,
+        },
+        include: {
+          clusterVenueMapping: {
+            include: { venue: true },
+          },
+          divisionVenueMapping: {
+            include: { venue: true },
+          },
+        },
+      });
+
+      return { 
+        success: true, 
+        message: `Created ${clusterVenueMappingIds.length} cluster-division mappings successfully`,
+        mappings: createdMappings
+      };
+    }),
+
   // Delete Cluster Division Mappings (plural - unchanged)
   deleteClusterDivisionMappings: protectedProcedure
     .input(z.object({

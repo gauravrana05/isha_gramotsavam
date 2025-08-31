@@ -252,7 +252,7 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, updateMutation, se
                   type="tel"
                   required 
                   pattern="[+]?[0-9\s\-\(\)]*"
-                  defaultValue={editVolunteer?.phone || ''}
+                  defaultValue={editVolunteer?.phoneNumber || ''}
                   disabled={isEditing} // Don't allow phone number changes when editing
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="+91 9876543210"
@@ -422,7 +422,7 @@ export default function VolunteersManagement() {
       uid: user.uid || user.id,
       firstName: user.firstName || '',
       lastName: user.lastName || '',
-      phoneNumber: user.phone || '',
+      phoneNumber: user.phone || user.phoneNumber || '',
       email: user.email,
       role: user.role as VolunteerRole,
       gender: user.gender as 'M' | 'F' | 'O',
@@ -560,7 +560,7 @@ export default function VolunteersManagement() {
         <div className="text-sm text-gray-900">
           <div className="flex items-center gap-2">
             <Phone className="w-4 h-4 text-gray-400" />
-            <span>{v.phone}</span>
+            <span>{v.phoneNumber}</span>
           </div>
         </div>
       )
@@ -863,7 +863,7 @@ export default function VolunteersManagement() {
 
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Phone Number</h3>
-                <p className="text-gray-900">{selectedVolunteer.phone}</p>
+                <p className="text-gray-900">{selectedVolunteer.phoneNumber}</p>
               </div>
 
               <div>
