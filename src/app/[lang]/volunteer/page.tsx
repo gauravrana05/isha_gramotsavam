@@ -72,7 +72,7 @@ export default function VolunteerMainPage() {
           <AlertCircle className="w-16 h-16 text-orange-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">No Venue Assignments</h1>
           <p className="text-gray-600 mb-4">
-            You haven't been assigned to any venues yet. Please contact your administrator.
+            You haven&apos;t been assigned to any venues yet. Please contact your administrator.
           </p>
           <button
             onClick={() => window.location.reload()}

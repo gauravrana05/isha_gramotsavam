@@ -5,9 +5,7 @@ import { X, Users, Plus, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-// import { createTeamByVolunteer } from '@/lib/actions/volunteer/teamManagement';
-import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
+import { api } from '@/server/trpc/react';
 
 interface Sport {
   id: string;

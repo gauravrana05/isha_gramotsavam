@@ -39,13 +39,17 @@ interface EventData {
   startDate: string | null;
   endDate: string | null;
   createdBy: string;
-  createdByName: string;
-  teamCount?: number;
-  fixtureCount?: number;
-  matchCount?: number;
-  venueCount?: number;
-  createdAt: string | null;
-  updatedAt: string | null;
+  createdByUser: {
+    firstName: string | null;
+    lastName: string | null;
+  };
+  _count: {
+    fixtures: number;
+    teams: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
 }
 
 export default function AdminEventsPage() {
@@ -79,8 +83,7 @@ export default function AdminEventsPage() {
     refetch: refetchEvents
   } = api.admin.events.getEvents.useQuery({
     limit: 100,
-    status: 'all',
-    includeStats: true
+    status: 'all'
   }, {
     enabled: !!user && userProfile?.role === 'admin'
   });
@@ -225,26 +228,26 @@ export default function AdminEventsPage() {
     {
       key: 'teams',
       header: 'Teams',
-      accessor: 'teamCount',
+      accessor: (event) => event._count.teams,
       sortable: true,
       minWidth: 80,
       render: (_, event) => (
         <div className="flex items-center space-x-1">
           <Users className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-900">{event.teamCount}</span>
+          <span className="text-sm text-gray-900">{event._count.teams}</span>
         </div>
       ),
     },
     {
       key: 'fixtures',
       header: 'Fixtures',
-      accessor: 'fixtureCount',
+      accessor: (event) => event._count.fixtures,
       sortable: true,
       minWidth: 80,
       render: (_, event) => (
         <div className="flex items-center space-x-1">
           <Trophy className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-900">{event.fixtureCount}</span>
+          <span className="text-sm text-gray-900">{event._count.fixtures}</span>
         </div>
       ),
     },
@@ -714,19 +717,19 @@ export default function AdminEventsPage() {
             {/* Statistics */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200">
               <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{selectedEvent.teamCount || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{selectedEvent._count.teams || 0}</p>
                 <p className="text-sm text-gray-600">Teams</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{selectedEvent.fixtureCount || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">{selectedEvent._count.fixtures || 0}</p>
                 <p className="text-sm text-gray-600">Fixtures</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{selectedEvent.matchCount || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">0</p>
                 <p className="text-sm text-gray-600">Matches</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-gray-900">{selectedEvent.venueCount || 0}</p>
+                <p className="text-2xl font-bold text-gray-900">0</p>
                 <p className="text-sm text-gray-600">Venues</p>
               </div>
             </div>
@@ -735,7 +738,7 @@ export default function AdminEventsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-200">
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Created By</h3>
-                <p className="text-gray-900">{selectedEvent.createdByName || 'Unknown'}</p>
+                <p className="text-gray-900">{`${selectedEvent.createdByUser?.firstName || ''} ${selectedEvent.createdByUser?.lastName || ''}`.trim() || 'Unknown'}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Created At</h3>
@@ -787,7 +790,7 @@ export default function AdminEventsPage() {
       >
         <div className="text-center py-4">
           <p className="text-gray-600 mb-4">
-            Are you sure you want to delete the event <strong>"{eventToDelete?.name}"</strong>?
+            Are you sure you want to delete the event <strong>&quot;{eventToDelete?.name}&quot;</strong>?
           </p>
           <p className="text-sm text-red-600">
             This action cannot be undone and will permanently remove all associated data.

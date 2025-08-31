@@ -12,6 +12,7 @@ import {
   type FilterField,
   type TableParams,
 } from '@/components/ui';
+import { LocationMappingData } from '@/lib/types';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
@@ -22,30 +23,6 @@ import {
   CheckCircle,
   Trash2,
 } from 'lucide-react';
-
-interface LocationMappingData {
-  id: string;
-  eventId: string;
-  locationType: 'district' | 'taluk';
-  locationName: string;
-  state: string;
-  district: string | null;
-  clusterVenueMappingId: string;
-  venueLocationMapping: {
-    id: string;
-    venue: {
-      id: string;
-      name: string;
-      district: string;
-      state: string;
-      address: string;
-    };
-    level: 'cluster';
-    maxTeams: number;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
 
 export default function LocationMappingPage({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = React.use(params);
@@ -62,9 +39,11 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
 
   // Table state
   const [tableParams, setTableParams] = useState<TableParams>({
-    pagination: { page: 1, pageSize: 50 },
-    sorting: { field: 'locationName', direction: 'asc' },
-    filters: {},
+    page: 1,
+    pageSize: 50,
+    filters: [],
+    search: '',
+    sort: { field: 'locationName', direction: 'asc' },
   });
 
   // Auth check
@@ -88,10 +67,10 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
     refetch: refetchMappings
   } = api.admin.mappings.getLocationClusterMappings.useQuery({
     eventId: selectedEvent,
-    locationType: tableParams.filters.locationType as 'district' | 'taluk' | undefined,
-    state: tableParams.filters.state as string,
-    district: tableParams.filters.district as string,
-    locationName: tableParams.filters.locationName as string,
+    locationType: undefined,
+    state: '',
+    district: '',
+    locationName: '',
   }, {
     enabled: !!selectedEvent,
   });
@@ -172,10 +151,10 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
       header: 'Assigned Cluster Venue',
       render: (_, mapping) => (
         <div className="text-sm">
-          <div className="font-medium text-gray-900">{mapping.venueLocationMapping.venue.name}</div>
-          <div className="text-gray-500">{mapping.venueLocationMapping.venue.address}</div>
+          <div className="font-medium text-gray-900">{mapping.venueLocationMapping?.venue.name || 'N/A'}</div>
+          <div className="text-gray-500">{mapping.venueLocationMapping?.venue.address || 'N/A'}</div>
           <div className="text-gray-500">
-            {mapping.venueLocationMapping.venue.district}, {mapping.venueLocationMapping.venue.state}
+            {mapping.venueLocationMapping?.venue.district || 'N/A'}, {mapping.venueLocationMapping?.venue.state || 'N/A'}
           </div>
         </div>
       ),
@@ -185,7 +164,7 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
       header: 'Max Teams',
       render: (_, mapping) => (
         <div className="text-sm text-gray-900">
-          {mapping.venueLocationMapping.maxTeams}
+          {mapping.venueLocationMapping?.maxTeams || 'N/A'}
         </div>
       ),
     },
@@ -313,9 +292,6 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
           data={(mappings || []) as LocationMappingData[]}
           columns={columns}
           loading={eventsLoading || mappingsLoading}
-          error={mappingsError?.message}
-          tableParams={tableParams}
-          onTableParamsChange={setTableParams}
           selectedRows={selectedMappings}
           onSelectedRowsChange={setSelectedMappings}
           filterFields={filterFields}

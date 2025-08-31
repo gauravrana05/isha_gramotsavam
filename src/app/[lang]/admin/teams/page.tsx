@@ -713,7 +713,7 @@ export default function AdminTeamsPage() {
             <AlertTriangle className="h-6 w-6 text-red-600" />
           </div>
           <p className="text-gray-600 mb-4">
-            Are you sure you want to delete <strong>"{teamToDelete?.name}"</strong>?
+            Are you sure you want to delete <strong>&quot;{teamToDelete?.name}&quot;</strong>?
           </p>
           <p className="text-sm text-red-600">
             This action cannot be undone and will permanently remove the team and all associated data.

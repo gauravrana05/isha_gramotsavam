@@ -80,7 +80,13 @@ export const adminEventsRouter = createTRPCRouter({
       }
 
       const sport = await db.sport.create({
-        data: input,
+        data: {
+          name: input.name,
+          isActive: input.isActive,
+          description: input.description,
+          mainPlayersCount: input.maxPlayers || 11,
+          maxSubstitutes: input.minPlayers || 5,
+        },
       });
 
       return sport;
@@ -141,9 +147,9 @@ export const adminEventsRouter = createTRPCRouter({
         where: { id: input.id },
         include: {
           teams: {
-            include: {
-              captain: true,
-              venue: true,
+            select: {
+              id: true,
+              name: true,
             },
           },
           _count: {
@@ -429,9 +435,9 @@ export const adminEventsRouter = createTRPCRouter({
             },
           },
           fixtures: {
-            include: {
-              team1: true,
-              team2: true,
+            select: {
+              id: true,
+              status: true,
             },
           },
         },
@@ -483,10 +489,8 @@ export const adminEventsRouter = createTRPCRouter({
                 status: true,
               },
             },
-            team1: true,
-            team2: true,
           },
-          orderBy: { scheduledAt: 'asc' },
+          orderBy: { createdAt: 'asc' },
           skip: input.offset,
           take: input.limit,
         }),

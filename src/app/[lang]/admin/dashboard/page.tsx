@@ -55,8 +55,8 @@ export default function AdminDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [nextRefreshIn, setNextRefreshIn] = useState<number>(30);
   const [criticalAlerts, setCriticalAlerts] = useState<string[]>([]);
-  const intervalRef = useRef<NodeJS.Timeout>();
-  const countdownRef = useRef<NodeJS.Timeout>();
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const previousDataRef = useRef<any>(null);
 
   // tRPC queries with real-time refetch
@@ -74,7 +74,6 @@ export default function AdminDashboard() {
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     staleTime: 1000 * 20, // Consider data stale after 20 seconds
-    cacheTime: 1000 * 60 // Cache for 1 minute
   });
 
   const {
@@ -90,7 +89,6 @@ export default function AdminDashboard() {
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     staleTime: 1000 * 20,
-    cacheTime: 1000 * 60
   });
 
   // Auth check

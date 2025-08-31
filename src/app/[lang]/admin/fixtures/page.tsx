@@ -12,6 +12,7 @@ import {
   type Column,
   type ActionButton,
 } from '@/components/ui';
+import { FixtureData } from '@/lib/types';
 import { 
   Plus, 
   Trophy,
@@ -27,19 +28,6 @@ import {
   Target
 } from 'lucide-react';
 
-interface FixtureData {
-  id: string;
-  name: string;
-  sportName: string;
-  eventName: string;
-  level: string;
-  status: string;
-  startDate: string | null;
-  endDate: string | null;
-  matchCount: number;
-  createdAt: string | null;
-}
-
 export default function AdminFixturesPage() {
   const router = useRouter();
   const { lang } = useParams();
@@ -52,8 +40,7 @@ export default function AdminFixturesPage() {
     error: fixturesError
   } = api.admin.events.getFixtures.useQuery({
     limit: 100,
-    status: 'all',
-    level: 'all'
+    status: 'all'
   }, {
     enabled: !!user && userProfile?.role === 'admin'
   });
@@ -94,7 +81,7 @@ export default function AdminFixturesPage() {
     {
       key: 'event',
       header: 'Event',
-      accessor: 'eventName',
+      accessor: (fixture) => fixture.eventName,
       sortable: true,
       minWidth: 150,
       render: (_, fixture) => (
@@ -104,7 +91,7 @@ export default function AdminFixturesPage() {
     {
       key: 'matches',
       header: 'Matches',
-      accessor: 'matchCount',
+      accessor: (fixture) => fixture.matchCount,
       sortable: true,
       minWidth: 100,
       render: (_, fixture) => (
@@ -142,7 +129,7 @@ export default function AdminFixturesPage() {
     {
       key: 'dates',
       header: 'Timeline',
-      accessor: 'startDate',
+      accessor: (fixture) => fixture.startDate,
       sortable: true,
       minWidth: 150,
       render: (_, fixture) => (
@@ -227,7 +214,7 @@ export default function AdminFixturesPage() {
           <SingleStatCard
             stat={{
               label: "Active Fixtures",
-              value: fixtures.filter((f: FixtureData) => f.status === 'teams_assigned' || f.status === 'in_progress').length.toString(),
+              value: fixtures.filter(f => f.status === 'teams_assigned' || f.status === 'in_progress').length.toString(),
               icon: Play,
               color: "warning"
             }}
@@ -243,7 +230,7 @@ export default function AdminFixturesPage() {
           <SingleStatCard
             stat={{
               label: "Total Matches",
-              value: fixtures.reduce((sum: number, fixture: FixtureData) => sum + fixture.matchCount, 0).toString(),
+              value: fixtures.reduce((sum: number, fixture: FixtureData) => sum + (fixture.matchCount || 0), 0).toString(),
               icon: Target,
               color: "primary"
             }}
@@ -260,7 +247,7 @@ export default function AdminFixturesPage() {
 
       {/* AdvancedTable */}
       <AdvancedTable<FixtureData>
-        data={fixtures}
+        data={fixtures as FixtureData[]}
         columns={columns}
         actions={actions}
         loading={loading}

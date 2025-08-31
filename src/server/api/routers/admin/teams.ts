@@ -313,7 +313,17 @@ export const adminTeamsRouter = createTRPCRouter({
       let venueAssignment = null;
       if (input.eventId) {
         try {
-          venueAssignment = await assignVenueToTeam(team.id, input.eventId);
+          venueAssignment = await assignVenueToTeam(
+            team.id, 
+            { 
+              panchayat: input.panchayat, 
+              district: input.district, 
+              state: input.state, 
+              taluk: input.taluk 
+            }, 
+            input.eventId, 
+            ctx.user.id
+          );
         } catch (error) {
           console.error('Venue assignment failed:', error);
           // Don't fail team creation if venue assignment fails
@@ -661,14 +671,14 @@ export const adminTeamsRouter = createTRPCRouter({
       });
 
       // Determine player status based on team status and update all players
-      let playerStatus: string | null = null;
+      let playerStatus: 'pending' | 'verified' | 'approved' | 'rejected' | null = null;
       
       if (status === 'checked_in') {
-        playerStatus = 'approved';
+        playerStatus = 'approved' as const;
       } else if (status === 'verified') {
-        playerStatus = 'verified';
+        playerStatus = 'verified' as const;
       } else if (status === 'submitted') {
-        playerStatus = 'pending';
+        playerStatus = 'pending' as const;
       }
 
       // Only update players if we have a specific status to set
@@ -744,7 +754,7 @@ export const adminTeamsRouter = createTRPCRouter({
           },
         },
         data: {
-          position: input.position,
+          position: input.position as 'main' | 'substitute',
         },
         include: {
           user: true,

@@ -42,10 +42,10 @@ interface ClusterDivisionMappingData {
       name: string;
       district: string;
       state: string;
-      address: string;
+      address: string | null;
     };
-    level: 'cluster';
-    maxTeams: number;
+    level: 'cluster' | 'division' | 'final';
+    maxTeams: number | null;
   };
   divisionVenueMapping: {
     id: string;
@@ -54,10 +54,10 @@ interface ClusterDivisionMappingData {
       name: string;
       district: string;
       state: string;
-      address: string;
+      address: string | null;
     };
-    level: 'division';
-    maxTeams: number;
+    level: 'cluster' | 'division' | 'final';
+    maxTeams: number | null;
   };
 }
 
@@ -509,7 +509,7 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
   // Location options for cluster venues - filtered to exclude already mapped venues
   const availableClusterOptions = useMemo(() => {
     console.log('🔍 Filtering cluster venues:', {
-      clusterVenuesData: clusterVenuesData?.length,
+      clusterVenuesData: clusterVenuesData?.venueLevelMappings?.length,
       allMappingsData: allMappingsData?.length,
       selectedState,
       isEditMode,
@@ -533,7 +533,7 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
       .filter(m => m.divisionVenueMappingId !== mapping.divisionVenueMappingId) // Exclude current mapping group
       .map(m => m.clusterVenueMappingId);
     
-    let availableVenues = clusterVenuesData.filter(venueMapping => {
+    const availableVenues = clusterVenuesData.filter(venueMapping => {
       const venue = venueMapping.venue;
       const isVenueUsed = usedClusterIds.includes(venueMapping.id);
       
@@ -569,7 +569,7 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
   // Filtered division venues based on availability
   const filteredDivisionVenues = useMemo(() => {
     console.log('🔍 Filtering division venues:', {
-      divisionVenuesData: divisionVenuesData?.length,
+      divisionVenuesData: divisionVenuesData?.venueLevelMappings?.length,
       allMappingsData: allMappingsData?.length,
       selectedState,
       isEditMode,
@@ -592,7 +592,7 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
       .filter(m => m.id !== mapping.id) // Allow keeping same division venue when editing
       .map(m => m.divisionVenueMappingId);
     
-    let availableVenues = divisionVenuesData.filter(venueMapping => {
+    const availableVenues = divisionVenuesData.filter(venueMapping => {
       const venue = venueMapping.venue;
       const isVenueUsed = usedDivisionIds.includes(venueMapping.id);
       
@@ -957,10 +957,10 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
   const [selectedEvent, setSelectedEvent] = useState<string>('');
 
   // Table state
-  const [tableParams, setTableParams] = useState<TableParams>({
+  const [tableParams, setTableParams] = useState({
     pagination: { page: 1, pageSize: 50 },
-    sorting: { field: 'clusterVenueMapping', direction: 'asc' },
-    filters: {},
+    sorting: { field: 'clusterVenueMapping', direction: 'asc' as const },
+    filters: [],
   });
 
   // Auth check
@@ -1109,12 +1109,6 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
           data={mappingsData || []}
           columns={columns}
           loading={loading}
-          tableParams={tableParams}
-          onTableParamsChange={setTableParams}
-          selectedRows={selectedMappings}
-          onSelectedRowsChange={setSelectedMappings}
-          filterFields={filterFields}
-          headerActions={headerActions}
           emptyState={{
             icon: MapPin,
             title: 'No mappings found',
@@ -1122,6 +1116,7 @@ export default function ClusterDivisionMappingPage({ params }: { params: Promise
           }}
           searchable
           searchPlaceholder="Search cluster venues, division venues, or locations..."
+          keyExtractor={(mapping) => mapping.id}
           onRowClick={(mapping) => {
             setSelectedMapping(mapping);
             setShowEditModal(true);

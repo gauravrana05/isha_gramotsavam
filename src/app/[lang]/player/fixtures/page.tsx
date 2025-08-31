@@ -264,7 +264,7 @@ export default function PlayerFixturesPage() {
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">No Teams Found</h1>
-          <p className="text-gray-600 mb-4">You're not part of any team yet. Wait for a captain to invite you.</p>
+          <p className="text-gray-600 mb-4">You&apos;re not part of any team yet. Wait for a captain to invite you.</p>
           <Link 
             href={`/${lang}/player/teams`}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
@@ -283,7 +283,7 @@ export default function PlayerFixturesPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Fixtures</h1>
-            <p className="text-gray-600 mt-2">View your team's match schedule and upcoming games</p>
+            <p className="text-gray-600 mt-2">View your team&apos;s match schedule and upcoming games</p>
           </div>
           <div className="flex items-center space-x-4">
             <div className="text-sm text-gray-600">

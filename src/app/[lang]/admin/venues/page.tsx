@@ -579,7 +579,7 @@ export default function AdminVenuesPage() {
           <p className="text-gray-600 mb-4">
             Are you sure you want to delete{' '}
             {venueToDelete ? (
-              <strong>"{venueToDelete.name}"</strong>
+              <strong>&quot;{venueToDelete.name}&quot;</strong>
             ) : (
               <strong>{selectedVenues.size} selected venue{selectedVenues.size > 1 ? 's' : ''}</strong>
             )}?

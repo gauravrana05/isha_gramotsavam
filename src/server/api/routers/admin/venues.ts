@@ -387,7 +387,6 @@ export const adminVenuesRouter = createTRPCRouter({
       const team = await db.team.findUnique({
         where: { id: input.teamId },
         include: {
-          captain: true,
           sport: true,
         },
       });
@@ -400,7 +399,7 @@ export const adminVenuesRouter = createTRPCRouter({
         where: {
           isActive: true,
           deletedAt: null,
-          district: team.captain.district,
+          district: team.district,
         },
         include: {
           venueLevelMappings: true,
@@ -493,7 +492,13 @@ export const adminVenuesRouter = createTRPCRouter({
       }
 
       const mapping = await db.venueLevelMapping.create({
-        data: input,
+        data: {
+          eventId: input.eventId,
+          venueId: input.venueId,
+          level: input.level,
+          maxTeams: input.maxTeams,
+          isActive: input.isActive,
+        },
         include: {
           venue: true,
         },
@@ -515,10 +520,16 @@ export const adminVenuesRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const { id, ...updateData } = input;
+      const { id, eventId, venueId, level, maxTeams, isActive } = input;
       const mapping = await db.venueLevelMapping.update({
         where: { id },
-        data: updateData,
+        data: {
+          eventId,
+          venueId,
+          level,
+          maxTeams,
+          isActive,
+        },
         include: {
           venue: true,
         },

@@ -344,7 +344,7 @@ export const adminUsersRouter = createTRPCRouter({
                 eventId: ongoingEvent.id,
                 volunteerId: user.id,
                 venueLevelMappingId: input.venueAssignmentId,
-                volunteerType: input.role,
+                volunteerType: input.role === 'verification_volunteer' ? 'general_volunteer' : input.role as 'general_volunteer' | 'technical_volunteer',
                 contactPhone: user.phone,
                 assignedBy: ctx.user.id,
                 status: 'assigned'
@@ -429,7 +429,7 @@ export const adminUsersRouter = createTRPCRouter({
                 eventId: ongoingEvent.id,
                 volunteerId: input.id,
                 venueLevelMappingId: input.venueAssignmentId,
-                volunteerType: input.role,
+                volunteerType: input.role === 'verification_volunteer' ? 'general_volunteer' : input.role as 'general_volunteer' | 'technical_volunteer',
                 contactPhone: user.phone,
                 assignedBy: ctx.user.id,
                 status: 'assigned'

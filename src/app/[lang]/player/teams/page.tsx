@@ -271,7 +271,7 @@ export default function PlayerTeamsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">My Teams</h1>
-            <p className="text-gray-600 mt-2">Teams you're part of and their verification status</p>
+            <p className="text-gray-600 mt-2">Teams you&apos;re part of and their verification status</p>
           </div>
         </div>
       </div>

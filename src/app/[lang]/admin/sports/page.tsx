@@ -657,7 +657,7 @@ export default function AdminSportsPage() {
             <AlertTriangle className="h-6 w-6 text-red-600" />
           </div>
           <p className="text-gray-600 mb-4">
-            Are you sure you want to delete <strong>"{sportToDelete?.name}"</strong>?
+            Are you sure you want to delete <strong>&quot;{sportToDelete?.name}&quot;</strong>?
           </p>
           <p className="text-sm text-red-600">
             This action cannot be undone and will remove all associated data.

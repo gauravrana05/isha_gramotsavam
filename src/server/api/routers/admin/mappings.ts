@@ -41,11 +41,6 @@ export const adminMappingsRouter = createTRPCRouter({
       const mappings = await db.locationClusterMapping.findMany({
         where,
         include: {
-          venueLocationMapping: {
-            include: {
-              venue: true,
-            },
-          },
           event: {
             select: {
               name: true,

@@ -651,21 +651,22 @@ async function assignVenueToTeam(
 // Helper functions with correct schema names
 async function findVenueByTalukMapping(location: TeamLocationData, eventId: string) {
   try {
-    const talukMapping = await db.talukClusterMapping.findFirst({
+    const talukMapping = await db.locationClusterMapping.findFirst({
       where: {
         eventId,
         district: location.district,
         state: location.state,
-        taluk: location.taluk,
+        locationType: 'taluk',
+        locationName: location.taluk,
       },
       include: {
-        venueLocationMapping: {
+        venueLevelMapping: {
           include: { venue: true },
         },
       },
     });
 
-    if (talukMapping?.venueLocationMapping?.venue?.isActive) {
+    if (talukMapping?.venueLevelMapping?.venue?.isActive) {
       const currentAssignments = await db.teamVenueAssignment.count({
         where: {
           eventId,
@@ -673,14 +674,14 @@ async function findVenueByTalukMapping(location: TeamLocationData, eventId: stri
         },
       });
 
-      const maxCapacity = talukMapping.venueLocationMapping.maxTeams || 100;
+      const maxCapacity = talukMapping.venueLevelMapping.maxTeams || 100;
       if (currentAssignments >= maxCapacity) {
         return null;
       }
 
       return {
-        venueId: talukMapping.venueLocationMapping.venue.id,
-        venueName: talukMapping.venueLocationMapping.venue.name,
+        venueId: talukMapping.venueLevelMapping.venue.id,
+        venueName: talukMapping.venueLevelMapping.venue.name,
         mappingId: talukMapping.clusterVenueMappingId,
         maxTeams: maxCapacity,
       };
