@@ -12,7 +12,7 @@ import {
   type Column,
   type ActionButton,
 } from '@/components/ui';
-import { FixtureData } from '@/lib/types';
+import { type FixtureData } from '@/lib/types';
 import { 
   Plus, 
   Trophy,
@@ -35,7 +35,7 @@ export default function AdminFixturesPage() {
 
   // tRPC query
   const {
-    data: fixturesData,
+    data: fixturesResponse,
     isLoading: fixturesLoading,
     error: fixturesError
   } = api.admin.events.getFixtures.useQuery({
@@ -61,7 +61,25 @@ export default function AdminFixturesPage() {
 
   const loading = fixturesLoading;
   const error = fixturesError?.message || '';
-  const fixtures = fixturesData?.fixtures || [];
+  const fixtures = fixturesResponse?.fixtures || [];
+
+  // Transform fixtures to match FixtureData interface
+  const transformedFixtures: FixtureData[] = fixtures.map(fixture => ({
+    id: fixture.id,
+    name: fixture.name,
+    genderCategory: fixture.genderCategory,
+    status: fixture.status,
+    eventId: fixture.eventId,
+    level: fixture.level,
+    sportId: fixture.sportId,
+    venueLevelMappingId: fixture.venueLevelMappingId,
+    eventName: fixture.event?.name || 'No Event',
+    sportName: 'Unknown Sport', // Will be populated by separate query if needed
+    matchCount: 0, // Will be populated by separate query if needed
+    createdAt: fixture.createdAt,
+    updatedAt: fixture.updatedAt,
+    deletedAt: fixture.deletedAt
+  }));
 
   // Define table columns
   const columns: Column<FixtureData>[] = useMemo(() => [
@@ -201,12 +219,12 @@ export default function AdminFixturesPage() {
       </div>
 
       {/* Stats Cards */}
-      {fixtures.length > 0 && (
+      {transformedFixtures.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <SingleStatCard
             stat={{
               label: "Total Fixtures",
-              value: fixtures.length.toString(),
+              value: transformedFixtures.length.toString(),
               icon: Trophy,
               color: "info"
             }}
@@ -214,7 +232,7 @@ export default function AdminFixturesPage() {
           <SingleStatCard
             stat={{
               label: "Active Fixtures",
-              value: fixtures.filter(f => f.status === 'teams_assigned' || f.status === 'in_progress').length.toString(),
+              value: transformedFixtures.filter(f => f.status === 'teams_assigned' || f.status === 'in_progress').length.toString(),
               icon: Play,
               color: "warning"
             }}
@@ -222,7 +240,7 @@ export default function AdminFixturesPage() {
           <SingleStatCard
             stat={{
               label: "Completed",
-              value: fixtures.filter((f: FixtureData) => f.status === 'completed').length.toString(),
+              value: transformedFixtures.filter(f => f.status === 'completed').length.toString(),
               icon: CheckCircle,
               color: "success"
             }}
@@ -230,7 +248,7 @@ export default function AdminFixturesPage() {
           <SingleStatCard
             stat={{
               label: "Total Matches",
-              value: fixtures.reduce((sum: number, fixture: FixtureData) => sum + (fixture.matchCount || 0), 0).toString(),
+              value: transformedFixtures.reduce((sum, fixture) => sum + (fixture.matchCount || 0), 0).toString(),
               icon: Target,
               color: "primary"
             }}
@@ -247,7 +265,7 @@ export default function AdminFixturesPage() {
 
       {/* AdvancedTable */}
       <AdvancedTable<FixtureData>
-        data={fixtures as FixtureData[]}
+        data={transformedFixtures}
         columns={columns}
         actions={actions}
         loading={loading}

@@ -1,15 +1,15 @@
 {
-  "name": "Isha Gramotsavam",
-  "short_name": "Gramotsavam",
-  "description": "Official app for Isha Gramotsavam - Sports tournament celebrating rural excellence",
-  "start_url": "/",
+  "name": "Isha Gramotsavam - Volunteer Portal",
+  "short_name": "Gramotsavam Vol",
+  "description": "Volunteer management system for Isha Gramotsavam - Manage teams, matches, and venue operations offline-first",
+  "start_url": "/en/volunteer",
   "display": "standalone",
   "background_color": "#F3F0E5",
   "theme_color": "#F28C38",
   "orientation": "portrait-primary",
   "scope": "/",
   "prefer_related_applications": false,
-  "categories": ["sports", "events", "social"],
+  "categories": ["sports", "events", "social", "productivity"],
   "lang": "en",
   "dir": "ltr",
   "icons": [
@@ -24,6 +24,122 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Venue Dashboard",
+      "short_name": "Dashboard",
+      "description": "Access venue dashboard and statistics",
+      "url": "/en/volunteer/venues/dashboard",
+      "icons": [
+        {
+          "src": "/icons/shortcut-dashboard.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Team Management",
+      "short_name": "Teams",
+      "description": "Manage team check-ins and player verification",
+      "url": "/en/volunteer/teams",
+      "icons": [
+        {
+          "src": "/icons/shortcut-teams.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Match Scoring",
+      "short_name": "Matches",
+      "description": "Update match scores and events",
+      "url": "/en/volunteer/matches",
+      "icons": [
+        {
+          "src": "/icons/shortcut-matches.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Offline Sync",
+      "short_name": "Sync",
+      "description": "View offline actions and sync status",
+      "url": "/en/volunteer/sync",
+      "icons": [
+        {
+          "src": "/icons/shortcut-sync.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/volunteer-dashboard.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Volunteer dashboard showing venue statistics and team management"
+    },
+    {
+      "src": "/screenshots/team-checkin.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "Team check-in interface with player verification"
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "web",
+      "url": "https://gramotsavam.isha.org"
+    }
+  ],
+  "display_override": ["window-controls-overlay", "standalone"],
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+gramotsavam",
+      "url": "/en/volunteer/action?data=%s"
     }
   ]
 }

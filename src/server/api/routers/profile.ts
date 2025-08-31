@@ -170,6 +170,47 @@ export const profileRouter = createTRPCRouter({
       }
     }),
 
+  update: protectedProcedure
+    .input(z.object({
+      firstName: z.string().optional(),
+      lastName: z.string().optional(),
+      whatsappNumber: z.string().optional(),
+      dateOfBirth: z.string().optional(),
+      gender: z.enum(['M', 'F']).optional(),
+      instagramHandle: z.string().optional(),
+      pincode: z.string().optional(),
+      panchayat: z.string().optional(),
+      taluk: z.string().optional(),
+      district: z.string().optional(),
+      state: z.string().optional(),
+      languagePreference: z.enum(['en', 'ta', 'hi', 'ml', 'te', 'kn', 'or']).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const updateData: any = { ...input };
+        
+        // Convert dateOfBirth string to Date if provided
+        if (input.dateOfBirth) {
+          updateData.dateOfBirth = new Date(input.dateOfBirth);
+        }
+        
+        const updatedUser = await db.user.update({
+          where: { id: ctx.user.id },
+          data: updateData,
+        });
+
+        return {
+          success: true,
+          user: updatedUser
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update profile',
+        });
+      }
+    }),
+
   updateComplete: protectedProcedure
     .input(z.object({
       userId: z.string().uuid(),

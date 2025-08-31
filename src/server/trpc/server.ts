@@ -11,6 +11,7 @@ import { type TRPCErrorResponse } from '@trpc/server/rpc'
 import { cookies } from 'next/headers'
 import { cache } from 'react'
 import superjson from 'superjson'
+import type { CreateNextContextOptions } from '@trpc/server/adapters/next'
 
 import { appRouter, type AppRouter } from '@/server/api/root'
 import { createTRPCContext } from '@/server/api/trpc'
@@ -21,14 +22,24 @@ import { createTRPCContext } from '@/server/api/trpc'
  */
 const createContext = cache(async () => {
   const cookieStore = await cookies();
+  
+  // Create proper mock request/response objects for server-side usage
+  const mockReq = {
+    headers: {
+      cookie: cookieStore.toString(),
+      'x-trpc-source': 'rsc',
+    },
+    cookies: {},
+  } as CreateNextContextOptions['req']
+
+  const mockRes = {
+    setHeader: () => {},
+    getHeader: () => undefined,
+  } as CreateNextContextOptions['res']
+
   return createTRPCContext({
-    req: {
-      headers: {
-        cookie: cookieStore.toString(),
-        'x-trpc-source': 'rsc',
-      },
-    } as any,
-    res: {} as any,
+    req: mockReq,
+    res: mockRes,
   })
 })
 

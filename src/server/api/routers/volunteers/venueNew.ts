@@ -1,0 +1,341 @@
+import { TRPCError } from '@trpc/server'
+import { z } from 'zod'
+import { db } from '@/lib/db'
+import { createTRPCRouter, protectedProcedure } from '../../trpc'
+import type { Team, User, Sport } from '@prisma/client'
+
+// Define proper types for the response data
+type TeamWithRelations = Team & {
+  captainUser: Pick<User, 'firstName' | 'lastName' | 'phone'> | null;
+  sport: Pick<Sport, 'name'> | null;
+}
+
+export const volunteersVenueRouter = createTRPCRouter({
+  getVenueTeams: protectedProcedure
+    .input(z.object({
+      venueId: z.string().uuid(),
+    }))
+    .query(async ({ input }) => {
+      // Get teams through fixture teams relationship
+      const fixtureTeams = await db.fixtureTeam.findMany({
+        where: {
+          fixture: {
+            venueLevelMapping: {
+              venueId: input.venueId
+            }
+          }
+        },
+        include: {
+          team: {
+            include: {
+              captainUser: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  phone: true,
+                },
+              },
+              sport: {
+                select: {
+                  name: true,
+                },
+              },
+            }
+          }
+        },
+      });
+
+      // Extract unique teams with proper typing
+      const uniqueTeams = new Map<string, TeamWithRelations>();
+      fixtureTeams.forEach(ft => {
+        if (ft.team && !uniqueTeams.has(ft.team.id)) {
+          uniqueTeams.set(ft.team.id, ft.team);
+        }
+      });
+
+      // Get verified players count for each team
+      const teamIds = Array.from(uniqueTeams.keys());
+      const verifiedPlayersCounts = await db.teamPlayer.groupBy({
+        by: ['teamId'],
+        where: {
+          teamId: { in: teamIds },
+          verificationStatus: 'verified'
+        },
+        _count: {
+          id: true
+        }
+      });
+
+      const verifiedCountsMap = new Map(
+        verifiedPlayersCounts.map(item => [item.teamId, item._count.id])
+      );
+
+      return Array.from(uniqueTeams.values()).map(team => ({
+        id: team.id,
+        name: team.name,
+        status: team.status,
+        captainUser: team.captainUser,
+        sport: team.sport,
+        currentPlayers: team.currentPlayers,
+        verifiedPlayersCount: verifiedCountsMap.get(team.id) || 0,
+      }));
+    }),
+
+  getVenueFixtures: protectedProcedure
+    .input(z.object({ venueId: z.string() }))
+    .query(async ({ input }) => {
+      const fixtures = await db.fixture.findMany({
+        where: { 
+          venueLevelMapping: {
+            venueId: input.venueId
+          }
+        },
+        include: {
+          sport: { select: { name: true } },
+          fixtureTeams: {
+            include: {
+              team: {
+                select: { id: true, name: true }
+              }
+            }
+          }
+        },
+      });
+
+      return fixtures.map(fixture => ({
+        id: fixture.id,
+        name: fixture.name,
+        sport: fixture.sport,
+        level: fixture.level,
+        status: fixture.status,
+        assignedTeams: fixture.fixtureTeams.map(ft => ft.team),
+        scheduledStartTime: fixture.scheduledStartTime,
+        actualStartTime: fixture.actualStartTime,
+        completedTime: fixture.completedTime
+      }));
+    }),
+
+  getFixtureDetails: protectedProcedure
+    .input(z.object({ fixtureId: z.string() }))
+    .query(async ({ input }) => {
+      const fixture = await db.fixture.findUnique({
+        where: { id: input.fixtureId },
+        include: {
+          sport: { select: { name: true } },
+          venue: { select: { name: true, location: true } },
+          fixtureTeams: {
+            include: {
+              team: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                  captainUser: {
+                    select: { firstName: true, lastName: true, phone: true }
+                  },
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (!fixture) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Fixture not found'
+        });
+      }
+
+      return fixture;
+    }),
+
+  getTodayMatches: protectedProcedure
+    .input(z.object({ 
+      venueId: z.string(),
+      date: z.string()
+    }))
+    .query(async ({ input }) => {
+      const startOfDay = new Date(input.date);
+      startOfDay.setHours(0, 0, 0, 0);
+      
+      const endOfDay = new Date(input.date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const matches = await db.match.findMany({
+        where: {
+          fixture: { venueId: input.venueId },
+          scheduledTime: {
+            gte: startOfDay,
+            lte: endOfDay
+          }
+        },
+        include: {
+          fixture: {
+            select: { name: true }
+          },
+          team1: {
+            select: { id: true, name: true }
+          },
+          team2: {
+            select: { id: true, name: true }
+          }
+        },
+      });
+
+      return matches;
+    }),
+
+  getVenueCheckedInTeams: protectedProcedure
+    .input(z.object({
+      venueId: z.string(),
+      eventId: z.string(),
+    }))
+    .query(async ({ input }) => {
+      const checkedInTeams = await db.fixtureTeam.findMany({
+        where: {
+          fixture: {
+            venueLevelMapping: {
+              venueId: input.venueId,
+              eventId: input.eventId
+            }
+          },
+          team: {
+            status: 'checked_in'
+          }
+        },
+        include: {
+          team: {
+            include: {
+              captainUser: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  phone: true
+                }
+              },
+              sport: {
+                select: {
+                  name: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      return checkedInTeams.map(ft => ({
+        id: ft.team.id,
+        name: ft.team.name,
+        status: ft.team.status,
+        captainUser: ft.team.captainUser,
+        currentPlayers: ft.team.currentPlayers,
+        verifiedPlayersCount: ft.team.verifiedPlayersCount,
+        sport: ft.team.sport
+      }));
+    }),
+
+  // Team management endpoints
+  searchUserByPhone: protectedProcedure
+    .input(z.object({ phone: z.string() }))
+    .query(async ({ input }) => {
+      const user = await db.user.findFirst({
+        where: {
+          OR: [
+            { phone: input.phone },
+            { phone: `+91${input.phone}` }
+          ]
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          dob: true,
+          gender: true
+        }
+      });
+
+      return user;
+    }),
+
+  createTeam: protectedProcedure
+    .input(z.object({
+      name: z.string(),
+      description: z.string().optional(),
+      sportId: z.string(),
+      captainPhone: z.string(),
+      captainDetails: z.object({
+        firstName: z.string(),
+        lastName: z.string(),
+        dob: z.string(),
+        gender: z.enum(['M', 'F'])
+      }),
+      location: z.object({
+        panchayat: z.string(),
+        district: z.string(),
+        state: z.string(),
+        taluk: z.string().optional()
+      }),
+      venueId: z.string()
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { captainPhone, captainDetails, location, ...teamData } = input;
+
+      // Find or create captain user
+      let captain = await db.user.findFirst({
+        where: {
+          OR: [
+            { phone: captainPhone },
+            { phone: `+91${captainPhone}` }
+          ]
+        }
+      });
+
+      if (!captain) {
+        // Create new user
+        captain = await db.user.create({
+          data: {
+            phone: captainPhone,
+            firstName: captainDetails.firstName,
+            lastName: captainDetails.lastName,
+            dob: new Date(captainDetails.dob),
+            gender: captainDetails.gender,
+            role: 'captain',
+            profileCompleted: true
+          }
+        });
+      } else {
+        // Update existing user if needed
+        await db.user.update({
+          where: { id: captain.id },
+          data: {
+            firstName: captain.firstName || captainDetails.firstName,
+            lastName: captain.lastName || captainDetails.lastName,
+            dob: captain.dob || new Date(captainDetails.dob),
+            gender: captain.gender || captainDetails.gender,
+          }
+        });
+      }
+
+      // Create team
+      const team = await db.team.create({
+        data: {
+          name: teamData.name,
+          description: teamData.description,
+          sportId: teamData.sportId,
+          captainId: captain.id,
+          captainName: `${captainDetails.firstName} ${captainDetails.lastName}`,
+          panchayat: location.panchayat,
+          district: location.district,
+          state: location.state,
+          taluk: location.taluk,
+          status: 'submitted',
+          currentPlayers: 1,
+          genderCategory: captainDetails.gender === 'F' ? 'women' : 'men'
+        }
+      });
+
+      return { success: true, teamId: team.id };
+    }),
+});

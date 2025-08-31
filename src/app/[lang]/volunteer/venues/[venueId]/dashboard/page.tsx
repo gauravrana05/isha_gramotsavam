@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useOffline } from '@/context/OfflineContext';
 import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
 import { 

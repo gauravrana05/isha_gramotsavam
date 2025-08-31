@@ -10,6 +10,7 @@ import { adminVenuesRouter } from "./admin/venues";
 import { adminMappingsRouter } from "./admin/mappings";
 import { venueAssignmentRouter } from "./admin/venueAssignment";
 import { adminMatchesRouter } from "./admin/matches";
+import { adminSportsRouter } from "./admin/sports";
 
 export const adminRouter = createTRPCRouter({
   dashboard: adminDashboardRouter,
@@ -18,6 +19,7 @@ export const adminRouter = createTRPCRouter({
   events: adminEventsRouter,
   venues: adminVenuesRouter,
   mappings: adminMappingsRouter,
+  sports: adminSportsRouter,
   venueAssignment: venueAssignmentRouter,
   matches: adminMatchesRouter,
 });

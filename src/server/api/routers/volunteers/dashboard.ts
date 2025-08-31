@@ -2,6 +2,21 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 import { db } from "../../../../lib/db";
+import type { Prisma } from '@prisma/client';
+
+// Type definition for audit log with user
+type AuditLogWithUser = {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  createdAt: Date;
+  metadata: Prisma.JsonValue;
+  user: {
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+};
 
 export const volunteersDashboardRouter = createTRPCRouter({
   getDashboardStats: protectedProcedure
@@ -352,14 +367,14 @@ export const volunteersDashboardRouter = createTRPCRouter({
 
         return {
           success: true,
-          activities: recentActivities.map((activity: any) => ({
+          activities: recentActivities.map((activity: AuditLogWithUser) => ({
             id: activity.id,
             action: activity.action,
             entityType: activity.entityType,
             entityId: activity.entityId,
             user: activity.user,
             timestamp: activity.createdAt,
-            metadata: activity.metadata as any
+            metadata: activity.metadata
           }))
         };
       } catch (error) {

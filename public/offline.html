@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Isha Gramotsavam Volunteer</title>
+    <meta name="theme-color" content="#F28C38">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #F3F0E5 0%, #F28C38 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4A2F1D;
+        }
+        
+        .offline-container {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 400px;
+            margin: 1rem;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(74, 47, 29, 0.1);
+            animation: slideUp 0.5s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .offline-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: #F28C38;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #4A2F1D;
+        }
+        
+        p {
+            color: #666;
+            line-height: 1.5;
+            margin-bottom: 1.5rem;
+        }
+        
+        .features {
+            text-align: left;
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: #F8F7F4;
+            border-radius: 10px;
+            border-left: 4px solid #F28C38;
+        }
+        
+        .features h3 {
+            color: #F28C38;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .features ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .features li {
+            padding: 0.25rem 0;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .features li:before {
+            content: "✓";
+            color: #F28C38;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+        
+        .retry-btn {
+            background: #F28C38;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0.5rem;
+        }
+        
+        .retry-btn:hover {
+            background: #E67A26;
+            transform: translateY(-1px);
+        }
+        
+        .sync-status {
+            display: none;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #E8F5E8;
+            border-radius: 10px;
+            color: #2D5A2D;
+            font-size: 0.9rem;
+        }
+        
+        .sync-status.show {
+            display: block;
+        }
+        
+        .connection-indicator {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .offline {
+            background: #FFE6E6;
+            color: #D63031;
+        }
+        
+        .online {
+            background: #E8F5E8;
+            color: #00B894;
+        }
+        
+        .cached-data {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #F0F7FF;
+            border-radius: 10px;
+            text-align: left;
+        }
+        
+        .cached-data h4 {
+            color: #0984e3;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .cached-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            font-size: 0.85rem;
+            color: #666;
+            border-bottom: 1px solid #E0E6ED;
+        }
+        
+        .cached-item:last-child {
+            border-bottom: none;
+        }
+        
+        @media (max-width: 480px) {
+            .offline-container {
+                margin: 0.5rem;
+                padding: 1.5rem;
+            }
+            
+            h1 {
+                font-size: 1.25rem;
+            }
+            
+            .offline-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-indicator offline" id="connectionStatus">
+        📶 Offline
+    </div>
+    
+    <div class="offline-container">
+        <div class="offline-icon">
+            🏟️
+        </div>
+        
+        <h1>You're Offline</h1>
+        <p>No worries! You can continue working with your cached venue data.</p>
+        
+        <div class="features">
+            <h3>Available Offline:</h3>
+            <ul>
+                <li>View cached team rosters</li>
+                <li>Access today's fixtures</li>
+                <li>Update match scores (syncs later)</li>
+                <li>Team check-ins and verifications</li>
+                <li>View venue statistics</li>
+            </ul>
+        </div>
+        
+        <div class="cached-data" id="cachedData">
+            <h4>📊 Cached Data Summary:</h4>
+            <div class="cached-item">
+                <span>Teams:</span>
+                <span id="cachedTeams">-</span>
+            </div>
+            <div class="cached-item">
+                <span>Players:</span>
+                <span id="cachedPlayers">-</span>
+            </div>
+            <div class="cached-item">
+                <span>Matches:</span>
+                <span id="cachedMatches">-</span>
+            </div>
+            <div class="cached-item">
+                <span>Pending Actions:</span>
+                <span id="pendingActions">-</span>
+            </div>
+            <div class="cached-item">
+                <span>Last Sync:</span>
+                <span id="lastSync">-</span>
+            </div>
+        </div>
+        
+        <button class="retry-btn" onclick="checkConnection()">
+            🔄 Check Connection
+        </button>
+        
+        <button class="retry-btn" onclick="goToApp()">
+            🏟️ Continue Offline
+        </button>
+        
+        <div class="sync-status" id="syncStatus">
+            Checking connection...
+        </div>
+    </div>
+
+    <script>
+        // Network status management
+        function updateConnectionStatus() {
+            const indicator = document.getElementById('connectionStatus');
+            const isOnline = navigator.onLine;
+            
+            if (isOnline) {
+                indicator.textContent = '📶 Online';
+                indicator.className = 'connection-indicator online';
+            } else {
+                indicator.textContent = '📶 Offline';
+                indicator.className = 'connection-indicator offline';
+            }
+        }
+        
+        function checkConnection() {
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.classList.add('show');
+            syncStatus.textContent = 'Checking connection...';
+            
+            // Try to fetch a small resource to test connectivity
+            fetch('/favicon.ico?t=' + Date.now(), { 
+                method: 'HEAD',
+                cache: 'no-cache'
+            })
+            .then(response => {
+                if (response.ok) {
+                    syncStatus.textContent = '✅ Connection restored! Redirecting...';
+                    setTimeout(() => {
+                        window.location.href = '/en/volunteer';
+                    }, 1500);
+                } else {
+                    throw new Error('Network error');
+                }
+            })
+            .catch(() => {
+                syncStatus.textContent = '❌ Still offline. You can continue working with cached data.';
+                setTimeout(() => {
+                    syncStatus.classList.remove('show');
+                }, 3000);
+            });
+        }
+        
+        function goToApp() {
+            window.location.href = '/en/volunteer';
+        }
+        
+        function loadCachedDataSummary() {
+            // Try to get cached data information from localStorage or IndexedDB
+            try {
+                const cachedInfo = localStorage.getItem('volunteer-cache-info');
+                if (cachedInfo) {
+                    const data = JSON.parse(cachedInfo);
+                    document.getElementById('cachedTeams').textContent = data.teams || '0';
+                    document.getElementById('cachedPlayers').textContent = data.players || '0';
+                    document.getElementById('cachedMatches').textContent = data.matches || '0';
+                    document.getElementById('pendingActions').textContent = data.pendingActions || '0';
+                    document.getElementById('lastSync').textContent = data.lastSync || 'Never';
+                }
+            } catch (error) {
+                console.warn('Could not load cached data summary:', error);
+            }
+        }
+        
+        // Event listeners
+        window.addEventListener('online', updateConnectionStatus);
+        window.addEventListener('offline', updateConnectionStatus);
+        
+        // Initialize
+        updateConnectionStatus();
+        loadCachedDataSummary();
+        
+        // Auto-check connection every 30 seconds
+        setInterval(() => {
+            if (!navigator.onLine) {
+                fetch('/favicon.ico?t=' + Date.now(), { 
+                    method: 'HEAD',
+                    cache: 'no-cache'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        updateConnectionStatus();
+                    }
+                })
+                .catch(() => {
+                    // Still offline
+                });
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

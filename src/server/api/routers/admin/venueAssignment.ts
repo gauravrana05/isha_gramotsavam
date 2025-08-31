@@ -367,7 +367,15 @@ export const venueAssignmentRouter = createTRPCRouter({
         const updatedAssignments = await Promise.all(
           existingAssignments.map(async (assignment) => {
             const volunteer = volunteers.find(v => v.id === assignment.volunteerId);
-            const assignmentType = input.volunteerType || (volunteer?.role as any) || 'general_volunteer';
+            // Use proper type assertion with UserRole enum values
+            const validVolunteerRoles: Array<'general_volunteer' | 'technical_volunteer' | 'verification_volunteer'> = 
+              ['general_volunteer', 'technical_volunteer', 'verification_volunteer'];
+            
+            const volunteerRole = volunteer?.role && validVolunteerRoles.includes(volunteer.role as typeof validVolunteerRoles[number]) 
+              ? volunteer.role as 'general_volunteer' | 'technical_volunteer' | 'verification_volunteer'
+              : 'general_volunteer';
+              
+            const assignmentType = input.volunteerType || volunteerRole;
             
             // Update user role based on assignment type
             if (assignmentType === 'technical_volunteer' && volunteer?.role !== 'technical_volunteer') {
@@ -398,7 +406,15 @@ export const venueAssignmentRouter = createTRPCRouter({
         const assignments = await Promise.all(
           newVolunteerIds.map(async (volunteerId) => {
             const volunteer = volunteers.find(v => v.id === volunteerId);
-            const assignmentType = input.volunteerType || (volunteer?.role as any) || 'general_volunteer';
+            // Use proper type assertion with UserRole enum values
+            const validVolunteerRoles: Array<'general_volunteer' | 'technical_volunteer' | 'verification_volunteer'> = 
+              ['general_volunteer', 'technical_volunteer', 'verification_volunteer'];
+            
+            const volunteerRole = volunteer?.role && validVolunteerRoles.includes(volunteer.role as typeof validVolunteerRoles[number]) 
+              ? volunteer.role as 'general_volunteer' | 'technical_volunteer' | 'verification_volunteer'
+              : 'general_volunteer';
+              
+            const assignmentType = input.volunteerType || volunteerRole;
             
             // Update user role based on assignment type
             if (assignmentType === 'technical_volunteer' && volunteer?.role !== 'technical_volunteer') {

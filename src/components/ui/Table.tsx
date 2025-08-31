@@ -108,6 +108,12 @@ export interface TableProps<T = any> extends BaseComponentProps {
   
   // Row configuration
   onRowClick?: (item: T, index: number) => void;
+  onRowMouseDown?: (item: T, index: number) => void;
+  onRowMouseUp?: () => void;
+  onRowMouseLeave?: () => void;
+  onRowTouchStart?: (item: T, index: number) => void;
+  onRowTouchEnd?: () => void;
+  onRowSelect?: (key: string | number, selected: boolean) => void;
   keyExtractor?: (item: T, index: number) => string | number;
   
   // Expandable rows
@@ -497,6 +503,12 @@ export function Table<T>({
   selectedRows = new Set(),
   onSelectionChange,
   onRowClick,
+  onRowMouseDown,
+  onRowMouseUp,
+  onRowMouseLeave,
+  onRowTouchStart,
+  onRowTouchEnd,
+  onRowSelect,
   keyExtractor = (item, index) => index,
   
   // Expandable props
@@ -764,6 +776,11 @@ export function Table<T>({
                         compactMode && 'text-sm'
                       )}
                       onClick={() => onRowClick?.(item, index)}
+                      onMouseDown={() => onRowMouseDown?.(item, index)}
+                      onMouseUp={onRowMouseUp}
+                      onMouseLeave={onRowMouseLeave}
+                      onTouchStart={() => onRowTouchStart?.(item, index)}
+                      onTouchEnd={onRowTouchEnd}
                       style={shouldVirtualize ? { display: 'block', height: rowHeight } as any : undefined}
                     >
                       {/* Expand button cell */}

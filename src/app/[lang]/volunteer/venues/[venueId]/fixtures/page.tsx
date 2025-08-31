@@ -1,14 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { api } from '@/server/trpc/react';
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
-import { useNotification } from '@/context/NotificationContext';
+import { useOffline } from '@/context/OfflineContext';
+import OfflineStatusBanner from '@/components/volunteer/OfflineStatusBanner';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
-import { EnhancedModal } from '@/components/ui/EnhancedModal';
-import type { Column, ActionButton } from '@/components/ui/Table';
+import type { Column } from '@/components/ui/Table';
 import { 
   Trophy, 
   Users, 
@@ -17,99 +15,129 @@ import {
   CheckCircle, 
   Clock, 
   AlertCircle,
-  Plus,
   Eye,
-  Edit,
-  ArrowLeft,
-  Target,
-  Camera,
-  Loader2
+  Loader2,
+  RefreshCw,
+  Timer,
+  Plus
 } from 'lucide-react';
 
-export default function FixturesPage() {
+interface FixtureData {
+  id: string;
+  name: string;
+  sport: { name: string; displayName: string; };
+  level: string;
+  status: 'draft' | 'teams_assigned' | 'in_progress' | 'completed';
+  matches: any[];
+  scheduledStartTime?: Date;
+  actualStartTime?: Date;
+  completedTime?: Date;
+}
+
+export default function VolunteerFixturesPage() {
   const params = useParams();
+  const router = useRouter();
   const { venueId, lang } = params as { venueId: string; lang: string };
   const { user, loading: authLoading } = useAuth();
-  const { addNotification } = useNotification();
-  const router = useRouter();
-  const eventId = 'isha_gramotsavam_2025';
+  
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // State for modals and selections
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedSportForCreation, setSelectedSportForCreation] = useState<{
-    sportId: string;
-    genderCategory: string;
-    sportName: string;
-    teamCount: number;
-  } | null>(null);
-  const [selectedFixtures, setSelectedFixtures] = useState<Set<string | number>>(new Set());
-
-  const { data: checkedInTeamsResult, isLoading: teamsLoading, error: teamsError } = api.volunteers.venue.getVenueCheckedInTeams.useQuery(
-    { venueId, eventId },
-    {
-      enabled: !authLoading && !!user && !!venueId,
-    }
-  );
-
-  const { data: fixtures, isLoading: fixturesLoading, error: fixturesError } = api.volunteers.venue.getVenueFixtures.useQuery(
+  // Data fetching with tRPC
+  const { 
+    data: fixtures, 
+    isLoading: fixturesLoading, 
+    error: fixturesError,
+    refetch: refetchFixtures
+  } = api.volunteers.fixture.getVenueFixtures.useQuery(
     { venueId },
-    {
-      enabled: !authLoading && !!user && !!venueId,
-    }
+    { enabled: !!user && !!venueId }
   );
 
-  const loading = authLoading || teamsLoading || fixturesLoading;
-  const error = teamsError?.message || fixturesError?.message || '';
+  const { 
+    data: availableSports,
+    isLoading: sportsLoading
+  } = api.volunteers.fixture.getAvailableSportsForFixture.useQuery(
+    { venueId },
+    { enabled: !!user && !!venueId }
+  );
 
-  useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      return;
+  const { 
+    data: todayMatches, 
+    isLoading: matchesLoading,
+    refetch: refetchMatches
+  } = api.volunteers.fixture.getTodayMatches.useQuery(
+    { venueId, date: selectedDate },
+    { enabled: !!user && !!venueId }
+  );
+
+  // Helper functions
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'in_progress': return 'bg-blue-100 text-blue-800';
+      case 'teams_assigned': return 'bg-yellow-100 text-yellow-800';
+      case 'draft': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
-  }, [user, authLoading, venueId]);
+  };
 
-  const getFixtureColumns = (): Column<any>[] => [
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return <CheckCircle className="w-4 h-4" />;
+      case 'in_progress': return <Play className="w-4 h-4" />;
+      case 'teams_assigned': return <Users className="w-4 h-4" />;
+      case 'draft': return <AlertCircle className="w-4 h-4" />;
+      default: return <AlertCircle className="w-4 h-4" />;
+    }
+  };
+
+  const getMatchProgress = (fixture: FixtureData) => {
+    if (!fixture.matches) return { completed: 0, total: 0 };
+    const matches = fixture.matches;
+    const completed = matches.filter(m => m.status === 'completed').length;
+    return { completed, total: matches.length };
+  };
+
+  // Table columns
+  const fixtureColumns: Column<FixtureData>[] = useMemo(() => [
     {
       key: 'name',
       header: 'Tournament',
       sortable: true,
-      render: (value, item, index) => {
+      className: 'min-w-0 w-32 sm:w-auto',
+      render: (_value, item) => {
         if (!item) return null;
         return (
           <div className="flex items-center">
-            <Trophy className="w-5 h-5 text-gray-400 mr-3" />
-            <div>
-              <div className="text-sm font-medium text-gray-900">{item.name}</div>
-              <div className="text-sm text-gray-500">Level: {item.level}</div>
+            <Trophy className="w-5 h-5 text-gray-400 mr-3 flex-shrink-0" />
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-gray-900 truncate">{item.name}</div>
+              <div className="text-xs text-gray-500">{item.sport?.displayName || item.sport?.name} • {item.level}</div>
             </div>
           </div>
         );
       }
     },
     {
-      key: 'teams',
-      header: 'Teams',
-      render: (value, item, index) => {
-        if (!item) return null;
-        return (
-          <span className="text-sm text-gray-900">
-            {item.assignedTeams?.length || 0}
-          </span>
-        );
-      }
-    },
-    {
       key: 'matches',
-      header: 'Matches',
-      render: (value, item, index) => {
+      header: 'Progress',
+      className: 'w-20 sm:w-24',
+      render: (_value, item) => {
         if (!item) return null;
+        const progress = getMatchProgress(item);
+        const percentage = progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
+        
         return (
-          <div>
-            <div className="text-sm text-gray-900">
-              {item.bracket?.matches?.filter((m: { status?: string }) => m?.status === 'completed').length || 0} / {item.bracket?.matches?.length || 0}
+          <div className="text-center">
+            <div className="text-sm font-medium text-gray-900">
+              {progress.completed}/{progress.total}
             </div>
-            <div className="text-xs text-gray-500">completed</div>
+            <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+              <div 
+                className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
           </div>
         );
       }
@@ -118,149 +146,25 @@ export default function FixturesPage() {
       key: 'status',
       header: 'Status',
       sortable: true,
-      render: (value, item, index) => {
+      className: 'w-24 sm:w-28',
+      render: (_value, item) => {
         if (!item) return null;
-        
-        const getStatusColor = (status: string) => {
-          switch (status) {
-            case 'completed': return 'bg-green-100 text-green-800';
-            case 'in_progress': return 'bg-blue-100 text-blue-800';
-            case 'scheduled': return 'bg-yellow-100 text-yellow-800';
-            default: return 'bg-gray-100 text-gray-800';
-          }
-        };
-        
-        const getStatusIcon = (status: string) => {
-          switch (status) {
-            case 'completed': return <CheckCircle className="w-4 h-4" />;
-            case 'in_progress': return <Play className="w-4 h-4" />;
-            case 'scheduled': return <Clock className="w-4 h-4" />;
-            default: return <AlertCircle className="w-4 h-4" />;
-          }
-        };
-        
         return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
             {getStatusIcon(item.status)}
-            <span className="ml-1 capitalize">{item.status.replace('_', ' ')}</span>
+            <span className="ml-1 capitalize hidden sm:inline">
+              {item.status.replace('_', ' ')}
+            </span>
           </span>
         );
       }
     }
-  ];
+  ], []);
 
-  const getFixtureFilters = () => [
-    {
-      key: 'status',
-      label: 'Status',
-      type: 'select' as const,
-      options: [
-        { label: 'All', value: '' },
-        { label: 'Scheduled', value: 'scheduled' },
-        { label: 'In Progress', value: 'in_progress' },
-        { label: 'Completed', value: 'completed' }
-      ]
-    },
-    {
-      key: 'level',
-      label: 'Level',
-      type: 'select' as const,
-      options: [
-        { label: 'All Levels', value: '' },
-        ...Array.from(new Set((fixtures || []).map(f => f.level))).map(level => ({
-          label: level,
-          value: level
-        }))
-      ]
-    }
-  ];
-
-  // Available sports for tournament creation
-  const availableSportsForCreation = useMemo(() => {
-    if (!checkedInTeamsResult?.success || !checkedInTeamsResult.teamsBySport) {
-      return [];
-    }
-
-    return Object.entries(checkedInTeamsResult.teamsBySport)
-      .map(([sportKey, sportTeams]) => {
-        const [sportId, genderCategory] = sportKey.split('_');
-        const firstTeam = (sportTeams as any)?.[0];
-        const sportName = firstTeam?.sportName || firstTeam?.displayName || sportId.replace('_', ' ');
-        const teamCount = (sportTeams as any)?.length || 0;
-        
-        // Check if tournament already exists
-        const existingFixture = (fixtures || []).find(f => 
-          f.sportId === sportId && f.genderCategory === genderCategory
-        );
-        
-        return {
-          sportId,
-          genderCategory,
-          sportName,
-          teamCount,
-          hasExisting: !!existingFixture,
-          existingFixture,
-          canCreate: teamCount >= 2
-        };
-      })
-      .filter(sport => sport.canCreate && !sport.hasExisting);
-  }, [checkedInTeamsResult, fixtures]);
-
-  // Fixture actions
-  const fixtureActions = useMemo<ActionButton<any>[]>(() => [
-    {
-      label: 'View Details',
-      icon: Eye,
-      onClick: (fixture) => router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${fixture.id}`),
-      variant: 'secondary'
-    },
-    {
-      label: 'Live Matches',
-      icon: Play,
-      onClick: (fixture) => router.push(`/${lang}/volunteer/venues/${venueId}/matches?fixture=${fixture.id}`),
-      variant: 'primary',
-      show: (fixture: any) => fixture.status === 'in_progress'
-    },
-    {
-      label: 'Upload Media',
-      icon: Camera,
-      onClick: (fixture) => router.push(`/${lang}/volunteer/venues/${venueId}/media/upload?fixtureId=${fixture.id}`),
-      variant: 'secondary'
-    }
-  ], [router, lang, venueId]);
-
-  // Handle tournament creation
-  const handleCreateTournament = (sport: typeof selectedSportForCreation) => {
-    if (sport) {
-      router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/create-draw?sport=${sport.sportId}&gender=${sport.genderCategory}`);
-    }
-  };
-
-  // Header actions for creating tournaments
-  const getHeaderActions = () => {
-    if (availableSportsForCreation.length === 0) {
-      return null;
-    }
-
+  // Loading and error states
+  if (authLoading || fixturesLoading) {
     return (
-      <button
-        onClick={() => setShowCreateModal(true)}
-        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-      >
-        <Plus className="w-4 h-4 mr-2" />
-        Create Tournament
-      </button>
-    );
-  };
-
-  // Header actions for selected fixtures
-  const getHeaderActionsSingle = (selectedItems: any[]) => {
-    return null; // No bulk actions needed for fixtures currently
-  };
-
-  if (authLoading || loading) {
-    return (
-      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
           <p className="text-gray-600">Loading fixtures...</p>
@@ -269,14 +173,14 @@ export default function FixturesPage() {
     );
   }
 
-  if (error) {
+  if (fixturesError) {
     return (
       <div className="p-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Error</h1>
-          <p className="mt-2 text-gray-600">{error}</p>
+          <p className="mt-2 text-gray-600">{fixturesError.message}</p>
           <button 
-            onClick={() => window.location.reload()}
+            onClick={() => refetchFixtures()}
             className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
             Retry
@@ -286,176 +190,228 @@ export default function FixturesPage() {
     );
   }
 
-  const checkedInTeams = checkedInTeamsResult?.teams || [];
-
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div className="w-full py-4 sm:py-8 px-0 sm:px-4 lg:px-6">
+      {/* Offline Status */}
+      <OfflineStatusBanner className="mb-4" />
+      
       {/* Header */}
-      <div className="flex items-center mb-6">
-        <Link href={`/en/volunteer/venues/${venueId}`} className="mr-4">
-          <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tournament Management</h1>
-          <p className="text-gray-600 text-sm">Create and manage tournaments for this venue</p>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg p-4 shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Checked-in Teams</p>
-              <p className="text-2xl font-bold text-green-600">{checkedInTeams.length}</p>
-            </div>
-            <Users className="w-8 h-8 text-green-400" />
+      <div className="mb-6 px-4 sm:px-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+              Tournament Fixtures
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600">
+              Manage tournament schedules and match progress
+            </p>
           </div>
-        </div>
-        
-        <div className="bg-white rounded-lg p-4 shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Active Tournaments</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {(fixtures || []).filter(f => f.status === 'in_progress').length}
-              </p>
-            </div>
-            <Trophy className="w-8 h-8 text-blue-400" />
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg p-4 shadow-sm border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-sm">Completed</p>
-              <p className="text-2xl font-bold text-gray-600">
-                {(fixtures || []).filter(f => f.status === 'completed').length}
-              </p>
-            </div>
-            <CheckCircle className="w-8 h-8 text-gray-400" />
-          </div>
-        </div>
-      </div>
-
-
-      {/* Active Fixtures */}
-      <AdvancedTable
-        data={fixtures || []}
-        columns={getFixtureColumns()}
-        actions={fixtureActions}
-        loading={loading}
-        searchable={true}
-        searchPlaceholder="Search tournaments..."
-        filterable={true}
-        filters={getFixtureFilters()}
-        sortable={true}
-        selectable={true}
-        selectedRows={selectedFixtures}
-        onSelectionChange={setSelectedFixtures}
-        keyExtractor={(fixture) => fixture.id}
-        headerActions={getHeaderActions()}
-        headerActionsSingle={getHeaderActionsSingle}
-        emptyState={{
-          icon: Trophy,
-          title: 'No tournaments created yet',
-          description: availableSportsForCreation.length > 0 
-            ? 'Create tournaments from checked-in teams using the button above.'
-            : 'Check in teams first before creating tournaments.'
-        }}
-        pagination={{ enabled: true, pageSize: 25 }}
-        persistState={false}
-      />
-
-      {/* Tournament Creation Modal */}
-      <EnhancedModal
-        isOpen={showCreateModal}
-        onClose={() => {
-          setShowCreateModal(false);
-          setSelectedSportForCreation(null);
-        }}
-        title="Create New Tournament"
-        subtitle="Select a sport to create a tournament bracket"
-        size="lg"
-        mobileFullScreen={true}
-        scrollableBody={true}
-        footer={
-          <div className="flex justify-end space-x-3">
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => {
-                setShowCreateModal(false);
-                setSelectedSportForCreation(null);
-              }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/create`)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors"
             >
-              Cancel
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Create Tournament</span>
             </button>
-            {selectedSportForCreation && (
-              <button
-                onClick={() => {
-                  handleCreateTournament(selectedSportForCreation);
-                  setShowCreateModal(false);
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26]"
-              >
-                Create Tournament
-              </button>
-            )}
+            <button
+              onClick={() => refetchFixtures()}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
           </div>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-gray-600 text-sm mb-4">
-            Select a sport and gender category to create a tournament. Only sports with 2 or more checked-in teams are available.
-          </p>
-          
-          {availableSportsForCreation.length === 0 ? (
-            <div className="text-center py-8">
-              <Trophy className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 font-medium">No sports available for tournament creation</p>
-              <p className="text-gray-400 text-sm mt-2">
-                Sports need at least 2 checked-in teams to create a tournament
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {availableSportsForCreation.map((sport) => (
-                <div
-                  key={`${sport.sportId}_${sport.genderCategory}`}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    selectedSportForCreation?.sportId === sport.sportId && 
-                    selectedSportForCreation?.genderCategory === sport.genderCategory
-                      ? 'border-[#F28C38] bg-orange-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                  onClick={() => setSelectedSportForCreation(sport)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Trophy className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
-                        <h3 className="font-medium text-gray-900 capitalize">
-                          {sport.sportName} - {sport.genderCategory}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          {sport.teamCount} teams checked in
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-green-600">
-                        Ready to create
-                      </div>
+        </div>
+      </div>
+
+      {/* Date Selector */}
+      <div className="mb-4 px-4 sm:px-0">
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-medium text-gray-700">View Date:</label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
+          />
+          {selectedDate !== new Date().toISOString().split('T')[0] && (
+            <button
+              onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+              className="text-sm text-[#F28C38] hover:text-[#E67A26]"
+            >
+              Today
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Create New Tournaments */}
+      {availableSports && availableSports.length > 0 && (
+        <div className="bg-white rounded-lg border shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Create New Tournament</h2>
+          <div className="space-y-3">
+            {availableSports.map((sport: any) => {
+              const existingFixture = fixtures?.find(f => 
+                f.sport.id === sport.sportId && f.genderCategory === sport.genderCategory
+              );
+              
+              return (
+                <div key={`${sport.sportId}_${sport.genderCategory}`} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center">
+                    <Trophy className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>
+                      <h3 className="font-medium text-gray-900 capitalize">
+                        {sport.sportName} - {sport.genderCategory}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {sport.teamCount} teams checked in
+                      </p>
                     </div>
                   </div>
+                  
+                  {existingFixture ? (
+                    <button
+                      onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${existingFixture.id}`)}
+                      className="flex items-center px-3 py-2 text-sm text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded-md border border-indigo-200"
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      View Tournament
+                    </button>
+                  ) : sport.teamCount >= 2 ? (
+                    <button
+                      onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/create?sport=${sport.sportId}&gender=${sport.genderCategory}`)}
+                      className="flex items-center px-3 py-2 text-sm text-white bg-[#F28C38] hover:bg-[#E67A26] rounded-md"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Create Tournament
+                    </button>
+                  ) : (
+                    <div className="text-sm text-gray-500 px-3 py-2 bg-gray-100 rounded-md">
+                      Need 2+ teams
+                    </div>
+                  )}
                 </div>
-              ))}
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <AdvancedTable
+        data={fixtures || []}
+        columns={fixtureColumns}
+        loading={fixturesLoading}
+        onRowClick={(fixture) => router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${fixture.id}`)}
+        keyExtractor={(fixture) => fixture.id}
+        stickyHeader={true}
+        compact={false}
+        searchable={true}
+        searchPlaceholder="Search fixtures, sports, levels..."
+        pagination={{
+          enabled: true,
+          pageSize: 20,
+          pageSizeOptions: [10, 20, 50]
+        }}
+      />
+
+      {/* Today's Matches Summary */}
+      {todayMatches && todayMatches.length > 0 && (
+        <div className="mt-8 px-4 sm:px-0">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Today's Matches ({selectedDate})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {todayMatches.slice(0, 6).map((match: any) => (
+              <div key={match.id} className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(match.status)}`}>
+                    {getStatusIcon(match.status)}
+                    <span className="ml-1 capitalize">{match.status}</span>
+                  </span>
+                  {match.scheduledTime && (
+                    <span className="text-xs text-gray-500">
+                      {new Date(match.scheduledTime).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm font-medium text-gray-900 mb-1">
+                  {match.fixture?.name}
+                </div>
+                <div className="text-xs text-gray-600">
+                  {match.team1?.name} vs {match.team2?.name}
+                </div>
+                {(match.team1Score !== null || match.team2Score !== null) && (
+                  <div className="text-sm font-medium text-gray-900 mt-2">
+                    {match.team1Score || 0} - {match.team2Score || 0}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {todayMatches.length > 6 && (
+            <div className="text-center mt-4">
+              <button
+                onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/matches`)}
+                className="text-[#F28C38] hover:text-[#E67A26] text-sm font-medium"
+              >
+                View all {todayMatches.length} matches →
+              </button>
             </div>
           )}
         </div>
-      </EnhancedModal>
+      )}
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 px-4 sm:px-0">
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Total Fixtures</p>
+              <p className="text-2xl font-bold text-gray-900">{fixtures?.length || 0}</p>
+            </div>
+            <Trophy className="w-8 h-8 text-gray-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">In Progress</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {fixtures?.filter(f => f.status === 'in_progress').length || 0}
+              </p>
+            </div>
+            <Play className="w-8 h-8 text-blue-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Completed</p>
+              <p className="text-2xl font-bold text-green-600">
+                {fixtures?.filter(f => f.status === 'completed').length || 0}
+              </p>
+            </div>
+            <CheckCircle className="w-8 h-8 text-green-400" />
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-600 text-sm">Today's Matches</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {todayMatches?.length || 0}
+              </p>
+            </div>
+            <Calendar className="w-8 h-8 text-purple-400" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

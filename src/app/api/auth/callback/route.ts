@@ -13,41 +13,47 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('OAuth error from Isha SSO:', error, errorDescription);
-      return NextResponse.json({ 
-        error: `OAuth error: ${error}`, 
-        description: errorDescription 
-      }, { status: 400 });
+      return NextResponse.redirect(`${new URL(request.url).origin}/en/login?error=oauth_error&details=${encodeURIComponent(errorDescription || error)}`);
     }
 
     if (!code) {
       console.error('Authorization code missing from callback');
-      return NextResponse.json({ error: 'Authorization code missing' }, { status: 400 });
+      return NextResponse.redirect(`${new URL(request.url).origin}/en/login?error=missing_code`);
     }
 
-    // Exchange authorization code for tokens using PKCE
+    // Validate state parameter
+    const storedState = request.cookies.get('oidc_state')?.value;
+    if (!storedState || storedState !== state) {
+      console.error('State mismatch or missing:', { stored: storedState, received: state });
+      return NextResponse.redirect(`${new URL(request.url).origin}/en/login?error=invalid_state`);
+    }
+
+    // Get code verifier from cookies
     const codeVerifier = request.cookies.get('code_verifier')?.value;
     
     console.log('=== PKCE VERIFICATION ===');
-    console.log('Code verifier from cookie:', codeVerifier);
-    console.log('All cookies:', Object.fromEntries(
-      Array.from(request.cookies.entries()).map(([key, cookie]) => [key, cookie.value])
-    ));
+    console.log('Code verifier from cookie:', codeVerifier ? 'Present' : 'Missing');
+    console.log('Code verifier length:', codeVerifier?.length);
+    console.log('Authorization code:', code.substring(0, 10) + '...');
     
     if (!codeVerifier) {
       console.error('Code verifier missing from cookies');
-      return NextResponse.json({ error: 'Invalid authentication state' }, { status: 400 });
+      console.log('Available cookies:', request.cookies.getAll().map(c => c.name));
+      return NextResponse.redirect(`${new URL(request.url).origin}/en/login?error=missing_pkce`);
     }
 
-    const tokenParams: Record<string, string> = {
+    // Prepare token exchange request
+    const tokenParams = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: process.env.ISHA_OIDC_CLIENT_ID!,
       code,
       redirect_uri: process.env.ISHA_OIDC_REDIRECT_URI!,
-      code_verifier: codeVerifier, // PKCE parameter
-    };
+      code_verifier: codeVerifier,
+    });
 
-    // For public clients without client secret, we don't add client_secret
-    // This follows the "No client-authentication" approach from the OIDC docs
+    console.log('=== TOKEN EXCHANGE REQUEST ===');
+    console.log('Token endpoint:', `${process.env.ISHA_OIDC_ISSUER}/oidc/token`);
+    console.log('Request params:', Object.fromEntries(tokenParams.entries()));
     
     const tokenResponse = await fetch(`${process.env.ISHA_OIDC_ISSUER}/oidc/token`, {
       method: 'POST',
@@ -55,45 +61,41 @@ export async function GET(request: NextRequest) {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
       },
-      body: new URLSearchParams(tokenParams),
+      body: tokenParams,
     });
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('Token exchange failed:', {
-        status: tokenResponse.status,
-        statusText: tokenResponse.statusText,
-        error: errorText,
-        params: tokenParams
-      });
-      return NextResponse.json({ 
-        error: 'Token exchange failed', 
-        details: errorText 
-      }, { status: 400 });
+      console.error('=== TOKEN EXCHANGE FAILED ===');
+      console.error('Status:', tokenResponse.status);
+      console.error('Response:', errorText);
+      
+      return NextResponse.redirect(`${new URL(request.url).origin}/en/login?error=token_exchange_failed&details=${encodeURIComponent(errorText)}`);
     }
 
     const tokens = await tokenResponse.json();
-    const accessToken = tokens.access_token;
+    console.log('=== TOKEN EXCHANGE SUCCESS ===');
+    console.log('Received tokens:', Object.keys(tokens));
 
     // Get user info from OIDC provider
     const userResponse = await fetch(`${process.env.ISHA_OIDC_ISSUER}/oidc/userinfo`, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${tokens.access_token}`,
         'Accept': 'application/json',
       },
     });
 
     if (!userResponse.ok) {
-      console.error('Failed to fetch user info');
-      return NextResponse.json({ error: 'Failed to fetch user info' }, { status: 400 });
+      console.error('Failed to fetch user info:', userResponse.status);
+      return NextResponse.redirect(`${new URL(request.url).origin}/en/login?error=userinfo_failed`);
     }
 
     const userInfo = await userResponse.json();
     
     console.log('=== USER INFO FROM ISHA SSO ===');
-    console.log('Full userInfo object:', JSON.stringify(userInfo, null, 2));
-    console.log('Phone number field:', userInfo.phone_number);
-    console.log('Phone extraction result:', userInfo.phone_number || userInfo.phone || userInfo.phoneNumber || userInfo.mobile || null);
+    console.log('User sub:', userInfo.sub);
+    console.log('User email:', userInfo.email);
+    console.log('User phone:', userInfo.phone_number);
     
     // Map OIDC user info to our User model
     const userData = {
@@ -110,9 +112,8 @@ export async function GET(request: NextRequest) {
       district: userInfo.address?.locality || userInfo.address?.district || null,
       state: userInfo.address?.region || userInfo.address?.state || null,
       pincode: userInfo.address?.postal_code || userInfo.address?.pincode || null,
-      profileComplete: false, // Will be updated based on completeness check
-      role: 'public', // Default role
-      // languagePreference: null (default) - let users choose their preference
+      profileComplete: false,
+      role: 'public',
     };
 
     // Create or update user in database
@@ -125,21 +126,18 @@ export async function GET(request: NextRequest) {
         email: userData.email,
         firstName: userData.firstName,
         lastName: userData.lastName,
-        sub: userInfo.sub, // Isha SSO user ID
-        // Store other available fields
+        sub: userInfo.sub,
         ...userInfo
       };
       
-      // Redirect to phone collection page with temp data
       const redirectUrl = new URL('/en/auth/phone-required', request.url);
       const response = NextResponse.redirect(redirectUrl);
       
-      // Store temp user data in cookie for phone collection page
       response.cookies.set('temp_user_data', JSON.stringify(tempUserData), {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 10 * 60 * 1000, // 10 minutes
+        maxAge: 10 * 60,
       });
       
       // Clear PKCE cookies
@@ -154,23 +152,21 @@ export async function GET(request: NextRequest) {
     });
 
     if (existingUser) {
-      // Update existing user
       user = await prisma.user.update({
         where: { phone: phone },
         data: {
           ...userData,
-          role: existingUser.role, // Preserve existing role
+          role: existingUser.role,
           updatedAt: new Date(),
         }
       });
     } else {
-      // Create new user
       user = await prisma.user.create({
         data: userData
       });
     }
 
-    // Check profile completeness - more flexible approach
+    // Check profile completeness
     const requiredFields = ['firstName', 'lastName', 'phone'];
     const optionalFields = ['dateOfBirth', 'gender', 'district', 'state'];
     
@@ -193,13 +189,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Create session by setting userId cookie and redirect using centralized navigation
+    // Determine redirect path
     const supportedLanguages = ['en', 'ta', 'hi', 'ml', 'te', 'kn', 'or'];
     const userLang = user.languagePreference && supportedLanguages.includes(user.languagePreference) 
       ? user.languagePreference 
       : 'en';
     
-    // Use centralized navigation logic
     const hasLanguagePreference = Boolean(user.languagePreference);
     let redirectPath = `/${userLang}`;
     
@@ -209,7 +204,7 @@ export async function GET(request: NextRequest) {
       if (!hasLanguagePreference) {
         redirectPath = `/${userLang}/volunteer?showLanguageModal=true`;
       } else {
-        redirectPath = `/${userLang}/volunteer`; // Will be handled by useRedirect for venue assignment
+        redirectPath = `/${userLang}/volunteer`;
       }
     } else if (user.role === 'captain') {
       redirectPath = `/${userLang}/captain/dashboard`;
@@ -228,22 +223,27 @@ export async function GET(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 30 // 30 days
+      maxAge: 60 * 60 * 24 * 30
     });
 
     // Clear PKCE cookies
     response.cookies.delete('oidc_state');
     response.cookies.delete('code_verifier');
 
+    console.log('=== AUTH SUCCESS ===');
+    console.log('User ID:', user.id);
+    console.log('Redirecting to:', redirectPath);
+
     return response;
 
   } catch (error) {
-    console.error('OIDC callback error:', error);
+    console.error('=== OIDC CALLBACK ERROR ===');
+    console.error('Error:', error);
     
-    // Clear any partial auth state
-    const errorResponse = NextResponse.redirect(`${new URL(request.url).origin}/en/login?error=auth_failed`);
+    const errorResponse = NextResponse.redirect(`${new URL(request.url).origin}/en/login?error=callback_error`);
     errorResponse.cookies.delete('userId');
     errorResponse.cookies.delete('oidc_state');
+    errorResponse.cookies.delete('code_verifier');
     
     return errorResponse;
   }

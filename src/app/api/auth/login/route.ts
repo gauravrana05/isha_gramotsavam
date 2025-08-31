@@ -29,23 +29,26 @@ export async function POST(request: NextRequest) {
     console.log('=== PKCE GENERATION ===');
     console.log('Code verifier:', codeVerifier);
     console.log('Code challenge:', codeChallenge);
-    console.log('Authorization URL:', authUrl.toString());
+    console.log('State:', state);
 
     // Return JSON with authUrl (as expected by AuthContext)
     const response = NextResponse.json({ authUrl: authUrl.toString() });
+    
+    // Set cookies with proper configuration
     response.cookies.set('oidc_state', state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 10 * 60 * 1000,
+      maxAge: 10 * 60, // 10 minutes in seconds
     });
+    
     response.cookies.set('code_verifier', codeVerifier, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 10 * 60 * 1000,
+      maxAge: 10 * 60, // 10 minutes in seconds
     });
 
     return response;
@@ -55,7 +58,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Add GET method for direct redirect
 export async function GET(request: NextRequest) {
   try {
     // Generate PKCE parameters
@@ -75,20 +77,25 @@ export async function GET(request: NextRequest) {
     console.log('=== PKCE GENERATION (GET) ===');
     console.log('Code verifier:', codeVerifier);
     console.log('Code challenge:', codeChallenge);
-    console.log('Authorization URL:', authUrl.toString());
+    console.log('State:', state);
 
     const response = NextResponse.redirect(authUrl.toString());
+    
+    // Set cookies with proper configuration
     response.cookies.set('oidc_state', state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 10 * 60 * 1000,
+      path: '/',
+      maxAge: 10 * 60, // 10 minutes in seconds
     });
+    
     response.cookies.set('code_verifier', codeVerifier, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 10 * 60 * 1000,
+      path: '/',
+      maxAge: 10 * 60, // 10 minutes in seconds
     });
 
     return response;

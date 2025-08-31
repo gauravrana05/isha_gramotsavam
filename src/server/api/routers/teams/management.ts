@@ -149,6 +149,49 @@ export const teamsManagementRouter = createTRPCRouter({
     return teams
   }),
 
+  // Get user teams (as captain) - alias for captain pages
+  getUserTeams: protectedProcedure.query(async ({ ctx }) => {
+    return await db.team.findMany({
+      where: {
+        captainId: ctx.user.id
+      },
+      include: {
+        sport: true,
+        teamVenueAssignments: {
+          include: {
+            clusterVenueMapping: {
+              include: { venue: true }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }),
+
+  // Get user player teams (as player) - for player pages
+  getUserPlayerTeams: protectedProcedure.query(async ({ ctx }) => {
+    return await db.teamPlayer.findMany({
+      where: {
+        userId: ctx.user.id
+      },
+      include: {
+        team: {
+          include: {
+            sport: true,
+            captainUser: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }),
+
   // Public team registration (for public registration form)
   register: publicProcedure
     .input(publicCreateTeamSchema)

@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useOffline } from '@/context/OfflineContext';
 import Link from 'next/link';
 import { MediaUpload } from '@/components/media/MediaUpload';
-import { ArrowLeft, Trophy, Target, Loader2 } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, Loader2, Wifi, WifiOff, Upload, CloudOff } from 'lucide-react';
 
 interface ContextInfo {
   type: 'fixture' | 'match' | null;

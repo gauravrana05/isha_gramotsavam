@@ -16,6 +16,7 @@ import {
   getUserVerificationsSchema,
   getPendingVerificationsSchema,
 } from '@/lib/validations/user'
+import type { Prisma } from '@prisma/client'
 
 export const usersRouter = createTRPCRouter({
   // Public procedures
@@ -34,8 +35,27 @@ export const usersRouter = createTRPCRouter({
           })
         }
 
+        // Create proper Prisma user data object
+        const userData: Prisma.UserCreateInput = {
+          phone: input.phone,
+          email: input.email || null,
+          role: input.role || 'public',
+          languagePreference: input.languagePreference || 'en',
+          firstName: input.firstName || null,
+          lastName: input.lastName || null,
+          dateOfBirth: input.dateOfBirth || null,
+          gender: input.gender || null,
+          whatsappNumber: input.whatsappNumber || null,
+          instagramHandle: input.instagramHandle || null,
+          panchayat: input.panchayat || null,
+          taluk: input.taluk || null,
+          district: input.district || null,
+          state: input.state || null,
+          pincode: input.pincode || null,
+        }
+
         const user = await db.user.create({
-          data: input as any,
+          data: userData,
         })
 
         return user
@@ -88,9 +108,28 @@ export const usersRouter = createTRPCRouter({
       const { id, ...updateData } = input
 
       try {
+        // Create proper Prisma update data object
+        const userData: Prisma.UserUpdateInput = {
+          ...(updateData.phone && { phone: updateData.phone }),
+          ...(updateData.email !== undefined && { email: updateData.email }),
+          ...(updateData.role && { role: updateData.role }),
+          ...(updateData.languagePreference !== undefined && { languagePreference: updateData.languagePreference }),
+          ...(updateData.firstName !== undefined && { firstName: updateData.firstName }),
+          ...(updateData.lastName !== undefined && { lastName: updateData.lastName }),
+          ...(updateData.dateOfBirth !== undefined && { dateOfBirth: updateData.dateOfBirth }),
+          ...(updateData.gender !== undefined && { gender: updateData.gender }),
+          ...(updateData.whatsappNumber !== undefined && { whatsappNumber: updateData.whatsappNumber }),
+          ...(updateData.instagramHandle !== undefined && { instagramHandle: updateData.instagramHandle }),
+          ...(updateData.panchayat !== undefined && { panchayat: updateData.panchayat }),
+          ...(updateData.taluk !== undefined && { taluk: updateData.taluk }),
+          ...(updateData.district !== undefined && { district: updateData.district }),
+          ...(updateData.state !== undefined && { state: updateData.state }),
+          ...(updateData.pincode !== undefined && { pincode: updateData.pincode }),
+        }
+
         const user = await db.user.update({
           where: { id },
-          data: updateData as any,
+          data: userData,
         })
 
         return user
@@ -387,7 +426,7 @@ export const usersRouter = createTRPCRouter({
       try {
         const user = await db.user.update({
           where: { id: input.userId },
-          data: { role: input.role as any }, 
+          data: { role: input.role }, // input.role is already properly typed from the schema
         })
 
         return user

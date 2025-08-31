@@ -149,6 +149,9 @@ model Fixture {
   genderCategory         GenderCategory @map("gender_category")
   level                  TournamentLevel
   status                 FixtureStatus @default(draft)
+  championTeamId         String? @db.Uuid @map("champion_team_id")
+  championTeamName       String? @db.VarChar(200) @map("champion_team_name")
+  completedAt            DateTime? @db.Timestamptz(6) @map("completed_at")
   createdAt              DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt              DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
   deletedAt              DateTime? @db.Timestamptz(6) @map("deleted_at")
@@ -187,6 +190,8 @@ model Match {
   scoreDetails           String? @map("score_details")
   resultEnteredBy        String? @db.Uuid @map("result_entered_by")
   resultEnteredAt        DateTime? @db.Timestamptz(6) @map("result_entered_at")
+  scheduledTime          DateTime? @db.Timestamptz(6) @map("scheduled_time")
+  actualStartTime        DateTime? @db.Timestamptz(6) @map("actual_start_time")
   status                 MatchStatus @default(scheduled)
   createdAt              DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt              DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")

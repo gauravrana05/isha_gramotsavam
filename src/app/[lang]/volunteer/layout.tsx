@@ -2,57 +2,38 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useRedirect } from '@/lib/utils/navigation';
-import VolunteerSidebar from '@/components/volunteer/VolunteerSidebar';
 import { useAuth } from '@/context/AuthContext';
-import { useTranslation } from '@/lib/utils/i18n';
-import { PageLoader } from '@/components/ui/loaders';
-import { LanguageCode } from '@/lib/utils/i18n-server';
 
 export default function VolunteerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  useRedirect(['general_volunteer', 'technical_volunteer', 'verification_volunteer']);
-  const { user, userProfile, loading } = useAuth();
   const router = useRouter();
   const { lang } = useParams();
-  const { t } = useTranslation();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { user, userProfile, loading } = useAuth();
 
-  const toggleSidebar = () => {
-    setIsSidebarCollapsed(!isSidebarCollapsed);
-  };
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/${lang}/auth/login`);
+    }
+  }, [user, loading, router, lang]);
 
-
-  if (loading || !user) {
+  if (loading) {
     return (
-      <PageLoader 
-        title={t('volunteer.loading_dashboard', 'Loading Volunteer Dashboard...')}
-        variant="brand"
-        size="lg"
-      />
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38]"></div>
+      </div>
     );
   }
 
-  return (
-    <>
-      <div className="lg:min-h-screen bg-gray-50 flex">
-        <VolunteerSidebar 
-          isDesktopCollapsed={isSidebarCollapsed}
-          onDesktopToggle={toggleSidebar}
-        />
-        <div className={`flex-1 min-w-0 overflow-hidden transition-all duration-300 ease-in-out ${
-          isSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
-        }`}>
-          <div className="lg:hidden h-16"></div>
-          <main className="flex-1 relative">
-            {children}
-          </main>
-        </div>
-      </div>
+  if (!user) {
+    return null;
+  }
 
-    </>
+  return (
+    <div className="min-h-screen bg-[#F3F0E5]">
+      {children}
+    </div>
   );
 }

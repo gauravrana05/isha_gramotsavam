@@ -1,115 +1,102 @@
-import { z } from 'zod'
-import { db } from '@/lib/db'
-import { createTRPCRouter, protectedProcedure } from '../trpc'
+import { z } from "zod";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { TRPCError } from "@trpc/server";
 
 export const fixturesRouter = createTRPCRouter({
-  getUpcomingMatches: protectedProcedure
+  // Get fixtures for specific teams
+  getTeamFixtures: protectedProcedure
     .input(z.object({
-      limit: z.number().min(1).max(50).default(5),
+      teamIds: z.array(z.string())
     }))
-    .query(async ({ input, ctx }) => {
-      const team = await db.team.findFirst({
-        where: { captainId: ctx.user.id },
-        select: { id: true },
-      })
-
-      if (!team) {
-        return []
+    .query(async ({ ctx, input }) => {
+      if (input.teamIds.length === 0) {
+        return [];
       }
 
-      const matches = await db.match.findMany({
+      return await ctx.db.fixture.findMany({
         where: {
-          OR: [
-            { team1Id: team.id },
-            { team2Id: team.id },
-          ],
-          status: {
-            in: ['scheduled', 'in_progress'],
-          },
+          fixtureTeams: {
+            some: {
+              teamId: { in: input.teamIds }
+            }
+          }
         },
         include: {
-          team1: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          team2: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
+          sport: true,
           venueLevelMapping: {
             include: {
-              venue: {
+              venue: true
+            }
+          },
+          matches: {
+            select: {
+              id: true,
+              status: true,
+              team1Id: true,
+              team2Id: true,
+              winnerId: true,
+              team1Score: true,
+              team2Score: true,
+              roundName: true,
+              matchNumber: true,
+              scheduledTime: true,
+              actualStartTime: true,
+              scoreDetails: true
+            },
+            orderBy: { matchNumber: 'asc' }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    }),
+
+  // Get fixture by ID
+  getFixtureById: protectedProcedure
+    .input(z.object({
+      fixtureId: z.string()
+    }))
+    .query(async ({ ctx, input }) => {
+      const fixture = await ctx.db.fixture.findUnique({
+        where: { id: input.fixtureId },
+        include: {
+          sport: true,
+          venueLevelMapping: {
+            include: {
+              venue: true
+            }
+          },
+          matches: {
+            include: {
+              team1: {
                 select: {
                   id: true,
                   name: true,
-                  address: true,
-                  district: true,
-                  state: true,
-                },
+                  tournamentNumber: true
+                }
               },
-            },
-          },
-        },
-        orderBy: { createdAt: 'asc' },
-        take: input.limit,
-      })
-
-      return matches
-    }),
-
-  getTeamFixtures: protectedProcedure.query(async ({ ctx }) => {
-    const team = await db.team.findFirst({
-      where: { captainId: ctx.user.id },
-      select: { id: true },
-    })
-
-    if (!team) {
-      return []
-    }
-
-    const fixtures = await db.fixture.findMany({
-      where: {
-        fixtureTeams: {
-          some: {
-            teamId: team.id,
-          },
-        },
-      },
-      include: {
-        event: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
-          },
-        },
-        sport: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        venueLevelMapping: {
-          include: {
-            venue: {
-              select: {
-                id: true,
-                name: true,
-                address: true,
-                district: true,
-                state: true,
+              team2: {
+                select: {
+                  id: true,
+                  name: true,
+                  tournamentNumber: true
+                }
               },
+              winner: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
             },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+            orderBy: { matchNumber: 'asc' }
+          }
+        }
+      });
 
-    return fixtures
-  }),
+      if (!fixture) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Fixture not found' });
+      }
+
+      return fixture;
+    })
 });

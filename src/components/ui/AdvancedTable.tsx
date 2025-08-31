@@ -56,6 +56,12 @@ export interface AdvancedTableConfig<T = any> {
   
   // Row interaction
   onRowClick?: (item: T, index: number) => void;
+  onRowMouseDown?: (item: T, index: number) => void;
+  onRowMouseUp?: () => void;
+  onRowMouseLeave?: () => void;
+  onRowTouchStart?: (item: T, index: number) => void;
+  onRowTouchEnd?: () => void;
+  onRowSelect?: (key: string | number, selected: boolean) => void;
   
   // Nested/Expandable rows
   expandable?: boolean;
@@ -229,6 +235,12 @@ export const AdvancedTable = <T,>({
   
   // Row interaction
   onRowClick,
+  onRowMouseDown,
+  onRowMouseUp,
+  onRowMouseLeave,
+  onRowTouchStart,
+  onRowTouchEnd,
+  onRowSelect,
   
   // Expandable rows
   expandable = false,
@@ -717,6 +729,12 @@ export const AdvancedTable = <T,>({
           compactMode={compact || compactMode}
           keyExtractor={keyExtractor}
           onRowClick={onRowClick}
+          onRowMouseDown={onRowMouseDown}
+          onRowMouseUp={onRowMouseUp}
+          onRowMouseLeave={onRowMouseLeave}
+          onRowTouchStart={onRowTouchStart}
+          onRowTouchEnd={onRowTouchEnd}
+          onRowSelect={onRowSelect}
           
           // Expandable rows
           expandable={expandable}
