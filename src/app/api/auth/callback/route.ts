@@ -27,12 +27,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authorization code missing' }, { status: 400 });
     }
 
-    // Exchange authorization code for tokens
+    // Exchange authorization code for tokens using PKCE
+    const codeVerifier = request.cookies.get('code_verifier')?.value;
+    
+    if (!codeVerifier) {
+      console.error('Code verifier missing from cookies');
+      return NextResponse.json({ error: 'Invalid authentication state' }, { status: 400 });
+    }
+
     const tokenParams: Record<string, string> = {
       grant_type: 'authorization_code',
       client_id: process.env.ISHA_OIDC_CLIENT_ID!,
       code,
       redirect_uri: process.env.ISHA_OIDC_REDIRECT_URI!,
+      code_verifier: codeVerifier, // PKCE parameter
     };
 
     // For public clients without client secret, we don't add client_secret
@@ -164,6 +172,10 @@ export async function GET(request: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 30 // 30 days
     });
+
+    // Clear PKCE cookies
+    response.cookies.delete('oidc_state');
+    response.cookies.delete('code_verifier');
 
     return response;
 
