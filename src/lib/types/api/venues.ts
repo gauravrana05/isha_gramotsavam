@@ -23,7 +23,7 @@ export interface LocationMappingData extends BaseEntity {
   state: string;
   district: string | null;
   clusterVenueMappingId: string;
-  venueLocationMapping?: {
+  venueLevelMapping?: {
     id: string;
     venue: {
       id: string;

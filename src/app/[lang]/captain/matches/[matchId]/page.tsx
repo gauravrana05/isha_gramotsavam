@@ -24,42 +24,33 @@ import {
 } from "lucide-react";
 
 interface CaptainMatchDetail {
-  matchId: string;
-  fixtureId: string;
-  fixtureName: string;
-  sportName?: string;
-  genderCategory?: string;
-  venue: {
-    id: string;
-    name: string;
-    address: string;
-  };
-  roundName: string;
-  matchNumber: number;
+  id: string;
+  name: string;
   status: string;
-  team1?: {
-    teamId: string;
-    teamName: string;
-    tournamentNumber?: number;
-  } | null;
-  team2?: {
-    teamId: string;
-    teamName: string;
-    tournamentNumber?: number;
-  } | null;
-  result?: {
-    winnerName: string;
-    winnerTeamId: string;
-    score: {
-      team1Score: number;
-      team2Score: number;
-    };
-  } | null;
+  genderCategory: string;
+  level: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt: string | null;
+  event: {
+    id: string;
+    name: string;
+    status: string;
+  } | null;
+  fixtureTeams: {
+    team: {
+      id: string;
+      name: string;
+      captainUser: {
+        firstName: string | null;
+        lastName: string | null;
+      };
+    };
+  }[];
+  // Computed properties for backward compatibility
   isCaptainInvolved?: boolean;
-  captainTeamSide?: 'team1' | 'team2' | null;
-  isCaptainTeamWinner?: boolean;
+  roundName?: string;
+  sportName?: string;
 }
 
 export default function CaptainMatchDetailPage() {
@@ -68,13 +59,26 @@ export default function CaptainMatchDetailPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
 
   // Get match details using tRPC
-  const { data: match, isLoading: matchLoading, error: matchError } = api.teams.management.getMyTeamMatches.useQuery(
+  const { data: matches, isLoading: matchLoading, error: matchError } = api.teams.management.getMyTeamMatches.useQuery(
     undefined,
     {
-      enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'captain',
-      select: (matches) => matches.find(m => m.matchId === matchId) as CaptainMatchDetail | undefined
+      enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'captain'
     }
   );
+
+  const match = useMemo(() => {
+    if (!matches) return undefined;
+    const foundMatch = matches.find(m => m.id === matchId);
+    if (foundMatch) {
+      return {
+        ...foundMatch,
+        isCaptainInvolved: foundMatch.fixtureTeams.length > 0,
+        roundName: foundMatch.event?.name || 'Event',
+        sportName: foundMatch.genderCategory
+      } as CaptainMatchDetail;
+    }
+    return undefined;
+  }, [matches, matchId]);
 
   const loading = authLoading || matchLoading;
   const error = matchError?.message;
@@ -182,13 +186,13 @@ export default function CaptainMatchDetailPage() {
                 <div>
                   <div className="flex items-center">
                     <Hash className="w-5 h-5 text-gray-400 mr-1" />
-                    <h1 className="text-2xl font-bold text-[#4A2F1D]">Match {match.matchNumber}</h1>
-                    {match.isCaptainInvolved && (
+                    <h1 className="text-2xl font-bold text-[#4A2F1D]">Match {match.name}</h1>
+                    {match.fixtureTeams.length > 0 && (
                       <Star className="w-5 h-5 text-yellow-500 ml-2" />
                     )}
                   </div>
                   <p className="text-gray-600">
-                    {match.fixtureName} • {match.roundName}
+                    {match.name} • {match.event?.name || "Event"}
                   </p>
                   {match.sportName && (
                     <p className="text-sm text-gray-500">
@@ -295,7 +299,7 @@ export default function CaptainMatchDetailPage() {
             </div>
 
             {/* Result Message for Captain */}
-            {match.result && match.isCaptainInvolved && (
+            {match.result && match.fixtureTeams.length > 0 && (
               <div className={`mt-6 p-4 rounded-lg ${
                 match.isCaptainTeamWinner ? 'bg-green-100 border border-green-200' : 'bg-red-100 border border-red-200'
               }`}>
@@ -335,8 +339,8 @@ export default function CaptainMatchDetailPage() {
               <h3 className="text-lg font-semibold text-[#4A2F1D]">Tournament</h3>
             </div>
             <div>
-              <p className="font-medium text-gray-900">{match.fixtureName}</p>
-              <p className="text-sm text-gray-600 mt-1">Round: {match.roundName}</p>
+              <p className="font-medium text-gray-900">{match.name}</p>
+              <p className="text-sm text-gray-600 mt-1">Round: {match.event?.name || "Event"}</p>
               {match.sportName && (
                 <p className="text-sm text-gray-600">{match.sportName} • {match.genderCategory}</p>
               )}

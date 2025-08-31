@@ -151,10 +151,10 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
       header: 'Assigned Cluster Venue',
       render: (_, mapping) => (
         <div className="text-sm">
-          <div className="font-medium text-gray-900">{mapping.venueLocationMapping?.venue.name || 'N/A'}</div>
-          <div className="text-gray-500">{mapping.venueLocationMapping?.venue.address || 'N/A'}</div>
+          <div className="font-medium text-gray-900">{mapping.venueLevelMapping?.venue.name || 'N/A'}</div>
+          <div className="text-gray-500">{mapping.venueLevelMapping?.venue.address || 'N/A'}</div>
           <div className="text-gray-500">
-            {mapping.venueLocationMapping?.venue.district || 'N/A'}, {mapping.venueLocationMapping?.venue.state || 'N/A'}
+            {mapping.venueLevelMapping?.venue.district || 'N/A'}, {mapping.venueLevelMapping?.venue.state || 'N/A'}
           </div>
         </div>
       ),
@@ -164,7 +164,7 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
       header: 'Max Teams',
       render: (_, mapping) => (
         <div className="text-sm text-gray-900">
-          {mapping.venueLocationMapping?.maxTeams || 'N/A'}
+          {mapping.venueLevelMapping?.maxTeams || 'N/A'}
         </div>
       ),
     },
@@ -293,10 +293,9 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
           columns={columns}
           loading={eventsLoading || mappingsLoading}
           selectedRows={selectedMappings}
-          onSelectedRowsChange={setSelectedMappings}
-          filterFields={filterFields}
+          onSelectionChange={setSelectedMappings}
+          filters={filterFields}
           headerActions={headerActions}
-          getRowActions={getRowActions}
           onRowClick={(mapping) => {
             setSelectedMapping(mapping);
             setShowEditModal(true);
@@ -449,17 +448,17 @@ function CreateLocationMappingModal({ isOpen, onClose, selectedEvent, onSuccess 
     
     if (locationType === 'district') {
       return (districtsData || [])
-        .filter(district => !mappedLocations.includes(typeof district === "string" ? district : district.name))
+        .filter(district => !mappedLocations.includes(district))
         .map(district => ({
-          label: district?.name || district || 'Unknown',
-          value: district?.name || district || 'Unknown'
+          label: district || 'Unknown',
+          value: district || 'Unknown'
         }));
     } else {
       return (taluksData || [])
-        .filter(taluk => !mappedLocations.includes(typeof taluk === "string" ? taluk : taluk.name))
+        .filter(taluk => !mappedLocations.includes(taluk))
         .map(taluk => ({
-          label: taluk?.name || taluk || 'Unknown',
-          value: taluk?.name || taluk || 'Unknown'
+          label: taluk || 'Unknown',
+          value: taluk || 'Unknown'
         }));
     }
   }, [locationType, districtsData, taluksData, allMappingsData]);
@@ -469,7 +468,7 @@ function CreateLocationMappingModal({ isOpen, onClose, selectedEvent, onSuccess 
     if (!venuesData || !allMappingsData) return [];
     
     // Get already used venue IDs for current event
-    const usedVenueIds = allMappingsData.map(m => m?.venueLocationMapping?.venue?.id);
+    const usedVenueIds = allMappingsData.map(m => m?.venueLevelMapping?.venue?.id);
     
     return (venuesData || []).filter((venueMapping: any) => {
       const venue = venueMapping.venue;
@@ -696,7 +695,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
   const [locationType, setLocationType] = useState<'district' | 'taluk'>(mapping.locationType);
   const [selectedState, setSelectedState] = useState<string>(mapping.state || '');
   const [selectedDistrict, setSelectedDistrict] = useState<string>(mapping.district || '');
-  const [selectedVenue, setSelectedVenue] = useState<string>(mapping?.venueLocationMapping?.venue?.id || '');
+  const [selectedVenue, setSelectedVenue] = useState<string>(mapping?.venueLevelMapping?.venue?.id || '');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([mapping.locationName]);
 
   // Get all current mappings to find related locations
@@ -712,7 +711,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
       // Find all mappings with the same venue, location type, and state
       const relatedLocations = allMappingsData
         .filter(m => 
-          m?.venueLocationMapping?.venue?.id === mapping?.venueLocationMapping?.venue?.id &&
+          m?.venueLevelMapping?.venue?.id === mapping?.venueLevelMapping?.venue?.id &&
           m.locationType === mapping.locationType && 
           m.state === mapping.state &&
           (mapping.locationType === 'district' || m.district === mapping.district)
@@ -732,12 +731,12 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
         locationType: mapping.locationType,
         state: mapping.state,
         district: mapping.district,
-        venueId: mapping?.venueLocationMapping?.venue?.id
+        venueId: mapping?.venueLevelMapping?.venue?.id
       });
       setLocationType(mapping.locationType);
       setSelectedState(mapping.state || '');
       setSelectedDistrict(mapping.district || '');
-      setSelectedVenue(mapping?.venueLocationMapping?.venue?.id || '');
+      setSelectedVenue(mapping?.venueLevelMapping?.venue?.id || '');
     }
   }, [isEditMode, mapping]);
 
@@ -773,17 +772,17 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
     
     if (locationType === 'district') {
       return (districtsData || [])
-        .filter(district => !mappedLocations.includes(typeof district === "string" ? district : district.name))
+        .filter(district => !mappedLocations.includes(district))
         .map(district => ({
-          label: district?.name || district || 'Unknown',
-          value: district?.name || district || 'Unknown'
+          label: district || 'Unknown',
+          value: district || 'Unknown'
         }));
     } else {
       return (taluksData || [])
-        .filter(taluk => !mappedLocations.includes(typeof taluk === "string" ? taluk : taluk.name))
+        .filter(taluk => !mappedLocations.includes(taluk))
         .map(taluk => ({
-          label: taluk?.name || taluk || 'Unknown',
-          value: taluk?.name || taluk || 'Unknown'
+          label: taluk || 'Unknown',
+          value: taluk || 'Unknown'
         }));
     }
   }, [locationType, districtsData, taluksData, allMappingsData]);
@@ -793,7 +792,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
     if (!venuesData || !allMappingsData) return [];
     
     // Get already used venue IDs for current event
-    const usedVenueIds = allMappingsData.map(m => m?.venueLocationMapping?.venue?.id);
+    const usedVenueIds = allMappingsData.map(m => m?.venueLevelMapping?.venue?.id);
     
     return (venuesData || []).filter((venueMapping: any) => {
       const venue = venueMapping.venue;
@@ -823,17 +822,17 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
     let availableLocations = [];
     if (locationType === 'district') {
       availableLocations = (districtsData || [])
-        .filter(district => !mappedLocations.includes(typeof district === "string" ? district : district.name))
+        .filter(district => !mappedLocations.includes(district))
         .map(district => ({
-          label: district?.name || district || 'Unknown',
-          value: district?.name || district || 'Unknown'
+          label: district || 'Unknown',
+          value: district || 'Unknown'
         }));
     } else {
       availableLocations = (taluksData || [])
-        .filter(taluk => !mappedLocations.includes(typeof taluk === "string" ? taluk : taluk.name))
+        .filter(taluk => !mappedLocations.includes(taluk))
         .map(taluk => ({
-          label: taluk?.name || taluk || 'Unknown',
-          value: taluk?.name || taluk || 'Unknown'
+          label: taluk || 'Unknown',
+          value: taluk || 'Unknown'
         }));
     }
 
@@ -859,7 +858,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
     // Get already used venue IDs for current event (excluding current mapping if editing)
     const usedVenueIds = allMappingsData
       .filter(m => m.id !== mapping?.id) // Allow keeping same venue when editing
-      .map(m => m?.venueLocationMapping?.venue?.id);
+      .map(m => m?.venueLevelMapping?.venue?.id);
     
     const availableVenues = (venuesData || []).filter((venueMapping: any) => {
       const venue = venueMapping.venue;
@@ -923,7 +922,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
       // Find all related mappings (same venue, location type, state, district)
       const relatedMappingIds = allMappingsData
         .filter(m => 
-          m?.venueLocationMapping?.venue?.id === mapping?.venueLocationMapping?.venue?.id &&
+          m?.venueLevelMapping?.venue?.id === mapping?.venueLevelMapping?.venue?.id &&
           m.locationType === mapping.locationType && 
           m.state === mapping.state &&
           (mapping.locationType === 'district' || m.district === mapping.district)
@@ -951,7 +950,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
       if (allMappingsData) {
         const relatedMappingIds = allMappingsData
           .filter(m => 
-            m?.venueLocationMapping?.venue?.id === mapping?.venueLocationMapping?.venue?.id &&
+            m?.venueLevelMapping?.venue?.id === mapping?.venueLevelMapping?.venue?.id &&
             m.locationType === mapping.locationType && 
             m.state === mapping.state &&
             (mapping.locationType === 'district' || m.district === mapping.district)
@@ -1056,15 +1055,15 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Venue:</span>
-                <span className="font-medium">{mapping?.venueLocationMapping?.venue.name}</span>
+                <span className="font-medium">{mapping?.venueLevelMapping?.venue.name}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Venue District:</span>
-                <span className="font-medium">{mapping?.venueLocationMapping?.venue.district}</span>
+                <span className="font-medium">{mapping?.venueLevelMapping?.venue.district}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Address:</span>
-                <span className="font-medium text-right max-w-xs">{mapping?.venueLocationMapping?.venue.address}</span>
+                <span className="font-medium text-right max-w-xs">{mapping?.venueLevelMapping?.venue.address}</span>
               </div>
             </div>
           </div>
@@ -1104,8 +1103,8 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
                   </SelectTrigger>
                   <SelectContent>
                     {(districtsData || []).map((district, index) => (
-                      <SelectItem key={district.id || typeof district === "string" ? district : district.name || index} value={typeof district === "string" ? district : district.name}>
-                        {typeof district === "string" ? district : district.name}
+                      <SelectItem key={district.id || district || index} value={district}>
+                        {district}
                       </SelectItem>
                     ))}
                   </SelectContent>

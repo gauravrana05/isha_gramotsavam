@@ -5,7 +5,7 @@ import { createTRPCRouter, publicProcedure, protectedProcedure, adminProcedure }
 import {
   createVenueSchema,
   updateVenueSchema,
-  createVenueLocationMappingSchema,
+  createVenueLevelMappingSchema,
   updateVenueLocationMappingSchema,
   createTalukClusterMappingSchema,
   createClusterDivisionMappingSchema,
@@ -250,11 +250,11 @@ export const venuesRouter = createTRPCRouter({
   getVenueCapacity: publicProcedure
     .input(getVenueCapacitySchema)
     .query(async ({ input }) => {
-      const { venueLocationMappingId, sportId } = input
+      const { venueLevelMappingId, sportId } = input
 
       // Get venue mapping details
       const venueMapping = await db.venueLevelMapping.findUnique({
-        where: { id: venueLocationMappingId },
+        where: { id: venueLevelMappingId },
         include: {
           venue: true,
         },
@@ -272,9 +272,9 @@ export const venuesRouter = createTRPCRouter({
         venueAssignments: {
           some: {
             OR: [
-              { clusterVenueMappingId: venueLocationMappingId },
-              { divisionVenueMappingId: venueLocationMappingId },
-              { finalVenueMappingId: venueLocationMappingId },
+              { clusterVenueMappingId: venueLevelMappingId },
+              { divisionVenueMappingId: venueLevelMappingId },
+              { finalVenueMappingId: venueLevelMappingId },
             ],
           },
         },
@@ -371,7 +371,7 @@ export const venuesRouter = createTRPCRouter({
 
   // Venue location mapping management
   createLocationMapping: adminProcedure
-    .input(createVenueLocationMappingSchema)
+    .input(createVenueLevelMappingSchema)
     .mutation(async ({ input }) => {
       try {
         // Check if mapping already exists

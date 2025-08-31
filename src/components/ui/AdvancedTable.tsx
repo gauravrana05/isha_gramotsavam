@@ -123,6 +123,14 @@ export interface AdvancedTableProps<T = any> extends BaseComponentProps, Advance
   headerActionsNone?: React.ReactNode;
   headerActionsSingle?: (selectedItems: T[]) => React.ReactNode;
   headerActionsMultiple?: (selectedItems: T[]) => React.ReactNode;
+  // Row actions
+  getRowActions?: (item: T) => any[];
+  // Error handling
+  error?: string | Error | null;
+  // Legacy props for backward compatibility
+  tableParams?: any;
+  onTableParamsChange?: (params: any) => void;
+  filterFields?: any[];
   // Virtualization
   emptyMessage?:string;
   virtualize?: boolean;
@@ -263,7 +271,7 @@ export const AdvancedTable = <T,>({
   // Remove these problematic props that shouldn't go to DOM
   tableParams,
   onTableParamsChange,
-  onSelectedRowsChange,
+  onSelectionChange,
   filterFields,
   getRowActions,
   

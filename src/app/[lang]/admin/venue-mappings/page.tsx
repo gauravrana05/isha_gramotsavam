@@ -86,7 +86,7 @@ export default function VenueMappingsPage() {
   });
 
   // Delete mapping mutation
-  const deleteMappingMutation = api.admin.venues.deleteVenueLocationMapping.useMutation({
+  const deleteMappingMutation = api.admin.venues.deleteVenueLevelMapping.useMutation({
     onSuccess: () => {
       refetchMappings();
     },

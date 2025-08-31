@@ -141,5 +141,116 @@
     "venue_tbd": "स्थान निर्धारित होगा",
     "fixtures_soon": "मैच जल्द आएंगे",
     "no_team_found": "कोई टीम नहीं मिली",
-    "no_team_registered_message": "आपकी कोई टीम अभी तक पंजीकृत नहीं है।"
+    "no_team_registered_message": "आपकी कोई टीम अभी तक पंजीकृत नहीं है।",
+
+    "_comment_volunteer_section": "=== स्वयंसेवक इंटरफेस अनुवाद ===",
+    
+    "volunteer": {
+      "title": "स्वयंसेवक पैनल",
+      "loading_assignment": "आपका कार्यभार लोड हो रहा है...",
+      "no_venue_assignments": "कोई स्थल कार्यभार नहीं",
+      "no_venue_assignments_desc": "आपको अभी तक किसी स्थल के लिए नियुक्त नहीं किया गया है। कृपया अपने प्रशासक से संपर्क करें।",
+      "redirecting_venue": "आपके स्थल पर भेजा जा रहा है...",
+      "refresh": "रीफ्रेश करें",
+      "loading_dashboard": "स्वयंसेवक डैशबोर्ड लोड हो रहा है...",
+      
+      "sidebar": {
+        "admin_panel": "प्रशासक पैनल",
+        "volunteer_panel": "स्वयंसेवक पैनल",
+        "isha_gramotsavam": "ईशा ग्रामोत्सव",
+        "expand_sidebar": "साइडबार विस्तार करें",
+        "collapse_sidebar": "साइडबार संकुचित करें",
+        "venue_overview": "स्थल अवलोकन",
+        "teams": "टीमें",
+        "fixtures": "मैच व्यवस्था",
+        "matches": "मैच",
+        "media": "मीडिया",
+        "my_venues": "मेरे स्थल",
+        "profile": "प्रोफ़ाइल",
+        "back_to_admin_dashboard": "प्रशासक डैशबोर्ड पर वापस जाएं",
+        "back_to_app": "ऐप पर वापस जाएं",
+        "sign_out": "साइन आउट"
+      },
+
+      "profile": {
+        "title": "स्वयंसेवक प्रोफ़ाइल",
+        "subtitle": "आपकी व्यक्तिगत जानकारी",
+        "incomplete_profile": "आपकी प्रोफ़ाइल अधूरी है। प्रभावी रूप से स्वयंसेवा करने के लिए कृपया इसे पूरा करें।",
+        "personal_details": "व्यक्तिगत विवरण",
+        "edit_profile": "प्रोफ़ाइल संपादित करें",
+        "contact_information": "संपर्क जानकारी",
+        "profile_summary": "प्रोफ़ाइल सारांश",
+        "basic_details": "मूल विवरण",
+        "profile_status": "प्रोफ़ाइल स्थिति",
+        "complete": "पूर्ण",
+        "incomplete": "अधूरा",
+        "needs_completion": "पूरा करना आवश्यक",
+        "complete_profile": "प्रोफ़ाइल पूरा करें",
+        "first_name": "पहला नाम",
+        "last_name": "अंतिम नाम",
+        "phone_number": "फोन नंबर",
+        "whatsapp_number": "WhatsApp नंबर",
+        "date_of_birth": "जन्म तिथि",
+        "gender": "लिंग",
+        "preferred_language": "पसंदीदा भाषा",
+        "role": "भूमिका",
+        "email": "ईमेल",
+        "instagram_handle": "Instagram हैंडल",
+        "not_available": "उपलब्ध नहीं",
+        "male": "पुरुष",
+        "female": "महिला",
+        "others": "अन्य",
+        "volunteer": "स्वयंसेवक"
+      },
+
+      "dashboard": {
+        "venue_dashboard": "स्वयंसेवक डैशबोर्ड",
+        "technical_station": "तकनीकी स्वयंसेवक स्टेशन",
+        "match_day_management": "मैच दिवस प्रबंधन",
+        "total_teams": "कुल टीमें",
+        "checked_in": "चेक-इन किया गया",
+        "confirmed": "पुष्ट",
+        "unconfirmed": "अपुष्ट",
+        "my_profile": "मेरी प्रोफ़ाइल",
+        "no_actions_available": "कोई क्रियाएं उपलब्ध नहीं",
+        "check_assignment_status": "अपनी स्वयंसेवक कार्यभार स्थिति की जांच करें।",
+        "active_tournaments": "सक्रिय टूर्नामेंट",
+        "teams_status": "टीमें • स्थिति:",
+        "manage": "प्रबंधन",
+        "live": "लाइव",
+        "view_all_tournaments": "सभी {count} टूर्नामेंट देखें",
+        "create_new_post": "नया पोस्ट बनाएं",
+        "error": "त्रुटि",
+        "retry": "पुनः प्रयास",
+        "volunteer_information": "स्वयंसेवक जानकारी",
+        "name": "नाम",
+        "venue_id": "स्थल आईडी",
+        "close": "बंद करें",
+        
+        "quick_actions": {
+          "team_verification": "टीम सत्यापन",
+          "team_verification_desc": "टूर्नामेंट के लिए टीमों को सत्यापित करें और चेक-इन करें",
+          "tournament_management": "टूर्नामेंट प्रबंधन", 
+          "tournament_management_desc": "टूर्नामेंट ब्रैकेट बनाएं और प्रबंधित करें",
+          "match_management": "मैच प्रबंधन",
+          "match_management_desc": "मैचों का स्कोर करें और परिणाम अपडेट करें",
+          "media_upload": "मीडिया अपलोड",
+          "media_upload_desc": "फोटो और वीडियो अपलोड करें",
+          "action": "क्रिया",
+          "count": "गिनती",
+          "status": "स्थिति",
+          "completed": "पूर्ण",
+          "active": "सक्रिय",
+          "pending": "प्रतीक्षित",
+          "open": "खोलें"
+        }
+      },
+
+      "language_selection": {
+        "title": "अपनी भाषा चुनें",
+        "subtitle": "स्वयंसेवक इंटरफेस के लिए अपनी पसंदीदा भाषा का चयन करें",
+        "save_preference": "भाषा प्राथमिकता सहेजें",
+        "cancel": "रद्द करें"
+      }
+    }
   }

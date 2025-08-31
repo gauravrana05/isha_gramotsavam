@@ -21,9 +21,12 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   User,
-  Settings
+  Settings,
+  Newspaper
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useTranslation } from '@/lib/utils/i18n';
+import VolunteerLanguageSwitcher from '@/components/volunteer/VolunteerLanguageSwitcher';
 
 interface VolunteerSidebarProps {
   className?: string;
@@ -51,6 +54,7 @@ export default function VolunteerSidebar({
   const pathname = usePathname();
   const { lang } = useParams();
   const { user, userProfile, profileImage, logout } = useAuth();
+  const { t } = useTranslation();
 
   // Admin detection - check if admin is accessing volunteer routes
   const isAdminAccessing = userProfile?.role === 'admin' && !pathname.includes('/admin/');
@@ -78,36 +82,41 @@ export default function VolunteerSidebar({
   const baseVenueNavigation = [
     // When in venue context, show venue-specific navigation
     {
-      name: 'Venue Overview',
+      name: t('volunteer.sidebar.venue_overview', 'Venue Overview'),
       href: `/${lang}/volunteer/venues/${venueId}`,
       icon: MapPin,
     },
     {
-      name: 'Teams',
+      name: t('volunteer.sidebar.teams', 'Teams'),
       href: `/${lang}/volunteer/venues/${venueId}/teams`,
       icon: Users,
     },
     {
-      name: 'Fixtures',
+      name: t('volunteer.sidebar.fixtures', 'Fixtures'),
       href: `/${lang}/volunteer/venues/${venueId}/fixtures`,
       icon: Trophy,
     },
     {
-      name: 'Matches',
+      name: t('volunteer.sidebar.matches', 'Matches'),
       href: `/${lang}/volunteer/venues/${venueId}/matches`,
       icon: Calendar,
     },
     {
-      name: 'Media',
+      name: t('volunteer.sidebar.media', 'Media'),
       href: `/${lang}/volunteer/venues/${venueId}/media`,
       icon: Camera,
+    },
+    {
+      name: t('volunteer.sidebar.posts', 'Posts'),
+      href: `/${lang}/volunteer/venues/${venueId}/post`,
+      icon: Newspaper,
     },
   ];
 
   const baseGeneralNavigation = [
     // When not in venue context, show message to go to venue
     {
-      name: 'My Venues',
+      name: t('volunteer.sidebar.my_venues', 'My Venues'),
       href: `/${lang}/volunteer`,
       icon: MapPin,
     },
@@ -262,9 +271,9 @@ export default function VolunteerSidebar({
                 </div>
                 <div className="ml-2">
                   <h2 className="text-sm font-semibold text-gray-900">
-                    {isAdminAccessing ? 'Admin Panel' : 'Volunteer Panel'}
+                    {isAdminAccessing ? t('volunteer.sidebar.admin_panel', 'Admin Panel') : t('volunteer.sidebar.volunteer_panel', 'Volunteer Panel')}
                   </h2>
-                  <p className="text-xs text-gray-600">Isha Gramotsavam</p>
+                  <p className="text-xs text-gray-600">{t('volunteer.sidebar.isha_gramotsavam', 'Isha Gramotsavam')}</p>
                 </div>
               </div>
             )}
@@ -335,6 +344,12 @@ export default function VolunteerSidebar({
 
           {/* Footer Actions */}
           <div className="border-t border-gray-200 p-3 space-y-1">
+            {/* Language Switcher */}
+            <VolunteerLanguageSwitcher 
+              isCollapsed={isDesktopCollapsed} 
+              showText={showContent}
+            />
+
             {/* Profile - only show when admin is NOT accessing */}
             {!isAdminAccessing && (
               <Link

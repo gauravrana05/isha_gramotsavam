@@ -153,5 +153,116 @@
   "no_team_registered_message": "You don't have any team registered yet.",
   "women": "Women",
   "men": "Men",
-  "mixed": "Mixed"
+  "mixed": "Mixed",
+
+  "_comment_volunteer_section": "=== VOLUNTEER INTERFACE TRANSLATIONS ===",
+  
+  "volunteer": {
+    "title": "Volunteer Panel",
+    "loading_assignment": "Loading your assignment...",
+    "no_venue_assignments": "No Venue Assignments",
+    "no_venue_assignments_desc": "You haven't been assigned to any venues yet. Please contact your administrator.",
+    "redirecting_venue": "Redirecting to your venue...",
+    "refresh": "Refresh",
+    "loading_dashboard": "Loading Volunteer Dashboard...",
+    
+    "sidebar": {
+      "admin_panel": "Admin Panel",
+      "volunteer_panel": "Volunteer Panel",
+      "isha_gramotsavam": "Isha Gramotsavam",
+      "expand_sidebar": "Expand sidebar",
+      "collapse_sidebar": "Collapse sidebar",
+      "venue_overview": "Venue Overview",
+      "teams": "Teams",
+      "fixtures": "Fixtures",
+      "matches": "Matches",
+      "media": "Media",
+      "my_venues": "My Venues",
+      "profile": "Profile",
+      "back_to_admin_dashboard": "Back to Admin Dashboard",
+      "back_to_app": "Back to App",
+      "sign_out": "Sign Out"
+    },
+
+    "profile": {
+      "title": "Volunteer Profile",
+      "subtitle": "Your personal information",
+      "incomplete_profile": "Your profile is incomplete. Please complete it to volunteer effectively.",
+      "personal_details": "Personal Details",
+      "edit_profile": "Edit Profile",
+      "contact_information": "Contact Information",
+      "profile_summary": "Profile Summary",
+      "basic_details": "Basic Details",
+      "profile_status": "Profile Status",
+      "complete": "Complete",
+      "incomplete": "Incomplete",
+      "needs_completion": "Needs Completion",
+      "complete_profile": "Complete Profile",
+      "first_name": "First Name",
+      "last_name": "Last Name",
+      "phone_number": "Phone Number",
+      "whatsapp_number": "WhatsApp Number",
+      "date_of_birth": "Date of Birth",
+      "gender": "Gender",
+      "preferred_language": "Preferred Language",
+      "role": "Role",
+      "email": "Email",
+      "instagram_handle": "Instagram Handle",
+      "not_available": "Not Available",
+      "male": "Male",
+      "female": "Female",
+      "others": "Others",
+      "volunteer": "Volunteer"
+    },
+
+    "dashboard": {
+      "venue_dashboard": "Volunteer Dashboard",
+      "technical_station": "Technical Volunteer Station",
+      "match_day_management": "Match Day Management",
+      "total_teams": "Total Teams",
+      "checked_in": "Checked In",
+      "confirmed": "Confirmed",
+      "unconfirmed": "Unconfirmed",
+      "my_profile": "My Profile",
+      "no_actions_available": "No actions available",
+      "check_assignment_status": "Check your volunteer assignment status.",
+      "active_tournaments": "Active Tournaments",
+      "teams_status": "teams • Status:",
+      "manage": "Manage",
+      "live": "Live",
+      "view_all_tournaments": "View All {count} Tournaments",
+      "create_new_post": "Create a New Post",
+      "error": "Error",
+      "retry": "Retry",
+      "volunteer_information": "Volunteer Information",
+      "name": "Name",
+      "venue_id": "Venue ID",
+      "close": "Close",
+      
+      "quick_actions": {
+        "team_verification": "Team Verification",
+        "team_verification_desc": "Verify and check-in teams for tournaments",
+        "tournament_management": "Tournament Management", 
+        "tournament_management_desc": "Create and manage tournament brackets",
+        "match_management": "Match Management",
+        "match_management_desc": "Score matches and update results",
+        "media_upload": "Media Upload",
+        "media_upload_desc": "Upload photos and videos",
+        "action": "Action",
+        "count": "Count",
+        "status": "Status",
+        "completed": "Completed",
+        "active": "Active",
+        "pending": "Pending",
+        "open": "Open"
+      }
+    },
+
+    "language_selection": {
+      "title": "Choose Your Language",
+      "subtitle": "Select your preferred language for the volunteer interface",
+      "save_preference": "Save Language Preference",
+      "cancel": "Cancel"
+    }
+  }
 }

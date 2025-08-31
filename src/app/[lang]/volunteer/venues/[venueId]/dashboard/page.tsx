@@ -28,8 +28,10 @@ import {
   ArrowRight,
   Target,
   Clock,
-  FileText
+  FileText,
+  Plus
 } from 'lucide-react';
+import PostCreator from '@/components/posts/PostCreator';
 
 interface PageProps {
   params: Promise<{
@@ -57,6 +59,7 @@ export default function VolunteerDashboard({ params }: PageProps) {
 
   // State for modals and interactions
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showPostCreator, setShowPostCreator] = useState(false);
   const [selectedAction, setSelectedAction] = useState<QuickActionData | null>(null);
 
   // tRPC queries for dashboard data
@@ -353,6 +356,10 @@ export default function VolunteerDashboard({ params }: PageProps) {
         persistState={false}
       />
 
+      <div className="mt-8">
+        <PostCreator />
+      </div>
+
       {/* Active Fixtures Section - if there are fixtures */}
       {fixtures.length > 0 && (
         <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
@@ -431,6 +438,26 @@ export default function VolunteerDashboard({ params }: PageProps) {
           </div>
         </div>
       </EnhancedModal>
+
+      {/* Floating Action Button for Mobile */}
+      <div className="md:hidden fixed bottom-4 right-4">
+        <button 
+          onClick={() => setShowPostCreator(true)} 
+          className="bg-blue-600 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </div>
+
+      <EnhancedModal
+        isOpen={showPostCreator}
+        onClose={() => setShowPostCreator(false)}
+        title="Create a New Post"
+        size="2xl"
+      >
+        <PostCreator compact onPostCreated={() => setShowPostCreator(false)} />
+      </EnhancedModal>
+
     </div>
   );
 }

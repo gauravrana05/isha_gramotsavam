@@ -328,7 +328,7 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
           tableParams={tableParams}
           onTableParamsChange={setTableParams}
           selectedRows={selectedTeams}
-          onSelectedRowsChange={setSelectedTeams}
+          onSelectionChange={setSelectedTeams}
           filters={filterFields}
           filterable={true}
           headerActions={headerActions}

@@ -26,7 +26,6 @@ import {
 } from 'lucide-react';
 import { MediaFullPreview } from '@/components/media/MediaFullPreview';
 import { MediaEditModal } from '@/components/media/MediaEditModal';
-import { useMediaManager } from '@/hooks/media/useMediaManager';
 import { MediaItem, MediaFilter } from '@/lib/types/media';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -90,35 +89,10 @@ export default function AdminMediaPage() {
     try {
       setLoading(true);
       
-      // Load all data in parallel
-      const [venuesSnap, tournamentsSnap, matchesSnap] = await Promise.all([
-        getDocs(collection(db, 'venues')),
-        getDocs(collection(db, 'fixtures')),
-        getDocs(collection(db, 'matches'))
-      ]);
-
-      // Process venues
-      const venuesData: Venue[] = venuesSnap.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name
-      }));
-      setVenues(venuesData);
-
-      // Process tournaments/fixtures
-      const tournamentsData: Tournament[] = tournamentsSnap.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name
-      }));
-      setTournaments(tournamentsData);
-
-      // Process matches
-      const matchesData: Match[] = matchesSnap.docs.map(doc => ({
-        id: doc.id,
-        matchNumber: doc.data().matchNumber,
-        fixtureName: doc.data().fixtureName,
-        roundName: doc.data().roundName
-      }));
-      setMatches(matchesData);
+      // TODO: Replace with tRPC calls
+      setVenues([]);
+      setTournaments([]);
+      setMatches([]);
 
       // Load media
       const filters: MediaFilter = {

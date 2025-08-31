@@ -22,6 +22,7 @@ import {
   Star,
   Award
 } from "lucide-react";
+import PostFeed from "@/components/posts/PostFeed";
 
 interface CaptainFixtureDetail {
   id: string;
@@ -406,6 +407,11 @@ export default function CaptainFixtureDetailPage() {
             </div>
           </div>
         )}
+
+        <div className="mt-8">
+          <PostFeed entityType="fixture" entityId={fixtureId as string} />
+        </div>
+
       </div>
     </div>
   );

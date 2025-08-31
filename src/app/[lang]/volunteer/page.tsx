@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useParams } from 'next/navigation';
+import { useTranslation } from '@/lib/utils/i18n';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { api } from '@/server/trpc/react';
 
@@ -10,6 +11,7 @@ export default function VolunteerMainPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
   const router = useRouter();
   const { lang } = useParams();
+  const { t } = useTranslation();
   
   // Enhanced assignments query with venue details for direct dashboard redirect
   const { 
@@ -43,8 +45,8 @@ export default function VolunteerMainPage() {
     if (assignmentsData?.success && assignmentsData.assignments?.length > 0) {
       const firstAssignment = assignmentsData.assignments[0];
       // Extract venue ID from venue location mapping
-      const venueId = firstAssignment.venueLocationMapping?.venue?.id || 
-                     firstAssignment.venueLocationMappingId?.split('-')[0]; // Fallback extraction
+      const venueId = firstAssignment.venueLevelMapping?.venue?.id || 
+                     firstAssignment.venueLevelMappingId?.split('-')[0]; // Fallback extraction
       
       if (venueId) {
         router.replace(`/${lang}/volunteer/venues/${venueId}/dashboard`);
@@ -58,7 +60,7 @@ export default function VolunteerMainPage() {
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
-          <p className="text-gray-600">Loading your assignment...</p>
+          <p className="text-gray-600">{t('volunteer.loading_assignment', 'Loading your assignment...')}</p>
         </div>
       </div>
     );
@@ -70,15 +72,17 @@ export default function VolunteerMainPage() {
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-orange-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">No Venue Assignments</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {t('volunteer.no_venue_assignments', 'No Venue Assignments')}
+          </h1>
           <p className="text-gray-600 mb-4">
-            You haven&apos;t been assigned to any venues yet. Please contact your administrator.
+            {t('volunteer.no_venue_assignments_desc', "You haven't been assigned to any venues yet. Please contact your administrator.")}
           </p>
           <button
             onClick={() => window.location.reload()}
             className="bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
-            Refresh
+            {t('volunteer.refresh', 'Refresh')}
           </button>
         </div>
       </div>
@@ -90,7 +94,7 @@ export default function VolunteerMainPage() {
     <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
-        <p className="text-gray-600">Redirecting to your venue...</p>
+        <p className="text-gray-600">{t('volunteer.redirecting_venue', 'Redirecting to your venue...')}</p>
       </div>
     </div>
   );

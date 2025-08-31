@@ -126,7 +126,7 @@ export const useRedirect = (allowedRoles?: string[]) => {
         if (assignmentsData.assignments.length > 0) {
           // Extract venue ID from first assignment and redirect to venue dashboard
           const firstAssignment = assignmentsData.assignments[0];
-          const venueId = firstAssignment.venueLocationMapping?.venue?.id;
+          const venueId = firstAssignment.venueLevelMapping?.venue?.id;
           if (venueId) {
             router.push(`/${lang}/volunteer/venues/${venueId}/dashboard`);
             return;

@@ -47,5 +47,116 @@
   "player_dashboard_title": "കളിക്കാരൻ ഡാഷ്ബോർഡ്",
   "player_dashboard_description": "നിങ്ങളുടെ ഇഷ ഗ്രാമോത്സവ ഇവന്റുകളും ടീമും കാണുക.",
   "guest_dashboard_title": "അതിഥി ഡാഷ്ബോർഡ്",
-  "guest_dashboard_description": "അതിഥിയായി ഇഷ ഗ്രാമോത്സവ ഇവന്റുകൾ പര്യവേക്ഷണം ചെയ്യുക."
+  "guest_dashboard_description": "അതിഥിയായി ഇഷ ഗ്രാമോത്സവ ഇവന്റുകൾ പര്യവേക്ഷണം ചെയ്യുക.",
+
+  "_comment_volunteer_section": "=== സ്വയംസേവക ഇന്റർഫേസ് വിവർത്തനങ്ങൾ ===",
+  
+  "volunteer": {
+    "title": "സ്വയംസേവക പാനൽ",
+    "loading_assignment": "നിങ്ങളുടെ അസൈൻമെന്റ് ലോഡ് ചെയ്യുന്നു...",
+    "no_venue_assignments": "വേദി അസൈൻമെന്റുകൾ ഇല്ല",
+    "no_venue_assignments_desc": "നിങ്ങളെ ഇനിയും ഒരു വേദിയിലും നിയമിച്ചിട്ടില്ല. ദയവായി നിങ്ങളുടെ അഡ്മിനിസ്ട്രേറ്ററെ ബന്ധപ്പെടുക.",
+    "redirecting_venue": "നിങ്ങളുടെ വേദിയിലേക്ക് റീഡയറക്ട് ചെയ്യുന്നു...",
+    "refresh": "പുതുക്കുക",
+    "loading_dashboard": "സ്വയംസേവക ഡാഷ്ബോർഡ് ലോഡ് ചെയ്യുന്നു...",
+    
+    "sidebar": {
+      "admin_panel": "അഡ്മിൻ പാനൽ",
+      "volunteer_panel": "സ്വയംസേവക പാനൽ",
+      "isha_gramotsavam": "ഇഷ ഗ്രാമോത്സവം",
+      "expand_sidebar": "സൈഡ്ബാർ വികസിപ്പിക്കുക",
+      "collapse_sidebar": "സൈഡ്ബാർ ചുരുക്കുക",
+      "venue_overview": "വേദി അവലോകനം",
+      "teams": "ടീമുകൾ",
+      "fixtures": "ഫിക്സ്ചറുകൾ",
+      "matches": "മത്സരങ്ങൾ",
+      "media": "മീഡിയ",
+      "my_venues": "എന്റെ വേദികൾ",
+      "profile": "പ്രൊഫൈൽ",
+      "back_to_admin_dashboard": "അഡ്മിൻ ഡാഷ്ബോർഡിലേക്ക് തിരികെ",
+      "back_to_app": "ആപ്പിലേക്ക് തിരികെ",
+      "sign_out": "സൈൻ ഔട്ട്"
+    },
+
+    "profile": {
+      "title": "സ്വയംസേവക പ്രൊഫൈൽ",
+      "subtitle": "നിങ്ങളുടെ വ്യക്തിഗത വിവരങ്ങൾ",
+      "incomplete_profile": "നിങ്ങളുടെ പ്രൊഫൈൽ അപൂർണ്ണമാണ്. ഫലപ്രദമായി സ്വയംസേവനം ചെയ്യുന്നതിന് ദയവായി അത് പൂർത്തിയാക്കുക.",
+      "personal_details": "വ്യക്തിഗത വിവരങ്ങൾ",
+      "edit_profile": "പ്രൊഫൈൽ എഡിറ്റ് ചെയ്യുക",
+      "contact_information": "ബന്ധപ്പെടാനുള്ള വിവരങ്ങൾ",
+      "profile_summary": "പ്രൊഫൈൽ സംഗ്രഹം",
+      "basic_details": "അടിസ്ഥാന വിവരങ്ങൾ",
+      "profile_status": "പ്രൊഫൈൽ നില",
+      "complete": "പൂർത്തിയായി",
+      "incomplete": "അപൂർണ്ണം",
+      "needs_completion": "പൂർത്തിയാക്കേണ്ടത് ആവശ്യമാണ്",
+      "complete_profile": "പ്രൊഫൈൽ പൂർത്തിയാക്കുക",
+      "first_name": "പേരിന്റെ ആദ്യഭാഗം",
+      "last_name": "കുടുംബപ്പേര്",
+      "phone_number": "ഫോൺ നമ്പർ",
+      "whatsapp_number": "വാട്സ്ആപ്പ് നമ്പർ",
+      "date_of_birth": "ജനനതാരീഖ്",
+      "gender": "ലിംഗം",
+      "preferred_language": "ഇഷ്ടമുള്ള ഭാഷ",
+      "role": "റോൾ",
+      "email": "ഇമെയിൽ",
+      "instagram_handle": "ഇൻസ്റ്റാഗ്രാം ഹാൻഡിൽ",
+      "not_available": "ലഭ്യമല്ല",
+      "male": "പുരുഷൻ",
+      "female": "സ്ത്രീ",
+      "others": "മറ്റുള്ളവ",
+      "volunteer": "സ്വയംസേവകൻ"
+    },
+
+    "dashboard": {
+      "venue_dashboard": "സ്വയംസേവക ഡാഷ്ബോർഡ്",
+      "technical_station": "ടെക്നിക്കൽ സ്വയംസേവക സ്റ്റേഷൻ",
+      "match_day_management": "മത്സര ദിന മാനേജ്മെന്റ്",
+      "total_teams": "മൊത്തം ടീമുകൾ",
+      "checked_in": "ചെക്ക് ഇൻ ആയി",
+      "confirmed": "സ്ഥിരീകരിച്ചു",
+      "unconfirmed": "സ്ഥിരീകരിച്ചിട്ടില്ല",
+      "my_profile": "എന്റെ പ്രൊഫൈൽ",
+      "no_actions_available": "പ്രവർത്തനങ്ങൾ ലഭ്യമല്ല",
+      "check_assignment_status": "നിങ്ങളുടെ സ്വയംസേവക അസൈൻമെന്റ് സ്ഥിതി പരിശോധിക്കുക.",
+      "active_tournaments": "സജീവ ടൂർണമെന്റുകൾ",
+      "teams_status": "ടീമുകൾ • നില:",
+      "manage": "നിയന്ത്രിക്കുക",
+      "live": "തത്സമയം",
+      "view_all_tournaments": "എല്ലാ {count} ടൂർണമെന്റുകളും കാണുക",
+      "create_new_post": "പുതിയ പോസ്റ്റ് സൃഷ്ടിക്കുക",
+      "error": "പിശക്",
+      "retry": "വീണ്ടും ശ്രമിക്കുക",
+      "volunteer_information": "സ്വയംസേവക വിവരങ്ങൾ",
+      "name": "പേര്",
+      "venue_id": "വേദി ഐഡി",
+      "close": "അടയ്ക്കുക",
+      
+      "quick_actions": {
+        "team_verification": "ടീം പരിശോധന",
+        "team_verification_desc": "ടൂർണമെന്റുകൾക്കായി ടീമുകളെ പരിശോധിക്കുകയും ചെക്ക്-ഇൻ ചെയ്യുകയും ചെയ്യുക",
+        "tournament_management": "ടൂർണമെന്റ് മാനേജ്മെന്റ",
+        "tournament_management_desc": "ടൂർണമെന്റ് ബ്രാക്കറ്റുകൾ സൃഷ്ടിക്കുകയും നിയന്ത്രിക്കുകയും ചെയ്യുക",
+        "match_management": "മത്സര മാനേജ്മെന്റ്",
+        "match_management_desc": "മത്സരങ്ങൾ സ്കോർ ചെയ്യുകയും ഫലങ്ങൾ അപ്ഡേറ്റ് ചെയ്യുകയും ചെയ്യുക",
+        "media_upload": "മീഡിയ അപ്ലോഡ്",
+        "media_upload_desc": "ഫോട്ടോകളും വീഡിയോകളും അപ്ലോഡ് ചെയ്യുക",
+        "action": "പ്രവർത്തനം",
+        "count": "എണ്ണം",
+        "status": "നില",
+        "completed": "പൂർത്തിയായി",
+        "active": "സജീവം",
+        "pending": "തീർപ്പുകൽപ്പിക്കാത്തത്",
+        "open": "തുറന്നത്"
+      }
+    },
+
+    "language_selection": {
+      "title": "നിങ്ങളുടെ ഭാഷ തിരഞ്ഞെടുക്കുക",
+      "subtitle": "സ്വയംസേവക ഇന്റർഫേസിനായി നിങ്ങളുടെ ഇഷ്ടമുള്ള ഭാഷ തിരഞ്ഞെടുക്കുക",
+      "save_preference": "ഭാഷാ മുൻഗണന സേവ് ചെയ്യുക",
+      "cancel": "റദ്ദാക്കുക"
+    }
+  }
 }

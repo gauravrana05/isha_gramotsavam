@@ -18,6 +18,7 @@ import {
   Hash,
   Crown
 } from 'lucide-react';
+import PostFeed from '@/components/posts/PostFeed';
 
 export default function FixtureDetailPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -413,6 +414,11 @@ export default function FixtureDetailPage() {
           </div>
         )}
       </div>
+
+      <div className="mt-8">
+        <PostFeed entityType="fixture" entityId={fixtureId} />
+      </div>
+
     </div>
   );
 }

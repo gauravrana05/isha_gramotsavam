@@ -68,7 +68,7 @@ export default function CreateVenueMappingPage() {
   });
 
   // Create mapping mutation
-  const createMappingMutation = api.admin.venues.createVenueLocationMapping.useMutation({
+  const createMappingMutation = api.admin.venues.createVenueLevelMapping.useMutation({
     onSuccess: (result) => {
       alert(`Successfully created venue mapping for ${result.mapping.venueName}!`);
       router.push(`/${lang}/admin/venue-mappings`);

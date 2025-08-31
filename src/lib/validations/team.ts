@@ -148,7 +148,7 @@ export const getTeamsByLocationSchema = z.object({
 })
 
 export const getTeamsByVenueSchema = z.object({
-  venueLocationMappingId: uuidSchema,
+  venueLevelMappingId: uuidSchema,
   sportId: uuidSchema.optional(),
   genderCategory: genderCategorySchema.optional(),
 })

@@ -47,5 +47,116 @@
   "player_dashboard_title": "ଖେଳାଳି ଡାସବୋର୍ଡ",
   "player_dashboard_description": "ଆପଣଙ୍କର ଇଶା ଗ୍ରାମୋତ୍ସବ ଇଭେଣ୍ଟ ଏବଂ ଦଳ ଦେଖନ୍ତୁ।",
   "guest_dashboard_title": "ଅତିଥି ଡାସବୋର୍ଡ",
-  "guest_dashboard_description": "ଅତିଥି ଭାବରେ ଇଶା ଗ୍ରାମୋତ୍ସବ ଇଭେଣ୍ଟଗୁଡ଼ିକ ଅନୁସନ୍ଧାନ କରନ୍ତୁ।"
+  "guest_dashboard_description": "ଅତିଥି ଭାବରେ ଇଶା ଗ୍ରାମୋତ୍ସବ ଇଭେଣ୍ଟଗୁଡ଼ିକ ଅନୁସନ୍ଧାନ କରନ୍ତୁ।",
+
+  "_comment_volunteer_section": "=== ସ୍ୱେଚ୍ଛାସେବୀ ଇଣ୍ଟରଫେସ୍ ଅନୁବାଦଗୁଡ଼ିକ ===",
+  
+  "volunteer": {
+    "title": "ସ୍ୱେଚ୍ଛାସେବୀ ପ୍ୟାନେଲ୍",
+    "loading_assignment": "ଆପଣଙ୍କର ନିଯୁକ୍ତି ଲୋଡ୍ ହେଉଛି...",
+    "no_venue_assignments": "କୌଣସି ସ୍ଥାନ ନିଯୁକ୍ତି ନାହିଁ",
+    "no_venue_assignments_desc": "ଆପଣ ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସ୍ଥାନକୁ ନିଯୁକ୍ତ ହୋଇନାହାନ୍ତି। ଦୟାକରି ଆପଣଙ୍କର ପ୍ରଶାସକଙ୍କୁ ସମ୍ପର୍କ କରନ୍ତୁ।",
+    "redirecting_venue": "ଆପଣଙ୍କର ସ୍ଥାନକୁ ରିଡାଇରେକ୍ଟ କରୁଛି...",
+    "refresh": "ରିଫ୍ରେସ୍ କରନ୍ତୁ",
+    "loading_dashboard": "ସ୍ୱେଚ୍ଛାସେବୀ ଡାସବୋର୍ଡ ଲୋଡ୍ ହେଉଛି...",
+    
+    "sidebar": {
+      "admin_panel": "ଆଡମିନ୍ ପ୍ୟାନେଲ୍",
+      "volunteer_panel": "ସ୍ୱେଚ୍ଛାସେବୀ ପ୍ୟାନେଲ୍",
+      "isha_gramotsavam": "ଇଶା ଗ୍ରାମୋତ୍ସବ",
+      "expand_sidebar": "ସାଇଡବାର୍ ବିସ୍ତାର କରନ୍ତୁ",
+      "collapse_sidebar": "ସାଇଡବାର୍ ସଂକୁଚିତ କରନ୍ତୁ",
+      "venue_overview": "ସ୍ଥାନ ଅବଲୋକନ",
+      "teams": "ଦଳଗୁଡ଼ିକ",
+      "fixtures": "ଫିକ୍ସଚର୍ଗୁଡ଼ିକ",
+      "matches": "ମ୍ୟାଚ୍‌ଗୁଡ଼ିକ",
+      "media": "ମିଡିଆ",
+      "my_venues": "ମୋ ସ୍ଥାନଗୁଡ଼ିକ",
+      "profile": "ପ୍ରୋଫାଇଲ୍",
+      "back_to_admin_dashboard": "ଆଡମିନ୍ ଡାସବୋର୍ଡକୁ ଫେରନ୍ତୁ",
+      "back_to_app": "ଆପ୍‌କୁ ଫେରନ୍ତୁ",
+      "sign_out": "ସାଇନ୍ ଆଉଟ୍"
+    },
+
+    "profile": {
+      "title": "ସ୍ୱେଚ୍ଛାସେବୀ ପ୍ରୋଫାଇଲ୍",
+      "subtitle": "ଆପଣଙ୍କର ବ୍ୟକ୍ତିଗତ ସୂଚନା",
+      "incomplete_profile": "ଆପଣଙ୍କର ପ୍ରୋଫାଇଲ୍ ଅସମ୍ପୂର୍ଣ୍ଣ ଅଛି। ପ୍ରଭାବଶାଳୀ ଭାବରେ ସ୍ୱେଚ୍ଛାସେବା କରିବା ପାଇଁ ଦୟାକରି ଏହାକୁ ସଂପୂର୍ଣ୍ଣ କରନ୍ତୁ।",
+      "personal_details": "ବ୍ୟକ୍ତିଗତ ବିବରଣୀ",
+      "edit_profile": "ପ୍ରୋଫାଇଲ୍ ସମ୍ପାଦନା କରନ୍ତୁ",
+      "contact_information": "ସଂପର୍କ ସୂଚନା",
+      "profile_summary": "ପ୍ରୋଫାଇଲ୍ ସାରାଂଶ",
+      "basic_details": "ମୁଳ ବିବରଣୀ",
+      "profile_status": "ପ୍ରୋଫାଇଲ୍ ସ୍ଥିତି",
+      "complete": "ସଂପୂର୍ଣ୍ଣ",
+      "incomplete": "ଅସମ୍ପୂର୍ଣ୍ଣ",
+      "needs_completion": "ସଂପୂର୍ଣ୍ଣତା ଆବଶ୍ୟକ",
+      "complete_profile": "ପ୍ରୋଫାଇଲ୍ ସଂପୂର୍ଣ୍ଣ କରନ୍ତୁ",
+      "first_name": "ପ୍ରଥମ ନାମ",
+      "last_name": "ଶେଷ ନାମ",
+      "phone_number": "ଫୋନ୍ ନମ୍ବର",
+      "whatsapp_number": "ହ୍ୱାଟସ୍‌ଆପ୍ ନମ୍ବର",
+      "date_of_birth": "ଜନ୍ମ ତାରିଖ",
+      "gender": "ଲିଙ୍ଗ",
+      "preferred_language": "ପସନ୍ଦର ଭାଷା",
+      "role": "ଭୂମିକା",
+      "email": "ଇମେଲ୍",
+      "instagram_handle": "ଇନଷ୍ଟାଗ୍ରାମ୍ ହ୍ୟାଣ୍ଡଲ୍",
+      "not_available": "ଉପଲବ୍ଧ ନାହିଁ",
+      "male": "ପୁରୁଷ",
+      "female": "ମହିଳା",
+      "others": "ଅନ୍ୟମାନେ",
+      "volunteer": "ସ୍ୱେଚ୍ଛାସେବୀ"
+    },
+
+    "dashboard": {
+      "venue_dashboard": "ସ୍ୱେଚ୍ଛାସେବୀ ଡାସବୋର୍ଡ",
+      "technical_station": "ଟେକ୍ନିକାଲ୍ ସ୍ୱେଚ୍ଛାସେବୀ ଷ୍ଟେସନ୍",
+      "match_day_management": "ମ୍ୟାଚ୍ ଦିନ ପରିଚାଳନା",
+      "total_teams": "ସମୁଦାୟ ଦଳ",
+      "checked_in": "ଚେକ୍ ଇନ୍ ହୋଇଛି",
+      "confirmed": "ନିଶ୍ଚିତ",
+      "unconfirmed": "ଅନିଶ୍ଚିତ",
+      "my_profile": "ମୋ ପ୍ରୋଫାଇଲ୍",
+      "no_actions_available": "କୌଣସି କାର୍ଯ୍ୟ ଉପଲବ୍ଧ ନାହିଁ",
+      "check_assignment_status": "ଆପଣଙ୍କର ସ୍ୱେଚ୍ଛାସେବୀ ନିଯୁକ୍ତି ସ୍ଥିତି ଯାଞ୍ଚ କରନ୍ତୁ।",
+      "active_tournaments": "ସକ୍ରିୟ ଟୁର୍ନାମେଣ୍ଟ",
+      "teams_status": "ଦଳଗୁଡ଼ିକ • ସ୍ଥିତି:",
+      "manage": "ପରିଚାଳନା କରନ୍ତୁ",
+      "live": "ଲାଇଭ୍",
+      "view_all_tournaments": "ସମସ୍ତ {count} ଟୁର୍ନାମେଣ୍ଟ ଦେଖନ୍ତୁ",
+      "create_new_post": "ନୂତନ ପୋଷ୍ଟ ତିଆରି କରନ୍ତୁ",
+      "error": "ତ୍ରୁଟି",
+      "retry": "ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
+      "volunteer_information": "ସ୍ୱେଚ୍ଛାସେବୀ ସୂଚନା",
+      "name": "ନାମ",
+      "venue_id": "ସ୍ଥାନ ଆଇଡି",
+      "close": "ବନ୍ଦ କରନ୍ତୁ",
+      
+      "quick_actions": {
+        "team_verification": "ଦଳ ଯାଞ୍ଚ",
+        "team_verification_desc": "ଟୁର୍ନାମେଣ୍ଟ ପାଇଁ ଦଳଗୁଡ଼ିକୁ ଯାଞ୍ଚ କରନ୍ତୁ ଏବଂ ଚେକ୍-ଇନ୍ କରନ୍ତୁ",
+        "tournament_management": "ଟୁର୍ନାମେଣ୍ଟ ପରିଚାଳନା",
+        "tournament_management_desc": "ଟୁର୍ନାମେଣ୍ଟ ବ୍ରାକେଟ୍ ସୃଷ୍ଟି ଏବଂ ପରିଚାଳନା କରନ୍ତୁ",
+        "match_management": "ମ୍ୟାଚ୍ ପରିଚାଳନା",
+        "match_management_desc": "ମ୍ୟାଚ୍‌ଗୁଡ଼ିକ ସ୍କୋର କରନ୍ତୁ ଏବଂ ଫଳାଫଳ ଅପଡେଟ୍ କରନ୍ତୁ",
+        "media_upload": "ମିଡିଆ ଅପଲୋଡ୍",
+        "media_upload_desc": "ଫଟୋ ଏବଂ ଭିଡିଓ ଅପଲୋଡ୍ କରନ୍ତୁ",
+        "action": "କାର୍ଯ୍ୟ",
+        "count": "ସଂଖ୍ୟା",
+        "status": "ସ୍ଥିତି",
+        "completed": "ସଂପୂର୍ଣ୍ଣ",
+        "active": "ସକ୍ରିୟ",
+        "pending": "ବିଚାରାଧୀନ",
+        "open": "ଖୋଲା"
+      }
+    },
+
+    "language_selection": {
+      "title": "ଆପଣଙ୍କର ଭାଷା ବାଛନ୍ତୁ",
+      "subtitle": "ସ୍ୱେଚ୍ଛାସେବୀ ଇଣ୍ଟରଫେସ୍ ପାଇଁ ଆପଣଙ୍କର ପସନ୍ଦର ଭାଷା ବାଛନ୍ତୁ",
+      "save_preference": "ଭାଷା ପସନ୍ଦ ସେଭ୍ କରନ୍ତୁ",
+      "cancel": "ବାତିଲ୍ କରନ୍ତୁ"
+    }
+  }
 }

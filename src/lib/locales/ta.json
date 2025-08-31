@@ -153,5 +153,116 @@
   "no_team_registered_message": "உங்களிடம் இன்னும் எந்த குழுவும் பதிவு செய்யப்படவில்லை.",
   "women": "பெண்கள்",
   "men": "ஆண்கள்",
-  "mixed": "கலப்பு"
+  "mixed": "கலப்பு",
+
+  "_comment_volunteer_section": "=== தன்னார்வலர் இடைமுகம் மொழிபெயர்ப்புகள் ===",
+  
+  "volunteer": {
+    "title": "தன்னார்வலர் பேனல்",
+    "loading_assignment": "உங்கள் பணியை ஏற்றுகிறது...",
+    "no_venue_assignments": "இடப் பணிகள் இல்லை",
+    "no_venue_assignments_desc": "நீங்கள் இன்னும் எந்த இடத்திற்கும் நியமிக்கப்படவில்லை. உங்கள் நிர்வாகியைத் தொடர்பு கொள்ளுங்கள்.",
+    "redirecting_venue": "உங்கள் இடத்திற்கு வழிநடத்துகிறது...",
+    "refresh": "புதுப்பிக்கவும்",
+    "loading_dashboard": "தன்னார்வலர் டாஷ்போர்டை ஏற்றுகிறது...",
+    
+    "sidebar": {
+      "admin_panel": "நிர்வாக பேனல்",
+      "volunteer_panel": "தன்னார்வலர் பேனல்",
+      "isha_gramotsavam": "இஷா கிராமோத்சவம்",
+      "expand_sidebar": "பக்கப் பட்டியை விரிவாக்கு",
+      "collapse_sidebar": "பக்கப் பட்டியைச் சுருக்கு",
+      "venue_overview": "இட மேலோட்டம்",
+      "teams": "அணிகள்",
+      "fixtures": "போட்டிகள்",
+      "matches": "ஆட்டங்கள்",
+      "media": "ஊடகம்",
+      "my_venues": "என் இடங்கள்",
+      "profile": "சுயவிவரம்",
+      "back_to_admin_dashboard": "நிர்வாக டாஷ்போர்டுக்கு திரும்பு",
+      "back_to_app": "ஆப்பிற்கு திரும்பு",
+      "sign_out": "வெளியேறு"
+    },
+
+    "profile": {
+      "title": "தன்னார்வலர் சுயவிவரம்",
+      "subtitle": "உங்கள் தனிப்பட்ட தகவல்",
+      "incomplete_profile": "உங்கள் சுயவிவரம் முழுமையடையவில்லை. தன்னார்வ பணியை திறம்பட செய்ய அதை முடிக்கவும்.",
+      "personal_details": "தனிப்பட்ட விவரங்கள்",
+      "edit_profile": "சுயவிவரத்தைத் திருத்து",
+      "contact_information": "தொடர்பு தகவல்",
+      "profile_summary": "சுயவிவர சுருக்கம்",
+      "basic_details": "அடிப்படை விவரங்கள்",
+      "profile_status": "சுயவிவர நிலை",
+      "complete": "முழுமை",
+      "incomplete": "முழுமையற்ற",
+      "needs_completion": "முடிக்க வேண்டும்",
+      "complete_profile": "சுயவிவரத்தை முடிக்கவும்",
+      "first_name": "முதல் பெயர்",
+      "last_name": "கடைசி பெயர்",
+      "phone_number": "தொலைபேசி எண்",
+      "whatsapp_number": "WhatsApp எண்",
+      "date_of_birth": "பிறந்த தேதி",
+      "gender": "பாலினம்",
+      "preferred_language": "விருப்பமான மொழி",
+      "role": "பதவி",
+      "email": "மின்னஞ்சல்",
+      "instagram_handle": "Instagram கைப்பிடி",
+      "not_available": "கிடைக்கவில்லை",
+      "male": "ஆண்",
+      "female": "பெண்",
+      "others": "மற்றவை",
+      "volunteer": "தன்னார்வலர்"
+    },
+
+    "dashboard": {
+      "venue_dashboard": "தன்னார்வலர் டாஷ்போர்டு",
+      "technical_station": "தொழில்நுட்ப தன்னார்வலர் நிலையம்",
+      "match_day_management": "ஆட்ட தின மேலாண்மை",
+      "total_teams": "மொத்த அணிகள்",
+      "checked_in": "சரிபார்க்கப்பட்டது",
+      "confirmed": "உறுதிப்படுத்தப்பட்டது",
+      "unconfirmed": "உறுதிப்படுத்தப்படாதது",
+      "my_profile": "என் சுயவிவரம்",
+      "no_actions_available": "செயல்கள் கிடைக்கவில்லை",
+      "check_assignment_status": "உங்கள் தன்னார்வ பணி நிலையைச் சரிபார்க்கவும்.",
+      "active_tournaments": "செயல்பாட்டில் உள்ள போட்டிகள்",
+      "teams_status": "அணிகள் • நிலை:",
+      "manage": "நிர்வகி",
+      "live": "நேரலை",
+      "view_all_tournaments": "அனைத்து {count} போட்டிகளையும் பார்க்கவும்",
+      "create_new_post": "புதிய போஸ்ட் உருவாக்கு",
+      "error": "பிழை",
+      "retry": "மீண்டும் முயற்சி",
+      "volunteer_information": "தன்னார்வலர் தகவல்",
+      "name": "பெயர்",
+      "venue_id": "இட அடையாள எண்",
+      "close": "மூடு",
+      
+      "quick_actions": {
+        "team_verification": "அணி சரிபார்ப்பு",
+        "team_verification_desc": "போட்டிகளுக்கான அணிகளை சரிபார்த்து பதிவு செய்யவும்",
+        "tournament_management": "போட்டி நிர்வாகம்", 
+        "tournament_management_desc": "போட்டி அடைப்புக்கள் உருவாக்கி நிர்வகிக்கவும்",
+        "match_management": "ஆட்ட நிர்வாகம்",
+        "match_management_desc": "ஆட்டங்களுக்கு மதிப்பெண் அளித்து முடிவுகளை புதுப்பிக்கவும்",
+        "media_upload": "ஊடக பதிவேற்றம்",
+        "media_upload_desc": "புகைப்படங்கள் மற்றும் வீடியோக்களை பதிவேற்றவும்",
+        "action": "செயல்",
+        "count": "எண்ணிக்கை",
+        "status": "நிலை",
+        "completed": "முழுமையானது",
+        "active": "செயல்பாட்டில்",
+        "pending": "காத்திருப்பில்",
+        "open": "திறந்த"
+      }
+    },
+
+    "language_selection": {
+      "title": "உங்கள் மொழியைத் தேர்ந்தெடுக்கவும்",
+      "subtitle": "தன்னார்வலர் இடைமுகத்திற்கு உங்கள் விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்",
+      "save_preference": "மொழி விருப்பத்தைச் சேமிக்கவும்",
+      "cancel": "ரத்து செய்யவும்"
+    }
+  }
 }

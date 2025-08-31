@@ -22,30 +22,48 @@ import {
   Star,
   Award
 } from "lucide-react";
+import PostFeed from "@/components/posts/PostFeed";
 
 interface PlayerFixtureDetail {
   id: string;
   name: string;
-  sportName: string;
+  status: string;
   genderCategory: string;
-  venue: {
+  level: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  event: {
+    id: string;
+    name: string;
+    status: string;
+  } | null;
+  fixtureTeams: {
+    team: {
+      id: string;
+      name: string;
+      captainUser: {
+        firstName: string | null;
+        lastName: string | null;
+      };
+    };
+  }[];
+  // Computed properties for backward compatibility
+  assignedTeams?: Array<{
+    id: string;
+    name: string;
+    tournamentNumber?: number;
+  }>;
+  sportName?: string;
+  venue?: {
     id: string;
     name: string;
     address: string;
     district: string;
     state: string;
   };
-  status: string;
-  level: string;
-  assignedTeams: Array<{
-    id: string;
-    name: string;
-    tournamentNumber?: number;
-  }>;
-  totalMatches: number;
-  completedMatches: number;
-  createdAt: string;
-  updatedAt: string;
+  totalMatches?: number;
+  completedMatches?: number;
   hasPlayerTeam?: boolean;
   playerTeamNames?: string[];
 }
@@ -60,7 +78,25 @@ export default function PlayerFixtureDetailPage() {
     undefined,
     {
       enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'player',
-      select: (fixtures) => fixtures.find(f => f.id === fixtureId) as PlayerFixtureDetail | undefined
+      select: (fixtures) => {
+        const foundFixture = fixtures.find(f => f.id === fixtureId);
+        if (foundFixture) {
+          return {
+            ...foundFixture,
+            assignedTeams: foundFixture.fixtureTeams.map(ft => ({
+              id: ft.team.id,
+              name: ft.team.name,
+              tournamentNumber: undefined
+            })),
+            sportName: foundFixture.genderCategory,
+            totalMatches: foundFixture.fixtureTeams.length,
+            completedMatches: foundFixture.status === 'completed' ? foundFixture.fixtureTeams.length : 0,
+            hasPlayerTeam: foundFixture.fixtureTeams.length > 0,
+            playerTeamNames: foundFixture.fixtureTeams.map(ft => ft.team.name)
+          } as PlayerFixtureDetail;
+        }
+        return undefined;
+      }
     }
   );
 
@@ -335,6 +371,11 @@ export default function PlayerFixtureDetailPage() {
             )}
           </div>
         </div>
+
+        <div className="mt-8">
+          <PostFeed entityType="fixture" entityId={fixtureId as string} />
+        </div>
+
       </div>
     </div>
   );

@@ -548,4 +548,70 @@ export const adminVenuesRouter = createTRPCRouter({
 
       return { success: true };
     }),
+
+  // Add missing venue location mapping methods
+  createVenueLevelMapping: protectedProcedure
+    .input(z.object({
+      eventId: z.string(),
+      venueId: z.string(),
+      tournamentLevel: z.enum(['cluster', 'division']),
+      maxTeams: z.number().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      // Check if mapping already exists
+      const existing = await db.venueLevelMapping.findFirst({
+        where: {
+          eventId: input.eventId,
+          venueId: input.venueId,
+          level: input.tournamentLevel,
+        },
+      });
+
+      if (existing) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Venue is already mapped to this event and tournament level',
+        });
+      }
+
+      const mapping = await db.venueLevelMapping.create({
+        data: {
+          eventId: input.eventId,
+          venueId: input.venueId,
+          level: input.tournamentLevel,
+          maxTeams: input.maxTeams,
+        },
+        include: {
+          venue: true,
+          event: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      return mapping;
+    }),
+
+  deleteVenueLevelMapping: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      await db.venueLevelMapping.delete({
+        where: { id: input.id },
+      });
+
+      return { success: true, message: 'Venue location mapping deleted successfully' };
+    }),
 });

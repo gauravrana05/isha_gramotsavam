@@ -303,4 +303,77 @@ export const adminMappingsRouter = createTRPCRouter({
 
       return mappings;
     }),
+
+  // Add missing methods
+  getTalukClusterMappings: protectedProcedure
+    .input(z.object({
+      eventId: z.string(),
+      state: z.string().optional(),
+      district: z.string().optional(),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      return await db.locationClusterMapping.findMany({
+        where: {
+          eventId: input.eventId,
+          locationType: 'taluk',
+          ...(input.state && { state: input.state }),
+          ...(input.district && { district: input.district }),
+        },
+        include: {
+          venueLevelMapping: {
+            include: {
+              venue: {
+                select: {
+                  id: true,
+                  name: true,
+                  district: true,
+                  state: true,
+                }
+              }
+            }
+          }
+        },
+        orderBy: [
+          { state: 'asc' },
+          { district: 'asc' },
+          { locationName: 'asc' }
+        ]
+      });
+    }),
+
+  deleteLocationClusterMapping: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      await db.locationClusterMapping.delete({
+        where: { id: input.id },
+      });
+
+      return { success: true, message: 'Mapping deleted successfully' };
+    }),
+
+  deleteTalukClusterMapping: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      await db.locationClusterMapping.delete({
+        where: { id: input.id },
+      });
+
+      return { success: true, message: 'Taluk mapping deleted successfully' };
+    }),
 });

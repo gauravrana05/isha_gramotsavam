@@ -281,4 +281,109 @@ export const volunteersVenueRouter = createTRPCRouter({
 
       return fixture;
     }),
+
+    getVenueMediaAndPosts: protectedProcedure
+    .input(z.object({
+      venueId: z.string(),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (!['admin', 'general_volunteer', 'technical_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Insufficient permissions',
+        });
+      }
+
+      const { venueId } = input;
+
+      const venueMedia = await db.media.findMany({
+        where: {
+          entityType: 'venue',
+          entityId: venueId,
+        },
+      });
+
+      const fixtures = await db.fixture.findMany({
+        where: {
+          venue: { id: venueId },
+        },
+        select: { id: true },
+      });
+      const fixtureIds = fixtures.map(f => f.id);
+
+      const matches = await db.match.findMany({
+        where: {
+          fixtureId: { in: fixtureIds },
+        },
+        select: { id: true },
+      });
+      const matchIds = matches.map(m => m.id);
+
+      const posts = await db.post.findMany({
+        where: {
+          OR: [
+            { entityType: 'fixture', entityId: { in: fixtureIds } },
+            { entityType: 'match', entityId: { in: matchIds } },
+          ],
+        },
+        include: {
+          media: true,
+          author: true,
+        },
+      });
+
+      return {
+        venueMedia,
+        posts,
+      };
+    }),
+
+    getVenuePosts: protectedProcedure
+    .input(z.object({
+      venueId: z.string(),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (!['admin', 'general_volunteer', 'technical_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Insufficient permissions',
+        });
+      }
+
+      const { venueId } = input;
+
+      const fixtures = await db.fixture.findMany({
+        where: {
+          venue: { id: venueId },
+        },
+        select: { id: true },
+      });
+      const fixtureIds = fixtures.map(f => f.id);
+
+      const matches = await db.match.findMany({
+        where: {
+          fixtureId: { in: fixtureIds },
+        },
+        select: { id: true },
+      });
+      const matchIds = matches.map(m => m.id);
+
+      const posts = await db.post.findMany({
+        where: {
+          OR: [
+            { entityType: 'fixture', entityId: { in: fixtureIds } },
+            { entityType: 'match', entityId: { in: matchIds } },
+          ],
+        },
+        include: {
+          media: true,
+          author: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      return posts;
+    }),
 });

@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useMediaUpload } from '@/hooks/media/useMediaUpload';
 import { MediaMetadata, MEDIA_CONFIG } from '@/lib/types/media';
+import PostCreator from '../posts/PostCreator';
 
 interface MediaUploadProps {
   venueId: string;
@@ -24,6 +25,9 @@ interface MediaUploadProps {
   onUploadError?: (error: string) => void;
   multiple?: boolean;
   acceptedTypes?: 'image' | 'video' | 'all';
+  postMode?: boolean; // NEW: Enable post creation mode
+  showContextSelector?: boolean; // NEW: Show fixture/match selector
+  onPostCreated?: (post: any) => void; // NEW: Post creation callback, TODO: use Post type
 }
 
 interface FileWithMetadata {
@@ -42,7 +46,10 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
   onUploadComplete,
   onUploadError,
   multiple = true,
-  acceptedTypes = 'all'
+  acceptedTypes = 'all',
+  postMode = false,
+  showContextSelector = false,
+  onPostCreated,
 }) => {
   // Support both new context props and legacy props
   const effectiveContextType = contextType || (fixtureId ? 'fixture' : matchId ? 'match' : null);
@@ -245,6 +252,10 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
+  if (postMode) {
+    return <PostCreator onPostCreated={onPostCreated} />;
+  }
 
   return (
     <div className="space-y-8">

@@ -464,4 +464,120 @@ export const teamsManagementRouter = createTRPCRouter({
 
       return updatedAssignment
     }),
+
+  // Add missing methods
+  getMyTeamFixtures: protectedProcedure
+    .input(z.object({
+      fixtureId: z.string().optional(),
+    }))
+    .query(async ({ input, ctx }) => {
+      const team = await db.team.findFirst({
+        where: { captainId: ctx.user.id },
+        select: { id: true },
+      });
+
+      if (!team) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Team not found',
+        });
+      }
+
+      const where = {
+        fixtureTeams: {
+          some: {
+            teamId: team.id,
+          },
+        },
+        ...(input.fixtureId && { id: input.fixtureId }),
+      };
+
+      return await db.fixture.findMany({
+        where,
+        include: {
+          event: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
+          fixtureTeams: {
+            include: {
+              team: {
+                select: {
+                  id: true,
+                  name: true,
+                  captainUser: {
+                    select: {
+                      firstName: true,
+                      lastName: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+    }),
+
+  getMyTeamMatches: protectedProcedure
+    .input(z.object({
+      matchId: z.string().optional(),
+    }))
+    .query(async ({ input, ctx }) => {
+      const team = await db.team.findFirst({
+        where: { captainId: ctx.user.id },
+        select: { id: true },
+      });
+
+      if (!team) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Team not found',
+        });
+      }
+
+      const where = {
+        fixtureTeams: {
+          some: {
+            teamId: team.id,
+          },
+        },
+        status: 'completed' as const,
+        ...(input.matchId && { id: input.matchId }),
+      };
+
+      return await db.fixture.findMany({
+        where,
+        include: {
+          event: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
+          fixtureTeams: {
+            include: {
+              team: {
+                select: {
+                  id: true,
+                  name: true,
+                  captainUser: {
+                    select: {
+                      firstName: true,
+                      lastName: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }),
 });

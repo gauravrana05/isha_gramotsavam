@@ -72,6 +72,7 @@ model Event {
   fixtures              Fixture[]
   matches               Match[]
   locationClusterMappings LocationClusterMapping[]
+  posts                 Post[]
   teamVenueAssignments  TeamVenueAssignment[]
   teams                 Team[]
   userRoles             UserRoleAssignment[]
@@ -233,6 +234,11 @@ model Media {
   createdAt    DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt    DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
   deletedAt    DateTime? @db.Timestamptz(6) @map("deleted_at")
+
+  postId      String? @map("post_id") @db.Uuid
+  caption     String? @db.VarChar(500)
+  orderInPost Int? @map("order_in_post")
+  post        Post? @relation(fields: [postId], references: [id])
 
   // Relations
   uploadedByUser User? @relation(fields: [uploadedBy], references: [id])
@@ -475,6 +481,30 @@ model Team {
   @@map("teams")
 }
 
+model Post {
+  id          String @id @default(uuid()) @db.Uuid
+  title       String? @db.VarChar(200)
+  content     String?
+  authorId    String @map("author_id") @db.Uuid
+  eventId     String @map("event_id") @db.Uuid
+
+  entityType  PostEntity @map("entity_type") @default(fixture)
+  entityId    String @map("entity_id") @db.Uuid
+
+  visibility  PostVisibility @default(public)
+  status      PostStatus @default(published)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  
+  author      User @relation(fields: [authorId], references: [id])
+  event       Event @relation(fields: [eventId], references: [id])
+  media       Media[]
+  
+  @@map("posts")
+}
+
 model UserProfileImage {
   userId           String @id @map("user_id") @db.Uuid
   profilePhotoPath String? @map("profile_photo_path") @db.VarChar(500)
@@ -527,6 +557,7 @@ model User {
   matches             Match[]
   media               Media[]
   notifications       Notification[]
+  posts               Post[]
   systemConfigs       SystemConfig[]
   teamPhotos          TeamPhoto[]
   teamPlayers         TeamPlayer[]
@@ -737,6 +768,8 @@ enum MediaEntity {
   match
   event
   venue
+  fixture
+  post
 }
 
 enum MediaStatus {
@@ -800,4 +833,20 @@ enum VerificationType {
 enum VolunteerType {
   general_volunteer
   technical_volunteer
+}
+
+enum PostEntity {
+  fixture
+  match
+}
+
+enum PostVisibility {
+  public
+  private
+}
+
+enum PostStatus {
+  draft
+  published
+  archived
 }

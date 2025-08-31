@@ -38,7 +38,7 @@ export const updateVenueSchema = z.object({
 })
 
 // Venue location mapping schemas
-export const createVenueLocationMappingSchema = z.object({
+export const createVenueLevelMappingSchema = z.object({
   eventId: uuidSchema,
   venueId: uuidSchema,
   tournamentLevel: tournamentLevelSchema,
@@ -109,14 +109,14 @@ export const getClusterDivisionMappingsSchema = z.object({
 })
 
 export const getVenueCapacitySchema = z.object({
-  venueLocationMappingId: uuidSchema,
+  venueLevelMappingId: uuidSchema,
   sportId: uuidSchema.optional(),
 })
 
 // Type exports
 export type CreateVenueInput = z.infer<typeof createVenueSchema>
 export type UpdateVenueInput = z.infer<typeof updateVenueSchema>
-export type CreateVenueLocationMappingInput = z.infer<typeof createVenueLocationMappingSchema>
+export type CreateVenueLocationMappingInput = z.infer<typeof createVenueLevelMappingSchema>
 export type UpdateVenueLocationMappingInput = z.infer<typeof updateVenueLocationMappingSchema>
 export type CreateTalukClusterMappingInput = z.infer<typeof createTalukClusterMappingSchema>
 export type CreateClusterDivisionMappingInput = z.infer<typeof createClusterDivisionMappingSchema>

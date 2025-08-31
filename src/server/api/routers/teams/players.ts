@@ -288,4 +288,74 @@ export const teamsPlayersRouter = createTRPCRouter({
 
       return teamPlayer
     }),
+
+  // Add missing methods
+  getTeamPlayers: protectedProcedure
+    .input(z.object({
+      teamId: z.string(),
+    }))
+    .query(async ({ input, ctx }) => {
+      return await db.teamPlayer.findMany({
+        where: {
+          teamId: input.teamId,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              age: true,
+              gender: true,
+            },
+          },
+          team: {
+            select: {
+              id: true,
+              name: true,
+              captainId: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+    }),
+
+  getPlayerTeams: protectedProcedure
+    .query(async ({ ctx }) => {
+      return await db.teamPlayer.findMany({
+        where: {
+          userId: ctx.user.id,
+        },
+        include: {
+          team: {
+            select: {
+              id: true,
+              name: true,
+              sport: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+              event: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                },
+              },
+              captainUser: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }),
 });

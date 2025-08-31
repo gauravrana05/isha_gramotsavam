@@ -47,5 +47,116 @@
   "player_dashboard_title": "ಆಟಗಾರ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
   "player_dashboard_description": "ನಿಮ್ಮ ಇಷಾ ಗ್ರಾಮೋತ್ಸವ ಘಟನೆಗಳು ಮತ್ತು ತಂಡವನ್ನು ವೀಕ್ಷಿಸಿ.",
   "guest_dashboard_title": "ಅತಿಥಿ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
-  "guest_dashboard_description": "ಅತಿಥಿಯಾಗಿ ಇಷಾ ಗ್ರಾಮೋತ್ಸವ ಘಟನೆಗಳನ್ನು ಅನ್ವೇಷಿಸಿ."
+  "guest_dashboard_description": "ಅತಿಥಿಯಾಗಿ ಇಷಾ ಗ್ರಾಮೋತ್ಸವ ಘಟನೆಗಳನ್ನು ಅನ್ವೇಷಿಸಿ.",
+
+  "_comment_volunteer_section": "=== ಸ್ವಯಂಸೇವಕ ಇಂಟರ್‌ಫೇಸ್ ಅನುವಾದಗಳು ===",
+  
+  "volunteer": {
+    "title": "ಸ್ವಯಂಸೇವಕ ಪ್ಯಾನೆಲ್",
+    "loading_assignment": "ನಿಮ್ಮ ನಿಯೋಜನೆ ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+    "no_venue_assignments": "ಸ್ಥಳ ನಿಯೋಜನೆಗಳು ಇಲ್ಲ",
+    "no_venue_assignments_desc": "ನೀವು ಇನ್ನೂ ಯಾವುದೇ ಸ್ಥಳಕ್ಕೆ ನಿಯೋಜಿಸಲಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ನಿರ್ವಾಹಕರನ್ನು ಸಂಪರ್ಕಿಸಿ.",
+    "redirecting_venue": "ನಿಮ್ಮ ಸ್ಥಳಕ್ಕೆ ಮರು ನಿರ್ದೇಶನ...",
+    "refresh": "ರಿಫ್ರೆಶ್ ಮಾಡಿ",
+    "loading_dashboard": "ಸ್ವಯಂಸೇವಕ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+    
+    "sidebar": {
+      "admin_panel": "ಆಡ್ಮಿನ್ ಪ್ಯಾನೆಲ್",
+      "volunteer_panel": "ಸ್ವಯಂಸೇವಕ ಪ್ಯಾನೆಲ್",
+      "isha_gramotsavam": "ಇಷಾ ಗ್ರಾಮೋತ್ಸವ",
+      "expand_sidebar": "ಸೈಡ್‌ಬಾರ್ ವಿಸ್ತರಿಸಿ",
+      "collapse_sidebar": "ಸೈಡ್‌ಬಾರ್ ಕುಗ್ಗಿಸಿ",
+      "venue_overview": "ಸ್ಥಳ ಅವಲೋಕನ",
+      "teams": "ತಂಡಗಳು",
+      "fixtures": "ಫಿಕ್ಸ್‌ಚರ್‌ಗಳು",
+      "matches": "ಪಂದ್ಯಗಳು",
+      "media": "ಮಾಧ್ಯಮ",
+      "my_venues": "ನನ್ನ ಸ್ಥಳಗಳು",
+      "profile": "ಪ್ರೊಫೈಲ್",
+      "back_to_admin_dashboard": "ಆಡ್ಮಿನ್ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ಗೆ ಹಿಂತಿರುಗಿ",
+      "back_to_app": "ಆ್ಯಪ್‌ಗೆ ಹಿಂತಿರುಗಿ",
+      "sign_out": "ಸೈನ್ ಔಟ್"
+    },
+
+    "profile": {
+      "title": "ಸ್ವಯಂಸೇವಕ ಪ್ರೊಫೈಲ್",
+      "subtitle": "ನಿಮ್ಮ ವೈಯಕ್ತಿಕ ಮಾಹಿತಿ",
+      "incomplete_profile": "ನಿಮ್ಮ ಪ್ರೊಫೈಲ್ ಅಪೂರ್ಣವಾಗಿದೆ. ಪರಿಣಾಮಕಾರಿಯಾಗಿ ಸ್ವಯಂಸೇವೆ ಮಾಡಲು ದಯವಿಟ್ಟು ಅದನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ.",
+      "personal_details": "ವೈಯಕ್ತಿಕ ವಿವರಗಳು",
+      "edit_profile": "ಪ್ರೊಫೈಲ್ ಎಡಿಟ್ ಮಾಡಿ",
+      "contact_information": "ಸಂಪರ್ಕ ಮಾಹಿತಿ",
+      "profile_summary": "ಪ್ರೊಫೈಲ್ ಸಾರಾಂಶ",
+      "basic_details": "ಮೂಲಭೂತ ವಿವರಗಳು",
+      "profile_status": "ಪ್ರೊಫೈಲ್ ಸ್ಥಿತಿ",
+      "complete": "ಪೂರ್ಣಗೊಂಡಿದೆ",
+      "incomplete": "ಅಪೂರ್ಣ",
+      "needs_completion": "ಪೂರ್ಣಗೊಳಿಸಬೇಕಾಗಿದೆ",
+      "complete_profile": "ಪ್ರೊಫೈಲ್ ಪೂರ್ಣಗೊಳಿಸಿ",
+      "first_name": "ಮೊದಲ ಹೆಸರು",
+      "last_name": "ಕೊನೆಯ ಹೆಸರು",
+      "phone_number": "ಫೋನ್ ಸಂಖ್ಯೆ",
+      "whatsapp_number": "ವಾಟ್ಸ್‌ಆಪ್ ಸಂಖ್ಯೆ",
+      "date_of_birth": "ಜನ್ಮ ದಿನಾಂಕ",
+      "gender": "ಲಿಂಗ",
+      "preferred_language": "ಆದ್ಯತೆಯ ಭಾಷೆ",
+      "role": "ಪಾತ್ರ",
+      "email": "ಇಮೇಲ್",
+      "instagram_handle": "ಇನ್‌ಸ್ಟಗ್ರಾಮ್ ಹ್ಯಾಂಡಲ್",
+      "not_available": "ಲಭ್ಯವಿಲ್ಲ",
+      "male": "ಪುರುಷ",
+      "female": "ಸ್ತ್ರೀ",
+      "others": "ಇತರರು",
+      "volunteer": "ಸ್ವಯಂಸೇವಕ"
+    },
+
+    "dashboard": {
+      "venue_dashboard": "ಸ್ವಯಂಸೇವಕ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+      "technical_station": "ತಾಂತ್ರಿಕ ಸ್ವಯಂಸೇವಕ ಕೇಂದ್ರ",
+      "match_day_management": "ಪಂದ್ಯ ದಿನ ನಿರ್ವಹಣೆ",
+      "total_teams": "ಒಟ್ಟು ತಂಡಗಳು",
+      "checked_in": "ಚೆಕ್ ಇನ್ ಆಗಿದ್ದಾರೆ",
+      "confirmed": "ದೃಢೀಕರಿಸಲಾಗಿದೆ",
+      "unconfirmed": "ದೃಢೀಕರಿಸಲಾಗಿಲ್ಲ",
+      "my_profile": "ನನ್ನ ಪ್ರೊಫೈಲ್",
+      "no_actions_available": "ಯಾವುದೇ ಕ್ರಿಯೆಗಳು ಲಭ್ಯವಿಲ್ಲ",
+      "check_assignment_status": "ನಿಮ್ಮ ಸ್ವಯಂಸೇವಕ ನಿಯೋಜನೆ ಸ್ಥಿತಿಯನ್ನು ಪರಿಶೀಲಿಸಿ.",
+      "active_tournaments": "ಸಕ್ರಿಯ ಪಂದ್ಯಾವಳಿಗಳು",
+      "teams_status": "ತಂಡಗಳು • ಸ್ಥಿತಿ:",
+      "manage": "ನಿರ್ವಹಿಸಿ",
+      "live": "ನೇರ ಪ್ರಸಾರ",
+      "view_all_tournaments": "ಎಲ್ಲಾ {count} ಪಂದ್ಯಾವಳಿಗಳನ್ನು ನೋಡಿ",
+      "create_new_post": "ಹೊಸ ಪೋಸ್ಟ್ ರಚಿಸಿ",
+      "error": "ದೋಷ",
+      "retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+      "volunteer_information": "ಸ್ವಯಂಸೇವಕ ಮಾಹಿತಿ",
+      "name": "ಹೆಸರು",
+      "venue_id": "ಸ್ಥಳ ಐಡಿ",
+      "close": "ಮುಚ್ಚಿ",
+      
+      "quick_actions": {
+        "team_verification": "ತಂಡ ಪರಿಶೀಲನೆ",
+        "team_verification_desc": "ಪಂದ್ಯಾವಳಿಗಳಿಗಾಗಿ ತಂಡಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಚೆಕ್-ಇನ್ ಮಾಡಿ",
+        "tournament_management": "ಪಂದ್ಯಾವಳಿ ನಿರ್ವಹಣೆ",
+        "tournament_management_desc": "ಪಂದ್ಯಾವಳಿ ಬ್ರಾಕೆಟ್‌ಗಳನ್ನು ರಚಿಸಿ ಮತ್ತು ನಿರ್ವಹಿಸಿ",
+        "match_management": "ಪಂದ್ಯ ನಿರ್ವಹಣೆ",
+        "match_management_desc": "ಪಂದ್ಯಗಳನ್ನು ಸ್ಕೋರ್ ಮಾಡಿ ಮತ್ತು ಫಲಿತಾಂಶಗಳನ್ನು ಅಪ್‌ಡೇಟ್ ಮಾಡಿ",
+        "media_upload": "ಮಾಧ್ಯಮ ಅಪ್‌ಲೋಡ್",
+        "media_upload_desc": "ಫೋಟೋಗಳು ಮತ್ತು ವೀಡಿಯೊಗಳನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ",
+        "action": "ಕ್ರಿಯೆ",
+        "count": "ಎಣಿಕೆ",
+        "status": "ಸ್ಥಿತಿ",
+        "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
+        "active": "ಸಕ್ರಿಯ",
+        "pending": "ಬಾಕಿ ಇದೆ",
+        "open": "ತೆರೆದಿದೆ"
+      }
+    },
+
+    "language_selection": {
+      "title": "ನಿಮ್ಮ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ",
+      "subtitle": "ಸ್ವಯಂಸೇವಕ ಇಂಟರ್‌ಫೇಸ್‌ಗಾಗಿ ನಿಮ್ಮ ಆದ್ಯತೆಯ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ",
+      "save_preference": "ಭಾಷಾ ಆದ್ಯತೆಯನ್ನು ಸೇವ್ ಮಾಡಿ",
+      "cancel": "ರದ್ದುಮಾಡಿ"
+    }
+  }
 }
