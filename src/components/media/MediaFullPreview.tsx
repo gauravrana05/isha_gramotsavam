@@ -54,6 +54,8 @@ export const MediaFullPreview: React.FC<MediaFullPreviewProps> = ({
             <Image
               src={mediaItem.url}
               alt={mediaItem.title}
+              width={800}
+              height={600}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
             />

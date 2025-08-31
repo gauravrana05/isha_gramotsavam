@@ -266,6 +266,8 @@ export default function AdminProfilePage() {
                   <Image
                     src={userProfile.documents.aadhaarFront.url}
                     alt="Aadhaar Front"
+                    width={400}
+                    height={192}
                     className="w-full h-48 object-cover rounded-lg border border-gray-200"
                   />
                 ) : (
@@ -281,6 +283,8 @@ export default function AdminProfilePage() {
                   <Image
                     src={userProfile.documents.aadhaarBack.url}
                     alt="Aadhaar Back"
+                    width={400}
+                    height={192}
                     className="w-full h-48 object-cover rounded-lg border border-gray-200"
                   />
                 ) : (

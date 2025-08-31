@@ -85,6 +85,8 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         <Image
           src={url}
           alt={label}
+          width={400}
+          height={300}
           className="w-full h-full object-cover rounded-lg border border-gray-200 cursor-pointer"
           onClick={handleImageClick}
         />
@@ -147,6 +149,8 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             <Image
               src={url!}
               alt={label}
+              width={800}
+              height={600}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
             />

@@ -32,12 +32,14 @@ export async function assignVenueToTeam(
   eventId: string,
   assignedByUserId: string
 ): Promise<VenueAssignmentResult> {
+  console.log('🎯 Starting venue assignment for:', { teamId, teamLocation, eventId });
+  
   try {
     // Check if team already has a venue assignment
     const existingAssignment = await db.teamVenueAssignment.findFirst({
       where: { teamId, eventId },
       include: {
-        venueLevelMapping: {
+        clusterVenueMapping: {
           include: {
             venue: { select: { id: true, name: true } }
           }
@@ -50,8 +52,8 @@ export async function assignVenueToTeam(
         success: true,
         message: 'Team already has venue assignment',
         assignment: {
-          venueId: existingAssignment.venueLevelMapping?.venue?.id || '',
-          venueName: existingAssignment.venueLevelMapping?.venue?.name || '',
+          venueId: existingAssignment.clusterVenueMapping?.venue?.id || '',
+          venueName: existingAssignment.clusterVenueMapping?.venue?.name || '',
           assignmentLevel: 'cluster',
           assignmentMethod: 'auto_assigned'
         }
@@ -133,8 +135,12 @@ export async function assignVenueToTeam(
  * Tier 1: Find venue by direct taluk mapping
  */
 async function findVenueByLocationMapping(location: TeamLocationData, eventId: string) {
+  console.log('🔍 Finding venue by location mapping:', location);
+  
   try {
     // Priority 1: Check district mapping first
+    console.log('🔍 Checking district mapping for:', { district: location.district, state: location.state, eventId });
+    
     const districtMapping = await db.locationClusterMapping.findFirst({
       where: {
         eventId,
@@ -149,14 +155,15 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
               select: { 
                 id: true, 
                 name: true, 
-                isActive: true,
-                capacity: true
+                isActive: true
               }
             }
           }
         }
       }
     });
+
+    console.log('🔍 District mapping result:', districtMapping);
 
     if (districtMapping?.venueLevelMapping?.venue?.isActive) {
       const currentAssignments = await db.teamVenueAssignment.count({
@@ -193,8 +200,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
         venue: {
           select: { 
             id: true, 
-            name: true, 
-            capacity: true
+            name: true
           }
         }
       }
@@ -209,7 +215,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
         }
       });
 
-      const maxCapacity = venue.venuevenue.maxTeams || 50;
+      const maxCapacity = venue.maxTeams || 50;
       if (currentAssignments < maxCapacity) {
         return {
           venueId: venue.venue.id,
@@ -236,8 +242,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
               select: { 
                 id: true, 
                 name: true, 
-                isActive: true,
-                capacity: true
+                isActive: true
               }
             }
           }
@@ -293,8 +298,7 @@ async function findVenuesByDistrict(location: TeamLocationData, eventId: string)
           select: { 
             id: true, 
             name: true, 
-            isActive: true,
-            capacity: true
+            isActive: true
           }
         }
       }
@@ -311,7 +315,7 @@ async function findVenuesByDistrict(location: TeamLocationData, eventId: string)
           }
         });
 
-        const maxCapacity = mapping.venuemapping.maxTeams || 50;
+        const maxCapacity = mapping.maxTeams || 50;
         if (currentAssignments < maxCapacity) {
           availableVenues.push({
             venueId: mapping.venue.id,
@@ -353,7 +357,7 @@ async function createVenueAssignment(
         assignedAt: new Date()
       },
       include: {
-        venueLevelMapping: {
+        clusterVenueMapping: {
           include: {
             venue: {
               select: { id: true, name: true }

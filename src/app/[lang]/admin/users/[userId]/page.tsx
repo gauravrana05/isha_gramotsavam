@@ -539,6 +539,8 @@ export default function UserDetailPage() {
             <Image
               src={selectedImage}
               alt="Document"
+              width={800}
+              height={600}
               className="max-w-full max-h-full object-contain rounded-lg"
             />
           </div>

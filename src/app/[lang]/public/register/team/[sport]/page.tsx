@@ -59,6 +59,16 @@ export default function TeamRegistrationPage() {
     },
     { enabled: !!sportName && !!userProfileData }
   );
+
+  // Get ongoing events for venue assignment
+  const { data: eventsData } = api.admin.events.getEvents.useQuery({
+    limit: 1,
+    status: 'ongoing',
+  }, {
+    enabled: !!user
+  });
+
+  const ongoingEvent = eventsData?.events?.[0];
   
   // This is now redundant since we're already fetching profile data above
   // const profileDataQuery = api.profile.checkCompletion.useQuery(
@@ -152,6 +162,7 @@ export default function TeamRegistrationPage() {
         genderCategory: userProfile?.gender === 'M' ? 'men' as const : 
                        userProfile?.gender === 'F' ? 'women' as const : 
                        'mixed' as const,
+        eventId: ongoingEvent?.id,
       };
       
       // Use tRPC mutation - pass team data directly

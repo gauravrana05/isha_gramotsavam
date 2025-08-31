@@ -74,14 +74,15 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
   // State management
   const [selectedTeams, setSelectedTeams] = useState<Set<string | number>>(new Set());
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<TeamAssignmentData | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string>('');
 
-  // Table state - default to showing only pending (unassigned) teams
+  // Table state - default to showing all teams
   const [tableParams, setTableParams] = useState<TableParams>({
     pagination: { page: 1, pageSize: 50 },
     sorting: { field: 'name', direction: 'asc' },
-    filters: { status: 'unassigned' }, // Focus on teams needing manual intervention
+    filters: { status: 'all' }, // Show all teams by default
   });
 
   // Auth check
@@ -92,7 +93,7 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
   }, [user, userProfile, authLoading, router, lang]);
 
   // Get events for filter - use 'ongoing' for current active events
-  const { data: eventsData } = api.admin.events.getEvents.useQuery({
+  const { data: eventsData, isLoading: eventsLoading } = api.admin.events.getEvents.useQuery({
     limit: 100,
     status: 'ongoing',
   });
@@ -134,8 +135,12 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
   const teams = useMemo(() => {
     if (!teamAssignmentsData) return [];
     
+    console.log('🔍 Team assignments data:', teamAssignmentsData);
+    console.log('🔍 Teams with assignments:', teamAssignmentsData.filter(t => t.teamVenueAssignments?.length > 0));
+    
     return teamAssignmentsData.map(team => ({
       ...team,
+      assignment: team.teamVenueAssignments?.[0] || null, // Map first assignment to assignment property
       captain: {
         name: team.captainUser ? `${team.captainUser.firstName} ${team.captainUser.lastName}` : 'N/A',
         phone: team.captainUser?.phone || 'N/A',
@@ -147,7 +152,7 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
     }));
   }, [teamAssignmentsData]);
 
-  const loading = authLoading || assignmentsLoading;
+  const loading = assignmentsLoading || eventsLoading || (!selectedEvent && eventsData?.events?.length > 0);
 
   // Table columns
   const columns: Column<TeamAssignmentData>[] = [
@@ -276,22 +281,78 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
     },
   ];
 
-  // Header actions - only show when teams are selected
-  const headerActions = selectedTeams.size > 0 ? (
-    <div className="flex items-center space-x-3">
-      <button
-        onClick={() => {
-          // Handle bulk venue assignment
-          console.log('Assign venues to selected teams:', Array.from(selectedTeams));
-        }}
-        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-        disabled={!selectedEvent || loading}
-      >
-        <MapPin className="w-4 h-4 mr-2" />
-        Assign Venue ({selectedTeams.size})
-      </button>
-    </div>
-  ) : null;
+  // Header actions - only show when teams are selected and all at same level
+  const headerActions = useMemo(() => {
+    console.log('🔍 Header actions check:', { selectedTeamsSize: selectedTeams.size, selectedTeams: Array.from(selectedTeams) });
+    
+    if (selectedTeams.size === 0) return null;
+    
+    // Check if all selected teams are at the same assignment level AND same state
+    const selectedTeamsList = Array.from(selectedTeams);
+    console.log('🔍 Selected team IDs:', selectedTeamsList);
+    console.log('🔍 Available teams:', teams.map(t => ({ id: t.id, name: t.name })));
+    
+    const teamData = selectedTeamsList.map(teamId => {
+      const team = teams.find(t => t.id === teamId);
+      console.log('🔍 Looking for team:', teamId, 'Found:', team?.name);
+      
+      if (!team) return null;
+      
+      // Determine next level based on qualification status
+      let level = 'cluster';
+      if (team.assignment?.divisionQualified) level = 'final';
+      else if (team.assignment?.clusterQualified) level = 'division';
+      
+      return {
+        teamId,
+        level,
+        state: team.state,
+        team
+      };
+    }).filter(Boolean);
+    
+    const teamLevels = teamData.map(t => t.level);
+    const teamStates = teamData.map(t => t.state);
+    
+    console.log('🔍 Team levels:', teamLevels);
+    console.log('🔍 Team states:', teamStates);
+    
+    // Only show if all teams are at the same level AND same state
+    const uniqueLevels = [...new Set(teamLevels)];
+    const uniqueStates = [...new Set(teamStates)];
+    console.log('🔍 Unique levels:', uniqueLevels);
+    console.log('🔍 Unique states:', uniqueStates);
+    
+    if (uniqueLevels.length !== 1) {
+      console.log('❌ Mixed levels, no header action');
+      return null;
+    }
+    
+    if (uniqueStates.length !== 1) {
+      console.log('❌ Mixed states, no header action');
+      return null;
+    }
+    
+    const level = uniqueLevels[0];
+    const state = uniqueStates[0];
+    console.log('✅ Same level and state, showing header action:', { level, state });
+    
+    return (
+      <div className="flex items-center space-x-3">
+        <button
+          onClick={() => {
+            console.log(`Assign ${level} venues to ${selectedTeams.size} teams in ${state}`);
+            setShowAssignModal(true);
+          }}
+          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+          disabled={!selectedEvent || loading}
+        >
+          <MapPin className="w-4 h-4 mr-2" />
+          Assign {level.charAt(0).toUpperCase() + level.slice(1)} Venue ({selectedTeams.size})
+        </button>
+      </div>
+    );
+  }, [selectedTeams, teams, selectedEvent, loading]);
 
   // Row click handler
   const handleRowClick = (team: TeamAssignmentData) => {
@@ -329,6 +390,8 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
           onTableParamsChange={setTableParams}
           selectedRows={selectedTeams}
           onSelectionChange={setSelectedTeams}
+          selectable={true}
+          keyExtractor={(item) => item.id}
           filters={filterFields}
           filterable={true}
           headerActions={headerActions}
@@ -475,6 +538,40 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
                   </div>
                 </div>
               )}
+            </div>
+          </EnhancedModal>
+        )}
+
+        {/* Venue Assignment Modal */}
+        {showAssignModal && (
+          <EnhancedModal
+            isOpen={showAssignModal}
+            onClose={() => setShowAssignModal(false)}
+            title="Assign Venues"
+            subtitle={`Select venue for ${selectedTeams.size} team(s)`}
+            size="lg"
+          >
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Venue assignment modal - TODO: Implement venue selection for teams in same state and level.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowAssignModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    // TODO: Implement venue assignment
+                    setShowAssignModal(false);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26]"
+                >
+                  Assign Venues
+                </button>
+              </div>
             </div>
           </EnhancedModal>
         )}

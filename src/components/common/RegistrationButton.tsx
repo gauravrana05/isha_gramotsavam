@@ -36,7 +36,7 @@ export default function RegistrationButton({
 
   const handleClick = () => {
     if (disabled) return
-    const targetUrl = `/${lang}/public/sports`
+    const targetUrl = `/${lang}/public/register/team/${sportId}`
     handleAction(targetUrl)
   }
 

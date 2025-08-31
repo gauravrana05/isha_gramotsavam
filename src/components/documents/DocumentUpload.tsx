@@ -147,6 +147,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             <Image
               src={currentUrl}
               alt={label}
+              width={400}
+              height={400}
               className="w-full h-full max-h-[400px] object-cover rounded-lg mx-auto border border-gray-200 cursor-pointer"
               onClick={handleImageClick}
             />
@@ -298,6 +300,8 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             <Image
               src={currentUrl}
               alt={label}
+              width={800}
+              height={600}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
             />

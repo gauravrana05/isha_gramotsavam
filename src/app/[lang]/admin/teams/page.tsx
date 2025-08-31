@@ -207,6 +207,20 @@ export default function AdminTeamsPage() {
     enabled: !!user && userProfile?.role === 'admin'
   });
 
+  // Get ongoing events for venue assignment
+  const { data: eventsData } = api.admin.events.getEvents.useQuery({
+    limit: 1,
+    status: 'ongoing',
+  }, {
+    enabled: !!user && userProfile?.role === 'admin'
+  });
+
+  const ongoingEvent = eventsData?.events?.[0];
+  
+  // Debug log to check if event is found
+  console.log('🔍 Admin Teams - eventsData:', eventsData);
+  console.log('🔍 Admin Teams - ongoingEvent:', ongoingEvent);
+
   // Auth check
   if (authLoading) {
     return <PageLoader title="Loading..." />;
@@ -314,6 +328,17 @@ export default function AdminTeamsPage() {
       addNotification(error.message || 'Failed to create team', 'error');
     },
   });
+
+  // Wrapper function to add eventId to team creation
+  const handleTeamCreation = (teamData: any) => {
+    console.log('🔍 Frontend - ongoingEvent:', ongoingEvent);
+    const dataWithEvent = {
+      ...teamData,
+      eventId: ongoingEvent?.id
+    };
+    console.log('🎯 Frontend - sending team data:', dataWithEvent);
+    createTeamMutation.mutate(dataWithEvent);
+  };
 
   // Update team status mutation
   const updateTeamStatusMutation = api.admin.teams.updateTeamStatus.useMutation({
@@ -652,7 +677,7 @@ export default function AdminTeamsPage() {
       >
         <div id="team-form">
           <TeamCreationForm
-            onSubmit={createTeamMutation.mutate}
+            onSubmit={handleTeamCreation}
             isLoading={createTeamMutation.isPending}
             formRef={formRef}
           />

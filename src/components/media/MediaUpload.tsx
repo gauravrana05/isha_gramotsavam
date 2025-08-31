@@ -374,6 +374,8 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                     <Image
                       src={fileData.preview}
                       alt="Preview"
+                      width={400}
+                      height={192}
                       className="w-full h-full object-cover"
                     />
                   ) : (

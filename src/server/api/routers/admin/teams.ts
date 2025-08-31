@@ -312,7 +312,9 @@ export const adminTeamsRouter = createTRPCRouter({
 
       // Trigger automatic venue assignment
       let venueAssignment = null;
+      console.log('🔍 Team creation - eventId:', input.eventId);
       if (input.eventId) {
+        console.log('🎯 Triggering venue assignment for team:', team.id);
         try {
           venueAssignment = await assignVenueToTeam(
             team.id, 
@@ -325,8 +327,9 @@ export const adminTeamsRouter = createTRPCRouter({
             input.eventId, 
             ctx.user.id
           );
+          console.log('✅ Venue assignment result:', venueAssignment);
         } catch (error) {
-          console.error('Venue assignment failed:', error);
+          console.error('❌ Venue assignment failed:', error);
           // Don't fail team creation if venue assignment fails
         }
       }

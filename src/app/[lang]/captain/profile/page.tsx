@@ -230,6 +230,8 @@ export default function CaptainProfilePage() {
                   <Image
                     src={userProfile.documents.aadhaarFront.url}
                     alt="Aadhaar Front"
+                    width={400}
+                    height={128}
                     className="w-full h-32 object-cover rounded border"
                   />
                   <div className="flex items-center text-sm text-green-600">
@@ -252,6 +254,8 @@ export default function CaptainProfilePage() {
                   <Image
                     src={userProfile.documents.aadhaarBack.url}
                     alt="Aadhaar Back"
+                    width={400}
+                    height={128}
                     className="w-full h-32 object-cover rounded border"
                   />
                   <div className="flex items-center text-sm text-green-600">
