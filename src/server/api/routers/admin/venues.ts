@@ -424,6 +424,7 @@ export const adminVenuesRouter = createTRPCRouter({
       eventId: z.string().optional(),
       level: z.enum(['all', 'cluster', 'division', 'state']).default('all'),
       district: z.string().optional(),
+      state: z.string().optional(),
       taluk: z.string().optional(),
     }))
     .query(async ({ input, ctx }) => {
@@ -443,10 +444,17 @@ export const adminVenuesRouter = createTRPCRouter({
         where.level = input.level;
       }
       
+      // Handle venue filtering based on location parameters
       if (input.district) {
         where.venue = { 
           district: { contains: input.district, mode: 'insensitive' }
         };
+      } else if (input.state) {
+        where.venue = { 
+          state: { contains: input.state, mode: 'insensitive' }
+        };
+      } else {
+        where.venue = {};
       }
       
       if (input.taluk) {
@@ -473,9 +481,7 @@ export const adminVenuesRouter = createTRPCRouter({
       console.log('Found mappings:', mappings.length);
       console.log('Mappings:', mappings);
 
-      return {
-        venueLevelMappings: mappings
-      };
+      return mappings;
     }),
 
   createVenueLevelMapping: protectedProcedure

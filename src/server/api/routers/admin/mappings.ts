@@ -46,6 +46,19 @@ export const adminMappingsRouter = createTRPCRouter({
               name: true,
             },
           },
+          venueLevelMapping: {
+            include: {
+              venue: {
+                select: {
+                  id: true,
+                  name: true,
+                  address: true,
+                  district: true,
+                  state: true,
+                },
+              },
+            },
+          },
         },
         orderBy: [
           { state: 'asc' },

@@ -43,7 +43,7 @@ export const sportsRouter = createTRPCRouter({
   getByIdOrName: publicProcedure
     .input(z.object({
       identifier: z.string(),
-      userGender: z.enum(['M', 'F', 'O']).optional(),
+      userGender: z.enum(['M', 'F', 'O']).nullable().optional(),
     }))
     .query(async ({ input }) => {
       try {

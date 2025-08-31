@@ -13,32 +13,43 @@ const Select = React.forwardRef<
   }
 >(({ children, autoSelectSingle = true, onValueChange, ...props }, ref) => {
   const [hasAutoSelected, setHasAutoSelected] = React.useState(false);
+  const [childrenKey, setChildrenKey] = React.useState(0);
 
+  // Extract SelectItem values from children, filtering out disabled items
+  const extractSelectItems = React.useCallback((children: React.ReactNode): string[] => {
+    const items: string[] = [];
+    React.Children.forEach(children, (child) => {
+      if (React.isValidElement(child)) {
+        // Check if this is a SelectItem and not disabled
+        if (child.type === SelectItem && !child.props.disabled) {
+          items.push(child.props.value);
+        } else if (child.props?.children) {
+          // Recursively check nested children
+          items.push(...extractSelectItems(child.props.children));
+        }
+      }
+    });
+    return items;
+  }, []);
+
+  // Track children changes to trigger re-evaluation
   React.useEffect(() => {
-    if (autoSelectSingle && !hasAutoSelected && !props.value) {
-      // Extract SelectItem values from children
-      const extractSelectItems = (children: React.ReactNode): string[] => {
-        const items: string[] = [];
-        React.Children.forEach(children, (child) => {
-          if (React.isValidElement(child)) {
-            if (child.type === SelectItem) {
-              items.push(child.props.value);
-            } else if (child.props?.children) {
-              items.push(...extractSelectItems(child.props.children));
-            }
-          }
-        });
-        return items;
-      };
+    setChildrenKey(prev => prev + 1);
+    setHasAutoSelected(false); // Reset auto-selection when children change
+  }, [React.Children.count(children)]);
 
+  // Auto-select single item when conditions are met
+  React.useEffect(() => {
+    if (autoSelectSingle && !hasAutoSelected && !props.value && onValueChange) {
       const selectItems = extractSelectItems(children);
       
-      if (selectItems.length === 1 && onValueChange) {
+      // Only auto-select if there's exactly one enabled, non-disabled item
+      if (selectItems.length === 1) {
         onValueChange(selectItems[0]);
         setHasAutoSelected(true);
       }
     }
-  }, [children, autoSelectSingle, hasAutoSelected, props.value, onValueChange]);
+  }, [childrenKey, autoSelectSingle, hasAutoSelected, props.value, onValueChange, extractSelectItems, children]);
 
   // Reset auto-selection flag when value is cleared
   React.useEffect(() => {

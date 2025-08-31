@@ -82,14 +82,12 @@ export async function GET(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      path: '/',
       maxAge: 10 * 60 * 1000,
     });
     response.cookies.set('code_verifier', codeVerifier, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      path: '/',
       maxAge: 10 * 60 * 1000,
     });
 

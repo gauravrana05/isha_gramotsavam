@@ -360,13 +360,17 @@ function CreateLocationMappingModal({ isOpen, onClose, selectedEvent, onSuccess 
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedVenue, setSelectedVenue] = useState<string>('');
 
-  // Get cluster venues for the event - filtered by district for taluk mapping
+  // Get cluster venues for the event - filtered by state/district based on location type
   const { data: venuesData, isLoading: venuesLoading, error: venuesError } = api.admin.venues.getVenueLevelMappings.useQuery({
     eventId: selectedEvent,
     level: 'cluster',
-    district: locationType === 'taluk' ? selectedDistrict : undefined, // Only filter by district for taluk mapping
+    district: locationType === 'taluk' ? selectedDistrict : undefined,
+    state: locationType === 'district' ? selectedState : undefined,
   }, {
-    enabled: !!selectedEvent && !!selectedState && (locationType === 'district' || (locationType === 'taluk' && !!selectedDistrict)),
+    enabled: !!selectedEvent && (
+      (locationType === 'district' && !!selectedState) ||
+      (locationType === 'taluk' && !!selectedState && !!selectedDistrict)
+    ),
   });
 
   console.log('Modal selectedEvent:', selectedEvent);
@@ -386,6 +390,28 @@ function CreateLocationMappingModal({ isOpen, onClose, selectedEvent, onSuccess 
   }, {
     enabled: !!selectedState,
   });
+
+  // Get districts that are already mapped at district-level (for filtering taluk districts)
+  const mappedDistrictsAtDistrictLevel = useMemo(() => {
+    if (!allMappingsData) return [];
+    
+    return allMappingsData
+      .filter(mapping => 
+        mapping.locationType === 'district' && 
+        mapping.state === selectedState
+      )
+      .map(mapping => mapping.locationName);
+  }, [allMappingsData, selectedState]);
+
+  // Filter districts for taluk mapping (exclude districts already mapped at district-level)
+  const availableDistrictsForTaluk = useMemo(() => {
+    if (locationType !== 'taluk' || !districtsData) return districtsData;
+    
+    return districtsData.filter(district => 
+      !mappedDistrictsAtDistrictLevel.includes(district)
+    );
+  }, [locationType, districtsData, mappedDistrictsAtDistrictLevel]);
+
   const { data: taluksData } = api.location.getTaluks.useQuery({
     state: selectedState,
     district: selectedDistrict,
@@ -470,7 +496,7 @@ function CreateLocationMappingModal({ isOpen, onClose, selectedEvent, onSuccess 
     // Get already used venue IDs for current event
     const usedVenueIds = allMappingsData.map(m => (m as any)?.venueLevelMapping?.venue?.id);
     
-    return Array.isArray(venuesData) ? venuesData.filter((venueMapping: any) => {
+    const filtered = Array.isArray(venuesData) ? venuesData.filter((venueMapping: any) => {
       const venue = venueMapping.venue;
       
       // Check if venue is already used
@@ -484,7 +510,17 @@ function CreateLocationMappingModal({ isOpen, onClose, selectedEvent, onSuccess 
       
       return !isVenueUsed && stateMatch;
     }) : [];
+    
+    return filtered;
   }, [venuesData, allMappingsData, locationType, selectedState]);
+
+  // Auto-select venue when there's only one available
+  React.useEffect(() => {
+    if (availableVenues.length === 1 && !selectedVenue) {
+      const venueId = availableVenues[0].id;
+      setSelectedVenue(venueId);
+    }
+  }, [availableVenues, selectedVenue]);
 
   return (
     <EnhancedModal
@@ -517,7 +553,7 @@ function CreateLocationMappingModal({ isOpen, onClose, selectedEvent, onSuccess 
         </div>
       }
     >
-      <div className="space-y-6 sm:min-h-[90vh] scrollbar-none">
+      <div className="space-y-6 sm:min-h-[60vh] scrollbar-none">
         {/* Location Type Selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">Location Type</label>
@@ -578,13 +614,16 @@ function CreateLocationMappingModal({ isOpen, onClose, selectedEvent, onSuccess 
                 <SelectValue placeholder="Select district" />
               </SelectTrigger>
               <SelectContent>
-                {(districtsData || []).map((district) => (
+                {(availableDistrictsForTaluk || []).map((district) => (
                   <SelectItem key={district} value={district}>
                     {district}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <div className="text-xs text-gray-500 mt-1">
+              Only showing districts not already mapped at district-level
+            </div>
           </div>
         )}
 
@@ -740,13 +779,17 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
     }
   }, [isEditMode, mapping]);
 
-  // Get cluster venues for the event - filtered by district for taluk mapping
+  // Get cluster venues for the event - filtered by state/district based on location type
   const { data: venuesData, isLoading: venuesLoading, error: venuesError } = api.admin.venues.getVenueLevelMappings.useQuery({
     eventId: selectedEvent,
     level: 'cluster',
-    district: locationType === 'taluk' ? selectedDistrict : undefined, // Only filter by district for taluk mapping
+    district: locationType === 'taluk' ? selectedDistrict : undefined,
+    state: locationType === 'district' ? selectedState : undefined,
   }, {
-    enabled: !!selectedEvent && !!selectedState && (locationType === 'district' || (locationType === 'taluk' && !!selectedDistrict)),
+    enabled: !!selectedEvent && (
+      (locationType === 'district' && !!selectedState) ||
+      (locationType === 'taluk' && !!selectedState && !!selectedDistrict)
+    ),
   });
 
   // Get states, districts, taluks from location service
@@ -762,6 +805,27 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
   }, {
     enabled: !!selectedState && !!selectedDistrict,
   });
+
+  // Get districts that are already mapped at district-level (for filtering taluk districts) - Edit Modal
+  const mappedDistrictsAtDistrictLevelEdit = useMemo(() => {
+    if (!allMappingsData) return [];
+    
+    return allMappingsData
+      .filter(mapping => 
+        mapping.locationType === 'district' && 
+        mapping.state === selectedState
+      )
+      .map(mapping => mapping.locationName);
+  }, [allMappingsData, selectedState]);
+
+  // Filter districts for taluk mapping (exclude districts already mapped at district-level) - Edit Modal
+  const availableDistrictsForTalukEdit = useMemo(() => {
+    if (locationType !== 'taluk' || !districtsData) return districtsData;
+    
+    return districtsData.filter(district => 
+      !mappedDistrictsAtDistrictLevelEdit.includes(district)
+    );
+  }, [locationType, districtsData, mappedDistrictsAtDistrictLevelEdit]);
 
   // Location options for MultiSelect - filtered to exclude already mapped locations
   const availableLocationOptions = useMemo(() => {
@@ -794,7 +858,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
     // Get already used venue IDs for current event
     const usedVenueIds = allMappingsData.map(m => (m as any)?.venueLevelMapping?.venue?.id);
     
-    return Array.isArray(venuesData) ? venuesData.filter((venueMapping: any) => {
+    const filtered = Array.isArray(venuesData) ? venuesData.filter((venueMapping: any) => {
       const venue = venueMapping.venue;
       
       // Check if venue is already used
@@ -808,6 +872,8 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
       
       return !isVenueUsed && stateMatch;
     }) : [];
+    
+    return filtered;
   }, [venuesData, allMappingsData, locationType, selectedState]);
 
   // Location options for MultiSelect - filtered to exclude already mapped locations
@@ -887,7 +953,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
   }, [venuesData, allMappingsData, mapping?.id, isEditMode, selectedVenue, locationType, selectedState]);
 
   // Delete and recreate mapping mutation (since there's no update API)
-  const deleteMappingMutation = api.admin.mappings.deleteLocationClusterMapping.useMutation();
+  const deleteMappingMutation = api.admin.mappings.deleteLocationClusterMappings.useMutation();
   const createMappingMutation = api.admin.mappings.createLocationClusterMapping.useMutation({
     onSuccess: () => {
       addNotification('Location mapping updated successfully', 'success');
@@ -902,7 +968,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
   });
 
   // Delete all related mappings mutation
-  const deleteAllMappingsMutation = api.admin.mappings.deleteLocationClusterMapping.useMutation({
+  const deleteAllMappingsMutation = api.admin.mappings.deleteLocationClusterMappings.useMutation({
     onSuccess: () => {
       addNotification('All related mappings deleted successfully', 'success');
       setShowDeleteConfirm(false);
@@ -931,7 +997,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
       
       if (relatedMappingIds.length > 0) {
         await deleteAllMappingsMutation.mutateAsync({
-          id: relatedMappingIds[0] // Delete one by one since this is single delete mutation
+          mappingIds: relatedMappingIds // Delete all related mappings at once
         });
       }
     } catch (error) {
@@ -959,7 +1025,7 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
         
         if (relatedMappingIds.length > 0) {
           await deleteMappingMutation.mutateAsync({
-            id: relatedMappingIds[0] // Delete one by one since this is single delete mutation
+            mappingIds: relatedMappingIds // Delete all related mappings at once
           });
         }
       }
@@ -1102,13 +1168,16 @@ function EditLocationMappingModal({ isOpen, onClose, mapping, selectedEvent, onS
                     <SelectValue placeholder="Select district" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(districtsData || []).map((district, index) => (
+                    {(availableDistrictsForTalukEdit || []).map((district, index) => (
                       <SelectItem key={district || index} value={district}>
                         {district}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="text-xs text-gray-500 mt-1">
+                  Only showing districts not already mapped at district-level
+                </div>
               </div>
             )}
 
