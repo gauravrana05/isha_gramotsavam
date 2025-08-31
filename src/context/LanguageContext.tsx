@@ -34,8 +34,8 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         targetLang = params.lang as LanguageCode;
       } 
       // 2. Fallback to user's preferred language if no valid URL lang
-      else if (user?.preferredLanguage && isValidLanguageCode(user.preferredLanguage)) {
-        targetLang = user.preferredLanguage as LanguageCode;
+      else if (user?.languagePreference && isValidLanguageCode(user.languagePreference)) {
+        targetLang = user.languagePreference as LanguageCode;
       }
 
       // Load and cache the translation
@@ -52,7 +52,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     initializeLanguage();
-  }, [params?.lang, user?.preferredLanguage]);
+  }, [params?.lang, user?.languagePreference]);
 
   // Function to switch language and update URL
   const switchLanguage = (newLang: LanguageCode) => {

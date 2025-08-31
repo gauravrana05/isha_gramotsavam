@@ -32,7 +32,7 @@ export default function VolunteerProfilePage() {
     { code: "or", name: "Odia" },
   ];
 
-  const phoneNumber = user?.phoneNumber?.replace(/^\+91/, '') || '';
+  const phoneNumber = user?.phone?.replace(/^\+91/, '') || '';
   const whatsappNumber = userProfile?.whatsappNumber?.replace(/^\+91/, '') || '';
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function VolunteerProfilePage() {
     }
   }, [user, loading, router, lang]);
 
-  const isProfileComplete = userProfile?.isProfileComplete || false;
+  const isProfileComplete = userProfile?.profileComplete || false;
 
   if (loading) {
     return (
@@ -173,7 +173,7 @@ export default function VolunteerProfilePage() {
                 Preferred Language
               </div>
               <div className="text-gray-900">
-                {languages.find(lang => lang.code === userProfile.preferredLanguage)?.name || 'Not Available'}
+                {languages.find(lang => lang.code === userProfile.languagePreference)?.name || 'Not Available'}
               </div>
             </div>
             <div>

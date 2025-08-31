@@ -33,7 +33,7 @@ export default function CaptainProfilePage() {
     { code: "or", name: "Odia" },
   ];
 
-  const phoneNumber = user?.phoneNumber?.replace(/^\+91/, '') || '';
+  const phoneNumber = user?.phone?.replace(/^\+91/, '') || '';
   const whatsappNumber = userProfile?.whatsappNumber?.replace(/^\+91/, '') || '';
 
   useEffect(() => {
@@ -165,7 +165,7 @@ export default function CaptainProfilePage() {
                 Preferred Language
               </div>
               <div className="text-gray-900">
-                {languages.find(lang => lang.code === userProfile.preferredLanguage)?.name || 'Not Available'}
+                {languages.find(lang => lang.code === userProfile.languagePreference)?.name || 'Not Available'}
               </div>
             </div>
             <div>

@@ -272,7 +272,7 @@ export const useAadhaarDocuments = (options?: UseDocumentManagerOptions) => {
       error: manager.getError('aadhaarBack'),
       clearError: () => manager.clearError('aadhaarBack')
     },
-    isComplete: manager.isProfileComplete,
+    isComplete: manager.profileComplete,
     uploadBoth: (frontFile: File, backFile: File) => manager.uploadMultiple([
       { type: 'aadhaarFront', file: frontFile },
       { type: 'aadhaarBack', file: backFile }

@@ -301,7 +301,7 @@ export default function CompleteProfilePage() {
         taluk: formData.taluk || undefined,
         district: formData.district,
         state: formData.state,
-        preferredLanguage: formData.preferredLanguage || undefined,
+        preferredLanguage: formData.languagePreference || undefined,
       });
 
       // Refresh user data to reflect changes
@@ -551,7 +551,7 @@ export default function CompleteProfilePage() {
               <label className="block text-sm font-medium text-gray-700 mb-2 font-fira">
                 Preferred Language
               </label>
-              <Select value={formData.preferredLanguage} onValueChange={(value) => handleInputChange('preferredLanguage', value)}>
+              <Select value={formData.languagePreference} onValueChange={(value) => handleInputChange('preferredLanguage', value)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select Preferred Language" />
                 </SelectTrigger>

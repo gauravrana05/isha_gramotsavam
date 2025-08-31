@@ -29,7 +29,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
     }
 
     // Profile incomplete
-    if (!userProfile?.isProfileComplete) {
+    if (!userProfile?.profileComplete) {
       router.push(`/${lang}/profile/complete`);
       return;
     }
@@ -47,7 +47,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
     }
   }, [userProfile, loading, user, allowedRoles, router, lang, redirectTo]);
 
-  if (loading || !user || !userProfile?.isProfileComplete || !allowedRoles.includes(userProfile.role)) {
+  if (loading || !user || !userProfile?.profileComplete || !allowedRoles.includes(userProfile.role)) {
     return null;
   }
 

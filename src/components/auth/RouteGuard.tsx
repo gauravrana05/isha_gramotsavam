@@ -66,7 +66,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({ children }) => {
         router.push(`/${lang}/login`);
         return;
       }
-      if (!userProfile?.isProfileComplete) {
+      if (!userProfile?.profileComplete) {
         router.push(`/${lang}/profile/complete`);
         return;
       }
@@ -79,7 +79,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({ children }) => {
       return;
     }
 
-    if (!userProfile?.isProfileComplete) {
+    if (!userProfile?.profileComplete) {
       router.push(`/${lang}/profile/complete`);
       return;
     }

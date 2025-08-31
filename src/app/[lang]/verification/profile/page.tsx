@@ -177,7 +177,7 @@ export default function VerificationProfilePage() {
                 Preferred Language
               </div>
               <div className="text-gray-900">
-                {languages.find(lang => lang.code === userProfile.preferredLanguage)?.name || 'Not Available'}
+                {languages.find(lang => lang.code === userProfile.languagePreference)?.name || 'Not Available'}
               </div>
             </div>
             <div>

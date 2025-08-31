@@ -204,7 +204,7 @@ export const profileRouter = createTRPCRouter({
           district: updateData.district,
           state: updateData.state,
           profileComplete: true, // Mark as complete when updating
-          languagePreference: updateData.preferredLanguage || 'en',
+          languagePreference: updateData.languagePreference || 'en',
         }
 
         // Remove undefined/empty fields

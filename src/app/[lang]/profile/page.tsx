@@ -357,7 +357,7 @@ export default function ProfilePage() {
         taluk: formData.taluk || undefined,
         district: formData.district,
         state: formData.state,
-        preferredLanguage: formData.preferredLanguage || undefined,
+        preferredLanguage: formData.languagePreference || undefined,
       });
 
       // Refresh user data to reflect changes
@@ -533,7 +533,7 @@ export default function ProfilePage() {
               <div>
                 <div className="text-sm font-medium text-gray-700 mb-1 font-fira">Preferred Language</div>
                 <div className="text-gray-900 font-fira">
-                  {languages.find(lang => lang.code === formData.preferredLanguage)?.name || 'Not Available'}
+                  {languages.find(lang => lang.code === formData.languagePreference)?.name || 'Not Available'}
                 </div>
               </div>
               <div>
@@ -678,7 +678,7 @@ export default function ProfilePage() {
                     Preferred Language
                   </label>
                   <Select
-                    value={formData.preferredLanguage}
+                    value={formData.languagePreference}
                     onValueChange={(value) => handleInputChange('preferredLanguage', value)}
                   >
                     <SelectTrigger className="w-full font-fira">

@@ -34,7 +34,7 @@ export default function AdminProfilePage() {
     { code: "or", name: "Odia" },
   ];
 
-  const phoneNumber = user?.phoneNumber?.replace(/^\+91/, '') || '';
+  const phoneNumber = user?.phone?.replace(/^\+91/, '') || '';
   const whatsappNumber = userProfile?.whatsappNumber?.replace(/^\+91/, '') || '';
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function AdminProfilePage() {
     }
   }, [user, loading, router, lang]);
 
-  const isProfileComplete = userProfile?.isProfileComplete || false;
+  const isProfileComplete = userProfile?.profileComplete || false;
   const hasAddress = userProfile?.pincode && userProfile?.state && userProfile?.district;
   const hasDocuments = userProfile?.documents?.aadhaarFront?.url && userProfile?.documents?.aadhaarBack?.url;
 
@@ -175,7 +175,7 @@ export default function AdminProfilePage() {
               <div>
                 <p className="text-sm text-gray-600 font-fira">Preferred Language</p>
                 <p className="font-medium text-gray-900 font-fira">
-                  {languages.find(l => l.code === userProfile.preferredLanguage)?.name || 'Not specified'}
+                  {languages.find(l => l.code === userProfile.languagePreference)?.name || 'Not specified'}
                 </p>
               </div>
             </div>

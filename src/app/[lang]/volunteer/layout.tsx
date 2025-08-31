@@ -32,7 +32,7 @@ export default function VolunteerLayout({
     if (loading || !user || !userProfile) return;
 
     // Check if user has a language preference
-    if (!userProfile.preferredLanguage) {
+    if (!userProfile.languagePreference) {
       // Show language selection modal if no preference is set
       setShowLanguageModal(true);
       return;
@@ -40,7 +40,7 @@ export default function VolunteerLayout({
 
     // Check if current URL language matches user preference
     const currentLang = lang as LanguageCode;
-    const preferredLang = userProfile.preferredLanguage as LanguageCode;
+    const preferredLang = userProfile.languagePreference as LanguageCode;
     
     if (currentLang !== preferredLang) {
       // Redirect to preferred language route

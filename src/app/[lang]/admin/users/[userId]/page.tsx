@@ -114,7 +114,7 @@ export default function UserDetailPage() {
           uid: userDoc.id,
           firstName: userData.firstName || '',
           lastName: userData.lastName || '',
-          phoneNumber: userData.phoneNumber || '',
+          phoneNumber: userData.phone || '',
           whatsappNumber: userData.whatsappNumber,
           email: userData.email,
           dob: userData.dob,
@@ -127,7 +127,7 @@ export default function UserDetailPage() {
           pincode: userData.pincode,
           role: userData.role || 'public',
           currentTeamId: userData.currentTeamId,
-          isProfileComplete: userData.isProfileComplete || false,
+          isProfileComplete: userData.profileComplete || false,
           documents: userData.documents || {},
           createdAt: userData.createdAt,
           updatedAt: userData.updatedAt
@@ -314,10 +314,10 @@ export default function UserDetailPage() {
               
               <div>
                 <label className="text-sm font-medium text-gray-500">Phone Number</label>
-                <p className="text-gray-900">{user.phoneNumber}</p>
+                <p className="text-gray-900">{user.phone}</p>
               </div>
               
-              {user.whatsappNumber && user.whatsappNumber !== user.phoneNumber && (
+              {user.whatsappNumber && user.whatsappNumber !== user.phone && (
                 <div>
                   <label className="text-sm font-medium text-gray-500">WhatsApp Number</label>
                   <p className="text-gray-900">{user.whatsappNumber}</p>
@@ -416,9 +416,9 @@ export default function UserDetailPage() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Profile Complete</span>
                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  user.isProfileComplete ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  user.profileComplete ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 }`}>
-                  {user.isProfileComplete ? 'Complete' : 'Incomplete'}
+                  {user.profileComplete ? 'Complete' : 'Incomplete'}
                 </span>
               </div>
               

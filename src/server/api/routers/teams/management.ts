@@ -84,7 +84,12 @@ export const teamsManagementRouter = createTRPCRouter({
     const team = await db.team.findFirst({
       where: { captainId: ctx.user.id },
       include: {
-        sport: true,
+        sport: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         captainUser: {
           select: {
             id: true,

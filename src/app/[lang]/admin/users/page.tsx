@@ -114,7 +114,7 @@ export default function AdminUsersPage() {
       minWidth: 180,
       render: (phone, u) => (
         <div className="text-sm text-gray-900">
-          <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" />{u.phoneNumber}</div>
+          <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" />{u.phone}</div>
           {u.email && (
             <div className="flex items-center gap-2 text-gray-600 mt-1"><Mail className="w-4 h-4 text-gray-400" />{u.email}</div>
           )}
@@ -218,14 +218,14 @@ export default function AdminUsersPage() {
           ['Name', 'Phone', 'Email', 'Role', 'Gender', 'Panchayat', 'District', 'Verified', 'Profile Complete', 'Created'].join(','),
           ...users.map(u => [
             `${u.firstName} ${u.lastName}`.trim(),
-            u.phoneNumber,
+            u.phone,
             u.email || '',
             u.role,
             u.gender,
             u.panchayat || '',
             u.district || '',
             u.isVerified ? 'Yes' : 'No',
-            u.isProfileComplete ? 'Yes' : 'No',
+            u.profileComplete ? 'Yes' : 'No',
             u.createdAt ? new Date(u.createdAt).toISOString().slice(0, 10) : ''
           ].join(','))
         ].join('\n');

@@ -161,11 +161,11 @@ export default function LanguageSelectionModal({
         </div>
 
         {/* Current selection indicator */}
-        {userProfile?.preferredLanguage && (
+        {userProfile?.languagePreference && (
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800">
               <strong>Current preference:</strong>{' '}
-              {SUPPORTED_LANGUAGES.find(l => l.code === userProfile.preferredLanguage)?.nativeName || userProfile.preferredLanguage}
+              {SUPPORTED_LANGUAGES.find(l => l.code === userProfile.languagePreference)?.nativeName || userProfile.languagePreference}
             </p>
           </div>
         )}
