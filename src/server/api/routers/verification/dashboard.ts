@@ -35,7 +35,7 @@ export const verificationDashboardRouter = createTRPCRouter({
         // Teams pending verification (submitted status)
         db.team.count({
           where: { 
-            status: { in: ['submitted', 'pending'] }
+            status: { in: ['submitted', 'draft'] }
           }
         }),
         
@@ -84,7 +84,7 @@ export const verificationDashboardRouter = createTRPCRouter({
       // Get teams that need immediate attention
       const urgentTeams = await db.team.findMany({
         where: {
-          status: { in: ['submitted', 'pending'] },
+          status: { in: ['submitted', 'draft'] },
           // Teams submitted more than 24 hours ago
           createdAt: {
             lt: new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -107,7 +107,7 @@ export const verificationDashboardRouter = createTRPCRouter({
       // Get incomplete verifications (teams with some players verified)
       const incompleteVerifications = await db.team.findMany({
         where: {
-          status: 'partial_verification'
+          status: 'draft'
         },
         include: {
           sport: true,
@@ -149,7 +149,7 @@ export const verificationDashboardRouter = createTRPCRouter({
       // Get recent team updates
       const recentActivity = await db.team.findMany({
         where: {
-          status: { in: ['verified', 'rejected', 'partial_verification'] },
+          status: { in: ['verified', 'rejected', 'draft'] },
           updatedAt: {
             gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
           }
@@ -187,9 +187,9 @@ export const verificationDashboardRouter = createTRPCRouter({
       currentMonth.setHours(0, 0, 0, 0)
 
       const verificationStats = await db.teamPlayer.groupBy({
-        by: ['verifiedById'],
+        by: ['addedBy'],
         where: {
-          verifiedAt: {
+          createdAt: {
             gte: currentMonth
           },
           verificationStatus: { in: ['verified', 'rejected'] }
@@ -201,7 +201,7 @@ export const verificationDashboardRouter = createTRPCRouter({
 
       // Get user details for the verifiers
       const verifierIds = verificationStats
-        .map(stat => stat.verifiedById)
+        .map(stat => stat.addedBy)
         .filter(Boolean) as string[]
 
       const verifiers = await db.user.findMany({
@@ -218,9 +218,9 @@ export const verificationDashboardRouter = createTRPCRouter({
 
       // Combine stats with user details
       const workloadStats = verificationStats.map(stat => {
-        const verifier = verifiers.find(v => v.id === stat.verifiedById)
+        const verifier = verifiers.find(v => v.id === stat.addedBy)
         return {
-          verifierId: stat.verifiedById,
+          verifierId: stat.addedBy,
           verifierName: verifier ? `${verifier.firstName} ${verifier.lastName}` : 'Unknown',
           verifierRole: verifier?.role || 'unknown',
           verificationsCount: stat._count.verificationStatus

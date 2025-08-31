@@ -9,7 +9,6 @@ export const volunteersVenueRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       includePlayerCount: z.boolean().default(true),
-      status: z.enum(['all', 'verified', 'pending', 'rejected']).default('all'),
     }))
     .query(async ({ input, ctx }) => {
       // Check volunteer permissions
@@ -34,7 +33,6 @@ export const volunteersVenueRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
-              category: true,
             },
           },
           captainUser: {
@@ -47,11 +45,9 @@ export const volunteersVenueRouter = createTRPCRouter({
           },
           _count: includePlayerCount ? {
             select: {
-              teamPlayers: true,
             },
           } : false,
         },
-        orderBy: { teamName: 'asc' },
       });
 
       return teams;
@@ -86,13 +82,12 @@ export const volunteersVenueRouter = createTRPCRouter({
         where.fixture.eventId = eventId;
       }
 
-      const checkIns = await db.teamCheckIn.findMany({
+      const checkIns = await db.fixtureTeam.findMany({
         where,
         include: {
           team: {
             select: {
               id: true,
-              teamName: true,
               captainUser: {
                 select: {
                   firstName: true,
@@ -105,19 +100,13 @@ export const volunteersVenueRouter = createTRPCRouter({
           fixture: {
             select: {
               id: true,
-              scheduledAt: true,
+              createdAt: true,
               event: {
                 select: {
                   id: true,
                   name: true,
                 },
               },
-            },
-          },
-          checkedInBy: {
-            select: {
-              firstName: true,
-              lastName: true,
             },
           },
         },
@@ -132,7 +121,6 @@ export const volunteersVenueRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       date: z.date().optional(),
-      status: z.enum(['all', 'scheduled', 'ongoing', 'completed']).default('all'),
     }))
     .query(async ({ input, ctx }) => {
       // Check volunteer permissions
@@ -175,37 +163,12 @@ export const volunteersVenueRouter = createTRPCRouter({
               sport: {
                 select: {
                   name: true,
-                  category: true,
-                },
-              },
-            },
-          },
-          team1: {
-            select: {
-              id: true,
-              teamName: true,
-              captainUser: {
-                select: {
-                  firstName: true,
-                  lastName: true,
-                },
-              },
-            },
-          },
-          team2: {
-            select: {
-              id: true,
-              teamName: true,
-              captainUser: {
-                select: {
-                  firstName: true,
-                  lastName: true,
                 },
               },
             },
           },
         },
-        orderBy: { scheduledAt: 'asc' },
+        orderBy: { createdAt: 'asc' },
       });
 
       return fixtures;
@@ -216,7 +179,6 @@ export const volunteersVenueRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       date: z.date().optional(),
-      status: z.enum(['all', 'scheduled', 'ongoing', 'completed']).default('all'),
     }))
     .query(async ({ input, ctx }) => {
       // Check volunteer permissions
@@ -259,31 +221,17 @@ export const volunteersVenueRouter = createTRPCRouter({
               sport: {
                 select: {
                   name: true,
-                  category: true,
                 },
               },
-            },
-          },
-          team1: {
-            select: {
-              id: true,
-              teamName: true,
-            },
-          },
-          team2: {
-            select: {
-              id: true,
-              teamName: true,
             },
           },
           winnerTeam: {
             select: {
               id: true,
-              teamName: true,
             },
           },
         },
-        orderBy: { scheduledAt: 'asc' },
+        orderBy: { createdAt: 'asc' },
       });
 
       return matches;
@@ -295,7 +243,6 @@ export const volunteersVenueRouter = createTRPCRouter({
       fixtureId: z.string(),
     }))
     .query(async ({ input, ctx }) => {
-      // Check volunteer permissions
       if (!['admin', 'general_volunteer', 'technical_volunteer'].includes(ctx.user.role)) {
         throw new TRPCError({
           code: 'FORBIDDEN',
@@ -307,68 +254,17 @@ export const volunteersVenueRouter = createTRPCRouter({
         where: { id: input.fixtureId },
         include: {
           event: {
-            include: {
-              sport: true,
-              venue: true,
+            select: {
+              id: true,
+              name: true,
             },
           },
-          team1: {
-            include: {
-              captainUser: {
-                select: {
-                  firstName: true,
-                  lastName: true,
-                  phone: true,
-                },
-              },
-              teamPlayers: {
-                include: {
-                  user: {
-                    select: {
-                      firstName: true,
-                      lastName: true,
-                      age: true,
-                      gender: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-          team2: {
-            include: {
-              captainUser: {
-                select: {
-                  firstName: true,
-                  lastName: true,
-                  phone: true,
-                },
-              },
-              teamPlayers: {
-                include: {
-                  user: {
-                    select: {
-                      firstName: true,
-                      lastName: true,
-                      age: true,
-                      gender: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-          teamCheckIns: {
+          fixtureTeams: {
             include: {
               team: {
                 select: {
-                  teamName: true,
-                },
-              },
-              checkedInBy: {
-                select: {
-                  firstName: true,
-                  lastName: true,
+                  id: true,
+                  name: true,
                 },
               },
             },

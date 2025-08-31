@@ -42,7 +42,11 @@ export const tournamentsMatchesRouter = createTRPCRouter({
       // Check if fixture exists and team is part of it
       const fixture = await db.fixture.findUnique({
         where: { id: fixtureId },
-        select: { team1Id: true, team2Id: true },
+        include: { 
+          fixtureTeams: {
+            select: { teamId: true }
+          }
+        },
       })
 
       if (!fixture) {
@@ -52,7 +56,8 @@ export const tournamentsMatchesRouter = createTRPCRouter({
         })
       }
 
-      if (fixture.team1Id !== teamId && fixture.team2Id !== teamId) {
+      const teamIds = fixture.fixtureTeams.map(ft => ft.teamId)
+      if (!teamIds.includes(teamId)) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'Team is not part of this fixture',
@@ -60,37 +65,17 @@ export const tournamentsMatchesRouter = createTRPCRouter({
       }
 
       // Create or update check-in record
-      const checkIn = await db.teamCheckIn.upsert({
+      const checkIn = await db.fixtureTeam.update({
         where: {
           fixtureId_teamId: {
             fixtureId,
             teamId,
           },
         },
-        update: {
+        data: {
+          checkedIn: true,
           checkedInAt: new Date(),
-          checkedInById: ctx.user.id,
-        },
-        create: {
-          fixtureId,
-          teamId,
-          checkedInAt: new Date(),
-          checkedInById: ctx.user.id,
-        },
-        include: {
-          team: {
-            select: {
-              id: true,
-              teamName: true,
-            },
-          },
-          checkedInBy: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
+          checkedInBy: ctx.user.id,
         },
       })
 
@@ -101,7 +86,7 @@ export const tournamentsMatchesRouter = createTRPCRouter({
   enterResult: protectedProcedure
     .input(enterMatchResultSchema)
     .mutation(async ({ input, ctx }) => {
-      const { matchId, team1Score, team2Score, winnerTeamId, remarks } = input
+      const { id, winnerId, winnerName, team1Score, team2Score, scoreDetails, resultEnteredBy } = input
 
       // Check if user has permission to enter results
       if (!['admin', 'technical_volunteer'].includes(ctx.user.role)) {
@@ -113,10 +98,8 @@ export const tournamentsMatchesRouter = createTRPCRouter({
 
       // Verify match exists
       const match = await db.match.findUnique({
-        where: { id: matchId },
+        where: { id },
         include: {
-          team1: true,
-          team2: true,
         },
       })
 
@@ -128,7 +111,7 @@ export const tournamentsMatchesRouter = createTRPCRouter({
       }
 
       // Validate winner team ID
-      if (winnerTeamId && winnerTeamId !== match.team1Id && winnerTeamId !== match.team2Id) {
+      if (winnerId && winnerId !== match.team1Id && winnerId !== match.team2Id) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Winner team must be one of the participating teams',
@@ -137,42 +120,15 @@ export const tournamentsMatchesRouter = createTRPCRouter({
 
       // Update match with result
       const updatedMatch = await db.match.update({
-        where: { id: matchId },
+        where: { id },
         data: {
           team1Score,
           team2Score,
-          winnerTeamId,
+          winnerId,
           status: 'completed',
-          remarks,
-          resultEnteredById: ctx.user.id,
+          scoreDetails,
+          resultEnteredBy: ctx.user.id,
           resultEnteredAt: new Date(),
-        },
-        include: {
-          team1: {
-            select: {
-              id: true,
-              teamName: true,
-            },
-          },
-          team2: {
-            select: {
-              id: true,
-              teamName: true,
-            },
-          },
-          winnerTeam: {
-            select: {
-              id: true,
-              teamName: true,
-            },
-          },
-          resultEnteredBy: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
         },
       })
 
@@ -185,51 +141,6 @@ export const tournamentsMatchesRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const match = await db.match.findUnique({
         where: { id: input.id },
-        include: {
-          event: {
-            include: {
-              sport: true,
-              venue: true,
-            },
-          },
-          team1: {
-            select: {
-              id: true,
-              teamName: true,
-              captainUser: {
-                select: {
-                  firstName: true,
-                  lastName: true,
-                },
-              },
-            },
-          },
-          team2: {
-            select: {
-              id: true,
-              teamName: true,
-              captainUser: {
-                select: {
-                  firstName: true,
-                  lastName: true,
-                },
-              },
-            },
-          },
-          winnerTeam: {
-            select: {
-              id: true,
-              teamName: true,
-            },
-          },
-          resultEnteredBy: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
       })
 
       if (!match) {
@@ -274,32 +185,9 @@ export const tournamentsMatchesRouter = createTRPCRouter({
       const matches = await db.match.findMany({
         where,
         include: {
-          event: {
-            include: {
-              sport: true,
-              venue: true,
-            },
-          },
-          team1: {
-            select: {
-              id: true,
-              teamName: true,
-            },
-          },
-          team2: {
-            select: {
-              id: true,
-              teamName: true,
-            },
-          },
-          winnerTeam: {
-            select: {
-              id: true,
-              teamName: true,
-            },
-          },
+          event: true,
         },
-        orderBy: { scheduledAt: 'desc' },
+        orderBy: { createdAt: 'desc' },
         skip: offset,
         take: limit,
       })

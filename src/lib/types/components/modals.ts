@@ -7,17 +7,6 @@ export interface ModalProps {
   children: React.ReactNode;
 }
 
-export interface SingleStatCardProps {
-  stat: {
-    label: string;
-    value: string | number;
-    icon: React.ComponentType<{ className?: string }>;
-    color: string;
-    trend?: string;
-    description?: string;
-  };
-}
-
 export interface PageLoaderProps {
-  // No message prop based on error
+  message?: string;
 }

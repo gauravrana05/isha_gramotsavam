@@ -10,6 +10,7 @@ export * from './api/users';
 export * from './api/events';
 export * from './api/matches';
 export * from './api/sports';
+export * from './api/media';
 
 export * from './components/tables';
 export * from './components/modals';

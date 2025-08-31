@@ -131,7 +131,7 @@ export const sportsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       try {
         // Determine which gender categories to look for
-        const genderCategories = ['mixed']
+        const genderCategories: ('men' | 'women' | 'mixed')[] = ['mixed']
         if (input.gender === 'M') genderCategories.push('men')
         if (input.gender === 'F') genderCategories.push('women')
 

@@ -24,7 +24,7 @@ export const volunteersAssignmentsRouter = createTRPCRouter({
             status: true,
           },
         },
-        venueLocationMapping: {
+        venueLevelMapping: {
           include: {
             venue: {
               select: {
@@ -34,7 +34,6 @@ export const volunteersAssignmentsRouter = createTRPCRouter({
                 state: true,
                 panchayat: true,
                 taluk: true,
-                facilities: true,
               },
             },
           },

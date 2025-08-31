@@ -8,6 +8,7 @@ import { FilterSidebar, type FilterField, type ActiveFilter } from './FilterSide
 import { Pagination } from './Pagination';
 import { cn, BaseComponentProps } from '@/lib/component-patterns';
 import { Modal } from './Modal';
+import { TableParams } from '@/lib/types/components/tables';
 
 // Combined table configuration interface
 export interface AdvancedTableConfig<T = any> {
@@ -98,14 +99,8 @@ export interface AdvancedTableConfig<T = any> {
   emptyMessage?: string;
 }
 
-// Table parameters for server-side operations
-export interface TableParams {
-  search: string;
-  sort: SortConfig[];
-  filters: ActiveFilter[];
-  page: number;
-  pageSize: number;
-}
+// Import centralized TableParams
+import { TableParams } from '@/lib/types/components/tables';
 
 // Table state interface
 interface TableState {

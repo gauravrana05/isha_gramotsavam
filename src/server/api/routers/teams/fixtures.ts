@@ -17,44 +17,22 @@ export const teamsFixturesRouter = createTRPCRouter({
 
     const fixtures = await db.fixture.findMany({
       where: {
-        OR: [
-          { team1Id: team.id },
-          { team2Id: team.id },
-        ],
+        fixtureTeams: {
+          some: {
+            teamId: team.id,
+          },
+        },
       },
       include: {
         event: {
-          include: {
-            sport: true,
-            venue: true,
-          },
-        },
-        team1: {
           select: {
             id: true,
-            teamName: true,
-            captainUser: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-        team2: {
-          select: {
-            id: true,
-            teamName: true,
-            captainUser: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
+            name: true,
+            status: true,
           },
         },
       },
-      orderBy: { scheduledAt: 'asc' },
+      orderBy: { createdAt: 'asc' },
     })
 
     return fixtures
@@ -80,37 +58,14 @@ export const teamsFixturesRouter = createTRPCRouter({
       },
       include: {
         event: {
-          include: {
-            sport: true,
-            venue: true,
-          },
-        },
-        team1: {
           select: {
             id: true,
-            teamName: true,
-            captainUser: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        },
-        team2: {
-          select: {
-            id: true,
-            teamName: true,
-            captainUser: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
+            name: true,
+            status: true,
           },
         },
       },
-      orderBy: { scheduledAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
     })
 
     return matches

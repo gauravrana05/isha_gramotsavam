@@ -35,7 +35,7 @@ export const usersRouter = createTRPCRouter({
         }
 
         const user = await db.user.create({
-          data: input,
+          data: input as any,
         })
 
         return user
@@ -90,7 +90,7 @@ export const usersRouter = createTRPCRouter({
       try {
         const user = await db.user.update({
           where: { id },
-          data: updateData,
+          data: updateData as any,
         })
 
         return user
@@ -291,26 +291,33 @@ export const usersRouter = createTRPCRouter({
         })
 
         // Create or update document verification record
-        await db.userVerification.upsert({
+        const existingVerification = await db.userVerification.findFirst({
           where: {
-            userId_verificationType: {
-              userId: input.userId,
-              verificationType: 'document_verification',
-            },
-          },
-          create: {
             userId: input.userId,
             verificationType: 'document_verification',
-            status: input.approved ? 'approved' : 'rejected',
-            verifiedBy: input.verifiedBy,
-            verifiedAt: input.approved ? new Date() : null,
-          },
-          update: {
-            status: input.approved ? 'approved' : 'rejected',
-            verifiedBy: input.verifiedBy,
-            verifiedAt: input.approved ? new Date() : null,
           },
         })
+
+        if (existingVerification) {
+          await db.userVerification.update({
+            where: { id: existingVerification.id },
+            data: {
+              status: input.approved ? 'approved' : 'rejected',
+              verifiedBy: input.verifiedBy,
+              verifiedAt: input.approved ? new Date() : null,
+            },
+          })
+        } else {
+          await db.userVerification.create({
+            data: {
+              userId: input.userId,
+              verificationType: 'document_verification',
+              status: input.approved ? 'approved' : 'rejected',
+              verifiedBy: input.verifiedBy,
+              verifiedAt: input.approved ? new Date() : null,
+            },
+          })
+        }
 
         return profileImages
       } catch (error) {

@@ -107,11 +107,7 @@ export const teamsManagementRouter = createTRPCRouter({
             },
           },
         },
-        venueAssignments: {
-          include: {
-            venue: true,
-          },
-        },
+        teamVenueAssignments: true,
       },
     })
 
@@ -251,13 +247,13 @@ export const teamsManagementRouter = createTRPCRouter({
           data: {
             teamId: team.id,
             userId: ctx.user.id,
-            position: 'player',
-            firstName: team.captainUser.firstName,
-            lastName: team.captainUser.lastName,
-            phone: team.captainUser.phone,
-            dateOfBirth: team.captainUser.dateOfBirth || new Date('1990-01-01'), // Fallback date
-            age: team.captainUser.age || 25, // Fallback age
-            gender: team.captainUser.gender,
+            position: 'main',
+            firstName: team.captainUser.firstName || 'Unknown',
+            lastName: team.captainUser.lastName || 'User',
+            phone: team.captainUser.phone || '',
+            dateOfBirth: team.captainUser.dateOfBirth || new Date('1990-01-01'),
+            age: team.captainUser.age || 25,
+            gender: team.captainUser.gender || 'M',
             panchayat: team.captainUser.panchayat || input.panchayat,
             taluk: team.captainUser.taluk || input.taluk,
             district: team.captainUser.district || input.district,
@@ -375,7 +371,7 @@ export const teamsManagementRouter = createTRPCRouter({
   uploadPhoto: protectedProcedure
     .input(uploadTeamPhotoSchema)
     .mutation(async ({ input, ctx }) => {
-      const { teamId, photoUrl, description } = input
+      const { teamId, photoPath, uploadedBy } = input
 
       // Check if user is captain of this team
       const team = await db.team.findUnique({
@@ -393,9 +389,8 @@ export const teamsManagementRouter = createTRPCRouter({
       const teamPhoto = await db.teamPhoto.create({
         data: {
           teamId,
-          photoUrl,
-          description,
-          uploadedById: ctx.user.id,
+          photoPath,
+          uploadedBy: uploadedBy || ctx.user.id,
         },
       })
 
@@ -406,7 +401,7 @@ export const teamsManagementRouter = createTRPCRouter({
   createVenueAssignment: protectedProcedure
     .input(createTeamVenueAssignmentSchema)
     .mutation(async ({ input, ctx }) => {
-      const { teamId, venueId, assignedAt } = input
+      const { teamId, eventId, clusterVenueMappingId, assignedBy } = input
 
       // Check if user is captain of this team
       const team = await db.team.findUnique({
@@ -424,12 +419,9 @@ export const teamsManagementRouter = createTRPCRouter({
       const venueAssignment = await db.teamVenueAssignment.create({
         data: {
           teamId,
-          venueId,
-          assignedAt,
-          assignedById: ctx.user.id,
-        },
-        include: {
-          venue: true,
+          eventId,
+          clusterVenueMappingId,
+          assignedBy,
         },
       })
 
@@ -440,7 +432,7 @@ export const teamsManagementRouter = createTRPCRouter({
   updateVenueAssignment: protectedProcedure
     .input(updateTeamVenueAssignmentSchema)
     .mutation(async ({ input, ctx }) => {
-      const { id, venueId, assignedAt } = input
+      const { id, divisionVenueMappingId, finalVenueMappingId, clusterQualified, divisionQualified, finalQualified } = input
 
       // Check if user is captain of the team for this assignment
       const assignment = await db.teamVenueAssignment.findUnique({
@@ -462,11 +454,11 @@ export const teamsManagementRouter = createTRPCRouter({
       const updatedAssignment = await db.teamVenueAssignment.update({
         where: { id },
         data: {
-          venueId,
-          assignedAt,
-        },
-        include: {
-          venue: true,
+          divisionVenueMappingId,
+          finalVenueMappingId,
+          clusterQualified,
+          divisionQualified,
+          finalQualified,
         },
       })
 

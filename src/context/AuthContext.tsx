@@ -28,7 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     { 
       enabled: !!user?.id,
       staleTime: 10 * 60 * 1000,
-      cacheTime: 15 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,

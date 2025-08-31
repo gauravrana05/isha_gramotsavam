@@ -1,13 +1,20 @@
 import { ComponentType } from 'react';
 import { SortConfig } from '../shared/common';
 
-// Table component types
+// Table component types - support both single sort and multi-sort
 export interface TableParams {
   page: number;
   pageSize: number;
   search: string;
-  sort: SortConfig;
+  sort: SortConfig | SortConfig[];
   filters: FilterField[];
+}
+
+// Active filter type for compatibility
+export interface ActiveFilter {
+  field: string;
+  value: any;
+  operator?: string;
 }
 
 export interface Column<T> {

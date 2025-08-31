@@ -351,7 +351,7 @@ export default function TeamVerificationPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleBulkAction('verified')}
-                    disabled={verifyPlayersBulkMutation.isLoading}
+                    disabled={verifyPlayersBulkMutation.isPending}
                     className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
                   >
                     <Check className="w-4 h-4 mr-1" />
@@ -359,7 +359,7 @@ export default function TeamVerificationPage() {
                   </button>
                   <button
                     onClick={() => handleBulkAction('rejected')}
-                    disabled={verifyPlayersBulkMutation.isLoading}
+                    disabled={verifyPlayersBulkMutation.isPending}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
                   >
                     <X className="w-4 h-4 mr-1" />
@@ -454,7 +454,7 @@ export default function TeamVerificationPage() {
                           <>
                             <button
                               onClick={() => handlePlayerStatusChange(player.playerId, 'verified', 'Verified by verification volunteer')}
-                              disabled={verifyPlayerMutation.isLoading}
+                              disabled={verifyPlayerMutation.isPending}
                               className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
                             >
                               Verify
@@ -466,7 +466,7 @@ export default function TeamVerificationPage() {
                                   handlePlayerStatusChange(player.playerId, 'rejected', reason);
                                 }
                               }}
-                              disabled={verifyPlayerMutation.isLoading}
+                              disabled={verifyPlayerMutation.isPending}
                               className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
                             >
                               Reject
@@ -551,7 +551,7 @@ export default function TeamVerificationPage() {
                   <>
                     <button
                       onClick={() => handlePlayerStatusChange(player.playerId, 'verified', 'Verified by verification volunteer')}
-                      disabled={verifyPlayerMutation.isLoading}
+                      disabled={verifyPlayerMutation.isPending}
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
                     >
                       <Check className="w-3 h-3 mr-1" />
@@ -564,7 +564,7 @@ export default function TeamVerificationPage() {
                           handlePlayerStatusChange(player.playerId, 'rejected', reason);
                         }
                       }}
-                      disabled={verifyPlayerMutation.isLoading}
+                      disabled={verifyPlayerMutation.isPending}
                       className="flex-1 bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded text-xs font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
                     >
                       <X className="w-3 h-3 mr-1" />
@@ -718,7 +718,7 @@ export default function TeamVerificationPage() {
                         setShowPlayerModal(false);
                         showSuccess('Player verified successfully!');
                       }}
-                      disabled={verifyPlayerMutation.isLoading}
+                      disabled={verifyPlayerMutation.isPending}
                       className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
                     >
                       <Check className="w-4 h-4 mr-2" />
@@ -734,7 +734,7 @@ export default function TeamVerificationPage() {
                           showSuccess('Player rejected successfully!');
                         }
                       }}
-                      disabled={verifyPlayerMutation.isLoading}
+                      disabled={verifyPlayerMutation.isPending}
                       className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium flex items-center disabled:opacity-50"
                     >
                       <X className="w-4 h-4 mr-2" />

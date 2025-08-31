@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
+import { db } from "../../../../lib/db";
 
 export const volunteersDashboardRouter = createTRPCRouter({
   getDashboardStats: protectedProcedure
@@ -9,14 +10,14 @@ export const volunteersDashboardRouter = createTRPCRouter({
     }))
     .query(async ({ ctx, input }) => {
       const { venueId } = input;
-      const { db, session } = ctx;
+      // const { db, session } = ctx;
 
       try {
         // Verify user is a volunteer assigned to this venue
         const volunteerAssignment = await db.volunteerAssignment.findFirst({
           where: {
-            volunteerId: session.user.id,
-            venueLocationMapping: {
+            volunteerId: ctx.user.id,
+            venueLevelMapping: {
               venue: {
                 id: venueId
               }
@@ -25,7 +26,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
           },
           include: {
             event: true,
-            venueLocationMapping: {
+            venueLevelMapping: {
               include: {
                 venue: true
               }
@@ -41,11 +42,11 @@ export const volunteersDashboardRouter = createTRPCRouter({
         }
 
         // Get teams statistics for this venue
-        const teamStats = await db.$transaction(async (tx) => {
+        const teamStats = await db.$transaction(async (tx: any) => {
           // Get all teams assigned to this venue
           const teams = await tx.team.findMany({
             where: {
-              venueId: venueId,
+              venueLevelMapping: { venue: { id: venueId } },
               eventId: volunteerAssignment.eventId,
               deletedAt: null
             },
@@ -59,19 +60,23 @@ export const volunteersDashboardRouter = createTRPCRouter({
 
           return {
             totalTeams: teams.length,
-            checkedInCount: teams.filter(t => t.status === 'checked_in').length,
-            verifiedCount: teams.filter(t => t.status === 'verified').length,
-            submittedCount: teams.filter(t => t.status === 'submitted').length,
-            pendingCount: teams.filter(t => !t.status || t.status === 'pending').length,
-            totalPlayers: teams.reduce((sum, team) => sum + (team.currentPlayers || 0), 0),
-            verifiedPlayers: teams.reduce((sum, team) => sum + (team.verifiedPlayersCount || 0), 0)
+            checkedInCount: teams.filter((t: any) => t.status === 'checked_in').length,
+            verifiedCount: teams.filter((t: any) => t.status === 'verified').length,
+            submittedCount: teams.filter((t: any) => t.status === 'submitted').length,
+            pendingCount: teams.filter((t: any) => !t.status || t.status === 'pending').length,
+            totalPlayers: teams.reduce((sum: any, team: any) => sum + (team.currentPlayers || 0), 0),
+            verifiedPlayers: teams.reduce((sum: any, team: any) => sum + (team.verifiedPlayersCount || 0), 0)
           };
         });
 
         // Get fixtures statistics for this venue
         const fixtureStats = await db.fixture.aggregate({
           where: {
-            venueId: venueId,
+            venueLevelMapping: {
+              venue: {
+                id: venueId
+              }
+            },
             eventId: volunteerAssignment.eventId,
             deletedAt: null
           },
@@ -83,7 +88,11 @@ export const volunteersDashboardRouter = createTRPCRouter({
         const fixturesByStatus = await db.fixture.groupBy({
           by: ['status'],
           where: {
-            venueId: venueId,
+            venueLevelMapping: {
+              venue: {
+                id: venueId
+              }
+            },
             eventId: volunteerAssignment.eventId,
             deletedAt: null
           },
@@ -92,7 +101,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
           }
         });
 
-        const fixtureStatusCounts = fixturesByStatus.reduce((acc, item) => {
+        const fixtureStatusCounts = fixturesByStatus.reduce((acc: any, item: any) => {
           acc[item.status] = item._count.id;
           return acc;
         }, {} as Record<string, number>);
@@ -101,7 +110,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
         const matchStats = await db.match.aggregate({
           where: {
             fixture: {
-              venueId: venueId,
+              venueLevelMapping: { venue: { id: venueId } },
               eventId: volunteerAssignment.eventId,
               deletedAt: null
             },
@@ -116,7 +125,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
           by: ['status'],
           where: {
             fixture: {
-              venueId: venueId,
+              venueLevelMapping: { venue: { id: venueId } },
               eventId: volunteerAssignment.eventId,
               deletedAt: null
             },
@@ -127,7 +136,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
           }
         });
 
-        const matchStatusCounts = matchesByStatus.reduce((acc, item) => {
+        const matchStatusCounts = matchesByStatus.reduce((acc: any, item: any) => {
           acc[item.status] = item._count.id;
           return acc;
         }, {} as Record<string, number>);
@@ -135,9 +144,9 @@ export const volunteersDashboardRouter = createTRPCRouter({
         return {
           success: true,
           venue: {
-            id: volunteerAssignment.venueLocationMapping.venue.id,
-            name: volunteerAssignment.venueLocationMapping.venue.name,
-            location: volunteerAssignment.venueLocationMapping.venue.address
+            id: volunteerAssignment.venueLevelMapping.venue.id,
+            name: volunteerAssignment.venueLevelMapping.venue.name,
+            location: volunteerAssignment.venueLevelMapping.venue.address
           },
           event: {
             id: volunteerAssignment.event.id,
@@ -146,7 +155,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
           stats: {
             teams: teamStats,
             fixtures: {
-              total: fixtureStats._count.id,
+              total: fixtureStats._count?.id || 0,
               byStatus: fixtureStatusCounts
             },
             matches: {
@@ -175,14 +184,14 @@ export const volunteersDashboardRouter = createTRPCRouter({
     }))
     .query(async ({ ctx, input }) => {
       const { venueId } = input;
-      const { db, session } = ctx;
+      // const { db, session } = ctx;
 
       try {
         // Verify user is a volunteer assigned to this venue
         const volunteerAssignment = await db.volunteerAssignment.findFirst({
           where: {
-            volunteerId: session.user.id,
-            venueLocationMapping: {
+            volunteerId: ctx.user.id,
+            venueLevelMapping: {
               venue: {
                 id: venueId
               }
@@ -191,7 +200,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
           },
           include: {
             event: true,
-            venueLocationMapping: {
+            venueLevelMapping: {
               include: {
                 venue: true
               }
@@ -210,14 +219,14 @@ export const volunteersDashboardRouter = createTRPCRouter({
         const [teamsCount, fixturesCount, pendingMatches] = await Promise.all([
           db.team.count({
             where: {
-              venueId: venueId,
+              venueLevelMapping: { venue: { id: venueId } },
               eventId: volunteerAssignment.eventId,
               deletedAt: null
             }
           }),
           db.fixture.count({
             where: {
-              venueId: venueId,
+              venueLevelMapping: { venue: { id: venueId } },
               eventId: volunteerAssignment.eventId,
               deletedAt: null
             }
@@ -225,7 +234,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
           db.match.count({
             where: {
               fixture: {
-                venueId: venueId,
+                venueLevelMapping: { venue: { id: venueId } },
                 eventId: volunteerAssignment.eventId,
                 deletedAt: null
               },
@@ -295,14 +304,14 @@ export const volunteersDashboardRouter = createTRPCRouter({
     }))
     .query(async ({ ctx, input }) => {
       const { venueId, limit } = input;
-      const { db, session } = ctx;
+      // const { db, session } = ctx;
 
       try {
         // Verify user is a volunteer assigned to this venue
         const volunteerAssignment = await db.volunteerAssignment.findFirst({
           where: {
-            volunteerId: session.user.id,
-            venueLocationMapping: {
+            volunteerId: ctx.user.id,
+            venueLevelMapping: {
               venue: {
                 id: venueId
               }
@@ -335,7 +344,6 @@ export const volunteersDashboardRouter = createTRPCRouter({
             user: {
               select: {
                 id: true,
-                name: true,
                 email: true
               }
             }
@@ -344,7 +352,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
 
         return {
           success: true,
-          activities: recentActivities.map(activity => ({
+          activities: recentActivities.map((activity: any) => ({
             id: activity.id,
             action: activity.action,
             entityType: activity.entityType,

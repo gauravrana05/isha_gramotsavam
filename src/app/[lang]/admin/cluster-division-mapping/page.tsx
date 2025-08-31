@@ -444,14 +444,12 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
   const { data: allMappingsData } = api.admin.mappings.getClusterDivisionMappings.useQuery({
     eventId: selectedEvent,
   }, {
-    enabled: !!selectedEvent && isEditMode,
+    enabled: !!selectedEvent && isOpen, // Load when modal opens, not just edit mode
   });
 
   // Update selectedClusterVenues when entering edit mode to show all related clusters
   useEffect(() => {
     if (allMappingsData && isEditMode && mapping) {
-      console.log('=== UPDATING CLUSTER VENUES FROM MAPPINGS DATA ===');
-      
       // Find all mappings with the same division venue (this represents the "group" that was created together)
       const relatedMappings = allMappingsData
         .filter(m => m.divisionVenueMappingId === mapping.divisionVenueMappingId);
@@ -462,9 +460,6 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
           .map(m => m.clusterVenueMappingId)
           .filter(Boolean);
         
-        console.log('Found related mappings for division venue:', mapping.divisionVenueMappingId);
-        console.log('Related cluster venue IDs:', relatedClusterIds);
-        
         // Update selectedClusterVenues array
         setSelectedClusterVenues(relatedClusterIds);
       }
@@ -474,13 +469,6 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
   // Reset form data when entering edit mode - separate useEffect like location-mapping
   useEffect(() => {
     if (isEditMode && mapping) {
-      console.log('=== INITIALIZING FORM DATA FOR EDIT MODE ===');
-      console.log('Mapping data:', {
-        state: mapping.divisionVenueMapping.venue.state,
-        divisionVenue: mapping.divisionVenueMappingId,
-        divisionVenueName: mapping.divisionVenueMapping.venue.name
-      });
-      
       // Set basic form fields
       setSelectedState(mapping.divisionVenueMapping.venue.state);
       setSelectedDivisionVenue(mapping.divisionVenueMappingId);
@@ -508,23 +496,12 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
 
   // Location options for cluster venues - filtered to exclude already mapped venues
   const availableClusterOptions = useMemo(() => {
-    console.log('🔍 Filtering cluster venues:', {
-      clusterVenuesData: clusterVenuesData?.venueLevelMappings?.length,
-      allMappingsData: allMappingsData?.length,
-      selectedState,
-      isEditMode,
-      selectedClusterVenues: selectedClusterVenues.length,
-      clusterVenuesLoading
-    });
-    
     // Wait for data to load
     if (clusterVenuesLoading || !clusterVenuesData || !Array.isArray(clusterVenuesData)) {
-      console.log('⏳ Cluster venues still loading or empty');
       return [];
     }
     
     if (!allMappingsData) {
-      console.log('⏳ All mappings data not available yet');
       return [];
     }
     
@@ -562,7 +539,6 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
       value: venue.id
     }));
     
-    console.log('✅ Cluster venue options result:', options.length);
     return options;
   }, [clusterVenuesData, clusterVenuesLoading, allMappingsData, mapping.divisionVenueMappingId, isEditMode, selectedClusterVenues, selectedState]);
 
@@ -846,7 +822,6 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
                 </div>
               ) : (
                 <Select value={selectedDivisionVenue} onValueChange={(value) => {
-                  console.log('Division venue changed to:', value);
                   setSelectedDivisionVenue(value);
                   setSelectedClusterVenues([]);
                 }}>

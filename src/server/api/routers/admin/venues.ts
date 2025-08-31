@@ -480,11 +480,11 @@ export const adminVenuesRouter = createTRPCRouter({
 
   createVenueLevelMapping: protectedProcedure
     .input(z.object({
+      eventId: z.string(),
       venueId: z.string(),
-      district: z.string(),
-      taluk: z.string(),
-      cluster: z.string().optional(),
-      division: z.string().optional(),
+      level: z.enum(['cluster', 'division', 'final']),
+      maxTeams: z.number().optional(),
+      isActive: z.boolean().default(true),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
@@ -510,26 +510,21 @@ export const adminVenuesRouter = createTRPCRouter({
   updateVenueLevelMapping: protectedProcedure
     .input(z.object({
       id: z.string(),
-      district: z.string().optional(),
-      taluk: z.string().optional(),
-      cluster: z.string().optional(),
-      division: z.string().optional(),
+      eventId: z.string().optional(),
+      venueId: z.string().optional(),
+      level: z.enum(['cluster', 'division', 'final']).optional(),
+      maxTeams: z.number().optional(),
+      isActive: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const { id, eventId, venueId, level, maxTeams, isActive } = input;
+      const { id, ...updateData } = input;
       const mapping = await db.venueLevelMapping.update({
         where: { id },
-        data: {
-          eventId,
-          venueId,
-          level,
-          maxTeams,
-          isActive,
-        },
+        data: updateData,
         include: {
           venue: true,
         },

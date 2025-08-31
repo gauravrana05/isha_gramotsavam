@@ -28,7 +28,7 @@ export const venuesRouter = createTRPCRouter({
       const venue = await db.venue.findUnique({
         where: { id },
         include: {
-          venueLocationMappings: includeLocationMappings ? {
+          venueLevelMappings: includeLocationMappings ? {
             include: {
               event: {
                 select: {
@@ -102,18 +102,15 @@ export const venuesRouter = createTRPCRouter({
       if (tournamentLevel) where.tournamentLevel = tournamentLevel
       if (venueId) where.venueId = venueId
 
-      const mappings = await db.venueLocationMapping.findMany({
+      const mappings = await db.venueLevelMapping.findMany({
         where,
         include: {
           venue: {
             select: {
               id: true,
               name: true,
-              capacity: true,
               district: true,
               state: true,
-              contactPerson: true,
-              contactPhone: true,
             },
           },
           event: {
@@ -125,7 +122,7 @@ export const venuesRouter = createTRPCRouter({
           },
         },
         orderBy: [
-          { tournamentLevel: 'asc' },
+          { level: 'asc' },
           { venue: { name: 'asc' } },
         ],
       })
@@ -146,10 +143,10 @@ export const venuesRouter = createTRPCRouter({
       if (state) where.state = state
 
       // Get venues that are not already mapped to this event and tournament level
-      const mappedVenueIds = await db.venueLocationMapping.findMany({
+      const mappedVenueIds = await db.venueLevelMapping.findMany({
         where: {
           eventId,
-          tournamentLevel,
+          level: tournamentLevel,
         },
         select: { venueId: true },
       })
@@ -178,10 +175,10 @@ export const venuesRouter = createTRPCRouter({
       if (district) where.district = district
       if (state) where.state = state
 
-      const mappings = await db.talukClusterMapping.findMany({
+      const mappings = await db.locationClusterMapping.findMany({
         where,
         include: {
-          clusterVenueMapping: {
+          venueLevelMapping: {
             include: {
               venue: {
                 select: {
@@ -197,7 +194,7 @@ export const venuesRouter = createTRPCRouter({
         orderBy: [
           { state: 'asc' },
           { district: 'asc' },
-          { taluk: 'asc' },
+          { locationName: 'asc' },
         ],
       })
 
@@ -256,7 +253,7 @@ export const venuesRouter = createTRPCRouter({
       const { venueLocationMappingId, sportId } = input
 
       // Get venue mapping details
-      const venueMapping = await db.venueLocationMapping.findUnique({
+      const venueMapping = await db.venueLevelMapping.findUnique({
         where: { id: venueLocationMappingId },
         include: {
           venue: true,
@@ -289,7 +286,7 @@ export const venuesRouter = createTRPCRouter({
 
       return {
         venue: venueMapping.venue,
-        tournamentLevel: venueMapping.tournamentLevel,
+        level: venueMapping.level,
         maxTeams: venueMapping.maxTeams,
         assignedTeams,
         remainingCapacity: venueMapping.maxTeams ? venueMapping.maxTeams - assignedTeams : null,
@@ -339,7 +336,7 @@ export const venuesRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       try {
         // Check if venue has any active mappings
-        const activeMappings = await db.venueLocationMapping.count({
+        const activeMappings = await db.venueLevelMapping.count({
           where: {
             venueId: input.id,
             isActive: true,
@@ -378,11 +375,11 @@ export const venuesRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       try {
         // Check if mapping already exists
-        const existing = await db.venueLocationMapping.findFirst({
+        const existing = await db.venueLevelMapping.findFirst({
           where: {
             eventId: input.eventId,
             venueId: input.venueId,
-            tournamentLevel: input.tournamentLevel,
+            level: input.tournamentLevel,
           },
         })
 
@@ -393,8 +390,12 @@ export const venuesRouter = createTRPCRouter({
           })
         }
 
-        const mapping = await db.venueLocationMapping.create({
-          data: input,
+        const { tournamentLevel, ...rest } = input
+        const mapping = await db.venueLevelMapping.create({
+          data: {
+            ...rest,
+            level: tournamentLevel,
+          },
           include: {
             venue: true,
             event: {
@@ -422,7 +423,7 @@ export const venuesRouter = createTRPCRouter({
       const { id, ...updateData } = input
 
       try {
-        const mapping = await db.venueLocationMapping.update({
+        const mapping = await db.venueLevelMapping.update({
           where: { id },
           data: updateData,
         })
@@ -441,7 +442,7 @@ export const venuesRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       try {
         // Check if any teams are assigned to this venue mapping
-        const assignedTeams = await db.teamVenueAssignments.count({
+        const assignedTeams = await db.teamVenueAssignment.count({
           where: {
             OR: [
               { clusterVenueMappingId: input.id },
@@ -459,7 +460,7 @@ export const venuesRouter = createTRPCRouter({
         }
 
         // Perform soft delete
-        await db.venueLocationMapping.update({
+        await db.venueLevelMapping.update({
           where: { id: input.id },
           data: {
             deletedAt: new Date(),
@@ -483,11 +484,11 @@ export const venuesRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       try {
         // Check if mapping already exists
-        const existing = await db.talukClusterMapping.findFirst({
+        const existing = await db.locationClusterMapping.findFirst({
           where: {
             eventId: input.eventId,
             district: input.district,
-            taluk: input.taluk,
+            locationName: input.taluk,
           },
         })
 
@@ -498,10 +499,15 @@ export const venuesRouter = createTRPCRouter({
           })
         }
 
-        const mapping = await db.talukClusterMapping.create({
-          data: input,
+        const { taluk, ...rest } = input
+        const mapping = await db.locationClusterMapping.create({
+          data: {
+            ...rest,
+            locationName: taluk,
+            locationType: 'taluk',
+          },
           include: {
-            clusterVenueMapping: {
+            venueLevelMapping: {
               include: {
                 venue: {
                   select: {
@@ -601,11 +607,14 @@ export const venuesRouter = createTRPCRouter({
       try {
         const mappings = await Promise.all(
           input.taluks.map((taluk) =>
-            db.talukClusterMapping.create({
+            db.locationClusterMapping.create({
               data: {
                 eventId: input.eventId,
                 clusterVenueMappingId: input.clusterVenueMappingId,
-                ...taluk,
+                locationName: taluk.taluk,
+                locationType: 'taluk',
+                district: taluk.district,
+                state: taluk.state,
               },
             })
           )

@@ -45,7 +45,7 @@ export const adminDashboardRouter = createTRPCRouter({
         : 0;
 
       // Enhanced Venues stats with multi-level mapping
-      const [totalVenues, activeVenues, venueLocationMappings] = await Promise.all([
+      const [totalVenues, activeVenues, venueLevelMappings] = await Promise.all([
         db.venue.count(),
         db.venue.count({ where: { isActive: true } }),
         db.venueLevelMapping.groupBy({
@@ -55,7 +55,7 @@ export const adminDashboardRouter = createTRPCRouter({
         })
       ]);
 
-      const venuesByLevel = venueLocationMappings.reduce((acc, mapping) => {
+      const venuesByLevel = venueLevelMappings.reduce((acc, mapping) => {
         acc[mapping.level] = mapping._count._all;
         return acc;
       }, {} as Record<string, number>);

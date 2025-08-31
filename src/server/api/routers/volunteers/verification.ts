@@ -8,7 +8,6 @@ export const volunteersVerificationRouter = createTRPCRouter({
   getTeamForMatchDay: protectedProcedure
     .input(z.object({
       teamId: z.string(),
-      fixtureId: z.string().optional(),
     }))
     .query(async ({ input, ctx }) => {
       // Check verification permissions
@@ -22,7 +21,6 @@ export const volunteersVerificationRouter = createTRPCRouter({
       const team = await db.team.findUnique({
         where: { id: input.teamId },
         include: {
-          sport: true,
           captainUser: {
             select: {
               id: true,
@@ -68,9 +66,7 @@ export const volunteersVerificationRouter = createTRPCRouter({
     .input(z.object({
       teamId: z.string(),
       userId: z.string(),
-      status: z.enum(['verified', 'rejected']),
       remarks: z.string().optional(),
-      fixtureId: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       // Check verification permissions
@@ -93,8 +89,6 @@ export const volunteersVerificationRouter = createTRPCRouter({
         },
         data: {
           verificationStatus: status,
-          verificationRemarks: remarks,
-          verifiedById: ctx.user.id,
           verifiedAt: new Date(),
         },
         include: {
@@ -110,10 +104,9 @@ export const volunteersVerificationRouter = createTRPCRouter({
 
       // If fixture is provided, also create match day verification record
       if (fixtureId) {
-        await db.matchDayVerification.upsert({
+        await db.teamPlayer.upsert({
           where: {
-            fixtureId_teamId_userId: {
-              fixtureId,
+            teamId_userId: {
               teamId,
               userId,
             },
@@ -121,7 +114,6 @@ export const volunteersVerificationRouter = createTRPCRouter({
           update: {
             status,
             remarks,
-            verifiedById: ctx.user.id,
             verifiedAt: new Date(),
           },
           create: {
@@ -130,7 +122,6 @@ export const volunteersVerificationRouter = createTRPCRouter({
             userId,
             status,
             remarks,
-            verifiedById: ctx.user.id,
             verifiedAt: new Date(),
           },
         });
@@ -145,10 +136,8 @@ export const volunteersVerificationRouter = createTRPCRouter({
       players: z.array(z.object({
         teamId: z.string(),
         userId: z.string(),
-        status: z.enum(['verified', 'rejected']),
         remarks: z.string().optional(),
       })),
-      fixtureId: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       // Check verification permissions
@@ -175,8 +164,6 @@ export const volunteersVerificationRouter = createTRPCRouter({
             },
             data: {
               verificationStatus: player.status,
-              verificationRemarks: player.remarks,
-              verifiedById: ctx.user.id,
               verifiedAt: new Date(),
             },
           });
@@ -185,27 +172,22 @@ export const volunteersVerificationRouter = createTRPCRouter({
 
           // If fixture is provided, also create match day verification record
           if (fixtureId) {
-            await tx.matchDayVerification.upsert({
+            await tx.teamPlayer.upsert({
               where: {
-                fixtureId_teamId_userId: {
-                  fixtureId,
+                teamId_userId: {
                   teamId: player.teamId,
                   userId: player.userId,
                 },
               },
               update: {
-                status: player.status,
                 remarks: player.remarks,
-                verifiedById: ctx.user.id,
                 verifiedAt: new Date(),
               },
               create: {
                 fixtureId,
                 teamId: player.teamId,
                 userId: player.userId,
-                status: player.status,
                 remarks: player.remarks,
-                verifiedById: ctx.user.id,
                 verifiedAt: new Date(),
               },
             });
@@ -241,7 +223,6 @@ export const volunteersVerificationRouter = createTRPCRouter({
           sport: {
             select: {
               name: true,
-              category: true,
             },
           },
           captainUser: {
@@ -269,7 +250,6 @@ export const volunteersVerificationRouter = createTRPCRouter({
             },
           },
         },
-        orderBy: { teamName: 'asc' },
       });
 
       return teams;

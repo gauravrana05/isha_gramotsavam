@@ -33,7 +33,7 @@ export default function Header({ lang }: HeaderProps) {
     { 
       enabled: !!user?.id,
       staleTime: 10 * 60 * 1000, // Consider data fresh for 10 minutes in header
-      cacheTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
+      gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
       refetchOnWindowFocus: false, // Don't refetch on window focus
       refetchOnReconnect: false, // Don't refetch on reconnect
       refetchOnMount: false, // Don't refetch on component mount if cache exists

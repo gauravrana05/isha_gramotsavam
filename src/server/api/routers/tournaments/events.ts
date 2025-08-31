@@ -19,42 +19,16 @@ export const tournamentsEventsRouter = createTRPCRouter({
       const event = await db.event.findUnique({
         where: { id },
         include: {
-          creator: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-          venueLocationMappings: includeVenueMappings ? {
+          venueLevelMappings: includeVenueMappings ? {
             include: {
               venue: true,
             },
           } : false,
           fixtures: includeFixtures ? {
             include: {
-              team1: {
-                select: {
-                  id: true,
-                  teamName: true,
-                  captainUser: {
-                    select: {
-                      firstName: true,
-                      lastName: true,
-                    },
-                  },
-                },
-              },
-              team2: {
-                select: {
-                  id: true,
-                  teamName: true,
-                  captainUser: {
-                    select: {
-                      firstName: true,
-                      lastName: true,
-                    },
-                  },
+              fixtureTeams: {
+                include: {
+                  team: true,
                 },
               },
             },
@@ -76,7 +50,7 @@ export const tournamentsEventsRouter = createTRPCRouter({
   getAll: publicProcedure
     .input(getEventsSchema)
     .query(async ({ input }) => {
-      const { limit, offset, status, sportId, venueId, includeStats } = input
+      const { page, limit, status, createdBy, search, dateRange, sortBy, sortOrder } = input
 
       const where: any = {}
       
@@ -84,35 +58,30 @@ export const tournamentsEventsRouter = createTRPCRouter({
         where.status = status
       }
       
-      if (sportId) {
-        where.sportId = sportId
+      if (createdBy) {
+        where.createdBy = createdBy
       }
       
-      if (venueId) {
-        where.venueId = venueId
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ]
       }
+      
+      if (dateRange) {
+        where.startDate = {
+          gte: dateRange.startDate,
+          lte: dateRange.endDate,
+        }
+      }
+
+      const skip = (page - 1) * limit
 
       const events = await db.event.findMany({
         where,
-        include: {
-          sport: true,
-          venue: true,
-          creator: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-          _count: includeStats ? {
-            select: {
-              fixtures: true,
-              teams: true,
-            },
-          } : false,
-        },
-        orderBy: { startDate: 'desc' },
-        skip: offset,
+        orderBy: { [sortBy]: sortOrder },
+        skip,
         take: limit,
       })
 
@@ -126,18 +95,7 @@ export const tournamentsEventsRouter = createTRPCRouter({
       const event = await db.event.create({
         data: {
           ...input,
-          createdById: ctx.user.id,
-        },
-        include: {
-          sport: true,
-          venue: true,
-          creator: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
+          createdBy: ctx.user.id,
         },
       })
 
@@ -153,17 +111,6 @@ export const tournamentsEventsRouter = createTRPCRouter({
       const event = await db.event.update({
         where: { id },
         data: updateData,
-        include: {
-          sport: true,
-          venue: true,
-          creator: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
       })
 
       return event

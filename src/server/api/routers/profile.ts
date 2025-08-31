@@ -177,7 +177,7 @@ export const profileRouter = createTRPCRouter({
       lastName: z.string().min(1, 'Last name is required'),
       whatsappNumber: z.string().optional(),
       dateOfBirth: z.string().min(1, 'Date of birth is required'),
-      gender: z.enum(['M', 'F', 'O'], { required_error: 'Gender is required' }),
+      gender: z.enum(['M', 'F', 'O'], { message: 'Gender is required' }),
       instagramHandle: z.string().optional(),
       pincode: z.string().optional(),
       panchayat: z.string().min(1, 'Panchayat is required'),

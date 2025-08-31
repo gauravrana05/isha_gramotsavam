@@ -13,17 +13,17 @@ export const teamsPlayersRouter = createTRPCRouter({
   getPlayers: protectedProcedure
     .input(getTeamPlayersSchema)
     .query(async ({ input }) => {
-      const { teamId, includeUser, verificationStatus } = input
+      const { teamId, position } = input
 
       const where: any = { teamId }
-      if (verificationStatus) {
-        where.verificationStatus = verificationStatus
+      if (position) {
+        where.position = position
       }
 
       const players = await db.teamPlayer.findMany({
         where,
         include: {
-          user: includeUser ? {
+          user: {
             select: {
               id: true,
               firstName: true,
@@ -34,7 +34,7 @@ export const teamsPlayersRouter = createTRPCRouter({
               district: true,
               taluk: true,
             },
-          } : false,
+          },
         },
         orderBy: { createdAt: 'asc' },
       })
@@ -46,7 +46,7 @@ export const teamsPlayersRouter = createTRPCRouter({
   addPlayer: protectedProcedure
     .input(addTeamPlayerSchema)
     .mutation(async ({ input, ctx }) => {
-      const { teamId, userId, position } = input
+      const { teamId, position, firstName, lastName, phone, dateOfBirth, age, gender, panchayat, taluk, district, state, pincode, verificationStatus } = input
 
       // Check if user is captain of this team
       const team = await db.team.findUnique({
@@ -62,12 +62,11 @@ export const teamsPlayersRouter = createTRPCRouter({
       }
 
       // Check if player is already in the team
-      const existingPlayer = await db.teamPlayer.findUnique({
+      // Check if player with same phone already exists in team
+      const existingPlayer = await db.teamPlayer.findFirst({
         where: {
-          teamId_userId: {
-            teamId,
-            userId,
-          },
+          teamId,
+          phone,
         },
       })
 
@@ -78,12 +77,41 @@ export const teamsPlayersRouter = createTRPCRouter({
         })
       }
 
+      // Create user first
+      const user = await db.user.create({
+        data: {
+          firstName,
+          lastName,
+          phone,
+          dateOfBirth,
+          age,
+          gender,
+          panchayat,
+          taluk,
+          district,
+          state,
+          pincode,
+        },
+      })
+
       const teamPlayer = await db.teamPlayer.create({
         data: {
           teamId,
-          userId,
+          userId: user.id,
           position,
-          verificationStatus: 'pending',
+          firstName,
+          lastName,
+          phone,
+          dateOfBirth,
+          age,
+          gender,
+          panchayat,
+          taluk,
+          district,
+          state,
+          pincode,
+          addedBy: 'captain',
+          verificationStatus: verificationStatus || 'pending',
         },
         include: {
           user: {

@@ -25,9 +25,17 @@ export interface StatsCardProps extends BaseComponentProps {
   showShadow?: boolean;
 }
 
-// Individual stat card props
+// Individual stat card props - support both patterns
 export interface SingleStatCardProps extends BaseComponentProps {
-  stat: StatItem;
+  stat?: StatItem;
+  // Individual props for backward compatibility
+  title?: string;
+  value?: string | number;
+  icon?: React.ReactNode;
+  color?: string;
+  trend?: string;
+  description?: string;
+  // Component props
   size?: 'sm' | 'base' | 'lg';
   showBorder?: boolean;
   showShadow?: boolean;
@@ -165,14 +173,30 @@ const TrendIndicator = ({
 // Single stat card component
 export const SingleStatCard: React.FC<SingleStatCardProps> = ({
   stat,
+  title,
+  value,
+  icon,
+  color,
+  trend,
+  description,
   size = 'base',
   showBorder = true,
   showShadow = false,
   className,
   ...props
 }) => {
-  const color = stat.color || 'gray';
-  const colors = colorClasses[color];
+  // Support both patterns: stat object or individual props
+  const statData = stat || {
+    label: title || '',
+    value: value || '',
+    icon: icon,
+    color: color || 'gray',
+    trend,
+    description,
+  };
+  
+  const statColor = statData.color || 'gray';
+  const colors = colorClasses[statColor];
   const sizes = sizeClasses[size];
   
   const CardContent = () => (
@@ -181,46 +205,46 @@ export const SingleStatCard: React.FC<SingleStatCardProps> = ({
       sizes.container,
       showBorder && 'border border-gray-200',
       showShadow && 'shadow-sm hover:shadow-md',
-      stat.onClick && 'cursor-pointer hover:bg-gray-50',
+      statData.onClick && 'cursor-pointer hover:bg-gray-50',
       className
     )}>
       {/* Icon */}
-      {stat.icon && (
+      {statData.icon && (
         <div className={cn('flex justify-center mb-2')}>
           <div className={cn(
             'p-2 rounded-full',
             colors.bg
           )}>
-            <stat.icon className={cn(sizes.icon, colors.icon)} />
+            <statData.icon className={cn(sizes.icon, colors.icon)} />
           </div>
         </div>
       )}
       
       {/* Value */}
       <div className={cn(sizes.value, colors.value)}>
-        {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
+        {typeof statData.value === 'number' ? statData.value.toLocaleString() : statData.value}
       </div>
       
       {/* Label */}
       <div className={cn(sizes.label, 'text-gray-600 font-medium mt-1')}>
-        {stat.label}
+        {statData.label}
       </div>
       
       {/* Description */}
-      {stat.description && (
+      {statData.description && (
         <div className={cn(sizeClasses.sm.label, 'text-gray-500 mt-1')}>
-          {stat.description}
+          {statData.description}
         </div>
       )}
       
       {/* Trend */}
-      <TrendIndicator trend={stat.trend} size={size} />
+      <TrendIndicator trend={statData.trend} size={size} />
     </div>
   );
   
-  if (stat.onClick) {
+  if (statData.onClick) {
     return (
-      <button onClick={stat.onClick} className="w-full text-left" {...props}>
+      <button onClick={statData.onClick} className="w-full text-left" {...props}>
         <CardContent />
       </button>
     );

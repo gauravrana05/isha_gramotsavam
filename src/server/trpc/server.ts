@@ -5,7 +5,7 @@ import {
   loggerLink,
   TRPCClientError,
 } from '@trpc/client'
-import { callProcedure } from '@trpc/server'
+import { callTRPCProcedure } from '@trpc/server'
 import { observable } from '@trpc/server/observable'
 import { type TRPCErrorResponse } from '@trpc/server/rpc'
 import { cookies } from 'next/headers'
@@ -49,10 +49,10 @@ export const api = createTRPCProxyClient<AppRouter>({
         observable((observer) => {
           createContext()
             .then((ctx) => {
-              return callProcedure({
-                procedures: appRouter._def.procedures,
+              return callTRPCProcedure({
+                router: appRouter,
                 path: op.path,
-                rawInput: op.input,
+                input: op.input,
                 ctx,
                 type: op.type,
               })

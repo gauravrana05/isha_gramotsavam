@@ -117,11 +117,7 @@ export const teamsVerificationRouter = createTRPCRouter({
             },
           },
           teamPhoto: true,
-          venueAssignments: {
-            include: {
-              venue: true,
-            },
-          },
+          teamVenueAssignments: true,
         },
       })
 
@@ -163,9 +159,6 @@ export const teamsVerificationRouter = createTRPCRouter({
         },
         data: {
           verificationStatus: status,
-          verificationRemarks: remarks,
-          verifiedById: ctx.user.id,
-          verifiedAt: new Date(),
         },
         include: {
           user: {
@@ -212,9 +205,6 @@ export const teamsVerificationRouter = createTRPCRouter({
             },
             data: {
               verificationStatus: status,
-              verificationRemarks: remarks,
-              verifiedById: ctx.user.id,
-              verifiedAt: new Date(),
             },
           })
         )
