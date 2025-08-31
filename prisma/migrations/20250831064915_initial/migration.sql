@@ -1,4 +1,7 @@
 -- CreateEnum
+CREATE TYPE "public"."LocationType" AS ENUM ('district', 'taluk');
+
+-- CreateEnum
 CREATE TYPE "public"."AssignmentMethod" AS ENUM ('auto_assigned', 'manual_assigned');
 
 -- CreateEnum
@@ -20,7 +23,7 @@ CREATE TYPE "public"."GenderCategory" AS ENUM ('men', 'women', 'mixed');
 CREATE TYPE "public"."MatchStatus" AS ENUM ('scheduled', 'ready', 'in_progress', 'completed', 'cancelled');
 
 -- CreateEnum
-CREATE TYPE "public"."MediaEntity" AS ENUM ('match', 'event', 'venue');
+CREATE TYPE "public"."MediaEntity" AS ENUM ('match', 'event', 'venue', 'fixture', 'post');
 
 -- CreateEnum
 CREATE TYPE "public"."MediaStatus" AS ENUM ('pending', 'approved', 'rejected');
@@ -48,6 +51,15 @@ CREATE TYPE "public"."VerificationType" AS ENUM ('document_verification', 'ongro
 
 -- CreateEnum
 CREATE TYPE "public"."VolunteerType" AS ENUM ('general_volunteer', 'technical_volunteer');
+
+-- CreateEnum
+CREATE TYPE "public"."PostEntity" AS ENUM ('fixture', 'match');
+
+-- CreateEnum
+CREATE TYPE "public"."PostVisibility" AS ENUM ('public', 'private');
+
+-- CreateEnum
+CREATE TYPE "public"."PostStatus" AS ENUM ('draft', 'published', 'archived');
 
 -- CreateTable
 CREATE TABLE "public"."audit_logs" (
@@ -142,7 +154,7 @@ CREATE TABLE "public"."fixtures" (
     "name" VARCHAR(200) NOT NULL,
     "event_id" UUID,
     "sport_id" UUID NOT NULL,
-    "venue_location_mapping_id" UUID NOT NULL,
+    "venue_level_mapping_id" UUID NOT NULL,
     "gender_category" "public"."GenderCategory" NOT NULL,
     "level" "public"."TournamentLevel" NOT NULL,
     "status" "public"."FixtureStatus" NOT NULL DEFAULT 'draft',
@@ -159,7 +171,7 @@ CREATE TABLE "public"."matches" (
     "fixture_id" UUID NOT NULL,
     "event_id" UUID,
     "sport_id" UUID NOT NULL,
-    "venue_location_mapping_id" UUID NOT NULL,
+    "venue_level_mapping_id" UUID NOT NULL,
     "gender_category" "public"."GenderCategory" NOT NULL,
     "round_name" VARCHAR(100) NOT NULL,
     "match_number" INTEGER NOT NULL,
@@ -198,6 +210,9 @@ CREATE TABLE "public"."media" (
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
     "deleted_at" TIMESTAMPTZ(6),
+    "post_id" UUID,
+    "caption" VARCHAR(500),
+    "order_in_post" INTEGER,
 
     CONSTRAINT "media_pkey" PRIMARY KEY ("id")
 );
@@ -259,18 +274,19 @@ CREATE TABLE "public"."system_config" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."taluk_cluster_mappings" (
+CREATE TABLE "public"."location_cluster_mappings" (
     "id" UUID NOT NULL,
     "event_id" UUID NOT NULL,
-    "district" VARCHAR(100) NOT NULL,
+    "location_type" "public"."LocationType" NOT NULL,
+    "location_name" VARCHAR(100) NOT NULL,
     "state" VARCHAR(100) NOT NULL,
-    "taluk" VARCHAR(100) NOT NULL,
+    "district" VARCHAR(100),
     "cluster_venue_mapping_id" UUID NOT NULL,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
     "deleted_at" TIMESTAMPTZ(6),
 
-    CONSTRAINT "taluk_cluster_mappings_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "location_cluster_mappings_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -367,6 +383,24 @@ CREATE TABLE "public"."teams" (
 );
 
 -- CreateTable
+CREATE TABLE "public"."posts" (
+    "id" UUID NOT NULL,
+    "title" VARCHAR(200),
+    "content" TEXT,
+    "author_id" UUID NOT NULL,
+    "event_id" UUID NOT NULL,
+    "entity_type" "public"."PostEntity" NOT NULL DEFAULT 'fixture',
+    "entity_id" UUID NOT NULL,
+    "visibility" "public"."PostVisibility" NOT NULL DEFAULT 'public',
+    "status" "public"."PostStatus" NOT NULL DEFAULT 'published',
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ(6) NOT NULL,
+    "deleted_at" TIMESTAMPTZ(6),
+
+    CONSTRAINT "posts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "public"."user_profile_images" (
     "user_id" UUID NOT NULL,
     "profile_photo_path" VARCHAR(500),
@@ -393,6 +427,7 @@ CREATE TABLE "public"."users" (
     "first_name" VARCHAR(100),
     "last_name" VARCHAR(100),
     "date_of_birth" DATE,
+    "age" INTEGER,
     "gender" "public"."Gender",
     "whatsapp_number" VARCHAR(20),
     "instagram_handle" VARCHAR(100),
@@ -424,34 +459,30 @@ CREATE TABLE "public"."user_verifications" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."venue_location_mappings" (
+CREATE TABLE "public"."venue_level_mappings" (
     "id" UUID NOT NULL,
     "event_id" UUID NOT NULL,
     "venue_id" UUID NOT NULL,
     "level" "public"."TournamentLevel" NOT NULL,
-    "max_teams" INTEGER,
+    "max_teams" INTEGER DEFAULT 100,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
     "deleted_at" TIMESTAMPTZ(6),
 
-    CONSTRAINT "venue_location_mappings_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "venue_level_mappings_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "public"."venues" (
     "id" UUID NOT NULL,
     "name" VARCHAR(200) NOT NULL,
-    "capacity" INTEGER,
+    "address" VARCHAR(500),
     "panchayat" VARCHAR(100),
     "taluk" VARCHAR(100),
     "district" VARCHAR(100) NOT NULL,
     "state" VARCHAR(100) NOT NULL,
     "pincode" VARCHAR(10),
-    "contact_phone" VARCHAR(20),
-    "contact_email" VARCHAR(255),
-    "contact_person" VARCHAR(100),
-    "facilities" TEXT,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
@@ -465,7 +496,7 @@ CREATE TABLE "public"."volunteer_assignments" (
     "id" UUID NOT NULL,
     "event_id" UUID NOT NULL,
     "volunteer_id" UUID NOT NULL,
-    "venue_location_mapping_id" UUID NOT NULL,
+    "venue_level_mapping_id" UUID NOT NULL,
     "volunteer_type" "public"."VolunteerType" NOT NULL,
     "contact_phone" VARCHAR(20),
     "status" "public"."AssignmentStatus" NOT NULL DEFAULT 'assigned',
@@ -521,7 +552,7 @@ CREATE INDEX "fixture_teams_team_id_idx" ON "public"."fixture_teams"("team_id");
 CREATE UNIQUE INDEX "fixture_teams_fixture_id_final_position_key" ON "public"."fixture_teams"("fixture_id", "final_position");
 
 -- CreateIndex
-CREATE INDEX "fixtures_event_id_sport_id_venue_location_mapping_id_gender_idx" ON "public"."fixtures"("event_id", "sport_id", "venue_location_mapping_id", "gender_category", "level");
+CREATE INDEX "fixtures_event_id_sport_id_venue_level_mapping_id_gender_ca_idx" ON "public"."fixtures"("event_id", "sport_id", "venue_level_mapping_id", "gender_category", "level");
 
 -- CreateIndex
 CREATE INDEX "matches_fixture_id_idx" ON "public"."matches"("fixture_id");
@@ -533,7 +564,7 @@ CREATE INDEX "matches_event_id_idx" ON "public"."matches"("event_id");
 CREATE INDEX "matches_sport_id_idx" ON "public"."matches"("sport_id");
 
 -- CreateIndex
-CREATE INDEX "matches_venue_location_mapping_id_idx" ON "public"."matches"("venue_location_mapping_id");
+CREATE INDEX "matches_venue_level_mapping_id_idx" ON "public"."matches"("venue_level_mapping_id");
 
 -- CreateIndex
 CREATE INDEX "matches_team1_id_idx" ON "public"."matches"("team1_id");
@@ -563,13 +594,16 @@ CREATE INDEX "notifications_related_entity_id_idx" ON "public"."notifications"("
 CREATE UNIQUE INDEX "system_config_key_key" ON "public"."system_config"("key");
 
 -- CreateIndex
-CREATE INDEX "taluk_cluster_mappings_event_id_idx" ON "public"."taluk_cluster_mappings"("event_id");
+CREATE INDEX "location_cluster_mappings_event_id_idx" ON "public"."location_cluster_mappings"("event_id");
 
 -- CreateIndex
-CREATE INDEX "taluk_cluster_mappings_cluster_venue_mapping_id_idx" ON "public"."taluk_cluster_mappings"("cluster_venue_mapping_id");
+CREATE INDEX "location_cluster_mappings_cluster_venue_mapping_id_idx" ON "public"."location_cluster_mappings"("cluster_venue_mapping_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "taluk_cluster_mappings_event_id_district_taluk_key" ON "public"."taluk_cluster_mappings"("event_id", "district", "taluk");
+CREATE INDEX "location_cluster_mappings_location_type_idx" ON "public"."location_cluster_mappings"("location_type");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "location_cluster_mappings_event_id_location_type_location_n_key" ON "public"."location_cluster_mappings"("event_id", "location_type", "location_name", "state", "district");
 
 -- CreateIndex
 CREATE INDEX "team_photos_team_id_idx" ON "public"."team_photos"("team_id");
@@ -617,6 +651,18 @@ CREATE INDEX "user_verifications_user_id_idx" ON "public"."user_verifications"("
 CREATE INDEX "user_verifications_verified_by_idx" ON "public"."user_verifications"("verified_by");
 
 -- CreateIndex
+CREATE INDEX "idx_venue_level_mappings_event_id" ON "public"."venue_level_mappings"("event_id");
+
+-- CreateIndex
+CREATE INDEX "idx_venue_level_mappings_venue_id" ON "public"."venue_level_mappings"("venue_id");
+
+-- CreateIndex
+CREATE INDEX "idx_venue_level_mappings_level" ON "public"."venue_level_mappings"("level");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "venue_level_mappings_unique" ON "public"."venue_level_mappings"("event_id", "venue_id", "level");
+
+-- CreateIndex
 CREATE INDEX "idx_venue_location" ON "public"."venues"("district", "state");
 
 -- CreateIndex
@@ -635,7 +681,7 @@ CREATE INDEX "idx_volunteer_assignments_event_id" ON "public"."volunteer_assignm
 CREATE INDEX "idx_volunteer_assignments_volunteer_id" ON "public"."volunteer_assignments"("volunteer_id");
 
 -- CreateIndex
-CREATE INDEX "idx_volunteer_assignments_venue_location_mapping_id" ON "public"."volunteer_assignments"("venue_location_mapping_id");
+CREATE INDEX "idx_volunteer_assignments_venue_level_mapping_id" ON "public"."volunteer_assignments"("venue_level_mapping_id");
 
 -- CreateIndex
 CREATE INDEX "idx_volunteer_assignments_assigned_by" ON "public"."volunteer_assignments"("assigned_by");
@@ -647,7 +693,7 @@ CREATE INDEX "idx_volunteer_assignments_status" ON "public"."volunteer_assignmen
 CREATE INDEX "idx_volunteer_assignments_deleted_at" ON "public"."volunteer_assignments"("deleted_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "volunteer_assignments_unique" ON "public"."volunteer_assignments"("event_id", "volunteer_id", "venue_location_mapping_id");
+CREATE UNIQUE INDEX "volunteer_assignments_unique" ON "public"."volunteer_assignments"("event_id", "volunteer_id", "venue_level_mapping_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "user_roles_unique" ON "public"."user_roles"("user_id", "event_id", "role");
@@ -656,10 +702,10 @@ CREATE UNIQUE INDEX "user_roles_unique" ON "public"."user_roles"("user_id", "eve
 ALTER TABLE "public"."audit_logs" ADD CONSTRAINT "audit_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."cluster_division_mappings" ADD CONSTRAINT "cluster_division_mappings_cluster_venue_mapping_id_fkey" FOREIGN KEY ("cluster_venue_mapping_id") REFERENCES "public"."venue_location_mappings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."cluster_division_mappings" ADD CONSTRAINT "cluster_division_mappings_cluster_venue_mapping_id_fkey" FOREIGN KEY ("cluster_venue_mapping_id") REFERENCES "public"."venue_level_mappings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."cluster_division_mappings" ADD CONSTRAINT "cluster_division_mappings_division_venue_mapping_id_fkey" FOREIGN KEY ("division_venue_mapping_id") REFERENCES "public"."venue_location_mappings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."cluster_division_mappings" ADD CONSTRAINT "cluster_division_mappings_division_venue_mapping_id_fkey" FOREIGN KEY ("division_venue_mapping_id") REFERENCES "public"."venue_level_mappings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."cluster_division_mappings" ADD CONSTRAINT "cluster_division_mappings_event_id_fkey" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -695,7 +741,7 @@ ALTER TABLE "public"."fixtures" ADD CONSTRAINT "fixtures_event_id_fkey" FOREIGN 
 ALTER TABLE "public"."fixtures" ADD CONSTRAINT "fixtures_sport_id_fkey" FOREIGN KEY ("sport_id") REFERENCES "public"."sports"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."fixtures" ADD CONSTRAINT "fixtures_venue_location_mapping_id_fkey" FOREIGN KEY ("venue_location_mapping_id") REFERENCES "public"."venue_location_mappings"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."fixtures" ADD CONSTRAINT "fixtures_venue_level_mapping_id_fkey" FOREIGN KEY ("venue_level_mapping_id") REFERENCES "public"."venue_level_mappings"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."matches" ADD CONSTRAINT "matches_depends_on_match1_id_fkey" FOREIGN KEY ("depends_on_match1_id") REFERENCES "public"."matches"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -716,7 +762,7 @@ ALTER TABLE "public"."matches" ADD CONSTRAINT "matches_fixture_id_fkey" FOREIGN 
 ALTER TABLE "public"."matches" ADD CONSTRAINT "matches_sport_id_fkey" FOREIGN KEY ("sport_id") REFERENCES "public"."sports"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."matches" ADD CONSTRAINT "matches_venue_location_mapping_id_fkey" FOREIGN KEY ("venue_location_mapping_id") REFERENCES "public"."venue_location_mappings"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."matches" ADD CONSTRAINT "matches_venue_level_mapping_id_fkey" FOREIGN KEY ("venue_level_mapping_id") REFERENCES "public"."venue_level_mappings"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."matches" ADD CONSTRAINT "matches_team1_id_fkey" FOREIGN KEY ("team1_id") REFERENCES "public"."teams"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -731,6 +777,9 @@ ALTER TABLE "public"."matches" ADD CONSTRAINT "matches_winner_id_fkey" FOREIGN K
 ALTER TABLE "public"."matches" ADD CONSTRAINT "matches_result_entered_by_fkey" FOREIGN KEY ("result_entered_by") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "public"."media" ADD CONSTRAINT "media_post_id_fkey" FOREIGN KEY ("post_id") REFERENCES "public"."posts"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "public"."media" ADD CONSTRAINT "media_uploaded_by_fkey" FOREIGN KEY ("uploaded_by") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -743,10 +792,10 @@ ALTER TABLE "public"."sport_gender_categories" ADD CONSTRAINT "sport_gender_cate
 ALTER TABLE "public"."system_config" ADD CONSTRAINT "system_config_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."taluk_cluster_mappings" ADD CONSTRAINT "taluk_cluster_mappings_cluster_venue_mapping_id_fkey" FOREIGN KEY ("cluster_venue_mapping_id") REFERENCES "public"."venue_location_mappings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."location_cluster_mappings" ADD CONSTRAINT "location_cluster_mappings_cluster_venue_mapping_id_fkey" FOREIGN KEY ("cluster_venue_mapping_id") REFERENCES "public"."venue_level_mappings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."taluk_cluster_mappings" ADD CONSTRAINT "taluk_cluster_mappings_event_id_fkey" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."location_cluster_mappings" ADD CONSTRAINT "location_cluster_mappings_event_id_fkey" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."team_photos" ADD CONSTRAINT "team_photos_team_id_fkey" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -764,13 +813,13 @@ ALTER TABLE "public"."team_players" ADD CONSTRAINT "team_players_user_id_fkey" F
 ALTER TABLE "public"."team_venue_assignments" ADD CONSTRAINT "team_venue_assignments_assigned_by_fkey" FOREIGN KEY ("assigned_by") REFERENCES "public"."users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."team_venue_assignments" ADD CONSTRAINT "team_venue_assignments_cluster_venue_mapping_id_fkey" FOREIGN KEY ("cluster_venue_mapping_id") REFERENCES "public"."venue_location_mappings"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."team_venue_assignments" ADD CONSTRAINT "team_venue_assignments_cluster_venue_mapping_id_fkey" FOREIGN KEY ("cluster_venue_mapping_id") REFERENCES "public"."venue_level_mappings"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."team_venue_assignments" ADD CONSTRAINT "team_venue_assignments_division_venue_mapping_id_fkey" FOREIGN KEY ("division_venue_mapping_id") REFERENCES "public"."venue_location_mappings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."team_venue_assignments" ADD CONSTRAINT "team_venue_assignments_division_venue_mapping_id_fkey" FOREIGN KEY ("division_venue_mapping_id") REFERENCES "public"."venue_level_mappings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."team_venue_assignments" ADD CONSTRAINT "team_venue_assignments_final_venue_mapping_id_fkey" FOREIGN KEY ("final_venue_mapping_id") REFERENCES "public"."venue_location_mappings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."team_venue_assignments" ADD CONSTRAINT "team_venue_assignments_final_venue_mapping_id_fkey" FOREIGN KEY ("final_venue_mapping_id") REFERENCES "public"."venue_level_mappings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."team_venue_assignments" ADD CONSTRAINT "team_venue_assignments_event_id_fkey" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -791,7 +840,13 @@ ALTER TABLE "public"."teams" ADD CONSTRAINT "teams_event_id_fkey" FOREIGN KEY ("
 ALTER TABLE "public"."teams" ADD CONSTRAINT "teams_sport_id_fkey" FOREIGN KEY ("sport_id") REFERENCES "public"."sports"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."teams" ADD CONSTRAINT "teams_tournament_number_venue_mapping_id_fkey" FOREIGN KEY ("tournament_number_venue_mapping_id") REFERENCES "public"."venue_location_mappings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."teams" ADD CONSTRAINT "teams_tournament_number_venue_mapping_id_fkey" FOREIGN KEY ("tournament_number_venue_mapping_id") REFERENCES "public"."venue_level_mappings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."posts" ADD CONSTRAINT "posts_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "public"."users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."posts" ADD CONSTRAINT "posts_event_id_fkey" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."user_profile_images" ADD CONSTRAINT "user_profile_images_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -806,10 +861,10 @@ ALTER TABLE "public"."user_verifications" ADD CONSTRAINT "user_verifications_use
 ALTER TABLE "public"."user_verifications" ADD CONSTRAINT "user_verifications_verified_by_fkey" FOREIGN KEY ("verified_by") REFERENCES "public"."users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."venue_location_mappings" ADD CONSTRAINT "venue_location_mappings_event_id_fkey" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."venue_level_mappings" ADD CONSTRAINT "venue_level_mappings_event_id_fkey" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."venue_location_mappings" ADD CONSTRAINT "venue_location_mappings_venue_id_fkey" FOREIGN KEY ("venue_id") REFERENCES "public"."venues"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."venue_level_mappings" ADD CONSTRAINT "venue_level_mappings_venue_id_fkey" FOREIGN KEY ("venue_id") REFERENCES "public"."venues"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."volunteer_assignments" ADD CONSTRAINT "volunteer_assignments_assigned_by_fkey" FOREIGN KEY ("assigned_by") REFERENCES "public"."users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -821,7 +876,7 @@ ALTER TABLE "public"."volunteer_assignments" ADD CONSTRAINT "volunteer_assignmen
 ALTER TABLE "public"."volunteer_assignments" ADD CONSTRAINT "volunteer_assignments_event_id_fkey" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."volunteer_assignments" ADD CONSTRAINT "volunteer_assignments_venue_location_mapping_id_fkey" FOREIGN KEY ("venue_location_mapping_id") REFERENCES "public"."venue_location_mappings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."volunteer_assignments" ADD CONSTRAINT "volunteer_assignments_venue_level_mapping_id_fkey" FOREIGN KEY ("venue_level_mapping_id") REFERENCES "public"."venue_level_mappings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."user_roles" ADD CONSTRAINT "user_roles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

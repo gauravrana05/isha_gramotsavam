@@ -2,7 +2,7 @@ import { initTRPC, TRPCError } from '@trpc/server'
 import { type CreateNextContextOptions } from '@trpc/server/adapters/next'
 import superjson from 'superjson'
 import { ZodError } from 'zod'
-import { redis } from '@/lib/redis'; // Import the Redis client
+import { redis, safeRedisOperation } from '@/lib/redis'; // Import the Redis client
 
 const STALE_TIME = 60; // 60 seconds
 
@@ -16,10 +16,20 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     // Check for user ID in cookies or headers
     const userId = req.cookies?.userId || req.headers.userid as string;
     if (userId) {
-      const cachedUser = await redis.get(`user:${userId}`);
-      if (cachedUser) {
-        user = JSON.parse(cachedUser);
-      } else {
+      // Try to get user from cache, fallback to database
+      user = await safeRedisOperation(
+        async (redis) => {
+          const cachedUser = await redis.get(`user:${userId}`);
+          if (cachedUser) {
+            return JSON.parse(cachedUser);
+          }
+          return null;
+        },
+        async () => null
+      );
+
+      // If not in cache, fetch from database
+      if (!user) {
         // Import db here to avoid circular dependency issues
         const { db } = await import('@/lib/db');
         user = await db.user.findUnique({
@@ -33,8 +43,15 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
             role: true,
           }
         });
+        
+        // Cache the user if found
         if (user) {
-          await redis.set(`user:${userId}`, JSON.stringify(user), 'EX', STALE_TIME);
+          await safeRedisOperation(
+            async (redis) => {
+              await redis.set(`user:${userId}`, JSON.stringify(user), 'EX', STALE_TIME);
+            },
+            async () => {} // No-op fallback
+          );
         }
       }
     }

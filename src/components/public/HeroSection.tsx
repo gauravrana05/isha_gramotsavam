@@ -15,12 +15,38 @@ export default function HeroSection({ lang }: HeroSectionProps) {
   const { t } = useTranslation();
   
   const scrollToSports = () => {
-    const sportsSection = document.getElementById('sports-preview');
-    if (sportsSection) {
-      sportsSection.scrollIntoView({ 
-        behavior: 'smooth',
-        block: 'start'
-      });
+    // Try multiple approaches to find the element
+    const findAndScroll = () => {
+      let sportsSection = document.getElementById('sports-preview');
+      
+      // If not found by ID, try querySelector
+      if (!sportsSection) {
+        sportsSection = document.querySelector('[id="sports-preview"]');
+      }
+      
+      // If still not found, try finding by section with sports content
+      if (!sportsSection) {
+        sportsSection = document.querySelector('section[class*="bg-isha"]');
+      }
+      
+      if (sportsSection) {
+        sportsSection.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        });
+        return true;
+      }
+      return false;
+    };
+    
+    // Try immediately
+    if (!findAndScroll()) {
+      // If not found, try after a delay
+      setTimeout(() => {
+        if (!findAndScroll()) {
+          console.warn('Sports section not found for scrolling');
+        }
+      }, 500);
     }
   };
 
