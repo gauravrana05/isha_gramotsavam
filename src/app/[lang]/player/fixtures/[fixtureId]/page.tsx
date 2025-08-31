@@ -74,31 +74,33 @@ export default function PlayerFixtureDetailPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
 
   // Get fixture details using tRPC
-  const { data: fixture, isLoading: fixtureLoading, error: fixtureError } = api.teams.management.getMyTeamFixtures.useQuery(
+  const { data: fixtures, isLoading: fixtureLoading, error: fixtureError } = api.teams.management.getMyTeamFixtures.useQuery(
     undefined,
     {
-      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'player',
-      select: (fixtures) => {
-        const foundFixture = fixtures.find(f => f.id === fixtureId);
-        if (foundFixture) {
-          return {
-            ...foundFixture,
-            assignedTeams: foundFixture.fixtureTeams.map(ft => ({
-              id: ft.team.id,
-              name: ft.team.name,
-              tournamentNumber: undefined
-            })),
-            sportName: foundFixture.genderCategory,
-            totalMatches: foundFixture.fixtureTeams.length,
-            completedMatches: foundFixture.status === 'completed' ? foundFixture.fixtureTeams.length : 0,
-            hasPlayerTeam: foundFixture.fixtureTeams.length > 0,
-            playerTeamNames: foundFixture.fixtureTeams.map(ft => ft.team.name)
-          } as PlayerFixtureDetail;
-        }
-        return undefined;
-      }
+      enabled: !authLoading && !!user && userProfile?.profile_complete && user.role === 'player'
     }
   );
+
+  const fixture = useMemo(() => {
+    if (!fixtures) return undefined;
+    const foundFixture = fixtures.find(f => f.id === fixtureId);
+    if (foundFixture) {
+      return {
+        ...foundFixture,
+        assignedTeams: foundFixture.fixtureTeams.map(ft => ({
+          id: ft.team.id,
+          name: ft.team.name,
+          tournamentNumber: undefined
+        })),
+        sportName: foundFixture.genderCategory,
+        totalMatches: foundFixture.fixtureTeams.length,
+        completedMatches: foundFixture.status === 'completed' ? foundFixture.fixtureTeams.length : 0,
+        hasPlayerTeam: foundFixture.fixtureTeams.length > 0,
+        playerTeamNames: foundFixture.fixtureTeams.map(ft => ft.team.name)
+      } as PlayerFixtureDetail;
+    }
+    return undefined;
+  }, [fixtures, fixtureId]);
 
   const loading = authLoading || fixtureLoading;
   const error = fixtureError?.message;

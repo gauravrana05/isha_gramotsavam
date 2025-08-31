@@ -51,6 +51,17 @@ interface CaptainMatchDetail {
   isCaptainInvolved?: boolean;
   roundName?: string;
   sportName?: string;
+  captainTeamSide?: 'team1' | 'team2' | null;
+  team1?: {
+    teamId: string;
+    teamName: string;
+    tournamentNumber?: number;
+  } | null;
+  team2?: {
+    teamId: string;
+    teamName: string;
+    tournamentNumber?: number;
+  } | null;
 }
 
 export default function CaptainMatchDetailPage() {
@@ -70,11 +81,23 @@ export default function CaptainMatchDetailPage() {
     if (!matches) return undefined;
     const foundMatch = matches.find(m => m.id === matchId);
     if (foundMatch) {
+      const teams = foundMatch.fixtureTeams.slice(0, 2); // Get first 2 teams
       return {
         ...foundMatch,
         isCaptainInvolved: foundMatch.fixtureTeams.length > 0,
         roundName: foundMatch.event?.name || 'Event',
-        sportName: foundMatch.genderCategory
+        sportName: foundMatch.genderCategory,
+        captainTeamSide: teams.length > 0 ? 'team1' : null,
+        team1: teams[0] ? {
+          teamId: teams[0].team.id,
+          teamName: teams[0].team.name,
+          tournamentNumber: undefined
+        } : null,
+        team2: teams[1] ? {
+          teamId: teams[1].team.id,
+          teamName: teams[1].team.name,
+          tournamentNumber: undefined
+        } : null
       } as CaptainMatchDetail;
     }
     return undefined;

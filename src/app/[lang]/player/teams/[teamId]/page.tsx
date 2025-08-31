@@ -211,10 +211,10 @@ export default function PlayerTeamDetailsPage() {
             className="mx-auto"
           />
           <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">
-            {teamData.name}
+            {teamData.team.name}
           </h1>
           <p className="text-gray-600">
-            {t('team_details_for', 'Details for {sportName} Team').replace('{sportName}', teamData.sportName)}
+            {t('team_details_for', 'Details for {sportName} Team').replace('{sportName}', teamData.team.sport.name)}
           </p>
         </div>
 

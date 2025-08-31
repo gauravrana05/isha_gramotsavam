@@ -21,7 +21,7 @@ import {
 import PostFeed from '@/components/posts/PostFeed';
 
 export default function FixtureDetailPage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const params = useParams();
   
   const venueId = params?.venueId as string;
@@ -38,8 +38,8 @@ export default function FixtureDetailPage() {
     if (!fixture) return [];
     
     const allTeamIds = [
-      ...(fixture.assignedTeams?.map(team => team.id) || []),
-      ...(fixture.bracket?.matches?.flatMap((match: any) => [match?.team1Id, match?.team2Id, match?.winnerId]) || [])
+      ...(fixture.fixtureTeams?.map(team => team.team.id) || []),
+      ...(fixture.name?.matches?.flatMap((match: any) => [match?.team1Id, match?.team2Id, match?.winnerId]) || [])
     ].filter(Boolean);
 
     return Array.from(new Set(allTeamIds));
@@ -148,7 +148,7 @@ export default function FixtureDetailPage() {
   const matchesByRound = useMemo(() => {
     if (!fixture?.bracket?.matches) return {};
     
-    return fixture.bracket.matches.reduce((acc: any, match: any) => {
+    return [].reduce((acc: any, match: any) => {
       const round = match.roundName;
       if (!acc[round]) {
         acc[round] = [];
@@ -194,7 +194,7 @@ export default function FixtureDetailPage() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900">{fixture.name}</h2>
               <p className="text-gray-600 text-sm">
-                {fixture.assignedTeams?.length || 0} teams • {fixture.level} level
+                {fixture.fixtureTeams?.length || 0} teams • {fixture.level} level
               </p>
             </div>
           </div>
@@ -219,7 +219,7 @@ export default function FixtureDetailPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Total Teams</p>
-              <p className="text-2xl font-bold text-gray-900">{fixture.assignedTeams?.length || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">{fixture.fixtureTeams?.length || 0}</p>
             </div>
             <Users className="w-8 h-8 text-gray-400" />
           </div>
@@ -229,7 +229,7 @@ export default function FixtureDetailPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Total Matches</p>
-              <p className="text-2xl font-bold text-blue-600">{fixture.bracket?.matches?.length || 0}</p>
+              <p className="text-2xl font-bold text-blue-600">{fixture.name?.matches?.length || 0}</p>
             </div>
             <Calendar className="w-8 h-8 text-blue-400" />
           </div>
@@ -240,7 +240,7 @@ export default function FixtureDetailPage() {
             <div>
               <p className="text-gray-600 text-sm">Completed</p>
               <p className="text-2xl font-bold text-green-600">
-                {fixture.bracket?.matches?.filter((m: any) => m.status === 'completed').length || 0}
+                {fixture.name?.matches?.filter((m: any) => m.status === 'completed').length || 0}
               </p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-400" />
@@ -394,13 +394,13 @@ export default function FixtureDetailPage() {
         </div>
 
         {/* Tournament Winner */}
-        {fixture.status === 'completed' && fixture.bracket?.winners && fixture.bracket.winners.length > 0 && (
+        {fixture.status === 'completed' && fixture.name?.winners && fixture.name.winners.length > 0 && (
           <div className="mt-8 p-6 bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-lg">
             <div className="text-center">
               <Crown className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
               <h3 className="text-xl font-bold text-gray-900 mb-2">Tournament Complete!</h3>
               <div className="space-y-2">
-                {fixture.bracket.winners.map((winnerId: string, index: number) => (
+                {fixture.name.winners.map((winnerId: string, index: number) => (
                   <div key={winnerId} className="flex items-center justify-center">
                     <Trophy className="w-5 h-5 text-yellow-500 mr-2" />
                     <span className="font-semibold text-lg">

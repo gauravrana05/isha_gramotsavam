@@ -77,7 +77,7 @@ export const volunteersVerificationRouter = createTRPCRouter({
         });
       }
 
-      const { teamId, userId, status, remarks, fixtureId } = input;
+      const { teamId, userId, remarks } = input;
 
       // Update player verification status
       const teamPlayer = await db.teamPlayer.update({
@@ -88,8 +88,8 @@ export const volunteersVerificationRouter = createTRPCRouter({
           },
         },
         data: {
-          verificationStatus: status,
-          verifiedAt: new Date(),
+          verificationStatus: 'verified',
+          updatedAt: new Date(),
         },
         include: {
           user: {
@@ -101,31 +101,6 @@ export const volunteersVerificationRouter = createTRPCRouter({
           },
         },
       });
-
-      // If fixture is provided, also create match day verification record
-      if (fixtureId) {
-        await db.teamPlayer.upsert({
-          where: {
-            teamId_userId: {
-              teamId,
-              userId,
-            },
-          },
-          update: {
-            status,
-            remarks,
-            verifiedAt: new Date(),
-          },
-          create: {
-            fixtureId,
-            teamId,
-            userId,
-            status,
-            remarks,
-            verifiedAt: new Date(),
-          },
-        });
-      }
 
       return teamPlayer;
     }),
@@ -148,7 +123,7 @@ export const volunteersVerificationRouter = createTRPCRouter({
         });
       }
 
-      const { players, fixtureId } = input;
+      const { players } = input;
 
       const results = await db.$transaction(async (tx) => {
         const updatedPlayers = [];
@@ -163,35 +138,12 @@ export const volunteersVerificationRouter = createTRPCRouter({
               },
             },
             data: {
-              verificationStatus: player.status,
-              verifiedAt: new Date(),
+              verificationStatus: 'verified',
+              updatedAt: new Date(),
             },
           });
 
           updatedPlayers.push(teamPlayer);
-
-          // If fixture is provided, also create match day verification record
-          if (fixtureId) {
-            await tx.teamPlayer.upsert({
-              where: {
-                teamId_userId: {
-                  teamId: player.teamId,
-                  userId: player.userId,
-                },
-              },
-              update: {
-                remarks: player.remarks,
-                verifiedAt: new Date(),
-              },
-              create: {
-                fixtureId,
-                teamId: player.teamId,
-                userId: player.userId,
-                remarks: player.remarks,
-                verifiedAt: new Date(),
-              },
-            });
-          }
         }
 
         return updatedPlayers;

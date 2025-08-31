@@ -12,6 +12,10 @@ export interface MediaData extends BaseEntity {
   eventId?: string;
   venueId?: string;
   teamId?: string;
+  fixtureId?: string;
+  matchId?: string;
+  title?: string;
+  capturedDuring?: string;
   description?: string;
   tags?: string[];
 }

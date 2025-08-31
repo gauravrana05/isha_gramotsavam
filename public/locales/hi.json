@@ -34,5 +34,16 @@
     "error_no_otp": "कृपया OTP दर्ज करें",
     "error_no_code_sent": "कृपया पहले कोड भेजें",
     "error_recaptcha_expired": "reCAPTCHA समाप्त हो गया। कृपया पुनः प्रयास करें।",
-    "error_upload_failed": "फ़ाइलें अपलोड करने में विफल। कृपया अनुमतियाँ जाँचें।"
+    "error_upload_failed": "फ़ाइलें अपलोड करने में विफल। कृपया अनुमतियाँ जाँचें।",
+    "volunteer.media.title": "स्थान मीडिया",
+    "volunteer.media.description": "इस स्थान से तस्वीरें, वीडियो और पोस्ट",
+    "volunteer.media.upload_button": "मीडिया अपलोड करें",
+    "volunteer.media.all_media_tab": "सभी मीडिया",
+    "volunteer.media.posts_tab": "पोस्ट",
+    "volunteer.media.upload_modal_title": "मीडिया अपलोड करें",
+    "volunteer.media.login_required": "मीडिया प्रबंधन तक पहुंचने के लिए कृपया लॉग इन करें।",
+    "volunteer.post.title": "स्थान पोस्ट",
+    "volunteer.post.description": "इस स्थान से अपडेट और घोषणाएं",
+    "volunteer.post.create_button": "पोस्ट बनाएं",
+    "volunteer.post.login_required": "पोस्ट तक पहुंचने के लिए कृपया लॉग इन करें।"
   }

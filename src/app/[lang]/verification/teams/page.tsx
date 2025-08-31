@@ -49,8 +49,7 @@ export default function VerificationTeamsPage() {
   // Enhanced query with search and filter
   const { data: teamsData, isLoading: teamsLoading, error: teamsError, refetch } = api.teams.verification.getForVerification.useQuery(
     {
-      searchTerm,
-      statusFilter,
+      status: statusFilter as 'pending' | 'verified' | 'rejected',
       limit: 50,
       offset: 0
     },
@@ -65,7 +64,7 @@ export default function VerificationTeamsPage() {
     { enabled: !authLoading && !!user && ['admin', 'verification_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
   );
 
-  const teams = teamsData?.teams || [];
+  const teams = teamsData || [];
   const loading = authLoading || teamsLoading;
 
   // Clean up - removed debug logging
@@ -171,13 +170,13 @@ export default function VerificationTeamsPage() {
     {
       label: 'Verify',
       icon: UserCheck,
-      onClick: (team) => router.push(`/${lang}/verification/teams/${team.id}`),
+      onClick: (team: any) => router.push(`/${lang}/verification/teams/${team.id}`),
       variant: 'primary',
     },
     {
       label: 'Quick View',
       icon: Eye,
-      onClick: (team) => {
+      onClick: (team: any) => {
         setSelectedTeam(team);
         setShowTeamModal(true);
       },
@@ -186,9 +185,9 @@ export default function VerificationTeamsPage() {
     {
       label: 'Reject',
       icon: FileX,
-      onClick: (team) => handleQuickAction(team, 'rejected'),
+      onClick: (team: any) => handleQuickAction(team, 'rejected'),
       variant: 'danger',
-      show: (team) => team.status !== 'rejected' && team.status !== 'verified'
+      show: (team: any) => team.status !== 'rejected' && team.status !== 'verified'
     }
   ], [router, lang]);
 
@@ -200,18 +199,10 @@ export default function VerificationTeamsPage() {
   const handleQuickAction = async (team: TeamData, action: string) => {
     try {
       // This would be implemented with actual API calls
-      addNotification({
-        type: 'success',
-        title: 'Action Completed',
-        message: `Team ${team.name} ${action} successfully`
-      });
+      addNotification(`Team ${team.name} ${action} successfully`, 'success');
       refetch();
     } catch (error) {
-      addNotification({
-        type: 'error',
-        title: 'Action Failed',
-        message: 'Failed to update team status'
-      });
+      addNotification('Failed to update team status', 'error');
     }
   };
 

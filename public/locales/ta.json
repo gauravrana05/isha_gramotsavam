@@ -47,5 +47,16 @@
   "player_dashboard_title": "வீரர் டாஷ்போர்டு",
   "player_dashboard_description": "உங்கள் இஷா கிராமோத்சவ நிகழ்வுகள் மற்றும் குழுவைப் பார்க்கவும்.",
   "guest_dashboard_title": "விருந்தினர் டாஷ்போர்டு",
-  "guest_dashboard_description": "இஷா கிராமோத்சவ நிகழ்வுகளை விருந்தினராக ஆராயவும்."
+  "guest_dashboard_description": "இஷா கிராமோத்சவ நிகழ்வுகளை விருந்தினராக ஆராயவும்.",
+  "volunteer.media.title": "இடத்தின் மீடியா",
+  "volunteer.media.description": "இந்த இடத்திலிருந்து புகைப்படங்கள், வீடியோக்கள் மற்றும் இடுகைகள்",
+  "volunteer.media.upload_button": "மீடியாவை பதிவேற்றவும்",
+  "volunteer.media.all_media_tab": "அனைத்து மீடியாவும்",
+  "volunteer.media.posts_tab": "இடுகைகள்",
+  "volunteer.media.upload_modal_title": "மீடியாவை பதிவேற்றவும்",
+  "volunteer.media.login_required": "மீடியா நிர்வாகத்தை அணுக உள்நுழையவும்.",
+  "volunteer.post.title": "இடத்தின் இடுகைகள்",
+  "volunteer.post.description": "இந்த இடத்திலிருந்து புதுப்பிப்புகள் மற்றும் அறிவிப்புகள்",
+  "volunteer.post.create_button": "இடுகையை உருவாக்கவும்",
+  "volunteer.post.login_required": "இடுகைகளை அணுக உள்நுழையவும்."
 }

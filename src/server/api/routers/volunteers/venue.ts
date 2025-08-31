@@ -9,6 +9,7 @@ export const volunteersVenueRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       includePlayerCount: z.boolean().default(true),
+      status: z.enum(['all', 'pending', 'verified']).default('all'),
     }))
     .query(async ({ input, ctx }) => {
       // Check volunteer permissions
@@ -29,11 +30,6 @@ export const volunteersVenueRouter = createTRPCRouter({
       const teams = await db.team.findMany({
         where,
         include: {
-          sport: {
-            select: {
-              id: true,
-              name: true,
-            },
           },
           captainUser: {
             select: {
@@ -121,6 +117,7 @@ export const volunteersVenueRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       date: z.date().optional(),
+      status: z.enum(['all', 'pending', 'completed']).default('all'),
     }))
     .query(async ({ input, ctx }) => {
       // Check volunteer permissions
@@ -160,10 +157,6 @@ export const volunteersVenueRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
-              sport: {
-                select: {
-                  name: true,
-                },
               },
             },
           },
@@ -179,6 +172,7 @@ export const volunteersVenueRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       date: z.date().optional(),
+      status: z.enum(['all', 'pending', 'completed']).default('all'),
     }))
     .query(async ({ input, ctx }) => {
       // Check volunteer permissions
@@ -218,10 +212,6 @@ export const volunteersVenueRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
-              sport: {
-                select: {
-                  name: true,
-                },
               },
             },
           },
@@ -305,7 +295,7 @@ export const volunteersVenueRouter = createTRPCRouter({
 
       const fixtures = await db.fixture.findMany({
         where: {
-          venue: { id: venueId },
+          venueLevelMapping: { venueId: venueId },
         },
         select: { id: true },
       });
@@ -354,7 +344,7 @@ export const volunteersVenueRouter = createTRPCRouter({
 
       const fixtures = await db.fixture.findMany({
         where: {
-          venue: { id: venueId },
+          venueLevelMapping: { venueId: venueId },
         },
         select: { id: true },
       });

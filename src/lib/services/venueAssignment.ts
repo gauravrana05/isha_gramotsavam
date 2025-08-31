@@ -143,7 +143,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
         state: location.state,
       },
       include: {
-        venueLevelMapping: {
+        clusterVenueMapping: {
           include: {
             venue: {
               select: { 
@@ -158,7 +158,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
       }
     });
 
-    if (districtMapping?.venueLevelMapping?.venue?.isActive) {
+    if (districtMapping?.clusterVenueMapping?.venue?.isActive) {
       const currentAssignments = await db.teamVenueAssignment.count({
         where: {
           eventId,
@@ -166,11 +166,11 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
         }
       });
 
-      const maxCapacity = districtMapping.venueLevelMapping.venue.capacity || districtMapping.venueLevelMapping.maxTeams || 50;
+      const maxCapacity = districtMapping.clusterVenueMapping.venuedistrictMapping.clusterVenueMapping.maxTeams || 50;
       if (currentAssignments < maxCapacity) {
         return {
-          venueId: districtMapping.venueLevelMapping.venue.id,
-          venueName: districtMapping.venueLevelMapping.venue.name,
+          venueId: districtMapping.clusterVenueMapping.venue.id,
+          venueName: districtMapping.clusterVenueMapping.venue.name,
           mappingId: districtMapping.clusterVenueMappingId,
           maxTeams: maxCapacity
         };
@@ -178,7 +178,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
     }
 
     // Priority 2: Check if only one cluster venue in district
-    const clusterVenues = await db.venueLevelMapping.findMany({
+    const clusterVenues = await db.clusterVenueMapping.findMany({
       where: {
         eventId,
         level: 'cluster',
@@ -209,7 +209,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
         }
       });
 
-      const maxCapacity = venue.venue.capacity || venue.maxTeams || 50;
+      const maxCapacity = venue.venuevenue.maxTeams || 50;
       if (currentAssignments < maxCapacity) {
         return {
           venueId: venue.venue.id,
@@ -230,7 +230,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
         state: location.state,
       },
       include: {
-        venueLevelMapping: {
+        clusterVenueMapping: {
           include: {
             venue: {
               select: { 
@@ -245,7 +245,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
       }
     });
 
-    if (talukMapping?.venueLevelMapping?.venue?.isActive) {
+    if (talukMapping?.clusterVenueMapping?.venue?.isActive) {
       const currentAssignments = await db.teamVenueAssignment.count({
         where: {
           eventId,
@@ -253,11 +253,11 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
         }
       });
 
-      const maxCapacity = talukMapping.venueLevelMapping.venue.capacity || talukMapping.venueLevelMapping.maxTeams || 50;
+      const maxCapacity = talukMapping.clusterVenueMapping.venuetalukMapping.clusterVenueMapping.maxTeams || 50;
       if (currentAssignments < maxCapacity) {
         return {
-          venueId: talukMapping.venueLevelMapping.venue.id,
-          venueName: talukMapping.venueLevelMapping.venue.name,
+          venueId: talukMapping.clusterVenueMapping.venue.id,
+          venueName: talukMapping.clusterVenueMapping.venue.name,
           mappingId: talukMapping.clusterVenueMappingId,
           maxTeams: maxCapacity
         };
@@ -277,7 +277,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
 async function findVenuesByDistrict(location: TeamLocationData, eventId: string) {
   try {
     // Find all cluster venue mappings in the same district
-    const mappings = await db.venueLevelMapping.findMany({
+    const mappings = await db.clusterVenueMapping.findMany({
       where: {
         eventId,
         isActive: true,
@@ -311,7 +311,7 @@ async function findVenuesByDistrict(location: TeamLocationData, eventId: string)
           }
         });
 
-        const maxCapacity = mapping.venue.capacity || mapping.maxTeams || 50;
+        const maxCapacity = mapping.venuemapping.maxTeams || 50;
         if (currentAssignments < maxCapacity) {
           availableVenues.push({
             venueId: mapping.venue.id,
