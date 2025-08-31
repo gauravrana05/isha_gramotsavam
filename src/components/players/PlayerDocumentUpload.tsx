@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useRef, useState } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -153,15 +155,15 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
     <div className={`relative ${className}`}>
       <div className="relative mb-4">
         {currentUrl ? (
-          <img
+          <Image
             src={currentUrl}
             alt={label}
-            className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 cursor-pointer"
+            width={64} height={64} className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 cursor-pointer"
             onClick={handleImageClick}
           />
         ) : (
           <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
-            <Camera className="w-12 h-12 text-gray-400" />
+            <Camera width={64} height={64} className="w-12 h-12 text-gray-400" />
           </div>
         )}
         
@@ -184,7 +186,7 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
           </div>
         ) : (
           <div className="flex items-center space-x-1">
-            <Camera className="w-3 h-3" />
+            <Camera width={64} height={64} className="w-3 h-3" />
             <span>{currentUrl ? 'Change' : 'Upload'}</span>
           </div>
         )}
@@ -218,7 +220,7 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
       <div className="text-center">
         {currentUrl ? (
           <div className="w-full h-full mb-4">
-            <img
+            <Image
               src={currentUrl}
               alt={label}
               className="w-full h-full max-h-[350px] object-cover rounded-lg mx-auto border border-gray-200 cursor-pointer"
@@ -226,7 +228,7 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
             />
           </div>
         ) : (
-          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <Upload width={64} height={64} className="w-12 h-12 text-gray-400 mx-auto mb-4" />
         )}
         
         <h3 className="text-lg font-medium text-gray-900 mb-2">{label}</h3>
@@ -278,10 +280,10 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
       
       <div className="flex items-center space-x-2">
         {currentUrl && (
-          <img
+          <Image
             src={currentUrl}
             alt={label}
-            className="w-12 h-12 object-cover rounded border border-gray-200 cursor-pointer"
+            width={64} height={64} className="w-12 h-12 object-cover rounded border border-gray-200 cursor-pointer"
             onClick={handleImageClick}
           />
         )}
@@ -299,7 +301,7 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
               </div>
             ) : (
               <div className="flex items-center justify-center space-x-1">
-                <Upload className="w-3 h-3" />
+                <Upload width={64} height={64} className="w-3 h-3" />
                 <span>{currentUrl ? 'Replace' : 'Upload'}</span>
               </div>
             )}
@@ -353,7 +355,7 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
               onClick={clearError}
               className="text-red-400 hover:text-red-600"
             >
-              <X className="w-3 h-3" />
+              <X width={64} height={64} className="w-3 h-3" />
             </button>
           </div>
         </div>
@@ -367,9 +369,9 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
               onClick={() => setShowModal(false)}
               className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
             >
-              <X className="w-8 h-8" />
+              <X width={64} height={64} className="w-8 h-8" />
             </button>
-            <img
+            <Image
               src={currentUrl}
               alt={label}
               className="max-w-full max-h-full object-contain"

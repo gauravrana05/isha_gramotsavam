@@ -1,7 +1,9 @@
 'use client';
 
+import Image from 'next/image';
+
 import React from 'react';
-import { Download, Edit, Trash2, Image, Video, Eye } from 'lucide-react';
+import { Download, Edit, Trash2, Image as ImageIcon, Video, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/badge';
 import { MediaItem } from '@/lib/types/media';
@@ -97,21 +99,21 @@ export const MediaDisplay: React.FC<MediaDisplayProps> = ({
     >
       {item.type === 'image' ? (
         <div className={`${classes.aspect} bg-gray-100 overflow-hidden`}>
-          <img
+          <Image
             src={item.url}
-            alt={item.title}
+            alt={item.title || 'Media image'}
+            fill
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-            loading="lazy"
           />
         </div>
       ) : (
         <div className={`${classes.aspect} bg-gray-900 overflow-hidden relative`}>
           {item.thumbnailUrl ? (
-            <img
+            <Image
               src={item.thumbnailUrl}
-              alt={item.title}
+              alt={item.title || 'Video thumbnail'}
+              fill
               className="w-full h-full object-cover"
-              loading="lazy"
             />
           ) : (
             <div className="flex items-center justify-center w-full h-full bg-gray-800">
@@ -142,7 +144,7 @@ export const MediaDisplay: React.FC<MediaDisplayProps> = ({
           className={`${classes.badgeSize} border-0 shadow-sm`}
         >
           {item.type === 'image' ? (
-            <Image className={`${classes.iconSize} mr-1`} />
+            <Image className={`${classes.iconSize} mr-1`} alt="Image" width={16} height={16} />
           ) : (
             <Video className={`${classes.iconSize} mr-1`} />
           )}

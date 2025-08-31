@@ -236,10 +236,10 @@ const UserProfileSection: React.FC<{
         !isCollapsed && 'mr-3'
       )}>
         {profileImage ? (
-          <img
+          <Image
             src={profileImage}
             alt={displayName}
-            className="w-8 h-8 rounded-full object-cover"
+            width={64} height={64} className="w-8 h-8 rounded-full object-cover"
           />
         ) : (
           <div className="w-8 h-8 bg-[#3A7F3F] rounded-full flex items-center justify-center">
@@ -369,9 +369,9 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           )}
         >
           {isCollapsed ? (
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight width={64} height={64} className="w-4 h-4" />
           ) : (
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft width={64} height={64} className="w-4 h-4" />
           )}
         </button>
       </div>

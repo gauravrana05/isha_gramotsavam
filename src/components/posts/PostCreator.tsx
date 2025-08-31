@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/Label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/Card';
 import { MediaUpload } from '@/components/media/MediaUpload';
-import { api } from '@/lib/api';
+import { api } from '@/server/trpc/react';
 import { useNotification } from '@/context/NotificationContext';
 import { useParams } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';

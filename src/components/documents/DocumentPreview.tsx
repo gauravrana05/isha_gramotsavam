@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useState } from 'react';
 import { Eye, Download, Trash2, CheckCircle, XCircle, X } from 'lucide-react';
 import { useDocumentManager } from '@/hooks/documents';
@@ -80,7 +82,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   return (
     <div className={`relative group ${className}`}>
       <div className={`${sizeClasses[size]} relative`}>
-        <img
+        <Image
           src={url}
           alt={label}
           className="w-full h-full object-cover rounded-lg border border-gray-200 cursor-pointer"
@@ -104,7 +106,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                 className="p-2 bg-white rounded-full text-gray-700 hover:text-blue-600 transition-colors"
                 title="View"
               >
-                <Eye className="w-4 h-4" />
+                <Eye width={64} height={64} className="w-4 h-4" />
               </button>
               
               <button
@@ -112,7 +114,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                 className="p-2 bg-white rounded-full text-gray-700 hover:text-green-600 transition-colors"
                 title="Download"
               >
-                <Download className="w-4 h-4" />
+                <Download width={64} height={64} className="w-4 h-4" />
               </button>
               
               <button
@@ -120,7 +122,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                 className="p-2 bg-white rounded-full text-gray-700 hover:text-red-600 transition-colors"
                 title="Delete"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 width={64} height={64} className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -140,9 +142,9 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({
               onClick={() => setShowModal(false)}
               className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
             >
-              <X className="w-8 h-8" />
+              <X width={64} height={64} className="w-8 h-8" />
             </button>
-            <img
+            <Image
               src={url!}
               alt={label}
               className="max-w-full max-h-full object-contain"

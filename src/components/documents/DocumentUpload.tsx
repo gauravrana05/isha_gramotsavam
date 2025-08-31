@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useRef, useState } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
 import { useDocumentManager } from '@/hooks/documents';
@@ -77,15 +79,15 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     <div className={`relative ${className}`}>
       <div className="relative mb-4">
         {currentUrl ? (
-          <img
+          <Image
             src={currentUrl}
             alt={label}
-            className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 cursor-pointer"
+            width={64} height={64} className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 cursor-pointer"
             onClick={handleImageClick}
           />
         ) : (
           <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
-            <Camera className="w-12 h-12 text-gray-400" />
+            <Camera width={64} height={64} className="w-12 h-12 text-gray-400" />
           </div>
         )}
         
@@ -108,7 +110,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           </div>
         ) : (
           <div className="flex items-center space-x-2">
-            <Camera className="w-4 h-4" />
+            <Camera width={64} height={64} className="w-4 h-4" />
             <span>{currentUrl ? 'Change Photo' : 'Upload Photo'}</span>
           </div>
         )}
@@ -142,7 +144,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       <div className="text-center">
         {currentUrl ? (
           <div className="mb-4 w-full h-full">
-            <img
+            <Image
               src={currentUrl}
               alt={label}
               className="w-full h-full max-h-[400px] object-cover rounded-lg mx-auto border border-gray-200 cursor-pointer"
@@ -150,7 +152,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             />
           </div>
         ) : (
-          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <Upload width={64} height={64} className="w-12 h-12 text-gray-400 mx-auto mb-4" />
         )}
         
         <h3 className="text-lg font-medium text-gray-900 mb-2">{label}</h3>
@@ -202,10 +204,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       
       <div className="flex items-center space-x-4">
         {currentUrl && (
-          <img
+          <Image
             src={currentUrl}
             alt={label}
-            className="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-pointer"
+            width={64} height={64} className="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-pointer"
             onClick={handleImageClick}
           />
         )}
@@ -223,7 +225,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               </div>
             ) : (
               <div className="flex items-center justify-center space-x-2">
-                <Upload className="w-4 h-4" />
+                <Upload width={64} height={64} className="w-4 h-4" />
                 <span>{currentUrl ? 'Replace File' : 'Choose File'}</span>
               </div>
             )}
@@ -277,7 +279,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               onClick={() => clearError(type)}
               className="text-red-400 hover:text-red-600"
             >
-              <X className="w-4 h-4" />
+              <X width={64} height={64} className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -291,9 +293,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               onClick={() => setShowModal(false)}
               className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
             >
-              <X className="w-8 h-8" />
+              <X width={64} height={64} className="w-8 h-8" />
             </button>
-            <img
+            <Image
               src={currentUrl}
               alt={label}
               className="max-w-full max-h-full object-contain"

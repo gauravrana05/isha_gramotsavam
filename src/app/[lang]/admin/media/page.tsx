@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 // import { db } from '@/lib/firebase/config';
@@ -245,26 +246,21 @@ export default function AdminMediaPage() {
             onClick={() => handleMediaPreview(item.mediaId)}
           >
             {item.type === 'image' ? (
-              <img 
+              <Image 
                 src={item.url} 
-                alt={item.title}
+                alt={item.title || 'Media item'}
+                width={64}
+                height={64}
                 className="w-16 h-16 object-cover rounded-lg"
-                onError={(e) => {
-                  // Fallback to placeholder if image fails to load
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.nextElementSibling?.setAttribute('style', 'display: flex');
-                }}
               />
             ) : (
               item.thumbnailUrl ? (
-                <img 
+                <Image 
                   src={item.thumbnailUrl} 
-                  alt={item.title}
+                  alt={item.title || 'Video thumbnail'}
+                  width={64}
+                  height={64}
                   className="w-16 h-16 object-cover rounded-lg"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextElementSibling?.setAttribute('style', 'display: flex');
-                  }}
                 />
               ) : (
                 <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">

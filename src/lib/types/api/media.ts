@@ -9,13 +9,20 @@ export interface MediaData extends BaseEntity {
   url: string;
   thumbnailUrl?: string;
   uploadedBy: string;
+  uploadedByName?: string;
+  uploadedAt?: string;
   eventId?: string;
   venueId?: string;
   teamId?: string;
   fixtureId?: string;
   matchId?: string;
+  mediaId?: string;
   title?: string;
   capturedDuring?: string;
+  location?: string;
+  type?: 'image' | 'video';
+  duration?: number;
+  fileSize?: number;
   description?: string;
   tags?: string[];
 }
@@ -30,6 +37,35 @@ export interface MediaFilter {
   teamId?: string;
   uploadedBy?: string;
   tags?: string[];
+}
+
+export interface MediaMetadata {
+  title?: string;
+  description?: string;
+  capturedDuring?: string;
+  location?: string;
+  tags?: string[];
+}
+
+export type MediaType = 'image' | 'video';
+
+export interface MediaUploadProgress {
+  loaded: number;
+  total: number;
+  percentage: number;
+}
+
+export interface MediaUploadResult {
+  success: boolean;
+  mediaId?: string;
+  url?: string;
+  error?: string;
+}
+
+export interface MediaBatchUploadResult {
+  success: boolean;
+  results: MediaUploadResult[];
+  errors: string[];
 }
 
 export interface MediaMetadata {

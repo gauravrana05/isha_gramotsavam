@@ -37,7 +37,7 @@ export async function assignVenueToTeam(
     const existingAssignment = await db.teamVenueAssignment.findFirst({
       where: { teamId, eventId },
       include: {
-        clusterVenueMapping: {
+        venueLevelMapping: {
           include: {
             venue: { select: { id: true, name: true } }
           }
@@ -50,8 +50,8 @@ export async function assignVenueToTeam(
         success: true,
         message: 'Team already has venue assignment',
         assignment: {
-          venueId: existingAssignment.clusterVenueMapping?.venue?.id || '',
-          venueName: existingAssignment.clusterVenueMapping?.venue?.name || '',
+          venueId: existingAssignment.venueLevelMapping?.venue?.id || '',
+          venueName: existingAssignment.venueLevelMapping?.venue?.name || '',
           assignmentLevel: 'cluster',
           assignmentMethod: 'auto_assigned'
         }
@@ -143,7 +143,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
         state: location.state,
       },
       include: {
-        clusterVenueMapping: {
+        venueLevelMapping: {
           include: {
             venue: {
               select: { 
@@ -158,27 +158,27 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
       }
     });
 
-    if (districtMapping?.clusterVenueMapping?.venue?.isActive) {
+    if (districtMapping?.venueLevelMapping?.venue?.isActive) {
       const currentAssignments = await db.teamVenueAssignment.count({
         where: {
           eventId,
-          clusterVenueMappingId: districtMapping.clusterVenueMappingId
+          clusterVenueMappingId: districtMapping.venueLevelMappingId
         }
       });
 
-      const maxCapacity = districtMapping.clusterVenueMapping.venuedistrictMapping.clusterVenueMapping.maxTeams || 50;
+      const maxCapacity = districtMapping.venueLevelMapping.maxTeams || 50;
       if (currentAssignments < maxCapacity) {
         return {
-          venueId: districtMapping.clusterVenueMapping.venue.id,
-          venueName: districtMapping.clusterVenueMapping.venue.name,
-          mappingId: districtMapping.clusterVenueMappingId,
+          venueId: districtMapping.venueLevelMapping.venue.id,
+          venueName: districtMapping.venueLevelMapping.venue.name,
+          mappingId: districtMapping.venueLevelMappingId,
           maxTeams: maxCapacity
         };
       }
     }
 
     // Priority 2: Check if only one cluster venue in district
-    const clusterVenues = await db.clusterVenueMapping.findMany({
+    const clusterVenues = await db.venueLevelMapping.findMany({
       where: {
         eventId,
         level: 'cluster',
@@ -230,7 +230,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
         state: location.state,
       },
       include: {
-        clusterVenueMapping: {
+        venueLevelMapping: {
           include: {
             venue: {
               select: { 
@@ -245,20 +245,20 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
       }
     });
 
-    if (talukMapping?.clusterVenueMapping?.venue?.isActive) {
+    if (talukMapping?.venueLevelMapping?.venue?.isActive) {
       const currentAssignments = await db.teamVenueAssignment.count({
         where: {
           eventId,
-          clusterVenueMappingId: talukMapping.clusterVenueMappingId
+          clusterVenueMappingId: talukMapping.venueLevelMappingId
         }
       });
 
-      const maxCapacity = talukMapping.clusterVenueMapping.venuetalukMapping.clusterVenueMapping.maxTeams || 50;
+      const maxCapacity = talukMapping.venueLevelMapping.maxTeams || 50;
       if (currentAssignments < maxCapacity) {
         return {
-          venueId: talukMapping.clusterVenueMapping.venue.id,
-          venueName: talukMapping.clusterVenueMapping.venue.name,
-          mappingId: talukMapping.clusterVenueMappingId,
+          venueId: talukMapping.venueLevelMapping.venue.id,
+          venueName: talukMapping.venueLevelMapping.venue.name,
+          mappingId: talukMapping.venueLevelMappingId,
           maxTeams: maxCapacity
         };
       }
@@ -277,7 +277,7 @@ async function findVenueByLocationMapping(location: TeamLocationData, eventId: s
 async function findVenuesByDistrict(location: TeamLocationData, eventId: string) {
   try {
     // Find all cluster venue mappings in the same district
-    const mappings = await db.clusterVenueMapping.findMany({
+    const mappings = await db.venueLevelMapping.findMany({
       where: {
         eventId,
         isActive: true,
@@ -353,7 +353,7 @@ async function createVenueAssignment(
         assignedAt: new Date()
       },
       include: {
-        clusterVenueMapping: {
+        venueLevelMapping: {
           include: {
             venue: {
               select: { id: true, name: true }

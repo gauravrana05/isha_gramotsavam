@@ -49,7 +49,7 @@ export default function CaptainProfilePage() {
   if (loading) {
     return (
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
+        <Loader2 width={64} height={64} className="w-8 h-8 animate-spin text-[#F28C38]" />
       </div>
     );
   }
@@ -84,7 +84,7 @@ export default function CaptainProfilePage() {
         {!isProfileComplete && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex items-center space-x-2">
-              <UserCheck className="w-5 h-5 text-yellow-600" />
+              <UserCheck width={64} height={64} className="w-5 h-5 text-yellow-600" />
               <p className="text-yellow-800">Your profile is incomplete. Please complete it to participate fully.</p>
             </div>
           </div>
@@ -95,14 +95,14 @@ export default function CaptainProfilePage() {
           <div className="text-center">
             <div className="mx-auto mb-4">
               {userProfile?.documents?.profilePhoto?.url ? (
-                <img
+                <Image
                   src={userProfile.documents.profilePhoto.url}
                   alt="Profile"
-                  className="w-24 h-24 rounded-full object-cover mx-auto border-4 border-[#F28C38]"
+                  width={64} height={64} className="w-24 h-24 rounded-full object-cover mx-auto border-4 border-[#F28C38]"
                 />
               ) : (
                 <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center mx-auto border-4 border-gray-300">
-                  <User className="w-12 h-12 text-gray-400" />
+                  <User width={64} height={64} className="w-12 h-12 text-gray-400" />
                 </div>
               )}
             </div>
@@ -116,7 +116,7 @@ export default function CaptainProfilePage() {
         {/* Personal Details */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="text-xl font-semibold text-[#4A2F1D] mb-4 flex items-center">
-            <User className="w-5 h-5 mr-2" />
+            <User width={64} height={64} className="w-5 h-5 mr-2" />
             Personal Details
           </h3>
           <hr className="mb-6" />
@@ -132,21 +132,21 @@ export default function CaptainProfilePage() {
             </div>
             <div>
               <div className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Phone className="w-4 h-4 mr-1" />
+                <Phone width={64} height={64} className="w-4 h-4 mr-1" />
                 Phone Number
               </div>
               <div className="text-gray-900">+91 {phoneNumber || 'Not Available'}</div>
             </div>
             <div>
               <div className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Phone className="w-4 h-4 mr-1" />
+                <Phone width={64} height={64} className="w-4 h-4 mr-1" />
                 WhatsApp Number
               </div>
               <div className="text-gray-900">+91 {whatsappNumber || 'Not Available'}</div>
             </div>
             <div>
               <div className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Calendar className="w-4 h-4 mr-1" />
+                <Calendar width={64} height={64} className="w-4 h-4 mr-1" />
                 Date of Birth
               </div>
               <div className="text-gray-900">{userProfile.dob || 'Not Available'}</div>
@@ -161,7 +161,7 @@ export default function CaptainProfilePage() {
             </div>
             <div>
               <div className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Globe className="w-4 h-4 mr-1" />
+                <Globe width={64} height={64} className="w-4 h-4 mr-1" />
                 Preferred Language
               </div>
               <div className="text-gray-900">
@@ -178,7 +178,7 @@ export default function CaptainProfilePage() {
         {/* Address Details */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="text-xl font-semibold text-[#4A2F1D] mb-4 flex items-center">
-            <MapPin className="w-5 h-5 mr-2" />
+            <MapPin width={64} height={64} className="w-5 h-5 mr-2" />
             Address Details
           </h3>
           <hr className="mb-6" />
@@ -208,7 +208,7 @@ export default function CaptainProfilePage() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <MapPin width={64} height={64} className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">No address information available</p>
             </div>
           )}
@@ -217,7 +217,7 @@ export default function CaptainProfilePage() {
         {/* Identity Verification */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="text-xl font-semibold text-[#4A2F1D] mb-4 flex items-center">
-            <CreditCard className="w-5 h-5 mr-2" />
+            <CreditCard width={64} height={64} className="w-5 h-5 mr-2" />
             Identity Verification
           </h3>
           <hr className="mb-6" />
@@ -227,19 +227,19 @@ export default function CaptainProfilePage() {
               <h4 className="font-medium text-gray-900 mb-2">Aadhaar Card Front</h4>
               {userProfile?.documents?.aadhaarFront?.url ? (
                 <div className="space-y-2">
-                  <img
+                  <Image
                     src={userProfile.documents.aadhaarFront.url}
                     alt="Aadhaar Front"
                     className="w-full h-32 object-cover rounded border"
                   />
                   <div className="flex items-center text-sm text-green-600">
-                    <UserCheck className="w-4 h-4 mr-1" />
+                    <UserCheck width={64} height={64} className="w-4 h-4 mr-1" />
                     Document uploaded
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <CreditCard className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <CreditCard width={64} height={64} className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-500 text-sm">No document uploaded</p>
                 </div>
               )}
@@ -249,19 +249,19 @@ export default function CaptainProfilePage() {
               <h4 className="font-medium text-gray-900 mb-2">Aadhaar Card Back</h4>
               {userProfile?.documents?.aadhaarBack?.url ? (
                 <div className="space-y-2">
-                  <img
+                  <Image
                     src={userProfile.documents.aadhaarBack.url}
                     alt="Aadhaar Back"
                     className="w-full h-32 object-cover rounded border"
                   />
                   <div className="flex items-center text-sm text-green-600">
-                    <UserCheck className="w-4 h-4 mr-1" />
+                    <UserCheck width={64} height={64} className="w-4 h-4 mr-1" />
                     Document uploaded
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <CreditCard className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <CreditCard width={64} height={64} className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-500 text-sm">No document uploaded</p>
                 </div>
               )}

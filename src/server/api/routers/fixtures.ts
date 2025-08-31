@@ -1,10 +1,8 @@
-import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { createTRPCRouter, protectedProcedure } from '../../trpc'
+import { createTRPCRouter, protectedProcedure } from '../trpc'
 
-export const teamsFixturesRouter = createTRPCRouter({
-  // Get upcoming matches for the user's team
+export const fixturesRouter = createTRPCRouter({
   getUpcomingMatches: protectedProcedure
     .input(z.object({
       limit: z.number().min(1).max(50).default(5),
@@ -48,7 +46,9 @@ export const teamsFixturesRouter = createTRPCRouter({
                 select: {
                   id: true,
                   name: true,
-                  location: true,
+                  address: true,
+                  district: true,
+                  state: true,
                 },
               },
             },
@@ -61,8 +61,7 @@ export const teamsFixturesRouter = createTRPCRouter({
       return matches
     }),
 
-  // Get my team fixtures
-  getMyTeamFixtures: protectedProcedure.query(async ({ ctx }) => {
+  getTeamFixtures: protectedProcedure.query(async ({ ctx }) => {
     const team = await db.team.findFirst({
       where: { captainId: ctx.user.id },
       select: { id: true },
@@ -88,43 +87,29 @@ export const teamsFixturesRouter = createTRPCRouter({
             status: true,
           },
         },
-      },
-      orderBy: { createdAt: 'asc' },
-    })
-
-    return fixtures
-  }),
-
-  // Get my team matches
-  getMyTeamMatches: protectedProcedure.query(async ({ ctx }) => {
-    const team = await db.team.findFirst({
-      where: { captainId: ctx.user.id },
-      select: { id: true },
-    })
-
-    if (!team) {
-      return []
-    }
-
-    const matches = await db.match.findMany({
-      where: {
-        OR: [
-          { team1Id: team.id },
-          { team2Id: team.id },
-        ],
-      },
-      include: {
-        event: {
+        sport: {
           select: {
             id: true,
             name: true,
-            status: true,
+          },
+        },
+        venueLevelMapping: {
+          include: {
+            venue: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+                district: true,
+                state: true,
+              },
+            },
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    return matches
+    return fixtures
   }),
 });

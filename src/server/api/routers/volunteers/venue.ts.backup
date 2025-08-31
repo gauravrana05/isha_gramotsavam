@@ -30,6 +30,7 @@ export const volunteersVenueRouter = createTRPCRouter({
       const teams = await db.team.findMany({
         where,
         include: {
+          },
           captainUser: {
             select: {
               id: true,
@@ -170,7 +171,8 @@ export const volunteersVenueRouter = createTRPCRouter({
   getVenueMatches: protectedProcedure
     .input(z.object({
       venueId: z.string(),
-      fixtureId: z.string().optional(),
+      date: z.date().optional(),
+      status: z.enum(['all', 'pending', 'completed']).default('all'),
     }))
     .query(async ({ input, ctx }) => {
       // Check volunteer permissions
@@ -181,60 +183,47 @@ export const volunteersVenueRouter = createTRPCRouter({
         });
       }
 
-      const { venueId, fixtureId } = input;
+      const { venueId, date, status } = input;
 
       const where: any = {
-        venueLevelMapping: { venueId },
-        team1: { isNot: null },
-        team2: { isNot: null },
+        event: { venueId },
       };
 
-      if (fixtureId) {
-        where.fixtureId = fixtureId;
+      if (status !== 'all') {
+        where.status = status;
+      }
+
+      if (date) {
+        const startOfDay = new Date(date);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(date);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        where.scheduledAt = {
+          gte: startOfDay,
+          lte: endOfDay,
+        };
       }
 
       const matches = await db.match.findMany({
         where,
         include: {
-          team1: {
+          event: {
             select: {
               id: true,
               name: true,
             },
           },
-          team2: {
+          winnerTeam: {
             select: {
               id: true,
-              name: true,
-            },
-          },
-          fixture: {
-            select: {
-              id: true,
-              name: true,
             },
           },
         },
-        orderBy: [
-          { matchNumber: 'asc' },
-          { createdAt: 'asc' },
-        ],
+        orderBy: { createdAt: 'asc' },
       });
 
-      return matches.map(match => ({
-        id: match.id,
-        roundName: match.roundName,
-        status: match.status,
-        team1Name: match.team1?.name || 'TBD',
-        team2Name: match.team2?.name || 'TBD',
-        team1Score: match.team1Score,
-        team2Score: match.team2Score,
-        scheduledTime: null, // Add if you have scheduled time field
-        actualStartTime: null, // Add if you have actual start time field
-        completedTime: match.status === 'completed' ? match.updatedAt.toISOString() : null,
-        fixtureId: match.fixtureId,
-        fixtureName: match.fixture.name,
-      }));
+      return matches;
     }),
 
   // Get fixture details
@@ -279,10 +268,7 @@ export const volunteersVenueRouter = createTRPCRouter({
         });
       }
 
-      return {
-        ...fixture,
-        assignedTeams: fixture.fixtureTeams,
-      };
+      return fixture;
     }),
 
   getVenueMediaAndPosts: protectedProcedure

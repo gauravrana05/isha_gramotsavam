@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, Camera, Video, AlertCircle, CheckCircle, Newspaper } from 'lucide-react';
 import { MediaUpload } from '@/components/media/MediaUpload';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/lib/api';
+import { api } from '@/server/trpc/react';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import MediaGrid from '@/components/media/MediaGrid';
 import PostFeed from '@/components/posts/PostFeed';

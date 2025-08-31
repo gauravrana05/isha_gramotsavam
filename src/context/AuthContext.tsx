@@ -1,12 +1,12 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { users } from "@prisma/client";
+import { User } from "@prisma/client";
 import { api } from "@/server/trpc/react";
 
 interface AuthContextType {
-  user: users | null;
-  userProfile: users | null; // Keep backward compatibility 
+  user: User | null;
+  userProfile: User | null; // Keep backward compatibility 
   profileImage: string | null;
   loading: boolean;
   login: () => Promise<void>;

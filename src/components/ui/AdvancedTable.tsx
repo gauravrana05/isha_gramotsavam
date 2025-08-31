@@ -99,9 +99,6 @@ export interface AdvancedTableConfig<T = any> {
   emptyMessage?: string;
 }
 
-// Import centralized TableParams
-import { TableParams } from '@/lib/types/components/tables';
-
 // Table state interface
 interface TableState {
   search: string;
@@ -229,7 +226,6 @@ export const AdvancedTable = <T,>({
   // Selection props
   selectable = false,
   selectedRows,
-  onSelectionChange,
   
   // Row interaction
   onRowClick,

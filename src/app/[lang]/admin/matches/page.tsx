@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { AdvancedTable, type AdvancedTableConfig } from '@/components/ui/AdvancedTable';
+import { api } from '@/server/trpc/react';
+import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import type { Column } from '@/components/ui/Table';
 import type { FilterField } from '@/components/ui/FilterSidebar';
 import Link from 'next/link';
@@ -42,114 +43,49 @@ interface Match {
   };
   result?: {
     winnerName?: string;
-    resultEnteredAt?: any;
-  };
-  createdAt?: string | null;
-  updatedAt?: string | null;
-  resultEnteredAt?: string | null;
-  [key: string]: any;
+    resultEnteredAt?: string | null;
+  } | null;
+  createdAt?: string;
+  updatedAt?: string;
+  resultEnteredAt?: string;
 }
 
 export default function AdminMatchesPage() {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [venues, setVenues] = useState<{id: string, name: string}[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  
   const router = useRouter();
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
-    }
+  // tRPC queries
+  const { data: matchesData, isLoading: matchesLoading, error: matchesError } = api.admin.matches.getMatches.useQuery(
+    { limit: 100 },
+    { enabled: !authLoading && !!user && userProfile?.role === 'admin' }
+  );
 
-    if (userProfile?.role !== 'admin') {
-      router.push(`/${lang}/player/dashboard`);
-      return;
-    }
+  const { data: stats, isLoading: statsLoading } = api.admin.matches.getMatchStats.useQuery(
+    undefined,
+    { enabled: !authLoading && !!user && userProfile?.role === 'admin' }
+  );
 
-    loadMatches();
-    loadVenues();
-  }, [user, userProfile, authLoading, lang, router]);
+  const { data: venues } = api.admin.matches.getVenues.useQuery(
+    undefined,
+    { enabled: !authLoading && !!user && userProfile?.role === 'admin' }
+  );
 
-  const loadMatches = async () => {
-    try {
-      setLoading(true);
-      const matchesQuery = query(
-        collection(db, 'matches'),
-        orderBy('createdAt', 'desc'),
-        limit(100)
-      );
+  // Redirect if not authenticated or not admin
+  if (!authLoading && (!user || userProfile?.role !== 'admin')) {
+    router.push(`/${lang}/login`);
+    return null;
+  }
 
-      const matchesSnapshot = await getDocs(matchesQuery);
-      
-      const allMatches: Match[] = matchesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
-        updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || null,
-        resultEnteredAt: doc.data().result?.resultEnteredAt?.toDate?.()?.toISOString() || null
-      }));
+  const matches = matchesData?.matches || [];
+  const loading = authLoading || matchesLoading || statsLoading;
 
-      // Filter out matches with TBD teams (admin only sees matches with actual teams)
-      const matchesData: Match[] = allMatches.filter(match => {
-        const team1Name = match.team1?.teamName?.toLowerCase() || '';
-        const team2Name = match.team2?.teamName?.toLowerCase() || '';
-        return team1Name !== 'tbd' && team2Name !== 'tbd' && 
-               team1Name !== '' && team2Name !== '';
-      });
-        
-      // Sort by match number and creation date
-      matchesData.sort((a, b) => {
-        if (a.matchNumber !== b.matchNumber) {
-          return (a.matchNumber || 0) - (b.matchNumber || 0);
-        }
-        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      });
-      
-      setMatches(matchesData);
-      
-    } catch (err: any) {
-      // Error handling removed
-      setError('Failed to load matches. Please check your permissions.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadVenues = async () => {
-    try {
-      const venuesSnapshot = await getDocs(collection(db, 'venues'));
-      const venuesData = venuesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name
-      }));
-      setVenues(venuesData);
-    } catch (error) {
-      // Error handling removed
-    }
-  };
-
-  // Calculate statistics
-  const stats = {
-    totalMatches: matches.length,
+  // Calculate statistics from tRPC data
+  const matchStats = stats || {
+    totalMatches: 0,
     byStatus: { scheduled: 0, ready: 0, in_progress: 0, completed: 0 },
     liveMatches: 0
   };
-  
-  matches.forEach(match => {
-    if (match.status && match.status in stats.byStatus) {
-      stats.byStatus[match.status as keyof typeof stats.byStatus]++;
-    }
-    if (match.status === 'in_progress') {
-      stats.liveMatches++;
-    }
-  });
 
   const formatMatchTeams = (match: Match) => {
     const team1Name = match.team1?.teamName || 'TBD';
@@ -291,7 +227,7 @@ export default function AdminMatchesPage() {
       key: 'venueName',
       label: 'Venue',
       type: 'select',
-      options: venues.map(venue => ({ label: venue.name, value: venue.name }))
+      options: (venues || []).map(venue => ({ label: venue.name, value: venue.name }))
     },
     {
       key: 'status',
@@ -339,7 +275,7 @@ export default function AdminMatchesPage() {
     }
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
@@ -347,19 +283,13 @@ export default function AdminMatchesPage() {
     );
   }
 
-  if (error) {
+  if (matchesError) {
     return (
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button 
-            onClick={loadMatches}
-            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
-          >
-            Retry
-          </button>
+          <p className="text-gray-600 mb-4">{matchesError.message}</p>
         </div>
       </div>
     );
@@ -374,7 +304,7 @@ export default function AdminMatchesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Total Matches</p>
-              <p className="text-2xl font-bold text-[#4A2F1D]">{stats.totalMatches}</p>
+              <p className="text-2xl font-bold text-[#4A2F1D]">{matchStats.totalMatches}</p>
             </div>
             <Trophy className="w-8 h-8 text-[#F28C38]" />
           </div>
@@ -384,7 +314,7 @@ export default function AdminMatchesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Live Now</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.liveMatches}</p>
+              <p className="text-2xl font-bold text-blue-600">{matchStats.liveMatches}</p>
             </div>
             <Play className="w-8 h-8 text-blue-400" />
           </div>
@@ -394,7 +324,7 @@ export default function AdminMatchesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Completed</p>
-              <p className="text-2xl font-bold text-green-600">{stats.byStatus.completed}</p>
+              <p className="text-2xl font-bold text-green-600">{matchStats.byStatus.completed}</p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-400" />
           </div>
@@ -404,7 +334,7 @@ export default function AdminMatchesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Ready</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.byStatus.ready}</p>
+              <p className="text-2xl font-bold text-yellow-600">{matchStats.byStatus.ready}</p>
             </div>
             <Users className="w-8 h-8 text-yellow-400" />
           </div>
@@ -414,7 +344,7 @@ export default function AdminMatchesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 text-sm">Scheduled</p>
-              <p className="text-2xl font-bold text-gray-600">{stats.byStatus.scheduled}</p>
+              <p className="text-2xl font-bold text-gray-600">{matchStats.byStatus.scheduled}</p>
             </div>
             <Clock className="w-8 h-8 text-gray-400" />
           </div>
@@ -422,13 +352,13 @@ export default function AdminMatchesPage() {
       </div>
 
       {/* Live Matches Alert */}
-      {stats.liveMatches > 0 && (
+      {matchStats.liveMatches > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <div className="flex items-center">
             <Play className="w-5 h-5 text-blue-600 mr-2" />
             <div>
               <h3 className="text-sm font-medium text-blue-900">
-                {stats.liveMatches} match{stats.liveMatches > 1 ? 'es' : ''} currently in progress
+                {matchStats.liveMatches} match{matchStats.liveMatches > 1 ? 'es' : ''} currently in progress
               </h3>
               <p className="text-sm text-blue-700">Monitor live matches for real-time updates</p>
             </div>

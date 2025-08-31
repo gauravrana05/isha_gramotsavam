@@ -1,4 +1,6 @@
-"use client";
+'use client';
+
+import Image from 'next/image';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -153,9 +155,9 @@ export default function PlayerSidebar({
                 <span className="flex-1 text-left">{item.name}</span>
                 {hasChildren && (
                   isExpanded ? (
-                    <ChevronDown className="w-4 h-4" />
+                    <ChevronDown width={64} height={64} className="w-4 h-4" />
                   ) : (
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight width={64} height={64} className="w-4 h-4" />
                   )
                 )}
                 {item.badge && (
@@ -185,7 +187,7 @@ export default function PlayerSidebar({
           onClick={() => setIsMobileOpen(true)}
           className="fixed top-4 left-4 z-50 p-2 rounded-md bg-white shadow-lg border border-gray-200"
         >
-          <Menu className="w-6 h-6 text-gray-700" />
+          <Menu width={64} height={64} className="w-6 h-6 text-gray-700" />
         </button>
       </div>
 
@@ -213,7 +215,7 @@ export default function PlayerSidebar({
             {showContent && (
               <div className="flex items-center animate-fade-in">
                 <div className="w-7 h-7 bg-[#F28C38] rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Users className="w-4 h-4 text-white" />
+                  <Users width={64} height={64} className="w-4 h-4 text-white" />
                 </div>
                 <div className="ml-2">
                   <h2 className="text-sm font-semibold text-gray-900">
@@ -233,9 +235,9 @@ export default function PlayerSidebar({
                   title={isDesktopCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
                   {isDesktopCollapsed ? (
-                    <ChevronRightIcon className="w-5 h-5 text-gray-500" />
+                    <ChevronRightIcon width={64} height={64} className="w-5 h-5 text-gray-500" />
                   ) : (
-                    <ChevronLeft className="w-5 h-5 text-gray-500" />
+                    <ChevronLeft width={64} height={64} className="w-5 h-5 text-gray-500" />
                   )}
                 </button>
               )}
@@ -246,7 +248,7 @@ export default function PlayerSidebar({
                   onClick={() => setIsMobileOpen(false)}
                   className="lg:hidden p-1 rounded-md hover:bg-gray-100"
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X width={64} height={64} className="w-5 h-5 text-gray-500" />
                 </button>
               )}
             </div>
@@ -259,10 +261,10 @@ export default function PlayerSidebar({
             }`}>
               <div className="flex items-center">
                 {profileImage ? (
-                  <img 
+                  <Image 
                     src={profileImage} 
                     alt={`${userProfile.firstName} ${userProfile.lastName}`}
-                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                    width={64} height={64} className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
                   <div className="w-8 h-8 bg-[#3A7F3F] rounded-full flex items-center justify-center flex-shrink-0">
@@ -298,7 +300,7 @@ export default function PlayerSidebar({
                 onClick={() => setIsMobileOpen(false)}
                 title={isDesktopCollapsed ? 'Back to Admin Dashboard' : undefined}
               >
-                <Settings className="w-5 h-5 mr-3 flex-shrink-0" />
+                <Settings width={64} height={64} className="w-5 h-5 mr-3 flex-shrink-0" />
                 {showContent && <span className="animate-fade-in">Back to Admin Dashboard</span>}
               </Link>
             )}
@@ -309,7 +311,7 @@ export default function PlayerSidebar({
               onClick={() => setIsMobileOpen(false)}
               title={isDesktopCollapsed ? (isAdminAccessing ? 'Player Profile' : 'Profile') : undefined}
             >
-              <User className="w-5 h-5 mr-3 flex-shrink-0" />
+              <User width={64} height={64} className="w-5 h-5 mr-3 flex-shrink-0" />
               {showContent && (
                 <span className="animate-fade-in">
                   {isAdminAccessing ? 'Player Profile' : 'Profile'}
@@ -329,7 +331,7 @@ export default function PlayerSidebar({
               className="w-full flex items-center px-4 text-sm font-medium text-red-700 rounded-lg hover:bg-red-50 hover:text-red-900 transition-colors h-12"
               title={isDesktopCollapsed ? 'Sign Out' : undefined}
             >
-              <LogOut className="w-5 h-5 mr-3 flex-shrink-0" />
+              <LogOut width={64} height={64} className="w-5 h-5 mr-3 flex-shrink-0" />
               {showContent && <span className="animate-fade-in">Sign Out</span>}
             </button>
           </div>

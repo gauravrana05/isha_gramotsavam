@@ -49,7 +49,7 @@ export default function VerificationProfilePage() {
   if (isLoading) {
     return (
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
+        <Loader2 width={64} height={64} className="w-8 h-8 animate-spin text-[#F28C38]" />
       </div>
     );
   }
@@ -84,7 +84,7 @@ export default function VerificationProfilePage() {
         {!isProfileComplete && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex items-center space-x-2">
-              <UserCheck className="w-5 h-5 text-yellow-600" />
+              <UserCheck width={64} height={64} className="w-5 h-5 text-yellow-600" />
               <p className="text-yellow-800">Your profile is incomplete. Please complete it to perform verification tasks effectively.</p>
             </div>
           </div>
@@ -95,14 +95,14 @@ export default function VerificationProfilePage() {
           <div className="text-center">
             <div className="mx-auto mb-4">
               {userProfile?.documents?.profilePhoto?.url ? (
-                <img
+                <Image
                   src={userProfile.documents.profilePhoto.url}
                   alt="Profile"
-                  className="w-24 h-24 rounded-full object-cover mx-auto border-4 border-[#F28C38]"
+                  width={64} height={64} className="w-24 h-24 rounded-full object-cover mx-auto border-4 border-[#F28C38]"
                 />
               ) : (
                 <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center mx-auto border-4 border-gray-300">
-                  <User className="w-12 h-12 text-gray-400" />
+                  <User width={64} height={64} className="w-12 h-12 text-gray-400" />
                 </div>
               )}
             </div>
@@ -110,7 +110,7 @@ export default function VerificationProfilePage() {
               {userProfile.firstName} {userProfile.lastName}
             </h2>
             <div className="flex items-center justify-center mt-2">
-              <Shield className="w-4 h-4 mr-1 text-[#F28C38]" />
+              <Shield width={64} height={64} className="w-4 h-4 mr-1 text-[#F28C38]" />
               <p className="text-gray-600 capitalize">Verification Volunteer</p>
             </div>
           </div>
@@ -120,14 +120,14 @@ export default function VerificationProfilePage() {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-semibold text-[#4A2F1D] flex items-center">
-              <User className="w-5 h-5 mr-2" />
+              <User width={64} height={64} className="w-5 h-5 mr-2" />
               Personal Details
             </h3>
             <button
               onClick={() => router.push(`/${lang}/profile`)}
               className="flex items-center text-[#F28C38] hover:text-[#E67A26] text-sm font-medium transition-colors"
             >
-              <Edit3 className="w-4 h-4 mr-1" />
+              <Edit3 width={64} height={64} className="w-4 h-4 mr-1" />
               Edit Profile
             </button>
           </div>
@@ -144,21 +144,21 @@ export default function VerificationProfilePage() {
             </div>
             <div>
               <div className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Phone className="w-4 h-4 mr-1" />
+                <Phone width={64} height={64} className="w-4 h-4 mr-1" />
                 Phone Number
               </div>
               <div className="text-gray-900">+91 {phoneNumber || 'Not Available'}</div>
             </div>
             <div>
               <div className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Phone className="w-4 h-4 mr-1" />
+                <Phone width={64} height={64} className="w-4 h-4 mr-1" />
                 WhatsApp Number
               </div>
               <div className="text-gray-900">+91 {whatsappNumber || 'Not Available'}</div>
             </div>
             <div>
               <div className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Calendar className="w-4 h-4 mr-1" />
+                <Calendar width={64} height={64} className="w-4 h-4 mr-1" />
                 Date of Birth
               </div>
               <div className="text-gray-900">{userProfile.dob || 'Not Available'}</div>
@@ -173,7 +173,7 @@ export default function VerificationProfilePage() {
             </div>
             <div>
               <div className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Globe className="w-4 h-4 mr-1" />
+                <Globe width={64} height={64} className="w-4 h-4 mr-1" />
                 Preferred Language
               </div>
               <div className="text-gray-900">
@@ -183,7 +183,7 @@ export default function VerificationProfilePage() {
             <div>
               <div className="text-sm font-medium text-gray-700 mb-1">Role</div>
               <div className="text-gray-900 flex items-center">
-                <Shield className="w-4 h-4 mr-1 text-[#F28C38]" />
+                <Shield width={64} height={64} className="w-4 h-4 mr-1 text-[#F28C38]" />
                 Verification Volunteer
               </div>
             </div>
@@ -193,7 +193,7 @@ export default function VerificationProfilePage() {
         {/* Contact Information */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="text-xl font-semibold text-[#4A2F1D] mb-4 flex items-center">
-            <Mail className="w-5 h-5 mr-2" />
+            <Mail width={64} height={64} className="w-5 h-5 mr-2" />
             Contact Information
           </h3>
           <hr className="mb-6" />
@@ -213,7 +213,7 @@ export default function VerificationProfilePage() {
         {/* Verification Responsibilities */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="text-xl font-semibold text-[#4A2F1D] mb-4 flex items-center">
-            <Shield className="w-5 h-5 mr-2" />
+            <Shield width={64} height={64} className="w-5 h-5 mr-2" />
             Verification Responsibilities
           </h3>
           <hr className="mb-6" />
@@ -272,7 +272,7 @@ export default function VerificationProfilePage() {
 
             <div className="text-center">
               <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2 bg-blue-100">
-                <Shield className="w-8 h-8 text-blue-600" />
+                <Shield width={64} height={64} className="w-8 h-8 text-blue-600" />
               </div>
               <p className="text-sm font-medium">Verification Access</p>
               <p className="text-xs text-blue-600">Active</p>

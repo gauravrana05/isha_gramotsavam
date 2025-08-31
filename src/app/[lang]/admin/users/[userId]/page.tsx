@@ -1,4 +1,6 @@
-"use client";
+'use client';
+
+import Image from 'next/image';
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -216,18 +218,18 @@ export default function UserDetailPage() {
 
   const getDocumentStatus = (doc?: { url?: string; verified: boolean }) => {
     if (!doc?.url) {
-      return { status: 'missing', color: 'text-red-600', icon: <XCircle className="w-4 h-4" /> };
+      return { status: 'missing', color: 'text-red-600', icon: <XCircle width={64} height={64} className="w-4 h-4" /> };
     }
     if (doc.verified) {
-      return { status: 'verified', color: 'text-green-600', icon: <CheckCircle className="w-4 h-4" /> };
+      return { status: 'verified', color: 'text-green-600', icon: <CheckCircle width={64} height={64} className="w-4 h-4" /> };
     }
-    return { status: 'pending', color: 'text-yellow-600', icon: <Clock className="w-4 h-4" /> };
+    return { status: 'pending', color: 'text-yellow-600', icon: <Clock width={64} height={64} className="w-4 h-4" /> };
   };
 
   if (authLoading || loading) {
     return (
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
+        <Loader2 width={64} height={64} className="w-8 h-8 animate-spin text-[#F28C38]" />
       </div>
     );
   }
@@ -236,7 +238,7 @@ export default function UserDetailPage() {
     return (
       <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <AlertCircle width={64} height={64} className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
           <p className="text-gray-600 mb-4">{error || 'User not found'}</p>
           <button 
@@ -259,7 +261,7 @@ export default function UserDetailPage() {
           onClick={() => router.push(`/${lang}/admin/users`)}
           className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
+          <ArrowLeft width={64} height={64} className="w-4 h-4 mr-2" />
           Back to Users
         </button>
         
@@ -274,7 +276,7 @@ export default function UserDetailPage() {
           </div>
           
           <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(user.role)}`}>
-            <Shield className="w-4 h-4 mr-1" />
+            <Shield width={64} height={64} className="w-4 h-4 mr-1" />
             {user.role.replace('_', ' ').charAt(0).toUpperCase() + user.role.replace('_', ' ').slice(1)}
           </span>
         </div>
@@ -288,7 +290,7 @@ export default function UserDetailPage() {
           {/* Personal Information */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <User className="w-5 h-5 mr-2 text-[#F28C38]" />
+              <User width={64} height={64} className="w-5 h-5 mr-2 text-[#F28C38]" />
               Personal Information
             </h2>
             
@@ -334,7 +336,7 @@ export default function UserDetailPage() {
           {/* Address Information */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <MapPin className="w-5 h-5 mr-2 text-[#F28C38]" />
+              <MapPin width={64} height={64} className="w-5 h-5 mr-2 text-[#F28C38]" />
               Address Information
             </h2>
             
@@ -375,7 +377,7 @@ export default function UserDetailPage() {
           {teams.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Users className="w-5 h-5 mr-2 text-[#F28C38]" />
+                <Users width={64} height={64} className="w-5 h-5 mr-2 text-[#F28C38]" />
                 Teams ({teams.length})
               </h2>
               
@@ -449,7 +451,7 @@ export default function UserDetailPage() {
           {/* Documents */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <FileText className="w-5 h-5 mr-2 text-[#F28C38]" />
+              <FileText width={64} height={64} className="w-5 h-5 mr-2 text-[#F28C38]" />
               Documents
             </h2>
             
@@ -470,7 +472,7 @@ export default function UserDetailPage() {
                     onClick={() => setSelectedImage(user.documents?.profilePhoto?.url || '')}
                     className="text-[#F28C38] hover:text-[#E67A26] text-sm flex items-center"
                   >
-                    <Eye className="w-4 h-4 mr-1" />
+                    <Eye width={64} height={64} className="w-4 h-4 mr-1" />
                     View
                   </button>
                 )}
@@ -492,7 +494,7 @@ export default function UserDetailPage() {
                     onClick={() => setSelectedImage(user.documents?.aadhaarFront?.url || '')}
                     className="text-[#F28C38] hover:text-[#E67A26] text-sm flex items-center"
                   >
-                    <Eye className="w-4 h-4 mr-1" />
+                    <Eye width={64} height={64} className="w-4 h-4 mr-1" />
                     View
                   </button>
                 )}
@@ -514,7 +516,7 @@ export default function UserDetailPage() {
                     onClick={() => setSelectedImage(user.documents?.aadhaarBack?.url || '')}
                     className="text-[#F28C38] hover:text-[#E67A26] text-sm flex items-center"
                   >
-                    <Eye className="w-4 h-4 mr-1" />
+                    <Eye width={64} height={64} className="w-4 h-4 mr-1" />
                     View
                   </button>
                 )}
@@ -532,9 +534,9 @@ export default function UserDetailPage() {
               onClick={() => setSelectedImage(null)}
               className="absolute -top-10 right-0 text-white hover:text-gray-300"
             >
-              <XCircle className="w-8 h-8" />
+              <XCircle width={64} height={64} className="w-8 h-8" />
             </button>
-            <img
+            <Image
               src={selectedImage}
               alt="Document"
               className="max-w-full max-h-full object-contain rounded-lg"

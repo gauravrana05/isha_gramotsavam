@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api } from '@/server/trpc/react';
 import PostCard from './PostCard';
 
 interface PostFeedProps {

@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React from 'react';
 import { X, Download, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -43,13 +45,13 @@ export const MediaFullPreview: React.FC<MediaFullPreviewProps> = ({
           onClick={onClose}
           className="absolute top-4 right-4 text-white hover:text-gray-300 z-10 bg-black/20 rounded-full p-2 backdrop-blur-sm"
         >
-          <X className="w-6 h-6" />
+          <X width={64} height={64} className="w-6 h-6" />
         </button>
 
         {/* Media content */}
         <div className="flex items-center justify-center w-full h-full">
           {mediaItem.type === 'image' ? (
-            <img
+            <Image
               src={mediaItem.url}
               alt={mediaItem.title}
               className="max-w-full max-h-full object-contain"

@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useRef, useState } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -91,14 +93,14 @@ const TeamPhotoUpload: React.FC<TeamPhotoUploadProps> = ({
       <div className="text-center">
         {currentUrl ? (
           <div className="mb-4">
-            <img
+            <Image
               src={currentUrl}
               alt="Team Photo"
-              className="w-32 h-20 object-cover rounded-lg mx-auto border border-gray-200"
+              width={64} height={64} className="w-32 h-20 object-cover rounded-lg mx-auto border border-gray-200"
             />
           </div>
         ) : (
-          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <Upload width={64} height={64} className="w-12 h-12 text-gray-400 mx-auto mb-4" />
         )}
         
         <h3 className="text-lg font-medium text-gray-900 mb-2">Team Photo</h3>
@@ -150,10 +152,10 @@ const TeamPhotoUpload: React.FC<TeamPhotoUploadProps> = ({
       
       <div className="flex items-center space-x-4">
         {currentUrl && (
-          <img
+          <Image
             src={currentUrl}
             alt="Current Team Photo"
-            className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+            width={64} height={64} className="w-20 h-20 object-cover rounded-lg border border-gray-200"
           />
         )}
         
@@ -170,7 +172,7 @@ const TeamPhotoUpload: React.FC<TeamPhotoUploadProps> = ({
               </div>
             ) : (
               <div className="flex items-center justify-center space-x-2">
-                <Upload className="w-4 h-4" />
+                <Upload width={64} height={64} className="w-4 h-4" />
                 <span>{currentUrl ? 'Replace Photo' : 'Upload Photo'}</span>
               </div>
             )}
@@ -213,7 +215,7 @@ const TeamPhotoUpload: React.FC<TeamPhotoUploadProps> = ({
               onClick={clearError}
               className="text-red-400 hover:text-red-600"
             >
-              <X className="w-4 h-4" />
+              <X width={64} height={64} className="w-4 h-4" />
             </button>
           </div>
         </div>

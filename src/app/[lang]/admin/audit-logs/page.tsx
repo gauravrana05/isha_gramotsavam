@@ -76,7 +76,7 @@ export default function AuditLogsPage() {
 //   const loadAuditLogs = async () => {
 //     try {
 //       setLoading(true);
-//       import { api } from '@server/trpc/react';
+//       import { api } from '@/server/trpc/react';
 
 // // ... (rest of the file)
 

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Plus, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/lib/api';
+import { api } from '@/server/trpc/react';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import PostFeed from '@/components/posts/PostFeed';
 import PostCreator from '@/components/posts/PostCreator';

@@ -1,8 +1,10 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, X, Image, Video, AlertCircle, CheckCircle } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Video, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Progress } from '@/components/ui/Progress';
 import { Input } from '@/components/ui/Input';
@@ -314,7 +316,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                 </p>
                 <div className="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 text-xs md:text-sm text-gray-500">
                   <div className="flex items-center gap-2">
-                    <Image className="h-4 w-4 md:h-5 md:w-5 text-blue-500" />
+                    <ImageIcon className="h-4 w-4 md:h-5 md:w-5 text-blue-500" alt="Upload icon" width={20} height={20} />
                     <span>Images up to 10MB</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -369,7 +371,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                 {/* File Preview Header */}
                 <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100">
                   {fileData.file.type.startsWith('image/') && fileData.preview ? (
-                    <img
+                    <Image
                       src={fileData.preview}
                       alt="Preview"
                       className="w-full h-full object-cover"

@@ -130,7 +130,7 @@ export const MediaFilterSidebar: React.FC<MediaFilterSidebarProps> = ({
             {/* Media Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Image className="h-4 w-4 inline mr-1" />
+                <Image className="h-4 w-4 inline mr-1" alt="Media icon" width={16} height={16} />
                 Media Type
               </label>
               <Select value={filters.type} onValueChange={(value) => updateFilter('type', value)}>
@@ -141,7 +141,7 @@ export const MediaFilterSidebar: React.FC<MediaFilterSidebarProps> = ({
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="image">
                     <div className="flex items-center gap-2">
-                      <Image className="h-4 w-4" />
+                      <Image className="h-4 w-4" alt="Image icon" width={16} height={16} />
                       Images
                     </div>
                   </SelectItem>

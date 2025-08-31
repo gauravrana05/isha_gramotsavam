@@ -51,7 +51,7 @@ export default function AdminProfilePage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
+          <Loader2 width={64} height={64} className="w-8 h-8 animate-spin text-[#F28C38]" />
           <p className="text-gray-600 font-fira">Loading profile...</p>
         </div>
       </div>
@@ -68,7 +68,7 @@ export default function AdminProfilePage() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-2">
-            <Shield className="w-8 h-8 text-[#F28C38]" />
+            <Shield width={64} height={64} className="w-8 h-8 text-[#F28C38]" />
             <h1 className="text-3xl font-bold text-gray-900 font-fira">Admin Profile</h1>
           </div>
           <p className="text-gray-600 font-fira">View your profile information</p>
@@ -78,7 +78,7 @@ export default function AdminProfilePage() {
         {!isProfileComplete && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex items-center space-x-2">
-              <UserCheck className="w-5 h-5 text-yellow-600" />
+              <UserCheck width={64} height={64} className="w-5 h-5 text-yellow-600" />
               <p className="text-yellow-800 font-fira">Your profile is incomplete</p>
             </div>
           </div>
@@ -89,9 +89,11 @@ export default function AdminProfilePage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-4 font-fira">Profile Photo</h2>
           <div className="flex justify-center">
             {userProfile?.documents?.profilePhoto?.url ? (
-              <img
+              <Image
                 src={userProfile.documents.profilePhoto.url}
-                alt="Profile"
+                alt="Profile photo"
+                width={128}
+                height={128}
                 className="w-32 h-32 rounded-full object-cover border-4 border-gray-200"
               />
             ) : (
@@ -107,7 +109,7 @@ export default function AdminProfilePage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-4 font-fira">Personal Information</h2>
           <div className="grid md:grid-cols-2 gap-6">
             <div className="flex items-center space-x-3">
-              <User className="w-5 h-5 text-gray-400" />
+              <User width={64} height={64} className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600 font-fira">Full Name</p>
                 <p className="font-medium text-gray-900 font-fira">
@@ -117,7 +119,7 @@ export default function AdminProfilePage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <Phone className="w-5 h-5 text-gray-400" />
+              <Phone width={64} height={64} className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600 font-fira">Phone Number</p>
                 <p className="font-medium text-gray-900 font-fira">
@@ -127,7 +129,7 @@ export default function AdminProfilePage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <Phone className="w-5 h-5 text-gray-400" />
+              <Phone width={64} height={64} className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600 font-fira">WhatsApp Number</p>
                 <p className="font-medium text-gray-900 font-fira">
@@ -137,7 +139,7 @@ export default function AdminProfilePage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <Mail className="w-5 h-5 text-gray-400" />
+              <Mail width={64} height={64} className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600 font-fira">Email</p>
                 <p className="font-medium text-gray-900 font-fira">
@@ -147,7 +149,7 @@ export default function AdminProfilePage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <Calendar className="w-5 h-5 text-gray-400" />
+              <Calendar width={64} height={64} className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600 font-fira">Date of Birth</p>
                 <p className="font-medium text-gray-900 font-fira">
@@ -157,7 +159,7 @@ export default function AdminProfilePage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <User className="w-5 h-5 text-gray-400" />
+              <User width={64} height={64} className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600 font-fira">Gender</p>
                 <p className="font-medium text-gray-900 font-fira">
@@ -169,7 +171,7 @@ export default function AdminProfilePage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <Globe className="w-5 h-5 text-gray-400" />
+              <Globe width={64} height={64} className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600 font-fira">Preferred Language</p>
                 <p className="font-medium text-gray-900 font-fira">
@@ -179,7 +181,7 @@ export default function AdminProfilePage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <Shield className="w-5 h-5 text-gray-400" />
+              <Shield width={64} height={64} className="w-5 h-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-600 font-fira">Role</p>
                 <p className="font-medium text-gray-900 font-fira capitalize">
@@ -196,7 +198,7 @@ export default function AdminProfilePage() {
           {hasAddress ? (
             <div className="grid md:grid-cols-2 gap-6">
               <div className="flex items-center space-x-3">
-                <MapPin className="w-5 h-5 text-gray-400" />
+                <MapPin width={64} height={64} className="w-5 h-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-600 font-fira">Pincode</p>
                   <p className="font-medium text-gray-900 font-fira">
@@ -206,7 +208,7 @@ export default function AdminProfilePage() {
               </div>
 
               <div className="flex items-center space-x-3">
-                <MapPin className="w-5 h-5 text-gray-400" />
+                <MapPin width={64} height={64} className="w-5 h-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-600 font-fira">State</p>
                   <p className="font-medium text-gray-900 font-fira">
@@ -216,7 +218,7 @@ export default function AdminProfilePage() {
               </div>
 
               <div className="flex items-center space-x-3">
-                <MapPin className="w-5 h-5 text-gray-400" />
+                <MapPin width={64} height={64} className="w-5 h-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-600 font-fira">District</p>
                   <p className="font-medium text-gray-900 font-fira">
@@ -226,7 +228,7 @@ export default function AdminProfilePage() {
               </div>
 
               <div className="flex items-center space-x-3">
-                <MapPin className="w-5 h-5 text-gray-400" />
+                <MapPin width={64} height={64} className="w-5 h-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-600 font-fira">Taluk</p>
                   <p className="font-medium text-gray-900 font-fira">
@@ -236,7 +238,7 @@ export default function AdminProfilePage() {
               </div>
 
               <div className="flex items-center space-x-3 md:col-span-2">
-                <MapPin className="w-5 h-5 text-gray-400" />
+                <MapPin width={64} height={64} className="w-5 h-5 text-gray-400" />
                 <div>
                   <p className="text-sm text-gray-600 font-fira">Panchayat</p>
                   <p className="font-medium text-gray-900 font-fira">
@@ -247,7 +249,7 @@ export default function AdminProfilePage() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <MapPin width={64} height={64} className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 font-fira">No address information available</p>
             </div>
           )}
@@ -261,14 +263,14 @@ export default function AdminProfilePage() {
               <div className="text-center">
                 <h3 className="text-lg font-medium text-gray-900 mb-4 font-fira">Aadhaar Front</h3>
                 {userProfile?.documents?.aadhaarFront?.url ? (
-                  <img
+                  <Image
                     src={userProfile.documents.aadhaarFront.url}
                     alt="Aadhaar Front"
                     className="w-full h-48 object-cover rounded-lg border border-gray-200"
                   />
                 ) : (
                   <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                    <CreditCard className="w-12 h-12 text-gray-400" />
+                    <CreditCard width={64} height={64} className="w-12 h-12 text-gray-400" />
                   </div>
                 )}
               </div>
@@ -276,21 +278,21 @@ export default function AdminProfilePage() {
               <div className="text-center">
                 <h3 className="text-lg font-medium text-gray-900 mb-4 font-fira">Aadhaar Back</h3>
                 {userProfile?.documents?.aadhaarBack?.url ? (
-                  <img
+                  <Image
                     src={userProfile.documents.aadhaarBack.url}
                     alt="Aadhaar Back"
                     className="w-full h-48 object-cover rounded-lg border border-gray-200"
                   />
                 ) : (
                   <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                    <CreditCard className="w-12 h-12 text-gray-400" />
+                    <CreditCard width={64} height={64} className="w-12 h-12 text-gray-400" />
                   </div>
                 )}
               </div>
             </div>
           ) : (
             <div className="text-center py-8">
-              <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <CreditCard width={64} height={64} className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 font-fira">No identity documents uploaded</p>
             </div>
           )}

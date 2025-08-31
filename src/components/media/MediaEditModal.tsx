@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import React, { useState, useEffect } from 'react';
 import { Edit, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -123,16 +125,16 @@ export const MediaEditModal: React.FC<MediaEditModalProps> = ({
           <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
             <div className="flex-shrink-0">
               {mediaItem.type === 'image' ? (
-                <img
+                <Image
                   src={mediaItem.url}
                   alt={mediaItem.title}
-                  className="w-20 h-20 object-cover rounded-lg"
+                  width={64} height={64} className="w-20 h-20 object-cover rounded-lg"
                 />
               ) : (
                 <video
                   src={mediaItem.url}
                   poster={mediaItem.thumbnailUrl}
-                  className="w-20 h-20 object-cover rounded-lg"
+                  width={64} height={64} className="w-20 h-20 object-cover rounded-lg"
                 />
               )}
             </div>
