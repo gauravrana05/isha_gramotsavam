@@ -12,11 +12,15 @@ export async function GET(request: NextRequest) {
     const errorDescription = searchParams.get('error_description');
 
     // Debug logging
-    console.log('Callback URL:', request.url);
+    console.log('=== OIDC CALLBACK DEBUG ===');
+    console.log('Full callback URL:', request.url);
     console.log('Search params:', Object.fromEntries(searchParams.entries()));
+    console.log('Cookies:', Object.fromEntries(
+      Array.from(request.cookies.entries()).map(([key, cookie]) => [key, cookie.value])
+    ));
 
     if (error) {
-      console.error('OAuth error:', error, errorDescription);
+      console.error('OAuth error from Isha SSO:', error, errorDescription);
       return NextResponse.json({ 
         error: `OAuth error: ${error}`, 
         description: errorDescription 
@@ -24,11 +28,24 @@ export async function GET(request: NextRequest) {
     }
 
     if (!code) {
+      console.error('Authorization code missing from callback');
       return NextResponse.json({ error: 'Authorization code missing' }, { status: 400 });
     }
 
     // Exchange authorization code for tokens using PKCE
     const codeVerifier = request.cookies.get('code_verifier')?.value;
+    
+    console.log('Code verifier from cookie:', codeVerifier ? 'Present' : 'Missing');
+    
+    if (!codeVerifier) {
+      console.error('Code verifier missing from cookies');
+      return NextResponse.json({ error: 'Invalid authentication state' }, { status: 400 });
+    }
+
+    // Exchange authorization code for tokens using PKCE
+    const codeVerifier = request.cookies.get('code_verifier')?.value;
+    
+    console.log('Code verifier from cookie:', codeVerifier ? 'Present' : 'Missing');
     
     if (!codeVerifier) {
       console.error('Code verifier missing from cookies');
@@ -42,6 +59,12 @@ export async function GET(request: NextRequest) {
       redirect_uri: process.env.ISHA_OIDC_REDIRECT_URI!,
       code_verifier: codeVerifier, // PKCE parameter
     };
+
+    console.log('Token request params:', {
+      ...tokenParams,
+      code_verifier: codeVerifier ? '[PRESENT]' : '[MISSING]'
+    });
+    console.log('Token endpoint:', `${process.env.ISHA_OIDC_ISSUER}/oidc/token`);
 
     // For public clients without client secret, we don't add client_secret
     // This follows the "No client-authentication" approach from the OIDC docs
@@ -87,15 +110,26 @@ export async function GET(request: NextRequest) {
 
     const userInfo = await userResponse.json();
     
+    console.log('=== USER INFO FROM ISHA SSO ===');
+    console.log('Full userInfo object:', JSON.stringify(userInfo, null, 2));
+    console.log('Available fields:', Object.keys(userInfo));
+    console.log('Phone fields check:', {
+      phone_number: userInfo.phone_number,
+      phone: userInfo.phone,
+      phoneNumber: userInfo.phoneNumber,
+      mobile: userInfo.mobile,
+      sub: userInfo.sub
+    });
+    
     // Map OIDC user info to our User model
     const userData = {
       email: userInfo.email || null,
-      phone: userInfo.phone_number || null,
+      phone: userInfo.phone_number || userInfo.phone || userInfo.phoneNumber || userInfo.mobile || null,
       firstName: userInfo.given_name || userInfo.name?.split(' ')[0] || null,
       lastName: userInfo.family_name || userInfo.name?.split(' ').slice(1).join(' ') || null,
       dateOfBirth: userInfo.birthdate ? new Date(userInfo.birthdate) : null,
       gender: userInfo.gender || null,
-      whatsappNumber: userInfo.whatsapp_number || userInfo.phone_number || null,
+      whatsappNumber: userInfo.whatsapp_number || userInfo.phone_number || userInfo.phone || null,
       instagramHandle: userInfo.instagram_handle || null,
       panchayat: userInfo.address?.panchayat || null,
       taluk: userInfo.address?.taluk || null,
@@ -109,11 +143,40 @@ export async function GET(request: NextRequest) {
 
     // Create or update user in database
     let user: any;
-    const phone = userInfo.phone_number;
+    const phone = userData.phone;
+    
+    console.log('Extracted phone number:', phone);
     
     if (!phone) {
-      console.error('Phone number missing from OIDC response:', userInfo);
-      return NextResponse.json({ error: 'Phone number is required for authentication' }, { status: 400 });
+      console.log('Phone number missing, redirecting to phone collection');
+      
+      // Store user info temporarily for phone collection
+      const tempUserData = {
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        sub: userInfo.sub, // Isha SSO user ID
+        // Store other available fields
+        ...userInfo
+      };
+      
+      // Redirect to phone collection page with temp data
+      const redirectUrl = new URL('/en/auth/phone-required', request.url);
+      const response = NextResponse.redirect(redirectUrl);
+      
+      // Store temp user data in cookie for phone collection page
+      response.cookies.set('temp_user_data', JSON.stringify(tempUserData), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 10 * 60 * 1000, // 10 minutes
+      });
+      
+      // Clear PKCE cookies
+      response.cookies.delete('oidc_state');
+      response.cookies.delete('code_verifier');
+      
+      return response;
     }
 
     const existingUser = await prisma.user.findUnique({
