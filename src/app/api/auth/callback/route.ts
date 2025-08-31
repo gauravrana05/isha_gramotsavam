@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
       pincode: userInfo.address?.postal_code || userInfo.address?.pincode || null,
       profileComplete: false, // Will be updated based on completeness check
       role: 'public', // Default role
-      languagePreference: 'en', // Default language
+      // languagePreference: null (default) - let users choose their preference
     };
 
     // Create or update user in database
@@ -193,8 +193,33 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Create session by setting userId cookie
-    const redirectUrl = new URL('/en', request.url);
+    // Create session by setting userId cookie and redirect using centralized navigation
+    const supportedLanguages = ['en', 'ta', 'hi', 'ml', 'te', 'kn', 'or'];
+    const userLang = user.languagePreference && supportedLanguages.includes(user.languagePreference) 
+      ? user.languagePreference 
+      : 'en';
+    
+    // Use centralized navigation logic
+    const hasLanguagePreference = Boolean(user.languagePreference);
+    let redirectPath = `/${userLang}`;
+    
+    if (user.role === 'admin') {
+      redirectPath = `/${userLang}/admin/dashboard`;
+    } else if (['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user.role)) {
+      if (!hasLanguagePreference) {
+        redirectPath = `/${userLang}/volunteer?showLanguageModal=true`;
+      } else {
+        redirectPath = `/${userLang}/volunteer`; // Will be handled by useRedirect for venue assignment
+      }
+    } else if (user.role === 'captain') {
+      redirectPath = `/${userLang}/captain/dashboard`;
+    } else if (user.role === 'player') {
+      redirectPath = `/${userLang}/player/dashboard`;
+    } else {
+      redirectPath = `/${userLang}/public`;
+    }
+
+    const redirectUrl = new URL(redirectPath, request.url);
     redirectUrl.searchParams.set('auth', 'success');
 
     const response = NextResponse.redirect(redirectUrl);

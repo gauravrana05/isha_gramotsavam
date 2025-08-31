@@ -149,7 +149,7 @@ export const adminUsersRouter = createTRPCRouter({
             isProfileComplete: user.profileComplete,
             createdAt: user.createdAt?.toISOString() || null,
             venueAssignment: venueData ? `${venueData.venue.name} - ${venueData.level}` : null,
-            venueAssignmentId: venueAssignment?.id || null,
+            venueAssignmentId: venueData?.id || null,
           };
         }),
         pagination: {

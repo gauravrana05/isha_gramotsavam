@@ -5,9 +5,10 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/lib/utils/i18n';
 import { SUPPORTED_LANGUAGES, LanguageCode } from '@/lib/utils/i18n-server';
-import { Globe, ChevronDown, Check } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import { api } from '@/server/trpc/react';
 import { useNotification } from '@/context/NotificationContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 
 interface VolunteerLanguageSwitcherProps {
   isCollapsed?: boolean;
@@ -18,12 +19,11 @@ export default function VolunteerLanguageSwitcher({
   isCollapsed = false,
   showText = true 
 }: VolunteerLanguageSwitcherProps) {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   
   const router = useRouter();
   const { lang } = useParams();
-  const { user, userProfile } = useAuth();
+  const { user } = useAuth();
   const { t, language } = useTranslation();
   const { addNotification } = useNotification();
 
@@ -34,16 +34,10 @@ export default function VolunteerLanguageSwitcher({
   // Update user profile mutation
   const updateProfileMutation = api.profile.update.useMutation({
     onSuccess: () => {
-      addNotification({
-        type: 'success',
-        message: 'Language updated successfully',
-      });
+      addNotification('Language updated successfully', 'success');
     },
     onError: (error) => {
-      addNotification({
-        type: 'error', 
-        message: error.message || 'Failed to update language preference',
-      });
+      addNotification(error.message || 'Failed to update language preference', 'error');
     },
     onSettled: () => {
       setIsUpdating(false);
@@ -51,13 +45,9 @@ export default function VolunteerLanguageSwitcher({
   });
 
   const handleLanguageChange = async (newLanguage: LanguageCode) => {
-    if (newLanguage === currentLang) {
-      setIsDropdownOpen(false);
-      return;
-    }
+    if (newLanguage === currentLang) return;
 
     setIsUpdating(true);
-    setIsDropdownOpen(false);
 
     try {
       // Update user preference in database
@@ -85,105 +75,43 @@ export default function VolunteerLanguageSwitcher({
   if (isCollapsed) {
     return (
       <div className="relative">
-        <button
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="flex items-center justify-center w-9 h-9 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-          title="Change Language"
-          disabled={isUpdating}
-        >
-          <Globe className="w-4 h-4" />
-        </button>
-
-        {isDropdownOpen && (
-          <>
-            {/* Backdrop */}
-            <div 
-              className="fixed inset-0 z-10" 
-              onClick={() => setIsDropdownOpen(false)} 
-            />
-            
-            {/* Dropdown */}
-            <div className="absolute left-12 top-0 z-20 min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg">
-              <div className="py-2">
-                {SUPPORTED_LANGUAGES.map((language) => (
-                  <button
-                    key={language.code}
-                    onClick={() => handleLanguageChange(language.code as LanguageCode)}
-                    className={`w-full flex items-center justify-between px-4 py-2 text-sm hover:bg-gray-50 ${
-                      currentLang === language.code ? 'bg-[#F28C38] bg-opacity-10 text-[#F28C38]' : 'text-gray-700'
-                    }`}
-                    disabled={isUpdating}
-                  >
-                    <div className="text-left">
-                      <div className="font-medium">{language.nativeName}</div>
-                      <div className="text-xs opacity-75">{language.name}</div>
-                    </div>
-                    
-                    {currentLang === language.code && (
-                      <Check className="w-4 h-4" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+        <Select value={currentLang} onValueChange={handleLanguageChange} disabled={isUpdating}>
+          <SelectTrigger className="flex items-center justify-center w-9 h-9 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors border-0 bg-transparent p-0 [&>[data-radix-select-icon]]:hidden">
+            <Globe className="w-4 h-4" />
+          </SelectTrigger>
+          <SelectContent>
+            {SUPPORTED_LANGUAGES.map((language) => (
+              <SelectItem key={language.code} value={language.code}>
+                {language.nativeName} ({language.name})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     );
   }
 
   return (
     <div className="relative">
-      <button
-        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="w-full flex items-center justify-between text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9 px-2"
-        disabled={isUpdating}
-      >
-        <div className="flex items-center">
-          <Globe className="w-4 h-4 flex-shrink-0 mr-2" />
-          {showText && (
-            <span className="truncate">
-              {currentLanguage?.nativeName || currentLang}
-            </span>
-          )}
-        </div>
-        <ChevronDown className={`w-3 h-3 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isDropdownOpen && (
-        <>
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setIsDropdownOpen(false)} 
-          />
-          
-          {/* Dropdown */}
-          <div className="absolute left-0 top-full mt-1 z-20 w-full min-w-48 bg-white border border-gray-200 rounded-lg shadow-lg">
-            <div className="py-2">
-              {SUPPORTED_LANGUAGES.map((language) => (
-                <button
-                  key={language.code}
-                  onClick={() => handleLanguageChange(language.code as LanguageCode)}
-                  className={`w-full flex items-center justify-between px-4 py-2 text-sm hover:bg-gray-50 ${
-                    currentLang === language.code ? 'bg-[#F28C38] bg-opacity-10 text-[#F28C38]' : 'text-gray-700'
-                  }`}
-                  disabled={isUpdating}
-                >
-                  <div className="text-left">
-                    <div className="font-medium">{language.nativeName}</div>
-                    <div className="text-xs opacity-75">{language.name}</div>
-                  </div>
-                  
-                  {currentLang === language.code && (
-                    <Check className="w-4 h-4" />
-                  )}
-                </button>
-              ))}
-            </div>
+      <Select value={currentLang} onValueChange={handleLanguageChange} disabled={isUpdating}>
+        <SelectTrigger className="w-full text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9 px-2 border-0 bg-transparent">
+          <div className="flex items-center">
+            <Globe className="w-4 h-4 flex-shrink-0 mr-2" />
+            {showText && (
+              <span className="truncate">
+                {currentLanguage?.nativeName || currentLang}
+              </span>
+            )}
           </div>
-        </>
-      )}
+        </SelectTrigger>
+        <SelectContent>
+          {SUPPORTED_LANGUAGES.map((language) => (
+            <SelectItem key={language.code} value={language.code}>
+              {language.nativeName} ({language.name})
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

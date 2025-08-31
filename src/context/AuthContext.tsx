@@ -14,6 +14,8 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   hasRole: (roles: string | string[]) => boolean;
+  updateLanguagePreference: (lang: string) => Promise<void>;
+  hasLanguagePreference: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,7 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const profileImageQuery = api.profile.checkCompletion.useQuery(
     { userId: user?.id || '' },
     { 
-      enabled: !!user?.id,
+      enabled: !!user?.id && user.id.length > 0,
       staleTime: 10 * 60 * 1000,
       gcTime: 15 * 60 * 1000,
       refetchOnWindowFocus: false,
@@ -204,6 +206,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
   }, []);
 
+  const updateLanguagePreference = useCallback(async (lang: string) => {
+    // This will be handled by the component using the tRPC mutation
+    // We just need to refresh the user data after update
+    await refreshUser();
+  }, [refreshUser]);
+
+  const hasLanguagePreference = Boolean(user?.languagePreference && user.languagePreference !== 'en');
+
   const value: AuthContextType = {
     user,
     userProfile: user, // Backward compatibility - same as user
@@ -214,6 +224,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser,
     isAuthenticated,
     hasRole,
+    updateLanguagePreference,
+    hasLanguagePreference,
   };
 
   return (
@@ -241,8 +253,11 @@ export const useAuth = () => {
         await fetch('/api/auth/logout', { method: 'POST' });
         window.location.href = '/';
       },
+      refreshUser: async () => {},
       isAuthenticated: false,
       hasRole: () => false,
+      updateLanguagePreference: async () => {},
+      hasLanguagePreference: false,
     };
   }
   return context;

@@ -30,6 +30,7 @@ interface MediaUploadProps {
   postMode?: boolean; // NEW: Enable post creation mode
   showContextSelector?: boolean; // NEW: Show fixture/match selector
   onPostCreated?: (post: any) => void; // NEW: Post creation callback, TODO: use Post type
+  simple?: boolean; // NEW: Disable metadata fields for simple uploads
 }
 
 interface FileWithMetadata {
@@ -52,6 +53,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
   postMode = false,
   showContextSelector = false,
   onPostCreated,
+  simple = false,
 }) => {
   // Support both new context props and legacy props
   const effectiveContextType = contextType || (fixtureId ? 'fixture' : matchId ? 'match' : null);
@@ -353,7 +355,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
               </h3>
               <p className="text-sm md:text-base text-gray-600">Review and add details to your media</p>
             </div>
-            {!uploading && !uploadState.uploading && Object.keys(uploadResults).length === 0 && (
+            {!uploading && !uploadState.uploading && Object.keys(uploadResults).length === 0 && !simple && (
               <Button 
                 onClick={handleUpload} 
                 className="w-full md:w-auto px-4 md:px-8 py-3 md:py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-sm md:text-base"
@@ -372,7 +374,7 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                 <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100">
                   {fileData.file.type.startsWith('image/') && fileData.preview ? (
                     <Image
-                      src={fileData.preview}
+                      src={fileData.preview || '/placeholder-image.jpg'}
                       alt="Preview"
                       width={400}
                       height={192}
@@ -388,11 +390,11 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                   <div className="absolute top-3 left-3">
                     <Badge 
                       variant={fileData.file.type.startsWith('image/') ? 'default' : 'secondary'}
-                      className="text-xs"
+                      className="text-xs text-white"
                     >
                       {fileData.file.type.startsWith('image/') ? (
                         <>
-                          <Image className="h-3 w-3 mr-1" />
+                          <Image className="h-3 w-3 mr-1 text-white" />
                           IMAGE
                         </>
                       ) : (
@@ -466,8 +468,8 @@ export const MediaUpload: React.FC<MediaUploadProps> = ({
                     </p>
                   </div>
 
-                  {/* Metadata Form - Only show if not uploading and no results */}
-                  {!uploading && !uploadState.uploading && !uploadResults[fileData.id] && (
+                  {/* Metadata Form - Only show if not uploading and no results and not simple mode */}
+                  {!uploading && !uploadState.uploading && !uploadResults[fileData.id] && !simple && (
                     <div className="space-y-3">
                       <div>
                         <Label htmlFor={`title-${fileData.id}`} className="text-sm font-medium">Title</Label>

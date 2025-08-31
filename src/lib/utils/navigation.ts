@@ -9,7 +9,7 @@ import { api } from "@/server/trpc/react";
 
 export const ALL_ROLES = ["admin", "captain", "player", "volunteer", "general_volunteer", "technical_volunteer", "verification", "public"];
 
-export const getDashboardRoute = (role: string | null | undefined, lang: string): string => {
+export const getDashboardRoute = (role: string | null | undefined, lang: string, hasLanguagePreference?: boolean): string => {
   const userRole = role || "public";
   switch (userRole) {
     case "admin":
@@ -21,7 +21,11 @@ export const getDashboardRoute = (role: string | null | undefined, lang: string)
     case "volunteer":
     case "general_volunteer":
     case "technical_volunteer":
-      return `/${lang}/volunteer`;
+      // If no language preference, show language modal
+      if (!hasLanguagePreference) {
+        return `/${lang}/volunteer?showLanguageModal=true`;
+      }
+      return `/${lang}/volunteer`; // This will be handled by useRedirect for venue assignment
     case "verification":
     case "verification_volunteer":
       return `/${lang}/verification/dashboard`;
@@ -51,21 +55,13 @@ export const handleRedirect = async (user: User, lang: string, router: AppRouter
   try {
     const role = user.role;
     const isProfileComplete = user.profileComplete;
+    const hasLanguagePreference = Boolean(user.languagePreference);
     
     // Special roles that can skip profile completion
     const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
 
     if (isProfileComplete || specialRole) {
-      // For volunteers, try to get venue assignment first
-      if (role === 'general_volunteer' || role === 'technical_volunteer') {
-        const venueId = await getVolunteerVenueRedirect(user.id);
-        if (venueId) {
-          router.push(`/${lang}/volunteer/venues/${venueId}/dashboard`);
-          return;
-        }
-      }
-      
-      const dashboardRoute = getDashboardRoute(role, lang);
+      const dashboardRoute = getDashboardRoute(role, lang, hasLanguagePreference);
       router.push(dashboardRoute);
     } else {
       router.push(`/${lang}/profile/complete`);
@@ -89,17 +85,9 @@ export const useRedirect = (allowedRoles?: string[]) => {
   const params = useParams();
   const lang = params?.lang;
 
-  // Fetch volunteer assignments. This query is only enabled for volunteers.
-  const { data: assignmentsData, isLoading: assignmentsLoading } = api.volunteers.assignments.getMyAssignments.useQuery(
-    undefined,
-    {
-      enabled: !loading && !!user && (user.role === 'general_volunteer' || user.role === 'technical_volunteer'),
-    }
-  );
-
   useEffect(() => {
     // Exit if still loading or if lang is not yet available
-    if (loading || assignmentsLoading || !lang) {
+    if (loading || !lang) {
       return;
     }
 
@@ -112,6 +100,7 @@ export const useRedirect = (allowedRoles?: string[]) => {
     const checkAndRedirect = async () => {
       const role = user.role;
       const isProfileComplete = user.profileComplete;
+      const hasLanguagePreference = Boolean(user.languagePreference);
 
       const specialRole = role === 'admin' || role === 'public' || (role && role.includes('volunteer'));
       
@@ -121,30 +110,15 @@ export const useRedirect = (allowedRoles?: string[]) => {
         return;
       }
       
-      // Special handling for volunteers: redirect to an assigned venue dashboard
-      if ((role === 'general_volunteer' || role === 'technical_volunteer') && assignmentsData?.assignments) {
-        if (assignmentsData.assignments.length > 0) {
-          // Extract venue ID from first assignment and redirect to venue dashboard
-          const firstAssignment = assignmentsData.assignments[0];
-          const venueId = firstAssignment.venueLevelMapping?.venue?.id;
-          if (venueId) {
-            router.push(`/${lang}/volunteer/venues/${venueId}/dashboard`);
-            return;
-          }
-        } 
-        // If there are no assignments, we do NOT redirect.
-        // The component (VolunteerMainPage) will handle rendering the "no assignments" message.
-        // This is the key change to prevent the infinite loop.
-      }
-      
       // If allowedRoles are specified and the user's role is not in the list, redirect them
       if (allowedRoles && !allowedRoles.includes(role)) {
-        const dashboardRoute = getDashboardRoute(role, lang as string);
+        const dashboardRoute = getDashboardRoute(role, lang as string, hasLanguagePreference);
         router.push(dashboardRoute);
+        return;
       }
     };
     
     checkAndRedirect();
-  }, [user, loading, assignmentsLoading, assignmentsData, router, lang, allowedRoles]);
+  }, [user, loading, router, lang, allowedRoles]);
 };
 

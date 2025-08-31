@@ -22,13 +22,32 @@ export const volunteersVenueRouter = createTRPCRouter({
 
       const { venueId, includePlayerCount, status } = input;
 
-      const where: any = { venueId };
-      if (status !== 'all') {
-        where.status = status;
-      }
+      // Find all venue level mappings for this venue
+      const venueLevelMappings = await db.venueLevelMapping.findMany({
+        where: { 
+          venueId,
+          isActive: true 
+        },
+        select: { id: true }
+      });
 
+      const venueLevelMappingIds = venueLevelMappings.map(vlm => vlm.id);
+
+      // Get teams through TeamVenueAssignment
       const teams = await db.team.findMany({
-        where,
+        where: {
+          teamVenueAssignments: {
+            some: {
+              OR: [
+                { clusterVenueMappingId: { in: venueLevelMappingIds } },
+                { divisionVenueMappingId: { in: venueLevelMappingIds } },
+                { finalVenueMappingId: { in: venueLevelMappingIds } },
+              ],
+            },
+          },
+          ...(status !== 'all' ? { status } : {}),
+          deletedAt: null,
+        },
         include: {
           captainUser: {
             select: {
@@ -38,15 +57,64 @@ export const volunteersVenueRouter = createTRPCRouter({
               phone: true,
             },
           },
+          sport: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          teamVenueAssignments: {
+            where: {
+              OR: [
+                { clusterVenueMappingId: { in: venueLevelMappingIds } },
+                { divisionVenueMappingId: { in: venueLevelMappingIds } },
+                { finalVenueMappingId: { in: venueLevelMappingIds } },
+              ],
+            },
+            include: {
+              clusterVenueMapping: {
+                select: { level: true }
+              },
+              divisionVenueMapping: {
+                select: { level: true }
+              },
+              finalVenueMapping: {
+                select: { level: true }
+              },
+            }
+          },
           _count: includePlayerCount ? {
             select: {
               teamPlayers: true,
             },
           } : false,
         },
+        orderBy: [
+          { status: 'asc' },
+          { name: 'asc' }
+        ],
       });
 
-      return teams;
+      // Enhance teams with venue assignment level info
+      const enhancedTeams = teams.map(team => {
+        const assignment = team.teamVenueAssignments[0];
+        let level = 'cluster';
+        
+        if (assignment) {
+          if (assignment.finalVenueMapping) level = 'final';
+          else if (assignment.divisionVenueMapping) level = 'division';
+          else if (assignment.clusterVenueMapping) level = 'cluster';
+        }
+
+        return {
+          ...team,
+          venueLevel: level,
+          playerCount: team._count?.teamPlayers || 0
+        };
+      });
+
+
+      return enhancedTeams;
     }),
 
   // Get venue checked-in teams
@@ -66,16 +134,23 @@ export const volunteersVenueRouter = createTRPCRouter({
 
       const { venueId, eventId } = input;
 
-      const where: any = {
+      let where: any = {
         fixture: {
-          event: {
-            venueId,
+          venueLevelMapping: {
+            venueId: venueId,
           },
         },
       };
 
       if (eventId) {
-        where.fixture.eventId = eventId;
+        where = {
+          fixture: {
+            venueLevelMapping: {
+              venueId: venueId,
+            },
+            eventId: eventId,
+          },
+        };
       }
 
       const checkIns = await db.fixtureTeam.findMany({
@@ -131,7 +206,7 @@ export const volunteersVenueRouter = createTRPCRouter({
       const { venueId, date, status } = input;
 
       const where: any = {
-        event: { venueId },
+        venueLevelMapping: { venueId },
       };
 
       if (status !== 'all') {

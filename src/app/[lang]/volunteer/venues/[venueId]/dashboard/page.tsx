@@ -58,7 +58,6 @@ export default function VolunteerDashboard({ params }: PageProps) {
   const router = useRouter();
 
   // State for modals and interactions
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPostCreator, setShowPostCreator] = useState(false);
   const [selectedAction, setSelectedAction] = useState<QuickActionData | null>(null);
 
@@ -89,11 +88,12 @@ export default function VolunteerDashboard({ params }: PageProps) {
   );
 
   // Loading and error states
-  const teams = teamsData?.teams || [];
+  const teams = teamsData || [];
   const fixtures = fixturesData || [];
   const checkedInTeamsResult = checkedInTeamsData || { success: false };
   const loading = authLoading || teamsLoading || checkedInLoading || fixturesLoading;
   const error = teamsError?.message || '';
+
 
   // Auth check
   useEffect(() => {
@@ -115,7 +115,10 @@ export default function VolunteerDashboard({ params }: PageProps) {
     const totalTeams = teams.length;
     const checkedInCount = teams.filter(team => team.status === 'checked_in').length;
     const verifiedCount = teams.filter(team => team.status === 'verified').length;
-    const pendingCount = teams.filter(team => team.status === 'submitted' || team.status === 'pending' || !team.status).length;
+    const rejectedCount = teams.filter(team => team.status === 'rejected').length;
+    const pendingCount = teams.filter(team => 
+      ['draft', 'submitted', 'pending'].includes(team.status) || !team.status
+    ).length;
     const activeFixtures = fixtures.filter(f => f.status === 'in_progress').length;
     const completedFixtures = fixtures.filter(f => f.status === 'completed').length;
 
@@ -123,6 +126,7 @@ export default function VolunteerDashboard({ params }: PageProps) {
       totalTeams,
       checkedInCount,
       verifiedCount,
+      rejectedCount,
       pendingCount,
       activeFixtures,
       completedFixtures,
@@ -236,13 +240,6 @@ export default function VolunteerDashboard({ params }: PageProps) {
     router.push(action.href);
   };
 
-  // Venue fallback data
-  const venue = {
-    id: venueId,
-    name: `Venue ${venueId}`,
-    location: 'Match Day Verification Center'
-  };
-
   if (authLoading || loading) {
     return <PageLoader />;
   }
@@ -270,60 +267,75 @@ export default function VolunteerDashboard({ params }: PageProps) {
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
-          {venue?.name || 'Volunteer Dashboard'}
-        </h1>
-        <p className="text-sm sm:text-base text-gray-600 font-fira">
-          {venue?.location || 'Technical Volunteer Station'} - Match Day Management
-        </p>
-      </div>
+      {/* Modern Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
+        {/* Total Teams */}
+        <div 
+          onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/teams`)}
+          className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-3 sm:p-6 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-lg border-0"
+        >
+          <div className="flex flex-col items-center text-center">
+            <div className="mb-3">
+              <div className="w-14 h-14 bg-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
+                <Users className="w-7 h-7 text-white" />
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-blue-900 mb-1">{stats.totalTeams}</div>
+            <div className="text-sm font-medium text-blue-700">Total Teams</div>
+          </div>
+          <div className="absolute top-0 right-0 w-20 h-20 bg-blue-200 rounded-full -mr-10 -mt-10 opacity-20"></div>
+        </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <SingleStatCard
-          stat={{
-            label: "Total Teams",
-            value: stats.totalTeams,
-            icon: Users,
-            onClick: () => router.push(`/${lang}/volunteer/venues/${venueId}/teams`)
-          }}
-          showShadow={true}
-        />
-        
-        <SingleStatCard
-          stat={{
-            label: "Checked In",
-            value: stats.checkedInCount,
-            icon: CheckCircle,
-            color: "success",
-            onClick: () => router.push(`/${lang}/volunteer/venues/${venueId}/teams?teamStatus=checked_in`)
-          }}
-          showShadow={true}
-        />
-        
-        <SingleStatCard
-          stat={{
-            label: "Confirmed",
-            value: stats.verifiedCount,
-            icon: UserCheck,
-            color: "info",
-            onClick: () => router.push(`/${lang}/volunteer/venues/${venueId}/teams?teamStatus=verified`)
-          }}
-          showShadow={true}
-        />
-        
-        <SingleStatCard
-          stat={{
-            label: "Unconfirmed",
-            value: stats.pendingCount,
-            icon: AlertCircle,
-            color: "warning",
-            onClick: () => router.push(`/${lang}/volunteer/venues/${venueId}/teams?teamStatus=submitted`)
-          }}
-          showShadow={true}
-        />
+        {/* Verified Teams */}
+        <div 
+          onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/teams?teamStatus=verified`)}
+          className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-2xl p-3 sm:p-6 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-lg border-0"
+        >
+          <div className="flex flex-col items-center text-center">
+            <div className="mb-3">
+              <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg">
+                <CheckCircle className="w-7 h-7 text-white" />
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-emerald-900 mb-1">{stats.verifiedCount}</div>
+            <div className="text-sm font-medium text-emerald-700">Verified</div>
+          </div>
+          <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-200 rounded-full -mr-10 -mt-10 opacity-20"></div>
+        </div>
+
+        {/* Pending Teams */}
+        <div 
+          onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/teams?teamStatus=submitted`)}
+          className="relative overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl p-3 sm:p-6 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-lg border-0"
+        >
+          <div className="flex flex-col items-center text-center">
+            <div className="mb-3">
+              <div className="w-14 h-14 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg">
+                <Clock className="w-7 h-7 text-white" />
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-amber-900 mb-1">{stats.pendingCount}</div>
+            <div className="text-sm font-medium text-amber-700">Pending</div>
+          </div>
+          <div className="absolute top-0 right-0 w-20 h-20 bg-amber-200 rounded-full -mr-10 -mt-10 opacity-20"></div>
+        </div>
+
+        {/* Active Fixtures */}
+        <div 
+          onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/fixtures?status=in_progress`)}
+          className="relative overflow-hidden bg-gradient-to-br from-violet-50 to-violet-100 rounded-2xl p-3 sm:p-6 cursor-pointer transform hover:scale-105 transition-all duration-200 hover:shadow-lg border-0"
+        >
+          <div className="flex flex-col items-center text-center">
+            <div className="mb-3">
+              <div className="w-14 h-14 bg-violet-500 rounded-2xl flex items-center justify-center shadow-lg">
+                <Trophy className="w-7 h-7 text-white" />
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-violet-900 mb-1">{stats.activeFixtures}</div>
+            <div className="text-sm font-medium text-violet-700">Active Fixtures</div>
+          </div>
+          <div className="absolute top-0 right-0 w-20 h-20 bg-violet-200 rounded-full -mr-10 -mt-10 opacity-20"></div>
+        </div>
       </div>
 
       {/* Quick Actions Table */}
@@ -338,15 +350,6 @@ export default function VolunteerDashboard({ params }: PageProps) {
         selectable={false}
         onRowClick={handleQuickActionClick}
         keyExtractor={(action) => action.id}
-        headerActions={
-          <button
-            onClick={() => router.push(`/${lang}/volunteer/profile`)}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-          >
-            <User className="w-4 h-4 mr-2" />
-            My Profile
-          </button>
-        }
         emptyState={{
           icon: AlertCircle,
           title: 'No actions available',
@@ -355,10 +358,6 @@ export default function VolunteerDashboard({ params }: PageProps) {
         pagination={{ enabled: false }}
         persistState={false}
       />
-
-      <div className="mt-8">
-        <PostCreator />
-      </div>
 
       {/* Active Fixtures Section - if there are fixtures */}
       {fixtures.length > 0 && (
@@ -407,40 +406,8 @@ export default function VolunteerDashboard({ params }: PageProps) {
         </div>
       )}
 
-      {/* Profile Modal */}
-      <EnhancedModal
-        isOpen={showProfileModal}
-        onClose={() => setShowProfileModal(false)}
-        title="Volunteer Profile"
-        subtitle="Your assignment and profile information"
-        size="lg"
-        mobileFullScreen={true}
-        scrollableBody={true}
-        footer={
-          <div className="flex justify-end">
-            <button
-              onClick={() => setShowProfileModal(false)}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Close
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Volunteer Information</h3>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-sm"><span className="font-medium">Name:</span> {userProfile?.name || 'N/A'}</p>
-              <p className="text-sm"><span className="font-medium">Role:</span> {userProfile?.role || 'N/A'}</p>
-              <p className="text-sm"><span className="font-medium">Venue ID:</span> {venueId}</p>
-            </div>
-          </div>
-        </div>
-      </EnhancedModal>
-
-      {/* Floating Action Button for Mobile */}
-      <div className="md:hidden fixed bottom-4 right-4">
+      {/* Floating Action Button for Mobile and Desktop */}
+      <div className="fixed bottom-4 right-4">
         <button 
           onClick={() => setShowPostCreator(true)} 
           className="bg-blue-600 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 transition-colors"
@@ -449,14 +416,13 @@ export default function VolunteerDashboard({ params }: PageProps) {
         </button>
       </div>
 
-      <EnhancedModal
+      {/* Post Creator Modal */}
+      <PostCreator 
         isOpen={showPostCreator}
         onClose={() => setShowPostCreator(false)}
-        title="Create a New Post"
-        size="2xl"
-      >
-        <PostCreator compact onPostCreated={() => setShowPostCreator(false)} />
-      </EnhancedModal>
+        onPostCreated={() => setShowPostCreator(false)}
+        compact={true}
+      />
 
     </div>
   );

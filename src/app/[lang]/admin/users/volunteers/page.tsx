@@ -68,6 +68,7 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, updateMutation, se
   const [sameAsWhatsapp, setSameAsWhatsapp] = useState(true);
   const [isVerificationVolunteer, setIsVerificationVolunteer] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<string>('none');
+  const [volunteerRole, setVolunteerRole] = useState<'general_volunteer' | 'technical_volunteer'>('general_volunteer');
 
   const isEditing = !!editVolunteer;
 
@@ -76,12 +77,12 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, updateMutation, se
     if (editVolunteer && isOpen) {
       setIsVerificationVolunteer(editVolunteer.role === 'verification_volunteer');
       setSelectedVenue(editVolunteer.venueAssignmentId || 'none');
-      // WhatsApp same as phone is assumed for existing volunteers
+      setVolunteerRole(editVolunteer.role === 'technical_volunteer' ? 'technical_volunteer' : 'general_volunteer');
       setSameAsWhatsapp(true);
     } else if (!isOpen) {
-      // Reset form when modal closes
       setIsVerificationVolunteer(false);
       setSelectedVenue('none');
+      setVolunteerRole('general_volunteer');
       setSameAsWhatsapp(true);
     }
   }, [editVolunteer, isOpen]);
@@ -118,8 +119,10 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, updateMutation, se
     try {
       const formData = new FormData(e.currentTarget);
       
-      // Set role based on verification checkbox
-      const role = isVerificationVolunteer ? 'verification_volunteer' : 'general_volunteer';
+      // Set role based on verification checkbox or selected role
+      const role = isVerificationVolunteer 
+        ? 'verification_volunteer' 
+        : volunteerRole;
       
       const volunteerData = {
         firstName: formData.get('firstName') as string,
@@ -127,7 +130,7 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, updateMutation, se
         phone: formData.get('phoneNumber') as string,
         email: formData.get('email') as string || undefined,
         gender: formData.get('gender') as 'M' | 'F' | 'O',
-        role: role as 'general_volunteer' | 'verification_volunteer',
+        role: role as 'general_volunteer' | 'verification_volunteer' | 'technical_volunteer',
         whatsappNumber: sameAsWhatsapp 
           ? formData.get('phoneNumber') as string 
           : formData.get('whatsappNumber') as string || undefined,
@@ -319,7 +322,7 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, updateMutation, se
               </label>
             </div>
             <p className="mt-2 text-sm text-gray-500">
-              If checked, volunteer will handle document verification and player eligibility. If not checked, volunteer will be assigned as General Volunteer (can be changed to Technical during venue assignment).
+              If checked, volunteer will handle document verification and player eligibility.
             </p>
           </div>
 
@@ -328,27 +331,48 @@ function AddVolunteerModal({ isOpen, onClose, createMutation, updateMutation, se
             <div>
               <h4 className="text-md font-medium text-gray-900 mb-3">Venue Assignment</h4>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Select Venue</label>
-                <Select value={selectedVenue} onValueChange={setSelectedVenue} disabled={venueLoading}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={venueLoading ? "Loading venues..." : "Select a venue for assignment..."} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No venue assignment</SelectItem>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Venue</label>
+                  <select
+                    name="venueAssignmentId"
+                    value={selectedVenue}
+                    onChange={(e) => setSelectedVenue(e.target.value)}
+                    disabled={venueLoading}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    defaultValue={editVolunteer?.venueAssignmentId || 'none'}
+                  >
+                    <option value="none">No venue assignment</option>
                     {venueOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        <span className="font-medium">{option.label}</span>
-                        {option.description && (
-                          <span className="block text-xs text-gray-500 mt-0.5">{option.description}</span>
-                        )}
-                      </SelectItem>
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
                     ))}
-                  </SelectContent>
-                </Select>
-                <p className="mt-1 text-sm text-gray-500">
-                  Volunteers can be assigned to venues later if not selected now.
-                </p>
+                  </select>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Volunteers can be assigned to venues later if not selected now.
+                  </p>
+                </div>
+
+                {/* Role Selection - Only show if venue is selected */}
+                {selectedVenue && selectedVenue !== 'none' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Volunteer Role</label>
+                    <select
+                      name="volunteerRole"
+                      value={volunteerRole}
+                      onChange={(e) => setVolunteerRole(e.target.value as 'general_volunteer' | 'technical_volunteer')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      defaultValue={editVolunteer?.role === 'technical_volunteer' ? 'technical_volunteer' : 'general_volunteer'}
+                    >
+                      <option value="general_volunteer">General Volunteer</option>
+                      <option value="technical_volunteer">Technical Volunteer</option>
+                    </select>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Role determines the volunteer&apos;s responsibilities at the venue.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -482,6 +506,40 @@ export default function VolunteersManagement() {
       addNotification(error.message || 'Failed to assign volunteers to venue', 'error');
     }
   });
+
+  // Patch existing venue and role when modal opens
+  useEffect(() => {
+    if (showAssignVenueModal && selectedVolunteers.size > 0) {
+      // Get the first selected volunteer to check for existing assignment
+      const firstVolunteerId = Array.from(selectedVolunteers)[0];
+      const firstVolunteer = volunteers.find(v => v.id === firstVolunteerId);
+      
+      console.log('🔍 Patching venue modal:', {
+        firstVolunteerId,
+        firstVolunteer: firstVolunteer ? {
+          name: `${firstVolunteer.firstName} ${firstVolunteer.lastName}`,
+          role: firstVolunteer.role,
+          venueAssignmentId: firstVolunteer.venueAssignmentId
+        } : null
+      });
+      
+      // Set role based on volunteer's current role
+      if (firstVolunteer?.role === 'technical_volunteer') {
+        console.log('✅ Setting role to technical');
+        setSelectedAssignmentType('technical');
+      } else if (firstVolunteer?.role === 'general_volunteer') {
+        console.log('✅ Setting role to general');
+        setSelectedAssignmentType('general');
+      } else {
+        console.log('❌ No specific role, resetting');
+        setSelectedAssignmentType('');
+      }
+      
+      // For now, keep venue as none since we don't have venue ID in volunteer data
+      // TODO: Include venue assignment ID in volunteer query response
+      setSelectedAssignmentVenue('none');
+    }
+  }, [showAssignVenueModal, selectedVolunteers, volunteers]);
 
   // Fetch venue level mappings for assignment modal
   const {
@@ -718,18 +776,6 @@ export default function VolunteersManagement() {
         keyExtractor={(v) => v.id}
         stickyHeader={true}
 
-        actions={[
-          {
-            label: 'Edit',
-            icon: Edit,
-            onClick: (volunteer) => {
-              setSelectedVolunteer(volunteer);
-              setIsAddModalOpen(true);
-            },
-            variant: 'secondary' as const
-          }
-        ]}
-
         persistState={false}
 
         headerActions={getHeaderActions()}
@@ -831,7 +877,8 @@ export default function VolunteersManagement() {
               <button
                 onClick={() => {
                   setShowViewModal(false);
-                  // TODO: Add edit functionality
+                  setSelectedVolunteer(selectedVolunteer);
+                  setIsAddModalOpen(true);
                 }}
                 className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26] transition-colors"
               >

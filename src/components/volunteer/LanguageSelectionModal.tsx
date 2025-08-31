@@ -1,172 +1,186 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/lib/utils/i18n';
 import { SUPPORTED_LANGUAGES, LanguageCode } from '@/lib/utils/i18n-server';
-import { api } from '@/server/trpc/react';
-import { useNotification } from '@/context/NotificationContext';
+import { Check, Globe } from 'lucide-react';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
-import { Globe, Check, Loader2 } from 'lucide-react';
 
 interface LanguageSelectionModalProps {
   isOpen: boolean;
-  onClose: () => void;
-  onLanguageSelected?: (language: LanguageCode) => void;
+  onLanguageSelect: (languageCode: LanguageCode) => void | Promise<void>;
+  onCancel?: () => void;
+  onClose?: () => void;
+  currentLanguage?: LanguageCode;
+  isLoading?: boolean;
 }
 
-export default function LanguageSelectionModal({ 
-  isOpen, 
-  onClose, 
-  onLanguageSelected 
+export default function LanguageSelectionModal({
+  isOpen,
+  onLanguageSelect,
+  onCancel,
+  onClose,
+  currentLanguage,
+  isLoading = false
 }: LanguageSelectionModalProps) {
-  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
   
-  const router = useRouter();
-  const { lang } = useParams();
-  const { user, userProfile } = useAuth();
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(currentLanguage || null);
   const { t } = useTranslation();
-  const { addNotification } = useNotification();
 
-  // Update user profile mutation
-  const updateProfileMutation = api.profile.update.useMutation({
-    onSuccess: () => {
-      addNotification({
-        type: 'success',
-        message: 'Language preference saved successfully',
-      });
-      
-      // Redirect to the new language route
-      if (selectedLanguage) {
-        const currentPath = window.location.pathname;
-        const pathSegments = currentPath.split('/');
-        
-        // Replace the language segment in the URL
-        if (pathSegments[1] && pathSegments[1] !== selectedLanguage) {
-          pathSegments[1] = selectedLanguage;
-          const newPath = pathSegments.join('/');
-          
-          // Call the callback if provided
-          onLanguageSelected?.(selectedLanguage);
-          
-          // Navigate to the new language path
-          router.push(newPath);
-        }
-      }
-      
-      onClose();
-    },
-    onError: (error) => {
-      addNotification({
-        type: 'error',
-        message: error.message || 'Failed to save language preference',
-      });
-    },
-    onSettled: () => {
-      setIsSaving(false);
-    },
-  });
-
-  const handleLanguageSelect = (language: LanguageCode) => {
-    setSelectedLanguage(language);
+  const handleLanguageClick = (languageCode: LanguageCode) => {
+    setSelectedLanguage(languageCode);
   };
 
-  const handleSavePreference = async () => {
-    if (!selectedLanguage || !user) return;
-    
-    setIsSaving(true);
-    
-    try {
-      await updateProfileMutation.mutateAsync({
-        preferredLanguage: selectedLanguage,
-      });
-    } catch (error) {
-      // Error handling is done in the mutation callbacks
+  const handleSave = async () => {
+    if (selectedLanguage && typeof onLanguageSelect === 'function') {
+      try {
+        await onLanguageSelect(selectedLanguage);
+      } catch (error) {
+        console.error('Error in onLanguageSelect:', error);
+      }
     }
   };
 
   const handleCancel = () => {
-    setSelectedLanguage(null);
-    onClose();
+    if (typeof onCancel === 'function') {
+      onCancel();
+    } else if (typeof onClose === 'function') {
+      onClose();
+    }
+  };
+
+  const getLanguageFlag = (code: LanguageCode) => {
+    const flags: Record<LanguageCode, string> = {
+      en: '🇺🇸',
+      ta: '🇮🇳',
+      hi: '🇮🇳',
+      ml: '🇮🇳',
+      te: '🇮🇳',
+      kn: '🇮🇳',
+      or: '🇮🇳'
+    };
+    return flags[code] || '🌐';
   };
 
   return (
     <EnhancedModal
       isOpen={isOpen}
-      onClose={handleCancel}
-      title={t('volunteer.language_selection.title', 'Choose Your Language')}
-      subtitle={t('volunteer.language_selection.subtitle', 'Select your preferred language for the volunteer interface')}
-      size="md"
-      mobileFullScreen={false}
+      onClose={onClose}
+      title={t('language_selection.title', 'Choose Your Language')}
+      size="lg"
+      mobileFullScreen={true}
+      showCloseButton={false}
       footer={
-        <div className="flex justify-end space-x-3">
+        <div className="flex justify-between sm:justify-end gap-3 pt-4">
           <button
             onClick={handleCancel}
-            disabled={isSaving}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
+            className="flex-1 sm:w-32 sm:flex-none px-6 py-3 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
-            {t('volunteer.language_selection.cancel', 'Cancel')}
+            {t('common.cancel', 'Cancel')}
           </button>
           <button
-            onClick={handleSavePreference}
-            disabled={!selectedLanguage || isSaving}
-            className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            onClick={handleSave}
+            disabled={isLoading || !selectedLanguage}
+            className="flex-1 sm:w-32 sm:flex-none px-6 py-3 text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26] transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
-            {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {t('volunteer.language_selection.save_preference', 'Save Language Preference')}
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                {t('common.saving', 'Saving...')}
+              </div>
+            ) : (
+              t('common.save', 'Save')
+            )}
           </button>
         </div>
       }
     >
-      <div className="space-y-4">
-        <div className="flex items-center justify-center mb-6">
-          <div className="w-16 h-16 bg-[#F28C38] bg-opacity-10 rounded-full flex items-center justify-center">
-            <Globe className="w-8 h-8 text-[#F28C38]" />
-          </div>
-        </div>
+      <div className="space-y-6 bg-gray-50">
+        {/* Subtitle */}
+        <p className="text-gray-600 text-center text-sm md:text-base">
+          {t('language_selection.subtitle', 'Select your preferred language for the best experience')}
+        </p>
 
-        <div className="space-y-2">
+        {/* Language Selection */}
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4">
           {SUPPORTED_LANGUAGES.map((language) => (
-            <div
+            <button
               key={language.code}
-              onClick={() => handleLanguageSelect(language.code as LanguageCode)}
-              className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                selectedLanguage === language.code
-                  ? 'border-[#F28C38] bg-[#F28C38] bg-opacity-5'
-                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-              }`}
+              onClick={() => handleLanguageClick(language.code as LanguageCode)}
+              disabled={isLoading}
+              className={`
+                w-full sm:w-[calc(50%-0.5rem)] flex items-center justify-start sm:justify-center p-4 rounded-lg border-2 
+                transition-all duration-300 min-h-[70px] sm:min-h-[80px] box-border
+                appearance-none bg-white hover:shadow-lg hover:shadow-orange-200 active:opacity-90
+                ${selectedLanguage === language.code
+                  ? 'border-[#F28C38] bg-orange-50 text-[#F28C38]'
+                  : 'border-gray-200 hover:border-[#F28C38] hover:border-orange-200'
+                }
+                ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+              `}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="flex flex-col">
-                    <span className="text-lg font-medium text-gray-900">
-                      {language.nativeName}
-                    </span>
-                    <span className="text-sm text-gray-600">
-                      {language.name}
-                    </span>
-                  </div>
+              {/* Selection indicator */}
+              {selectedLanguage === language.code && (
+                <div className="absolute top-2 right-2 sm:relative sm:top-0 sm:right-0 sm:ml-auto">
+                  <Check className="w-4 h-4 text-[#F28C38]" />
                 </div>
-                
-                {selectedLanguage === language.code && (
-                  <div className="flex items-center justify-center w-6 h-6 bg-[#F28C38] rounded-full">
-                    <Check className="w-4 h-4 text-white" />
+              )}
+
+              {/* Mobile: Row layout */}
+              <div className="flex items-center w-full sm:hidden">
+                {/* Flag/Icon */}
+                <div className="text-2xl mr-4 w-8 h-8 flex items-center justify-center">
+                  {getLanguageFlag(language.code as LanguageCode)}
+                </div>
+
+                {/* Language names */}
+                <div className="flex-grow text-left">
+                  <div className="font-medium text-base mb-1">
+                    {language.nativeName}
                   </div>
-                )}
+                  {language.code !== 'en' && (
+                    <div className="text-sm text-gray-500">
+                      {language.name}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+
+              {/* Desktop: Column layout */}
+              <div className="hidden sm:block text-center w-full">
+                {/* Flag/Icon */}
+                <div className="text-3xl mb-3 flex justify-center items-center h-12">
+                  {getLanguageFlag(language.code as LanguageCode)}
+                </div>
+
+                {/* Language names */}
+                <div>
+                  <div className="font-medium text-base mb-1">
+                    {language.nativeName}
+                  </div>
+                  {language.code !== 'en' && (
+                    <div className="text-sm text-gray-500">
+                      {language.name}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Loading overlay */}
+              {isLoading && selectedLanguage === language.code && (
+                <div className="absolute inset-0 bg-white bg-opacity-80 rounded-lg flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-[#F28C38] border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+            </button>
           ))}
         </div>
 
-        {/* Current selection indicator */}
-        {userProfile?.languagePreference && (
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>Current preference:</strong>{' '}
-              {SUPPORTED_LANGUAGES.find(l => l.code === userProfile.languagePreference)?.nativeName || userProfile.languagePreference}
-            </p>
+        {/* Loading state */}
+        {isLoading && (
+          <div className="text-center text-sm text-gray-600">
+            {t('language_selection.updating', 'Updating preference...')}
           </div>
         )}
       </div>

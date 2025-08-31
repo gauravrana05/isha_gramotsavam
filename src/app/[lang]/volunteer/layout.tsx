@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useRedirect } from '@/lib/utils/navigation';
 import VolunteerSidebar from '@/components/volunteer/VolunteerSidebar';
-import LanguageSelectionModal from '@/components/volunteer/LanguageSelectionModal';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/lib/utils/i18n';
 import { PageLoader } from '@/components/ui/loaders';
@@ -21,43 +20,11 @@ export default function VolunteerLayout({
   const { lang } = useParams();
   const { t } = useTranslation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
   };
 
-  // Language preference detection logic
-  useEffect(() => {
-    if (loading || !user || !userProfile) return;
-
-    // Check if user has a language preference
-    if (!userProfile.languagePreference) {
-      // Show language selection modal if no preference is set
-      setShowLanguageModal(true);
-      return;
-    }
-
-    // Check if current URL language matches user preference
-    const currentLang = lang as LanguageCode;
-    const preferredLang = userProfile.languagePreference as LanguageCode;
-    
-    if (currentLang !== preferredLang) {
-      // Redirect to preferred language route
-      const currentPath = window.location.pathname;
-      const pathSegments = currentPath.split('/');
-      
-      if (pathSegments[1] === currentLang) {
-        pathSegments[1] = preferredLang;
-        const newPath = pathSegments.join('/');
-        router.replace(newPath);
-      }
-    }
-  }, [user, userProfile, loading, lang, router]);
-
-  const handleLanguageSelected = (language: LanguageCode) => {
-    setShowLanguageModal(false);
-  };
 
   if (loading || !user) {
     return (
@@ -86,12 +53,6 @@ export default function VolunteerLayout({
         </div>
       </div>
 
-      {/* Language Selection Modal */}
-      <LanguageSelectionModal
-        isOpen={showLanguageModal}
-        onClose={() => setShowLanguageModal(false)}
-        onLanguageSelected={handleLanguageSelected}
-      />
     </>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/server/trpc/react';
+import { useParams, useRouter } from 'next/navigation';
 import { 
   Users, 
   Trophy, 
@@ -21,10 +22,10 @@ import {
   Zap,
   Pause,
   Play,
-  Timer
+  Timer,
+  Link
 } from 'lucide-react';
-import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 
 interface DashboardOverview {
   teams: any;
@@ -384,146 +385,77 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
         {/* Header */}
-        <div className="mb-6">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-semibold font-fira mb-2 text-[#4A2F1D]">
-                Admin Dashboard
-              </h1>
-              <p className="text-sm sm:text-base text-gray-600 font-fira">
-                Welcome back, {userProfile?.firstName}! Here&apos;s your system overview.
-              </p>
+        {/* Compact Control Bar */}
+        <div className="bg-white border-b border-gray-200 px-4 py-2 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center text-sm text-gray-600">
+                <div className={`w-2 h-2 rounded-full mr-2 ${
+                  loading ? 'bg-yellow-400' : 'bg-green-400'
+                }`} />
+                Last updated: {lastUpdated?.toLocaleTimeString() || 'Never'}
+              </div>
+              {autoRefreshEnabled && (
+                <div className="text-xs text-gray-500">
+                  Next refresh: {nextRefreshIn}s
+                </div>
+              )}
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <Select value={refreshInterval.toString()} onValueChange={(value) => handleIntervalChange(parseInt(value))}>
+                <SelectTrigger className="w-20 h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5s</SelectItem>
+                  <SelectItem value="10">10s</SelectItem>
+                  <SelectItem value="15">15s</SelectItem>
+                  <SelectItem value="30">30s</SelectItem>
+                  <SelectItem value="60">1m</SelectItem>
+                  <SelectItem value="120">2m</SelectItem>
+                  <SelectItem value="300">5m</SelectItem>
+                </SelectContent>
+              </Select>
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="flex items-center px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
               >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                )}
-                Refresh
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
               <button
-                onClick={toggleAutoRefresh}
-                className={`flex items-center px-4 py-2 border rounded-lg transition-colors ${
-                  autoRefreshEnabled
-                    ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
-                    : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                className={`p-1.5 rounded transition-colors ${
+                  autoRefreshEnabled 
+                    ? 'text-green-600 bg-green-50 hover:bg-green-100' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                {autoRefreshEnabled ? (
-                  <Play className="w-4 h-4 mr-2" />
-                ) : (
-                  <Pause className="w-4 h-4 mr-2" />
-                )}
-                Auto-Refresh
+                {autoRefreshEnabled ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
-            </div>
-          </div>
-
-          {/* Real-time Status Bar */}
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-6">
-                <div className="flex items-center">
-                  <div className={`w-2 h-2 rounded-full mr-2 ${
-                    autoRefreshEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-                  }`} />
-                  <span className="text-sm font-medium text-gray-700">
-                    {autoRefreshEnabled ? 'Live Updates' : 'Manual Refresh'}
-                  </span>
-                </div>
-                
-                <div className="flex items-center text-sm text-gray-600">
-                  <Timer className="w-4 h-4 mr-1" />
-                  Last updated: {lastUpdated.toLocaleTimeString()}
-                </div>
-
-                {autoRefreshEnabled && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Clock className="w-4 h-4 mr-1" />
-                    Next refresh: {nextRefreshIn}s
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600">Refresh interval:</span>
-                <select
-                  value={refreshInterval}
-                  onChange={(e) => handleIntervalChange(parseInt(e.target.value))}
-                  className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={!autoRefreshEnabled}
-                >
-                  <option value={15}>15s</option>
-                  <option value={30}>30s</option>
-                  <option value={60}>1m</option>
-                  <option value={120}>2m</option>
-                  <option value={300}>5m</option>
-                </select>
-              </div>
             </div>
           </div>
         </div>
-
         {/* Critical Alerts */}
         {criticalAlerts.length > 0 && (
-          <div className="mb-6">
+          <div className="mb-4">
             {criticalAlerts.map((alert, index) => (
-              <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-4 mb-2 animate-pulse">
+              <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-3 mb-2">
                 <div className="flex items-center">
-                  <AlertTriangle className="w-5 h-5 text-red-500 mr-3" />
+                  <AlertTriangle className="w-4 h-4 text-red-500 mr-2" />
                   <div>
-                    <h3 className="font-semibold text-red-900">Critical Update Detected</h3>
-                    <p className="text-sm text-red-700 mt-1">{alert}</p>
+                    <h3 className="text-sm font-medium text-red-900">Critical Update</h3>
+                    <p className="text-xs text-red-700">{alert}</p>
                   </div>
-                  <Zap className="w-4 h-4 text-red-500 ml-auto animate-bounce" />
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* System Health */}
-        {dashboardOverview?.systemHealth && (
-          <div className="mb-6 bg-white rounded-lg shadow-sm border p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className={`${getHealthColor(dashboardOverview.systemHealth.overall)} mr-3`}>
-                  {getHealthIcon(dashboardOverview.systemHealth.overall)}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">System Health</h3>
-                  <p className="text-sm text-gray-600">Score: {dashboardOverview.systemHealth.score}/100</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${
-                  dashboardOverview.systemHealth.overall === 'healthy' ? 'bg-green-100 text-green-800' :
-                  dashboardOverview.systemHealth.overall === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
-                }`}>
-                  {dashboardOverview.systemHealth.overall}
-                </span>
-              </div>
-            </div>
-            {dashboardOverview.systemHealth.issues.length > 0 && (
-              <div className="mt-3 space-y-1">
-                {dashboardOverview.systemHealth.issues.slice(0, 3).map((issue: string, index: number) => (
-                  <p key={index} className="text-sm text-gray-600">• {issue}</p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Overview Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className={`bg-white rounded-lg p-4 shadow-sm relative ${loading ? 'animate-pulse' : ''}`}>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div className={`bg-white rounded-md p-3 shadow-sm relative ${loading ? 'animate-pulse' : ''}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Total Teams</p>
@@ -622,25 +554,19 @@ export default function AdminDashboard() {
 
         {/* Tournament Progress */}
         {tournamentOverview && (
-          <div className={`mb-6 bg-white rounded-lg shadow-sm border p-6 ${loading ? 'animate-pulse' : ''}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center">
-                <h2 className="text-lg font-semibold text-gray-900 font-fira mr-3">Tournament Progress</h2>
-                {autoRefreshEnabled && !loading && (
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                )}
-              </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <TrendingUp className="w-4 h-4 mr-1" />
+          <div className={`mb-4 bg-white rounded-md shadow-sm border p-4 ${loading ? 'animate-pulse' : ''}`}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-900">Tournament Progress</h3>
+              <div className="text-xs text-gray-500">
                 {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-3 h-3 animate-spin" />
                 ) : (
                   `${tournamentOverview.summary.overallProgress}% Complete`
                 )}
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="font-medium text-gray-900 mb-2">Matches</h3>
                 <div className="space-y-1 text-sm">
@@ -798,45 +724,121 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Insights */}
-        {dashboardOverview?.insights && dashboardOverview.insights.length > 0 && (
-          <div className="mb-6 bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-lg font-semibold text-gray-900 font-fira mb-4">System Insights</h2>
-            <div className="space-y-3">
-              {dashboardOverview.insights.slice(0, 5).map((insight: any, index: number) => (
-                <div key={index} className={`p-3 rounded-lg border-l-4 ${
-                  insight.type === 'alert' ? 'bg-red-50 border-red-400 text-red-800' :
-                  insight.type === 'warning' ? 'bg-yellow-50 border-yellow-400 text-yellow-800' :
-                  'bg-blue-50 border-blue-400 text-blue-800'
-                }`}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">{insight.message}</p>
-                      {insight.action && (
-                        <p className="text-sm mt-1 opacity-80">Action: {insight.action}</p>
-                      )}
-                    </div>
-                    <span className="text-xs px-2 py-1 rounded-full bg-white bg-opacity-50 capitalize">
-                      {insight.category}
-                    </span>
-                  </div>
-                </div>
-              ))}
+        {/* New Admin Sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          
+          {/* Volunteer Management Panel */}
+          <div className="bg-white rounded-md shadow-sm border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-900">Volunteer Management</h3>
+              <UserCheck className="w-4 h-4 text-gray-400" />
             </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Total Assigned</span>
+                <span className="font-medium">{dashboardOverview?.volunteers?.assigned || 0}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Available</span>
+                <span className="font-medium text-green-600">{dashboardOverview?.volunteers?.available || 0}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Assignment Gaps</span>
+                <span className="font-medium text-orange-600">{dashboardOverview?.volunteers?.gaps || 0}</span>
+              </div>
+            </div>
+            <Link href={`/${lang}/admin/users/volunteers`} className="mt-3 block text-xs text-blue-600 hover:text-blue-800">
+              Manage Volunteers →
+            </Link>
           </div>
-        )}
+
+          {/* Event Status Overview */}
+          <div className="bg-white rounded-md shadow-sm border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-900">Event Status</h3>
+              <Calendar className="w-4 h-4 text-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Active Events</span>
+                <span className="font-medium">{dashboardOverview?.events?.active || 0}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Registration Open</span>
+                <span className="font-medium text-green-600">{dashboardOverview?.events?.registrationOpen || 0}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Upcoming Matches</span>
+                <span className="font-medium text-blue-600">{dashboardOverview?.matches?.upcoming || 0}</span>
+              </div>
+            </div>
+            <Link href={`/${lang}/admin/events`} className="mt-3 block text-xs text-blue-600 hover:text-blue-800">
+              Manage Events →
+            </Link>
+          </div>
+
+          {/* Media Management */}
+          <div className="bg-white rounded-md shadow-sm border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-900">Media Management</h3>
+              <Activity className="w-4 h-4 text-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Total Files</span>
+                <span className="font-medium">{dashboardOverview?.media?.total || 0}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Pending Approval</span>
+                <span className="font-medium text-orange-600">{dashboardOverview?.media?.pending || 0}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Storage Used</span>
+                <span className="font-medium">{dashboardOverview?.media?.storageUsed || '0 MB'}</span>
+              </div>
+            </div>
+            <Link href={`/${lang}/admin/media`} className="mt-3 block text-xs text-blue-600 hover:text-blue-800">
+              Manage Media →
+            </Link>
+          </div>
+
+          {/* User Activity Analytics */}
+          <div className="bg-white rounded-md shadow-sm border p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-900">User Activity</h3>
+              <TrendingUp className="w-4 h-4 text-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Recent Registrations</span>
+                <span className="font-medium">{dashboardOverview?.users?.recentRegistrations || 0}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Active Sessions</span>
+                <span className="font-medium text-green-600">{dashboardOverview?.users?.activeSessions || 0}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-600">Verification Queue</span>
+                <span className="font-medium text-orange-600">{dashboardOverview?.verification?.pending || 0}</span>
+              </div>
+            </div>
+            <Link href={`/${lang}/admin/users`} className="mt-3 block text-xs text-blue-600 hover:text-blue-800">
+              Manage Users →
+            </Link>
+          </div>
+        </div>
 
         {/* Quick Access */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h2 className="text-lg font-semibold text-gray-900 font-fira mb-4">Quick Access</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-md shadow-sm border p-4">
+          <h3 className="text-sm font-medium text-gray-900 mb-3">Quick Access</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Link
               href={`/${lang}/admin/teams`}
-              className="p-4 border border-gray-200 rounded-lg hover:border-[#F28C38] hover:bg-orange-50 transition-colors group"
+              className="p-3 border border-gray-200 rounded-md hover:border-[#F28C38] hover:bg-orange-50 transition-colors group"
             >
-              <Users className="w-6 h-6 text-gray-400 group-hover:text-[#F28C38] mb-2" />
-              <h3 className="font-medium text-gray-900 group-hover:text-[#F28C38]">Teams</h3>
-              <p className="text-sm text-gray-600">{dashboardOverview?.teams?.total || 0} registered</p>
+              <Users className="w-5 h-5 text-gray-400 group-hover:text-[#F28C38] mb-2" />
+              <h4 className="text-sm font-medium text-gray-900 group-hover:text-[#F28C38]">Teams</h4>
+              <p className="text-xs text-gray-600">{dashboardOverview?.teams?.total || 0} registered</p>
             </Link>
             
             <Link

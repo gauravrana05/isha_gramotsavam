@@ -359,8 +359,40 @@ export const venueAssignmentRouter = createTRPCRouter({
           }
         });
 
+        // Handle both new assignments and updates to existing ones
         const existingVolunteerIds = existingAssignments.map(a => a.volunteerId);
         const newVolunteerIds = input.volunteerIds.filter(id => !existingVolunteerIds.includes(id));
+
+        // Update existing assignments
+        const updatedAssignments = await Promise.all(
+          existingAssignments.map(async (assignment) => {
+            const volunteer = volunteers.find(v => v.id === assignment.volunteerId);
+            const assignmentType = input.volunteerType || (volunteer?.role as any) || 'general_volunteer';
+            
+            // Update user role based on assignment type
+            if (assignmentType === 'technical_volunteer' && volunteer?.role !== 'technical_volunteer') {
+              await db.user.update({
+                where: { id: assignment.volunteerId },
+                data: { role: 'technical_volunteer' }
+              });
+            } else if (assignmentType === 'general_volunteer' && volunteer?.role !== 'general_volunteer') {
+              await db.user.update({
+                where: { id: assignment.volunteerId },
+                data: { role: 'general_volunteer' }
+              });
+            }
+            
+            return db.volunteerAssignment.update({
+              where: { id: assignment.id },
+              data: {
+                venueLevelMappingId: input.venueLevelMappingId,
+                volunteerType: assignmentType,
+                assignedBy: ctx.user.id,
+                status: 'assigned'
+              }
+            });
+          })
+        );
 
         // Create new assignments for volunteers without existing assignments
         const assignments = await Promise.all(
@@ -413,10 +445,10 @@ export const venueAssignmentRouter = createTRPCRouter({
 
         return {
           success: true,
-          message: `Successfully assigned ${assignments.length} volunteer(s) to ${venueMapping.venue.name}`,
+          message: `Successfully assigned ${assignments.length + updatedAssignments.length} volunteer(s) to ${venueMapping.venue.name}`,
           data: {
             newAssignments: assignments.length,
-            existingAssignments: existingAssignments.length,
+            updatedAssignments: updatedAssignments.length,
             totalRequested: input.volunteerIds.length,
             venueName: venueMapping.venue.name,
             assignments: assignments

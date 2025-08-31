@@ -229,4 +229,37 @@ export const profileRouter = createTRPCRouter({
         })
       }
     }),
+
+  updateLanguagePreference: protectedProcedure
+    .input(z.object({
+      language: z.enum(['en', 'ta', 'hi', 'ml', 'te', 'kn', 'or'])
+    }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const updatedUser = await db.user.update({
+          where: { id: ctx.user.id },
+          data: { 
+            languagePreference: input.language,
+            updatedAt: new Date()
+          },
+          select: {
+            id: true,
+            languagePreference: true,
+            firstName: true,
+            lastName: true,
+            role: true
+          }
+        });
+
+        return {
+          success: true,
+          user: updatedUser
+        };
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update language preference',
+        });
+      }
+    }),
 })

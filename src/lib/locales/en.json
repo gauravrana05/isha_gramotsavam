@@ -18,6 +18,21 @@
   "profile_photo_label": "Profile Photo",
   "aadhaar_verification": "Aadhaar Verification",
   "aadhaar_status_pending": "Your documents are under review. This may take 1-2 business days.",
+  "language_selection": {
+    "title": "Choose Your Language",
+    "subtitle": "Select your preferred language for the best experience",
+    "continue": "Continue",
+    "updating": "Updating preference...",
+    "languages": {
+      "en": "English",
+      "ta": "Tamil",
+      "hi": "Hindi",
+      "ml": "Malayalam",
+      "te": "Telugu",
+      "kn": "Kannada",
+      "or": "Odia"
+    }
+  },
   "aadhaar_status_verified": "Your Aadhaar has been verified successfully.",
   "aadhaar_status_rejected": "Verification failed. Please re-upload your Aadhaar documents.",
   "go_to_dashboard": "Go to Dashboard",

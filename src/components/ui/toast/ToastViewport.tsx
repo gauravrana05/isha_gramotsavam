@@ -29,7 +29,7 @@ export default function ToastViewport() {
             {t.type === "error" && <XCircle className="w-5 h-5" />}
             {t.type === "info" && <Info className="w-5 h-5" />}
           </div>
-          <div className="p-3 flex-1 text-sm">{t.message}</div>
+          <div className="p-3 flex-1 text-sm">{typeof t.message === 'string' ? t.message : String(t.message)}</div>
           <button
             onClick={() => removeNotification(t.id)}
             className="p-3 hover:bg-black/10 transition-colors"

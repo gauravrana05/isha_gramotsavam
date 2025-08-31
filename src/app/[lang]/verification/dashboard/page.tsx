@@ -196,8 +196,10 @@ export default function VerificationDashboardPage() {
       header: 'Captain',
       render: (_, team) => (
         <div className="text-sm">
-          <div className="text-gray-900">{team.captainProfile.name}</div>
-          <div className="text-gray-600">+91 {team.captainProfile.phone}</div>
+          <div className="text-gray-900">
+            {team.captainProfile?.firstName} {team.captainProfile?.lastName}
+          </div>
+          <div className="text-gray-600">+91 {team.captainProfile?.phone}</div>
         </div>
       ),
     },

@@ -84,9 +84,9 @@ export default function VolunteerSidebar({
   const baseVenueNavigation = [
     // When in venue context, show venue-specific navigation
     {
-      name: t('volunteer.sidebar.venue_overview', 'Venue Overview'),
-      href: `/${lang}/volunteer/venues/${venueId}`,
-      icon: MapPin,
+      name: t('volunteer.sidebar.dashboard', 'Dashboard'),
+      href: `/${lang}/volunteer/venues/${venueId}/dashboard`,
+      icon: LayoutDashboard,
     },
     {
       name: t('volunteer.sidebar.teams', 'Teams'),
@@ -166,7 +166,9 @@ export default function VolunteerSidebar({
           <Link
             href={item.href}
             className={`flex items-center text-xs font-medium rounded-lg transition-colors h-9 ${
-              depth > 0 ? 'ml-6' : ''
+              isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
+            } ${
+              depth > 0 ? (isDesktopCollapsed ? '' : 'ml-4') : ''
             } ${
               itemIsActive
                 ? 'bg-[#F28C38] text-white shadow-sm'
@@ -175,7 +177,9 @@ export default function VolunteerSidebar({
             onClick={() => setIsMobileOpen(false)}
             title={isDesktopCollapsed ? item.name : undefined}
           >
-            <item.icon className={`w-4 h-4 flex-shrink-0`} />
+            <item.icon className={`w-4 h-4 flex-shrink-0 ${
+              isDesktopCollapsed ? '' : (depth > 0 ? 'mr-2' : 'mr-2')
+            }`} />
             {showContent && (
               <div className="flex items-center w-full animate-fade-in">
                 <span className="flex-1">{item.name}</span>
@@ -191,11 +195,15 @@ export default function VolunteerSidebar({
           <button
             onClick={() => !isDesktopCollapsed && toggleExpanded(item.name)}
             className={`w-full flex items-center text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9 ${
-              depth > 0 ? 'ml-6' : ''
+              isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
+            } ${
+              depth > 0 ? (isDesktopCollapsed ? '' : 'ml-4') : ''
             }`}
             title={isDesktopCollapsed ? item.name : undefined}
           >
-            <item.icon className={`w-4 h-4 flex-shrink-0`} />
+            <item.icon className={`w-4 h-4 flex-shrink-0 ${
+              isDesktopCollapsed ? '' : (depth > 0 ? 'mr-2' : 'mr-2')
+            }`} />
             {showContent && (
               <div className="flex items-center w-full animate-fade-in">
                 <span className="flex-1 text-left">{item.name}</span>
@@ -356,11 +364,15 @@ export default function VolunteerSidebar({
             {!isAdminAccessing && (
               <Link
                 href={`/${lang}/volunteer/profile`}
-                className="flex items-center text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9"
+                className={`flex items-center text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9 ${
+                  isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
+                }`}
                 onClick={() => setIsMobileOpen(false)}
                 title={isDesktopCollapsed ? 'Profile' : undefined}
               >
-                <User width={64} height={64} className="w-4 h-4 flex-shrink-0" />
+                <User width={64} height={64} className={`w-4 h-4 flex-shrink-0 ${
+                  isDesktopCollapsed ? '' : 'mr-2'
+                }`} />
                 {showContent && <span className="animate-fade-in">Profile</span>}
               </Link>
             )}
@@ -369,31 +381,43 @@ export default function VolunteerSidebar({
             {isAdminAccessing && (
               <Link
                 href={`/${lang}/admin/dashboard`}
-                className="flex items-center text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9"
+                className={`flex items-center text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9 ${
+                  isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
+                }`}
                 onClick={() => setIsMobileOpen(false)}
                 title={isDesktopCollapsed ? 'Back to Admin Dashboard' : undefined}
               >
-                <Settings width={64} height={64} className="w-4 h-4 flex-shrink-0" />
+                <Settings width={64} height={64} className={`w-4 h-4 flex-shrink-0 ${
+                  isDesktopCollapsed ? '' : 'mr-2'
+                }`} />
                 {showContent && <span className="animate-fade-in">Back to Admin Dashboard</span>}
               </Link>
             )}
             
             <Link
               href={`/${lang}/player/dashboard`}
-              className="flex items-center text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9"
+              className={`flex items-center text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9 ${
+                isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
+              }`}
               onClick={() => setIsMobileOpen(false)}
               title={isDesktopCollapsed ? 'Back to App' : undefined}
             >
-              <Home width={64} height={64} className="w-4 h-4 flex-shrink-0" />
+              <Home width={64} height={64} className={`w-4 h-4 flex-shrink-0 ${
+                isDesktopCollapsed ? '' : 'mr-2'
+              }`} />
               {showContent && <span className="animate-fade-in">Back to App</span>}
             </Link>
             
             <button
               onClick={handleLogout}
-              className="w-full flex items-center text-xs font-medium text-red-700 rounded-lg hover:bg-red-50 hover:text-red-900 transition-colors h-9"
+              className={`w-full flex items-center text-xs font-medium text-red-700 rounded-lg hover:bg-red-50 hover:text-red-900 transition-colors h-9 ${
+                isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
+              }`}
               title={isDesktopCollapsed ? 'Sign Out' : undefined}
             >
-              <LogOut width={64} height={64} className="w-4 h-4 flex-shrink-0" />
+              <LogOut width={64} height={64} className={`w-4 h-4 flex-shrink-0 ${
+                isDesktopCollapsed ? '' : 'mr-2'
+              }`} />
               {showContent && <span className="animate-fade-in">Sign Out</span>}
             </button>
           </div>

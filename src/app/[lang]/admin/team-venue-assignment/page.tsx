@@ -12,6 +12,7 @@ import {
   type FilterField,
   type TableParams,
 } from '@/components/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { 
   MapPin,
@@ -22,6 +23,140 @@ import {
   Clock,
   Phone,
 } from 'lucide-react';
+
+// Venue Assignment Modal Component
+interface VenueAssignmentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedTeams: string[];
+  teams: TeamAssignmentData[];
+  eventId: string;
+  onAssignmentComplete: () => void;
+}
+
+function VenueAssignmentModal({ 
+  isOpen, 
+  onClose, 
+  selectedTeams, 
+  teams, 
+  eventId, 
+  onAssignmentComplete 
+}: VenueAssignmentModalProps) {
+  const { addNotification } = useNotification();
+  const [selectedVenue, setSelectedVenue] = useState<string>('');
+  
+  // Get team data for selected teams
+  const teamData = selectedTeams.map(teamId => teams.find(t => t.id === teamId)).filter(Boolean);
+  const firstTeam = teamData[0];
+  
+  // Determine level and state
+  const level = firstTeam?.assignment?.divisionQualified ? 'final' : 
+               firstTeam?.assignment?.clusterQualified ? 'division' : 'cluster';
+  const state = firstTeam?.state;
+  
+  // Get available venues for this level and state
+  const { data: venuesData, isLoading: venuesLoading } = api.admin.venues.getVenueLevelMappings.useQuery({
+    eventId,
+    level,
+    state,
+  }, {
+    enabled: !!eventId && !!state,
+  });
+  
+  // Manual assign mutation
+  const assignMutation = api.admin.venueAssignment.manualAssignVenue.useMutation({
+    onSuccess: () => {
+      addNotification('Venues assigned successfully', 'success');
+      onAssignmentComplete();
+    },
+    onError: (error) => {
+      addNotification(error.message || 'Failed to assign venues', 'error');
+    },
+  });
+  
+  const handleAssign = async () => {
+    if (!selectedVenue) {
+      addNotification('Please select a venue', 'error');
+      return;
+    }
+    
+    // Assign venue to all selected teams
+    for (const teamId of selectedTeams) {
+      await assignMutation.mutateAsync({
+        teamId,
+        eventId,
+        venueLevelMappingId: selectedVenue,
+        level,
+      });
+    }
+  };
+  
+  return (
+    <EnhancedModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Assign Venues"
+      subtitle={`Select ${level} venue for ${selectedTeams.length} team(s) in ${state}`}
+      size="lg"
+      mobileFullScreen={true}
+    >
+      <div className="p-6">
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Available Venues
+          </label>
+          <Select value={selectedVenue} onValueChange={setSelectedVenue}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select a venue..." />
+            </SelectTrigger>
+            <SelectContent>
+              {venuesLoading ? (
+                <SelectItem value="loading" disabled>Loading venues...</SelectItem>
+              ) : venuesData?.length === 0 ? (
+                <SelectItem value="no-venues" disabled>No venues available</SelectItem>
+              ) : (
+                venuesData?.map((mapping) => (
+                  <SelectItem key={mapping.id} value={mapping.id}>
+                    {mapping.venue.name} - {mapping.venue.district}
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="mb-6">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Teams:</h4>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {teamData.map((team) => (
+              <div key={team.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm">{team.name}</span>
+                <span className="text-xs text-gray-500">{team.captain.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            disabled={assignMutation.isLoading}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleAssign}
+            className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26] disabled:opacity-50"
+            disabled={!selectedVenue || assignMutation.isLoading}
+          >
+            {assignMutation.isLoading ? 'Assigning...' : `Assign to ${selectedTeams.length} Teams`}
+          </button>
+        </div>
+      </div>
+    </EnhancedModal>
+  );
+}
 
 interface TeamAssignmentData {
   id: string;
@@ -76,6 +211,7 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
   const [showViewModal, setShowViewModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<TeamAssignmentData | null>(null);
+  const [editVenue, setEditVenue] = useState<string>('');
   const [selectedEvent, setSelectedEvent] = useState<string>('');
 
   // Table state - default to showing all teams
@@ -418,6 +554,34 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
             title="Team Details"
             subtitle={`${selectedTeam.name} - Assignment Information`}
             size="lg"
+            mobileFullScreen={true}
+            footer={
+              <div className="flex justify-end space-x-3 px-6 py-4 bg-gray-50">
+                <button
+                  onClick={() => {
+                    setShowViewModal(false);
+                    setSelectedTeam(null);
+                    setEditVenue('');
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    // TODO: Save venue assignment
+                    console.log('Save venue assignment:', editVenue);
+                    setShowViewModal(false);
+                    setSelectedTeam(null);
+                    setEditVenue('');
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26] disabled:opacity-50"
+                  disabled={!editVenue}
+                >
+                  Save Changes
+                </button>
+              </div>
+            }
           >
             <div className="space-y-6">
               {/* Team Information */}
@@ -538,42 +702,44 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
                   </div>
                 </div>
               )}
+
+              {/* Venue Selection Section */}
+              <div className="bg-blue-50 p-6 rounded-lg">
+                <h4 className="font-semibold text-gray-900 mb-4">Change Venue Assignment</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select New Venue
+                  </label>
+                  <Select value={editVenue} onValueChange={setEditVenue}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a venue..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="venue1">Venue 1 - District A</SelectItem>
+                      <SelectItem value="venue2">Venue 2 - District B</SelectItem>
+                      <SelectItem value="venue3">Venue 3 - District C</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           </EnhancedModal>
         )}
 
         {/* Venue Assignment Modal */}
         {showAssignModal && (
-          <EnhancedModal
+          <VenueAssignmentModal
             isOpen={showAssignModal}
             onClose={() => setShowAssignModal(false)}
-            title="Assign Venues"
-            subtitle={`Select venue for ${selectedTeams.size} team(s)`}
-            size="lg"
-          >
-            <div className="p-6">
-              <p className="text-sm text-gray-600 mb-4">
-                Venue assignment modal - TODO: Implement venue selection for teams in same state and level.
-              </p>
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => setShowAssignModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    // TODO: Implement venue assignment
-                    setShowAssignModal(false);
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-white bg-[#F28C38] rounded-lg hover:bg-[#E67A26]"
-                >
-                  Assign Venues
-                </button>
-              </div>
-            </div>
-          </EnhancedModal>
+            selectedTeams={Array.from(selectedTeams)}
+            teams={teams}
+            eventId={selectedEvent}
+            onAssignmentComplete={() => {
+              setShowAssignModal(false);
+              setSelectedTeams(new Set());
+              refetchAssignments();
+            }}
+          />
         )}
       </div>
     </div>
