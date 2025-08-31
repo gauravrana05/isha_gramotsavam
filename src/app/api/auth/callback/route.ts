@@ -27,7 +27,11 @@ export async function GET(request: NextRequest) {
     // Exchange authorization code for tokens using PKCE
     const codeVerifier = request.cookies.get('code_verifier')?.value;
     
-    console.log('Code verifier from cookie:', codeVerifier ? 'Present' : 'Missing');
+    console.log('=== PKCE VERIFICATION ===');
+    console.log('Code verifier from cookie:', codeVerifier);
+    console.log('All cookies:', Object.fromEntries(
+      Array.from(request.cookies.entries()).map(([key, cookie]) => [key, cookie.value])
+    ));
     
     if (!codeVerifier) {
       console.error('Code verifier missing from cookies');
@@ -85,7 +89,11 @@ export async function GET(request: NextRequest) {
     }
 
     const userInfo = await userResponse.json();
-  
+    
+    console.log('=== USER INFO FROM ISHA SSO ===');
+    console.log('Full userInfo object:', JSON.stringify(userInfo, null, 2));
+    console.log('Phone number field:', userInfo.phone_number);
+    console.log('Phone extraction result:', userInfo.phone_number || userInfo.phone || userInfo.phoneNumber || userInfo.mobile || null);
     
     // Map OIDC user info to our User model
     const userData = {

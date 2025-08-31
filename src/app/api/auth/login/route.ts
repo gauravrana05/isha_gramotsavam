@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
     authUrl.searchParams.set('code_challenge', codeChallenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
 
+    console.log('=== PKCE GENERATION ===');
+    console.log('Code verifier:', codeVerifier);
+    console.log('Code challenge:', codeChallenge);
     console.log('Authorization URL:', authUrl.toString());
 
     // Return JSON with authUrl (as expected by AuthContext)
@@ -34,12 +37,14 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
+      path: '/',
       maxAge: 10 * 60 * 1000,
     });
     response.cookies.set('code_verifier', codeVerifier, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
+      path: '/',
       maxAge: 10 * 60 * 1000,
     });
 
@@ -53,7 +58,10 @@ export async function POST(request: NextRequest) {
 // Add GET method for direct redirect
 export async function GET(request: NextRequest) {
   try {
+    // Generate PKCE parameters
     const state = crypto.randomUUID();
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = generateCodeChallenge(codeVerifier);
     
     const authUrl = new URL(`${process.env.ISHA_OIDC_ISSUER}/oidc/authorize`);
     authUrl.searchParams.set('response_type', 'code');
@@ -61,10 +69,12 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.set('redirect_uri', process.env.ISHA_OIDC_REDIRECT_URI!);
     authUrl.searchParams.set('scope', 'openid profile email');
     authUrl.searchParams.set('state', state);
-    // Remove PKCE temporarily
-    // authUrl.searchParams.set('code_challenge', codeChallenge);
-    // authUrl.searchParams.set('code_challenge_method', 'S256');
+    authUrl.searchParams.set('code_challenge', codeChallenge);
+    authUrl.searchParams.set('code_challenge_method', 'S256');
 
+    console.log('=== PKCE GENERATION (GET) ===');
+    console.log('Code verifier:', codeVerifier);
+    console.log('Code challenge:', codeChallenge);
     console.log('Authorization URL:', authUrl.toString());
 
     const response = NextResponse.redirect(authUrl.toString());
@@ -72,6 +82,14 @@ export async function GET(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
+      path: '/',
+      maxAge: 10 * 60 * 1000,
+    });
+    response.cookies.set('code_verifier', codeVerifier, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
       maxAge: 10 * 60 * 1000,
     });
 
