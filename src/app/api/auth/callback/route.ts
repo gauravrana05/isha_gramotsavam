@@ -11,14 +11,6 @@ export async function GET(request: NextRequest) {
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
 
-    // Debug logging
-    console.log('=== OIDC CALLBACK DEBUG ===');
-    console.log('Full callback URL:', request.url);
-    console.log('Search params:', Object.fromEntries(searchParams.entries()));
-    console.log('Cookies:', Object.fromEntries(
-      Array.from(request.cookies.entries()).map(([key, cookie]) => [key, cookie.value])
-    ));
-
     if (error) {
       console.error('OAuth error from Isha SSO:', error, errorDescription);
       return NextResponse.json({ 
@@ -42,16 +34,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid authentication state' }, { status: 400 });
     }
 
-    // Exchange authorization code for tokens using PKCE
-    const codeVerifier = request.cookies.get('code_verifier')?.value;
-    
-    console.log('Code verifier from cookie:', codeVerifier ? 'Present' : 'Missing');
-    
-    if (!codeVerifier) {
-      console.error('Code verifier missing from cookies');
-      return NextResponse.json({ error: 'Invalid authentication state' }, { status: 400 });
-    }
-
     const tokenParams: Record<string, string> = {
       grant_type: 'authorization_code',
       client_id: process.env.ISHA_OIDC_CLIENT_ID!,
@@ -59,12 +41,6 @@ export async function GET(request: NextRequest) {
       redirect_uri: process.env.ISHA_OIDC_REDIRECT_URI!,
       code_verifier: codeVerifier, // PKCE parameter
     };
-
-    console.log('Token request params:', {
-      ...tokenParams,
-      code_verifier: codeVerifier ? '[PRESENT]' : '[MISSING]'
-    });
-    console.log('Token endpoint:', `${process.env.ISHA_OIDC_ISSUER}/oidc/token`);
 
     // For public clients without client secret, we don't add client_secret
     // This follows the "No client-authentication" approach from the OIDC docs
@@ -109,17 +85,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userInfo = await userResponse.json();
-    
-    console.log('=== USER INFO FROM ISHA SSO ===');
-    console.log('Full userInfo object:', JSON.stringify(userInfo, null, 2));
-    console.log('Available fields:', Object.keys(userInfo));
-    console.log('Phone fields check:', {
-      phone_number: userInfo.phone_number,
-      phone: userInfo.phone,
-      phoneNumber: userInfo.phoneNumber,
-      mobile: userInfo.mobile,
-      sub: userInfo.sub
-    });
+  
     
     // Map OIDC user info to our User model
     const userData = {
@@ -144,12 +110,8 @@ export async function GET(request: NextRequest) {
     // Create or update user in database
     let user: any;
     const phone = userData.phone;
-    
-    console.log('Extracted phone number:', phone);
-    
+     
     if (!phone) {
-      console.log('Phone number missing, redirecting to phone collection');
-      
       // Store user info temporarily for phone collection
       const tempUserData = {
         email: userData.email,
