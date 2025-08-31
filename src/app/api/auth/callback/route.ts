@@ -35,11 +35,9 @@ export async function GET(request: NextRequest) {
       redirect_uri: process.env.ISHA_OIDC_REDIRECT_URI!,
     };
 
-    // Only add client_secret if it's provided (some OIDC flows use PKCE instead)
-    if (process.env.ISHA_OIDC_CLIENT_SECRET && process.env.ISHA_OIDC_CLIENT_SECRET !== 'null') {
-      tokenParams.client_secret = process.env.ISHA_OIDC_CLIENT_SECRET;
-    }
-
+    // For public clients without client secret, we don't add client_secret
+    // This follows the "No client-authentication" approach from the OIDC docs
+    
     const tokenResponse = await fetch(`${process.env.ISHA_OIDC_ISSUER}/oidc/token`, {
       method: 'POST',
       headers: {
@@ -51,8 +49,16 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('Token exchange failed:', errorText);
-      return NextResponse.json({ error: 'Token exchange failed' }, { status: 400 });
+      console.error('Token exchange failed:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        error: errorText,
+        params: tokenParams
+      });
+      return NextResponse.json({ 
+        error: 'Token exchange failed', 
+        details: errorText 
+      }, { status: 400 });
     }
 
     const tokens = await tokenResponse.json();
