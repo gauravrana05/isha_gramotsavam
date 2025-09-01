@@ -17,7 +17,7 @@ const DocumentProvider = dynamic(() => import("@/context/DocumentContext").then(
 const OfflineIndicator = dynamic(() => import("@/components/system/OfflineIndicator"), { ssr: false });
 const OfflineBanner = dynamic(() => import("@/components/system/OfflineBanner"), { ssr: false });
 const ToastViewport = dynamic(() => import("@/components/ui/toast/ToastViewport"), { ssr: false });
-const ProgressBar = dynamic(() => import("@/components/ui/Progress/ProgressBar"), { ssr: false });
+const ProgressBar = dynamic(() => import("@/components/ui/progress/ProgressBar"), { ssr: false });
 
 interface ClientProvidersProps {
   children: React.ReactNode;
