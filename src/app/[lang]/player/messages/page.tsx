@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { api } from '@/server/trpc/react';
 import { useAuth } from '@/context/AuthContext';
 import PlayerChat from '@/components/chat/PlayerChat';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { MessageSquare, MapPin } from 'lucide-react';
 

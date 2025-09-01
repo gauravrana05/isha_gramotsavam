@@ -69,7 +69,7 @@ export default function AdminLayout({
       />
       
         <div className={`flex flex-col md:min-h-screen ${
-          isDesktopSidebarCollapsed ? 'md:ml-16' : 'md:ml-72'
+          isDesktopSidebarCollapsed ? 'md:ml-16' : 'md:ml-48'
         } transition-[margin] duration-300 ease-in-out`}>
           <main className="flex-1 overflow-auto">
             {children}

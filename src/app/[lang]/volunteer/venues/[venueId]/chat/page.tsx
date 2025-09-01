@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import VolunteerChat from '@/components/chat/VolunteerChat';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { MessageSquare } from 'lucide-react';
 
 export default function VolunteerChatPage() {

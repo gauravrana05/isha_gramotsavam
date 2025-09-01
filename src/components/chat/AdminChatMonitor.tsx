@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { api } from '@/server/trpc/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/Button';
 import { MessageSquare, Eye, Users, Crown, User, RefreshCw } from 'lucide-react';
 import VolunteerChat from './VolunteerChat';
 

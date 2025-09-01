@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { api } from '@/server/trpc/react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/Button';
+import { Textarea } from '@/components/ui/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquare, Send, Users, User, Crown } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';

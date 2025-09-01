@@ -2,7 +2,7 @@
 
 import { api } from '@/server/trpc/react';
 import AdminChatMonitor from '@/components/chat/AdminChatMonitor';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { MessageSquare, TrendingUp, Users, AlertCircle } from 'lucide-react';
 
 export default function AdminChatPage() {
