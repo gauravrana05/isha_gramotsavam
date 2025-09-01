@@ -1,12 +1,17 @@
 /**
- * Service Worker extension for background sync
- * Enhances next-pwa with offline-first capabilities
+ * Service Worker extension for background sync and push notifications
+ * Enhances next-pwa with offline-first capabilities and push notification support
  */
 
 // Background sync configuration
 const SYNC_TAG = 'isha-gramotsavam-sync';
 const MAX_RETRY_COUNT = 3;
 const RETRY_DELAY = 60000; // 1 minute
+
+// Push notification configuration
+const NOTIFICATION_TAG = 'isha-gramotsavam-notification';
+const NOTIFICATION_ICON = '/icons/icon-192x192.png';
+const NOTIFICATION_BADGE = '/icons/icon-192x192.png';
 
 // IndexedDB configuration
 const DB_NAME = 'IshaGramotsavamOfflineDB';
@@ -306,20 +311,7 @@ self.addEventListener('notificationclick', event => {
   }
 });
 
-// Message Handler for manual sync triggers
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'TRIGGER_SYNC') {
-    console.log('Manual sync triggered from client');
-    
-    // Register sync immediately
-    self.registration.sync.register(SYNC_TAG).then(() => {
-      event.ports[0].postMessage({ success: true });
-    }).catch(error => {
-      console.error('Failed to register sync:', error);
-      event.ports[0].postMessage({ success: false, error: error.message });
-    });
-  }
-});
+// Legacy message handler removed - now handled in enhanced message handler below
 
 // Enhanced fetch event for offline-first behavior
 self.addEventListener('fetch', event => {
@@ -439,4 +431,396 @@ async function getOfflineData(request) {
   }
 }
 
-console.log('Background sync service worker extension loaded');
+/**
+ * Push notification handlers
+ */
+
+// Push event listener
+self.addEventListener('push', event => {
+  console.log('Push notification received:', event);
+
+  if (!event.data) {
+    console.log('Push event but no data');
+    return;
+  }
+
+  let notificationData;
+  try {
+    notificationData = event.data.json();
+  } catch (error) {
+    console.error('Invalid notification data:', error);
+    return;
+  }
+
+  const {
+    title,
+    message,
+    type = 'info',
+    actionUrl,
+    userId,
+    notificationId,
+    createdBy,
+    timestamp
+  } = notificationData;
+
+  // Get notification icon and badge based on type
+  const { icon, badge } = getNotificationAssets(type);
+
+  // Create notification options
+  const options = {
+    body: message,
+    icon,
+    badge,
+    tag: notificationId || `notification-${Date.now()}`,
+    data: {
+      notificationId,
+      actionUrl,
+      userId,
+      type,
+      timestamp: timestamp || Date.now(),
+      createdBy
+    },
+    actions: [],
+    requireInteraction: type === 'emergency' || type === 'system_announcement',
+    silent: false,
+    renotify: true,
+  };
+
+  // Add action buttons based on notification type
+  if (actionUrl) {
+    options.actions.push({
+      action: 'view',
+      title: 'View Details',
+      icon: '/icons/icon-192x192.png'
+    });
+  }
+
+  // Add mark as read action for non-emergency notifications
+  if (type !== 'emergency') {
+    options.actions.push({
+      action: 'mark-read',
+      title: 'Mark as Read',
+      icon: '/icons/icon-192x192.png'
+    });
+  }
+
+  // Add dismiss action
+  options.actions.push({
+    action: 'dismiss',
+    title: 'Dismiss',
+    icon: '/icons/icon-192x192.png'
+  });
+
+  // Show notification
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+      .then(() => {
+        console.log('Notification displayed successfully');
+        // Store notification in IndexedDB for offline access
+        return storeNotificationOffline(notificationData);
+      })
+      .catch(error => {
+        console.error('Failed to display notification:', error);
+      })
+  );
+});
+
+// Notification click event listener
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+
+  const { action } = event;
+  const { notificationId, actionUrl, type, userId } = event.notification.data;
+
+  console.log('Notification clicked:', { action, notificationId, actionUrl });
+
+  switch (action) {
+    case 'view':
+      // Open the action URL or default to app
+      event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true })
+          .then(clientList => {
+            const targetUrl = actionUrl || '/';
+            
+            // Check if app is already open
+            for (const client of clientList) {
+              if (client.url.includes(window.location.origin)) {
+                client.focus();
+                client.postMessage({
+                  type: 'NAVIGATE_TO',
+                  url: targetUrl,
+                  notificationId
+                });
+                return;
+              }
+            }
+            
+            // Open new window
+            return clients.openWindow(targetUrl);
+          })
+          .then(() => {
+            // Mark as read when viewed
+            return markNotificationAsRead(notificationId, userId);
+          })
+      );
+      break;
+
+    case 'mark-read':
+      // Mark notification as read
+      event.waitUntil(
+        markNotificationAsRead(notificationId, userId)
+          .then(() => {
+            console.log('Notification marked as read:', notificationId);
+          })
+      );
+      break;
+
+    case 'dismiss':
+    default:
+      // Just close the notification
+      console.log('Notification dismissed:', notificationId);
+      break;
+  }
+});
+
+// Notification close event listener
+self.addEventListener('notificationclose', event => {
+  console.log('Notification closed:', event.notification.data);
+  
+  // Track notification close events
+  const { notificationId } = event.notification.data;
+  if (notificationId) {
+    console.log('Tracking notification close:', notificationId);
+  }
+});
+
+/**
+ * Get notification assets based on type
+ */
+function getNotificationAssets(type) {
+  const baseIcon = NOTIFICATION_ICON;
+  const baseBadge = NOTIFICATION_BADGE;
+
+  // You could customize icons based on notification type
+  const typeIcons = {
+    info: baseIcon,
+    success: baseIcon,
+    warning: baseIcon,
+    error: baseIcon,
+    team_invitation: baseIcon,
+    verification_update: baseIcon,
+    match_result: baseIcon,
+    venue_assignment: baseIcon,
+    system_announcement: baseIcon,
+    match_reminder: baseIcon,
+    tournament_update: baseIcon,
+    emergency: baseIcon,
+  };
+
+  return {
+    icon: typeIcons[type] || baseIcon,
+    badge: baseBadge,
+  };
+}
+
+/**
+ * Store notification data offline for later access
+ */
+async function storeNotificationOffline(notificationData) {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction(['notifications'], 'readwrite');
+    const store = transaction.objectStore('notifications');
+
+    const offlineNotification = {
+      ...notificationData,
+      id: notificationData.notificationId || `offline-${Date.now()}`,
+      receivedAt: Date.now(),
+      read: false,
+      offline: true
+    };
+
+    return new Promise((resolve, reject) => {
+      const request = store.put(offlineNotification);
+      request.onsuccess = () => {
+        console.log('Notification stored offline:', offlineNotification.id);
+        resolve();
+      };
+      request.onerror = () => {
+        console.error('Failed to store notification offline:', request.error);
+        reject(request.error);
+      };
+    });
+  } catch (error) {
+    console.error('Error storing notification offline:', error);
+  }
+}
+
+/**
+ * Mark notification as read via API call
+ */
+async function markNotificationAsRead(notificationId, userId) {
+  try {
+    // Try to mark as read via network
+    const response = await fetch('/api/trpc/notifications.markAsRead', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        json: { notificationId },
+      }),
+    });
+
+    if (response.ok) {
+      console.log('Notification marked as read via API');
+      return true;
+    }
+
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  } catch (error) {
+    console.log('Failed to mark as read via API, queuing for sync:', error);
+    
+    // Queue for background sync if network fails
+    return queueNotificationMarkAsRead(notificationId, userId);
+  }
+}
+
+/**
+ * Queue notification mark-as-read for background sync
+ */
+async function queueNotificationMarkAsRead(notificationId, userId) {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([SYNC_STORE], 'readwrite');
+    const store = transaction.objectStore(SYNC_STORE);
+
+    const syncAction = {
+      id: `mark-read_${notificationId}_${Date.now()}`,
+      type: 'MARK_NOTIFICATION_READ',
+      notificationId,
+      userId,
+      timestamp: Date.now(),
+      status: 'PENDING',
+      retryCount: 0,
+      priority: 'low'
+    };
+
+    return new Promise((resolve, reject) => {
+      const request = store.add(syncAction);
+      request.onsuccess = () => {
+        console.log('Queued mark-as-read for sync:', notificationId);
+        
+        // Try to register sync immediately
+        if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+          self.registration.sync.register(SYNC_TAG);
+        }
+        
+        resolve();
+      };
+      request.onerror = () => {
+        console.error('Failed to queue mark-as-read:', request.error);
+        reject(request.error);
+      };
+    });
+  } catch (error) {
+    console.error('Error queuing notification mark-as-read:', error);
+    return false;
+  }
+}
+
+/**
+ * Enhanced message handler for push notification management
+ */
+self.addEventListener('message', event => {
+  const { type, data } = event.data || {};
+
+  switch (type) {
+    case 'TRIGGER_SYNC':
+      console.log('Manual sync triggered from client');
+      
+      self.registration.sync.register(SYNC_TAG).then(() => {
+        event.ports[0].postMessage({ success: true });
+      }).catch(error => {
+        console.error('Failed to register sync:', error);
+        event.ports[0].postMessage({ success: false, error: error.message });
+      });
+      break;
+
+    case 'SUBSCRIBE_TO_PUSH':
+      // Handle push subscription
+      console.log('Push subscription request from client');
+      handlePushSubscription(event);
+      break;
+
+    case 'UPDATE_NOTIFICATION_SETTINGS':
+      // Update notification preferences
+      console.log('Updating notification settings:', data);
+      updateNotificationSettings(data);
+      break;
+
+    default:
+      console.log('Unknown message type:', type);
+  }
+});
+
+/**
+ * Handle push subscription from client
+ */
+async function handlePushSubscription(event) {
+  try {
+    // Get or create push subscription
+    const subscription = await self.registration.pushManager.getSubscription();
+    
+    if (subscription) {
+      event.ports[0].postMessage({
+        success: true,
+        subscription: subscription.toJSON()
+      });
+    } else {
+      event.ports[0].postMessage({
+        success: false,
+        error: 'No push subscription available'
+      });
+    }
+  } catch (error) {
+    console.error('Failed to handle push subscription:', error);
+    event.ports[0].postMessage({
+      success: false,
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Update notification settings in IndexedDB
+ */
+async function updateNotificationSettings(settings) {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction(['notificationSettings'], 'readwrite');
+    const store = transaction.objectStore('notificationSettings');
+
+    const settingsData = {
+      id: 'user-settings',
+      ...settings,
+      updatedAt: Date.now()
+    };
+
+    return new Promise((resolve, reject) => {
+      const request = store.put(settingsData);
+      request.onsuccess = () => {
+        console.log('Notification settings updated:', settingsData);
+        resolve();
+      };
+      request.onerror = () => {
+        console.error('Failed to update notification settings:', request.error);
+        reject(request.error);
+      };
+    });
+  } catch (error) {
+    console.error('Error updating notification settings:', error);
+  }
+}
+
+console.log('Background sync and push notification service worker extension loaded');

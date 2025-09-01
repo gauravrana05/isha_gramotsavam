@@ -75,7 +75,7 @@ export const OfflineNotice: React.FC<OfflineNoticeProps> = ({
           </div>
 
           <p className="text-sm text-orange-700 mb-3">
-            You're working with cached data. All your changes will be saved and synchronized when you're back online.
+            You&apos;re working with cached data. All your changes will be saved and synchronized when you&apos;re back online.
           </p>
 
           {/* Offline capabilities */}

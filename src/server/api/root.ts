@@ -12,6 +12,7 @@ import { verificationRouter } from './routers/verification'
 import { postsRouter } from './routers/posts'
 import { fixturesRouter } from './routers/fixtures'
 import { matchesRouter } from './routers/matches'
+import { notificationsRouter } from './routers/notifications'
 
 /**
  * This is the primary router for your server.
@@ -32,6 +33,7 @@ export const appRouter = createTRPCRouter({
   posts: postsRouter,
   fixtures: fixturesRouter,
   matches: matchesRouter,
+  notifications: notificationsRouter,
 })
 
 // Export type definition of API

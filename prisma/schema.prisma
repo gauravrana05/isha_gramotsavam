@@ -265,17 +265,105 @@ model Notification {
   relatedEntityType   String? @db.VarChar(50) @map("related_entity_type")
   relatedEntityId     String? @db.Uuid @map("related_entity_id")
   actionUrl           String? @db.VarChar(500) @map("action_url")
+  
+  // Enhanced notification fields
+  createdBy           String? @db.Uuid @map("created_by")
+  templateId          String? @db.Uuid @map("template_id")
+  broadcastId         String? @db.Uuid @map("broadcast_id")
+  scheduledFor        DateTime? @db.Timestamptz(6) @map("scheduled_for")
+  deliveryStatus      NotificationDeliveryStatus @default(pending) @map("delivery_status")
+  deliveredAt         DateTime? @db.Timestamptz(6) @map("delivered_at")
+  pushSent            Boolean @default(false) @map("push_sent")
+  pushSentAt          DateTime? @db.Timestamptz(6) @map("push_sent_at")
+  
   createdAt           DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
   updatedAt           DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
   deletedAt           DateTime? @db.Timestamptz(6) @map("deleted_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByUser User? @relation("NotificationsCreated", fields: [createdBy], references: [id])
+  template NotificationTemplate? @relation(fields: [templateId], references: [id])
+  broadcast NotificationBroadcast? @relation(fields: [broadcastId], references: [id])
 
   // Indexes
   @@index([userId])
+  @@index([createdBy])
   @@index([relatedEntityId])
+  @@index([broadcastId])
+  @@index([deliveryStatus])
+  @@index([scheduledFor])
   @@map("notifications")
+}
+
+model NotificationTemplate {
+  id          String @id @default(uuid()) @db.Uuid
+  name        String @db.VarChar(100)
+  title       String @db.VarChar(200)
+  message     String
+  type        NotificationType
+  category    NotificationCategory @default(general)
+  isActive    Boolean @default(true) @map("is_active")
+  variables   Json @default("{}")
+  createdBy   String @db.Uuid @map("created_by")
+  createdAt   DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+  deletedAt   DateTime? @db.Timestamptz(6) @map("deleted_at")
+
+  // Relations
+  createdByUser User @relation("NotificationTemplatesCreated", fields: [createdBy], references: [id])
+  notifications Notification[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("notification_templates")
+}
+
+model NotificationBroadcast {
+  id                String @id @default(uuid()) @db.Uuid
+  title             String @db.VarChar(200)
+  message           String
+  type              NotificationType
+  targetRoles       Json @default("[]")
+  targetVenueIds    Json @default("[]")
+  scheduledFor      DateTime? @db.Timestamptz(6) @map("scheduled_for")
+  status            NotificationBroadcastStatus @default(draft)
+  totalRecipients   Int @default(0) @map("total_recipients")
+  deliveredCount    Int @default(0) @map("delivered_count")
+  readCount         Int @default(0) @map("read_count")
+  createdBy         String @db.Uuid @map("created_by")
+  createdAt         DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt         DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+  sentAt            DateTime? @db.Timestamptz(6) @map("sent_at")
+  deletedAt         DateTime? @db.Timestamptz(6) @map("deleted_at")
+
+  // Relations
+  createdByUser User @relation("NotificationBroadcastsCreated", fields: [createdBy], references: [id])
+  notifications Notification[]
+
+  @@index([status])
+  @@index([createdBy])
+  @@index([scheduledFor])
+  @@map("notification_broadcasts")
+}
+
+model NotificationSettings {
+  id                    String @id @default(uuid()) @db.Uuid
+  userId                String @unique @db.Uuid @map("user_id")
+  pushEnabled           Boolean @default(true) @map("push_enabled")
+  emailEnabled          Boolean @default(true) @map("email_enabled")
+  matchUpdates          Boolean @default(true) @map("match_updates")
+  teamUpdates           Boolean @default(true) @map("team_updates")
+  verificationUpdates   Boolean @default(true) @map("verification_updates")
+  systemAnnouncements   Boolean @default(true) @map("system_announcements")
+  pushSubscription      Json? @map("push_subscription")
+  createdAt             DateTime @default(now()) @db.Timestamptz(6) @map("created_at")
+  updatedAt             DateTime @updatedAt @db.Timestamptz(6) @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
 }
 
 model SportGenderCategory {
@@ -562,6 +650,7 @@ model User {
   matches             Match[]
   media               Media[]
   notifications       Notification[]
+  notificationsCreated Notification[] @relation("NotificationsCreated")
   posts               Post[]
   systemConfigs       SystemConfig[]
   teamPhotos          TeamPhoto[]
@@ -577,6 +666,11 @@ model User {
   volunteerAssignmentsAssigned VolunteerAssignment[] @relation("VolunteerAssignmentsAssignedBy")
   volunteerAssignmentsAsVolunteer VolunteerAssignment[] @relation("VolunteerAssignmentsAsVolunteer")
   userRoleAssignmentsAssignedBy UserRoleAssignment[] @relation("UserRoleAssignments_AssignedBy")
+  
+  // New notification relations
+  notificationTemplatesCreated NotificationTemplate[] @relation("NotificationTemplatesCreated")
+  notificationBroadcastsCreated NotificationBroadcast[] @relation("NotificationBroadcastsCreated")
+  notificationSettings NotificationSettings?
 
   @@map("users")
 }
@@ -792,6 +886,9 @@ enum NotificationType {
   verification_update
   match_result
   venue_assignment
+  system_announcement
+  match_reminder
+  tournament_update
 }
 
 enum PlayerPosition {
@@ -854,4 +951,29 @@ enum PostStatus {
   draft
   published
   archived
+}
+
+enum NotificationDeliveryStatus {
+  pending
+  delivered
+  failed
+  cancelled
+}
+
+enum NotificationCategory {
+  general
+  match
+  team
+  verification
+  system
+  emergency
+}
+
+enum NotificationBroadcastStatus {
+  draft
+  scheduled
+  sending
+  sent
+  failed
+  cancelled
 }

@@ -636,7 +636,13 @@ export default function AdminTeamsPage() {
             }
           }}
           noSearchResultsEmptyState={noSearchResultsConfig}
-          pagination={{ enabled: true }}
+          pagination={{ 
+            enabled: true, 
+            serverSide: true, 
+            total: teamsData?.total || 0,
+            pageSize: 25,
+            pageSizeOptions: [10, 25, 50, 100]
+          }}
           persistState={false}
         />
       </div>

@@ -52,22 +52,36 @@ export default function AdminUsersPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
 
   // tRPC query for users
-  const {
-    data: usersData,
-    isLoading: usersLoading,
-    error: usersError
-  } = api.admin.users.getUsers.useQuery({
-    limit: 100,
-    offset: 0,
+  const [tableParams, setTableParams] = useState<TableParams>({
+    search: '',
+    sort: [],
+    filters: [],
+    page: 1,
+    pageSize: 25,
+  });
+
+  const transformTableParams = (params: TableParams) => ({
+    limit: params.pageSize,
+    offset: (params.page - 1) * params.pageSize,
     role: 'all',
     gender: 'all',
     isVerified: 'all',
     isProfileComplete: 'all',
     sortBy: 'createdAt',
     sortOrder: 'desc'
-  }, {
+  });
+
+  const {
+    data: usersData,
+    isLoading: usersLoading,
+    error: usersError
+  } = api.admin.users.getUsers.useQuery(transformTableParams(tableParams), {
     enabled: !!user && userProfile?.role === 'admin'
   });
+
+  const handleDataLoad = (params: TableParams) => {
+    setTableParams(params);
+  };
 
   // Auth gate
   useEffect(() => {
@@ -280,7 +294,14 @@ export default function AdminUsersPage() {
         multiSort={true}
         defaultSort={[{ key: 'createdAt', direction: 'desc' }]}
 
-        pagination={{ enabled: false }}
+        pagination={{ 
+          enabled: true, 
+          serverSide: true, 
+          total: usersData?.total || 0,
+          pageSize: 25,
+          pageSizeOptions: [10, 25, 50, 100]
+        }}
+        onDataLoad={handleDataLoad}
 
         exportOptions={exportOptions}
 

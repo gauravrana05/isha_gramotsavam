@@ -314,11 +314,11 @@ export default function VolunteerFixturesPage() {
         }}
       />
 
-      {/* Today's Matches Summary */}
+      {/* Today&apos;s Matches Summary */}
       {todayMatches && todayMatches.length > 0 && (
         <div className="mt-8 px-4 sm:px-0">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Today's Matches ({selectedDate})
+            Today&apos;s Matches ({selectedDate})
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {todayMatches.slice(0, 6).map((match: any) => (
@@ -403,7 +403,7 @@ export default function VolunteerFixturesPage() {
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm">Today's Matches</p>
+              <p className="text-gray-600 text-sm">Today&apos;s Matches</p>
               <p className="text-2xl font-bold text-purple-600">
                 {todayMatches?.length || 0}
               </p>
