@@ -1,236 +1,244 @@
 import { spawn } from 'child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
 export class ProtocolTrainer {
   constructor() {
-    this.trainingPath = join(process.cwd(), 'agents', 'training', 'protocols');
-    this.ensureDirectory();
+    this.trainingPath = join(process.cwd(), 'dhrit', 'training', 'protocols');
+    this.ensureTrainingDirectory();
   }
 
-  ensureDirectory() {
+  ensureTrainingDirectory() {
     if (!existsSync(this.trainingPath)) {
       mkdirSync(this.trainingPath, { recursive: true });
     }
   }
 
   async trainAgentProtocol(agentName) {
-    console.log(`Training ${agentName} on coordination protocols...`);
+    console.log(`Starting protocol training for ${agentName}...`);
     
-    const protocolTraining = this.buildProtocolTraining(agentName);
-    const result = await this.executeProtocolTraining(agentName, protocolTraining);
+    const protocolSession = this.buildProtocolTraining(agentName);
+    const result = await this.executeProtocolTraining(agentName, protocolSession);
     
-    await this.saveProtocolTraining(agentName, result);
+    await this.saveProtocolResults(agentName, result);
     return result;
   }
 
   buildProtocolTraining(agentName) {
-    return `PROTOCOL TRAINING SESSION - ${agentName.toUpperCase()}
+    const baseProtocol = `PROTOCOL TRAINING SESSION - ${agentName.toUpperCase()}
 
-MULTI-AGENT COORDINATION PROTOCOL
+You are part of the Dhrit multi-agent development platform. Learn these coordination protocols:
 
-You are part of a 4-agent development team:
-1. Frontend Developer (Next.js, React, Amplify)
-2. Backend Developer (tRPC, APIs, Auth)
-3. Database Admin (Prisma, PostgreSQL, Schema)
-4. QA & DevOps (Testing, CI/CD, Deployment)
-
-COMMUNICATION PROTOCOL:
+AGENT COORDINATION PROTOCOL:
 
 1. MESSAGE STRUCTURE:
-   - Always include: Task ID, Dependencies, Outputs, Next Steps
-   - Format: Clear, structured, actionable
-   - Status: pending → in-progress → completed → failed
+   - All messages follow JSON format with id, from, to, type, payload, status, timestamp
+   - Message types: task, response, dependency, completion, error
+   - Status values: pending, in-progress, completed, failed, blocked
 
-2. HANDOFF REQUIREMENTS:
-   - Database Admin → Backend Developer: Schema + Migration files
-   - Backend Developer → Frontend Developer: API specs + tRPC types
-   - Frontend Developer → QA DevOps: Components + Pages for testing
-   - All Agents → QA DevOps: Code for testing and deployment
+2. DEVELOPMENT WORKFLOW:
+   Stage 1: Requirements Analysis (All agents review)
+   Stage 2: Architecture Planning (Pal leads, others contribute)
+   Stage 3: Design System (Kalp creates, Roop implements)
+   Stage 4: Security Planning (Bandh audits, others implement)
+   Stage 5: Database Design (Kosh designs, Mool integrates)
+   Stage 6: Backend Development (Mool develops, others integrate)
+   Stage 7: Frontend Development (Roop develops, integrates with Mool)
+   Stage 8: Performance Optimization (Gati optimizes all layers)
+   Stage 9: Testing & QA (Dhar tests, others fix)
+   Stage 10: Deployment (Dhar deploys, all agents monitor)
 
-3. DEPENDENCY MANAGEMENT:
-   - Wait for required inputs from other agents
-   - Clearly state what you need from others
-   - Provide complete outputs for dependent agents
-   - Signal when your work blocks others
+3. AGENT DEPENDENCIES:
+   ${this.getAgentDependencies(agentName)}
 
-4. OUTPUT STANDARDS:
-   - Provide complete, working code
-   - Include file paths and installation instructions
-   - Document integration points
-   - Specify testing requirements
+4. HANDOFF REQUIREMENTS:
+   ${this.getHandoffRequirements(agentName)}
 
-YOUR SPECIFIC PROTOCOL ROLE:
+5. COMMUNICATION STANDARDS:
+   - Always acknowledge task receipt
+   - Provide progress updates for long tasks
+   - Signal completion with deliverables
+   - Report blockers immediately
+   - Request clarification when needed
 
-${this.getAgentSpecificProtocol(agentName)}
+6. OUTPUT STANDARDS:
+   - Complete, working code
+   - Clear documentation
+   - Test coverage where applicable
+   - Integration instructions
+   - Next steps for dependent agents
 
-COORDINATION RULES:
+Remember: You are part of a coordinated team. Your success depends on clear communication and reliable handoffs.`;
 
-1. ALWAYS acknowledge dependencies:
-   "Waiting for: [agent] to provide [specific output]"
-
-2. ALWAYS provide complete handoffs:
-   "Delivering to [agent]: [specific files/outputs]"
-   "Integration notes: [how to use your output]"
-
-3. ALWAYS signal completion:
-   "Task complete. Next agent: [agent name]"
-   "Blockers: [any issues that prevent next steps]"
-
-4. ALWAYS maintain project context:
-   - Reference project requirements
-   - Maintain consistency with other agents' work
-   - Follow established patterns and conventions
-
-EXAMPLE COORDINATION FLOW:
-1. Database Admin creates schema → signals Backend Developer
-2. Backend Developer creates APIs → signals Frontend Developer  
-3. Frontend Developer creates UI → signals QA DevOps
-4. QA DevOps tests everything → signals deployment ready
-
-Remember: You are part of a coordinated team. Your work enables others, and others enable your work.`;
+    return baseProtocol;
   }
 
-  getAgentSpecificProtocol(agentName) {
-    const protocols = {
-      'frontend-developer': `
-FRONTEND DEVELOPER PROTOCOL:
+  getAgentDependencies(agentName) {
+    const dependencies = {
+      'roop': `
+   DEPENDS ON:
+   - Kalp: Design system, component specifications, design tokens
+   - Mool: API specifications, tRPC types, authentication flow
+   - Bandh: Security requirements, authentication patterns
+   - Gati: Performance requirements, optimization guidelines
+   
+   PROVIDES TO:
+   - Dhar: Frontend components for testing
+   - Gati: Frontend code for performance optimization
+   - All: User interface implementation`,
 
-INPUTS YOU NEED:
-- API specifications from Backend Developer
-- tRPC router types and procedures
-- Authentication flow from Backend
-- Design requirements from Linker
+      'mool': `
+   DEPENDS ON:
+   - Kosh: Database schema, Prisma client, query patterns
+   - Pal: API architecture, service patterns, scalability requirements
+   - Bandh: Security patterns, authentication, authorization
+   - Gati: Performance requirements, caching strategies
+   
+   PROVIDES TO:
+   - Roop: API specifications, tRPC types, authentication
+   - Dhar: API endpoints for testing
+   - All: Backend services and data access`,
 
-OUTPUTS YOU PROVIDE:
-- React components with TypeScript
-- Next.js pages and layouts
-- Tailwind CSS styling
-- Form handling and validation
-- tRPC client integration
-- Amplify deployment configuration
+      'kosh': `
+   DEPENDS ON:
+   - Pal: Database architecture, scaling requirements
+   - Bandh: Data security, encryption requirements
+   - Gati: Performance requirements, indexing strategies
+   
+   PROVIDES TO:
+   - Mool: Database schema, Prisma client, migrations
+   - Dhar: Database setup for testing
+   - All: Data model and persistence layer`,
 
-HANDOFF FORMAT:
-- Component files: src/components/[ComponentName].tsx
-- Page files: src/app/[route]/page.tsx
-- Type definitions: src/types/[domain].ts
-- Integration notes: How to connect with backend APIs
-- Testing requirements: What QA should test
+      'dhar': `
+   DEPENDS ON:
+   - Roop: Frontend components and pages
+   - Mool: Backend APIs and services
+   - Kosh: Database setup and test data
+   - All agents: Complete implementations for testing
+   
+   PROVIDES TO:
+   - All: Test results, deployment pipeline, quality assurance`,
 
-COORDINATION POINTS:
-- Request API specs before building forms
-- Confirm authentication flow before implementing auth UI
-- Provide component documentation for testing
-- Signal when UI is ready for integration testing`,
+      'kalp': `
+   DEPENDS ON:
+   - Requirements: Brand guidelines, design requirements
+   - Pal: Component architecture requirements
+   
+   PROVIDES TO:
+   - Roop: Design tokens, component specs, style guidelines
+   - All: Design system, brand identity, UI patterns`,
 
-      'backend-developer': `
-BACKEND DEVELOPER PROTOCOL:
+      'bandh': `
+   DEPENDS ON:
+   - Pal: Security architecture requirements
+   - Requirements: Compliance and security requirements
+   
+   PROVIDES TO:
+   - All agents: Security requirements, patterns, audit results`,
 
-INPUTS YOU NEED:
-- Database schema from Database Admin
-- Prisma client and types
-- Business logic requirements from Linker
-- Authentication requirements
+      'gati': `
+   DEPENDS ON:
+   - All agents: Code implementations for optimization
+   - Pal: Performance architecture requirements
+   
+   PROVIDES TO:
+   - All agents: Performance requirements, optimization strategies`,
 
-OUTPUTS YOU PROVIDE:
-- tRPC routers and procedures
-- API endpoint specifications
-- Authentication middleware
-- Input/output validation schemas
-- Database integration code
-- Type definitions for frontend
-
-HANDOFF FORMAT:
-- Router files: src/server/api/routers/[domain].ts
-- Type exports: Generated tRPC types
-- API documentation: Endpoint specs and usage
-- Authentication flow: How frontend should authenticate
-- Database queries: Prisma usage examples
-
-COORDINATION POINTS:
-- Wait for database schema before creating APIs
-- Provide complete tRPC types to Frontend
-- Document authentication flow for Frontend
-- Specify testing scenarios for QA DevOps`,
-
-      'database-admin': `
-DATABASE ADMIN PROTOCOL:
-
-INPUTS YOU NEED:
-- Data requirements from Linker
-- Entity relationships and business rules
-- Performance requirements
-- Scalability considerations
-
-OUTPUTS YOU PROVIDE:
-- Prisma schema definitions
-- Migration scripts
-- Database indexes and constraints
-- Seed data scripts
-- Query optimization recommendations
-- Performance monitoring setup
-
-HANDOFF FORMAT:
-- Schema file: prisma/schema.prisma
-- Migration files: prisma/migrations/
-- Seed script: prisma/seed.ts
-- Documentation: Entity relationships and constraints
-- Performance notes: Indexing and optimization strategies
-
-COORDINATION POINTS:
-- Provide complete schema before Backend starts
-- Document all relationships for Backend Developer
-- Specify performance considerations
-- Provide migration strategies for DevOps`,
-
-      'qa-devops': `
-QA & DEVOPS PROTOCOL:
-
-INPUTS YOU NEED:
-- Frontend components from Frontend Developer
-- API endpoints from Backend Developer
-- Database schema from Database Admin
-- Deployment requirements from Linker
-
-OUTPUTS YOU PROVIDE:
-- Test suites (unit, integration, e2e)
-- CI/CD pipeline configuration
-- Deployment scripts and configs
-- Monitoring and logging setup
-- Security and performance audits
-- Documentation and runbooks
-
-HANDOFF FORMAT:
-- Test files: __tests__/[component].test.tsx
-- Pipeline config: .github/workflows/ci.yml
-- Deployment config: amplify.yml or vercel.json
-- Monitoring setup: Performance and error tracking
-- Documentation: Deployment and operational procedures
-
-COORDINATION POINTS:
-- Wait for all components before comprehensive testing
-- Test integration between Frontend and Backend
-- Validate database performance under load
-- Coordinate deployment with all agents`
+      'pal': `
+   DEPENDS ON:
+   - Requirements: Scalability and architecture requirements
+   
+   PROVIDES TO:
+   - All agents: Architecture patterns, scalability guidelines, system design`
     };
 
-    return protocols[agentName] || 'Generic coordination protocol';
+    return dependencies[agentName] || 'No specific dependencies defined.';
   }
 
-  async executeProtocolTraining(agentName, protocolTraining) {
-    const agentMapping = {
-      'frontend-developer': 'frontend',
-      'backend-developer': 'backend',
-      'database-admin': 'database',
-      'qa-devops': 'devops'
+  getHandoffRequirements(agentName) {
+    const handoffs = {
+      'roop': `
+   WHEN RECEIVING FROM KALP:
+   - Design tokens (colors, typography, spacing)
+   - Component specifications and variants
+   - Responsive breakpoints and guidelines
+   
+   WHEN RECEIVING FROM MOOL:
+   - tRPC router types and procedures
+   - Authentication flow and components
+   - API error handling patterns
+   
+   WHEN PROVIDING TO DHAR:
+   - Complete component implementations
+   - Page routing and navigation
+   - Build configuration and deployment setup`,
+
+      'mool': `
+   WHEN RECEIVING FROM KOSH:
+   - Prisma schema and client
+   - Database connection configuration
+   - Migration files and seed data
+   
+   WHEN PROVIDING TO ROOP:
+   - tRPC router definitions and types
+   - Authentication middleware and utilities
+   - API documentation and usage examples`,
+
+      'kosh': `
+   WHEN PROVIDING TO MOOL:
+   - Complete Prisma schema
+   - Database connection setup
+   - Migration strategy and files
+   - Performance optimization recommendations`,
+
+      'dhar': `
+   WHEN RECEIVING FROM ALL:
+   - Complete implementations ready for testing
+   - Documentation and setup instructions
+   - Environment configuration requirements
+   
+   WHEN PROVIDING TO ALL:
+   - Test results and coverage reports
+   - Deployment pipeline and configuration
+   - Quality metrics and recommendations`,
+
+      'kalp': `
+   WHEN PROVIDING TO ROOP:
+   - Design token files (JSON/CSS)
+   - Component design specifications
+   - Style guide and usage documentation
+   - Accessibility guidelines and requirements`,
+
+      'bandh': `
+   WHEN PROVIDING TO ALL:
+   - Security requirements and guidelines
+   - Authentication and authorization patterns
+   - Compliance checklists and validation
+   - Security audit results and recommendations`,
+
+      'gati': `
+   WHEN PROVIDING TO ALL:
+   - Performance budgets and targets
+   - Optimization strategies and techniques
+   - Monitoring and alerting setup
+   - Performance test results and recommendations`,
+
+      'pal': `
+   WHEN PROVIDING TO ALL:
+   - System architecture diagrams and patterns
+   - Scalability guidelines and requirements
+   - Service integration patterns
+   - Infrastructure and deployment architecture`
     };
 
-    const qAgentName = agentMapping[agentName] || agentName;
+    return handoffs[agentName] || 'No specific handoff requirements defined.';
+  }
 
+  async executeProtocolTraining(agentName, protocolSession) {
     return new Promise((resolve, reject) => {
-      const qProcess = spawn('q', ['/agent', qAgentName], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env }
+      const qProcess = spawn('q', ['/agent', this.mapAgentToQType(agentName)], {
+        stdio: ['pipe', 'pipe', 'pipe']
       });
 
       let output = '';
@@ -246,44 +254,58 @@ COORDINATION POINTS:
 
       qProcess.on('close', (code) => {
         if (code === 0) {
-          resolve(output.trim());
+          resolve(`Protocol training completed for ${agentName}:\n${output}`);
         } else {
           reject(new Error(`Protocol training failed for ${agentName}: ${errorOutput}`));
         }
       });
 
-      const trainingInput = `${protocolTraining}\n\nPlease confirm you understand the coordination protocol and will follow these communication standards. Respond with "PROTOCOL TRAINING COMPLETE" and acknowledge your coordination responsibilities.\n\n/quit\n`;
-      qProcess.stdin.write(trainingInput);
+      qProcess.on('error', (error) => {
+        reject(new Error(`Failed to start protocol training for ${agentName}: ${error.message}`));
+      });
+
+      // Send protocol training to agent
+      qProcess.stdin.write(protocolSession);
+      qProcess.stdin.write('\n\nPlease confirm you understand these coordination protocols by responding with "PROTOCOL TRAINING COMPLETE".\n');
       qProcess.stdin.end();
     });
   }
 
-  async saveProtocolTraining(agentName, result) {
-    const trainingFile = join(this.trainingPath, `${agentName}-protocol.json`);
-    const trainingData = {
-      agent: agentName,
-      type: 'protocol',
-      timestamp: new Date().toISOString(),
-      result: result,
-      status: 'completed'
+  mapAgentToQType(agentName) {
+    const mapping = {
+      'roop': 'frontend',
+      'mool': 'backend', 
+      'kosh': 'database',
+      'dhar': 'devops',
+      'kalp': 'design',
+      'bandh': 'security',
+      'gati': 'performance',
+      'pal': 'architecture'
     };
-
-    writeFileSync(trainingFile, JSON.stringify(trainingData, null, 2));
+    
+    return mapping[agentName] || 'general';
   }
 
-  async trainAllAgentsProtocol() {
-    const agents = ['frontend-developer', 'backend-developer', 'database-admin', 'qa-devops'];
-    const results = [];
+  async saveProtocolResults(agentName, result) {
+    const protocolData = {
+      agentName,
+      trainingType: 'protocol',
+      result,
+      timestamp: new Date().toISOString()
+    };
 
-    for (const agent of agents) {
-      try {
-        const result = await this.trainAgentProtocol(agent);
-        results.push({ agent, status: 'success', result });
-      } catch (error) {
-        results.push({ agent, status: 'failed', error: error.message });
-      }
+    const filePath = join(this.trainingPath, `${agentName}-protocol.json`);
+    writeFileSync(filePath, JSON.stringify(protocolData, null, 2));
+  }
+
+  getProtocolResults(agentName) {
+    const filePath = join(this.trainingPath, `${agentName}-protocol.json`);
+    
+    if (existsSync(filePath)) {
+      const data = readFileSync(filePath, 'utf8');
+      return JSON.parse(data);
     }
-
-    return results;
+    
+    return null;
   }
 }

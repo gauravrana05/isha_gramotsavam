@@ -1,108 +1,61 @@
-import { QAgentExecutor } from './q-agent-executor.js';
-
 export class AgentCoordinator {
-  constructor() {
-    this.qExecutor = new QAgentExecutor();
-    this.activeAgents = new Map();
+  constructor(redisManager, dbManager) {
+    this.redis = redisManager;
+    this.db = dbManager;
+    this.agents = ['roop', 'mool', 'kosh', 'dhar', 'kalp', 'bandh', 'gati', 'pal'];
   }
 
-  async coordinateAgents(projectId, requirements) {
-    const plan = this.createExecutionPlan(requirements);
-    const results = [];
-
-    for (const stage of plan.stages) {
-      console.log(`Executing stage: ${stage.name}`);
+  async initializeProject(projectId, requirements) {
+    try {
+      // Create project in database
+      const project = await this.db.createProject(projectId, projectId, requirements);
       
-      const stageResults = await Promise.all(
-        stage.agents.map(async (agentTask) => {
-          const context = {
-            projectId,
-            stage: stage.name,
-            dependencies: results.filter(r => agentTask.dependencies?.includes(r.agent))
-          };
+      // Initialize project state in Redis
+      const initialState = {
+        projectId,
+        requirements,
+        currentStage: 'initialization',
+        stages: {
+          initialization: { status: 'completed', completedAt: new Date().toISOString() },
+          architecture: { status: 'pending' },
+          design: { status: 'pending' },
+          security: { status: 'pending' },
+          database: { status: 'pending' },
+          backend: { status: 'pending' },
+          frontend: { status: 'pending' },
+          performance: { status: 'pending' },
+          testing: { status: 'pending' },
+          deployment: { status: 'pending' }
+        },
+        agents: {},
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      };
 
-          return await this.qExecutor.executeAgent(
-            agentTask.agent,
-            agentTask.task,
-            agentTask.requirements,
-            context
-          );
-        })
-      );
-
-      results.push(...stageResults.map((result, index) => ({
-        agent: stage.agents[index].agent,
-        stage: stage.name,
-        result
-      })));
+      await this.redis.setProjectState(projectId, initialState);
+      return { success: true, projectId, initialState };
+    } catch (error) {
+      throw new Error(`Failed to initialize project: ${error.message}`);
     }
-
-    return results;
   }
 
-  createExecutionPlan(requirements) {
-    // Analyze requirements and create execution plan
-    const hasAuth = requirements.toLowerCase().includes('auth') || 
-                   requirements.toLowerCase().includes('login') ||
-                   requirements.toLowerCase().includes('user');
-    
-    const hasDatabase = requirements.toLowerCase().includes('data') ||
-                       requirements.toLowerCase().includes('store') ||
-                       requirements.toLowerCase().includes('user');
-
-    const plan = {
-      stages: [
-        {
-          name: 'database-design',
-          agents: hasDatabase ? [{
-            agent: 'database-admin',
-            task: 'Design database schema',
-            requirements: `Based on: ${requirements}`,
-            dependencies: []
-          }] : []
-        },
-        {
-          name: 'backend-development',
-          agents: [{
-            agent: 'backend-developer',
-            task: 'Create API endpoints',
-            requirements: `Based on: ${requirements}`,
-            dependencies: hasDatabase ? ['database-admin'] : []
-          }]
-        },
-        {
-          name: 'frontend-development',
-          agents: [{
-            agent: 'frontend-developer',
-            task: 'Build user interface',
-            requirements: `Based on: ${requirements}`,
-            dependencies: ['backend-developer']
-          }]
-        },
-        {
-          name: 'testing-deployment',
-          agents: [{
-            agent: 'qa-devops',
-            task: 'Setup testing and deployment',
-            requirements: `Based on: ${requirements}`,
-            dependencies: ['frontend-developer', 'backend-developer']
-          }]
-        }
-      ]
-    };
-
-    // Filter out empty stages
-    plan.stages = plan.stages.filter(stage => stage.agents.length > 0);
-    
-    return plan;
+  async getProjectStatus(projectId) {
+    try {
+      const state = await this.redis.getProjectState(projectId);
+      const project = await this.db.getProject(projectId);
+      
+      return { projectId, project, state };
+    } catch (error) {
+      throw new Error(`Failed to get project status: ${error.message}`);
+    }
   }
 
-  async getAgentStatus(projectId) {
-    // Return status of all agents for a project
-    return {
-      projectId,
-      activeAgents: Array.from(this.activeAgents.keys()),
-      timestamp: new Date().toISOString()
-    };
+  async executeFullProject(projectId, requirements) {
+    try {
+      await this.initializeProject(projectId, requirements);
+      return { success: true, message: 'Project execution started' };
+    } catch (error) {
+      throw new Error(`Failed to execute full project: ${error.message}`);
+    }
   }
 }

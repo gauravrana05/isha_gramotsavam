@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Badge } from '@/components/ui/badge';
 import  { Input }  from '@/components/ui';
 import { Label } from '@/components/ui';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui';
 import { useNotification } from '@/context/NotificationContext';
 import { Search, Users, CheckCircle, Clock, Camera } from 'lucide-react';
 

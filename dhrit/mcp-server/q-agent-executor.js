@@ -1,26 +1,54 @@
 import { spawn } from 'child_process';
-import { writeFileSync, readFileSync, existsSync } from 'fs';
-import { join } from 'path';
 
 export class QAgentExecutor {
-  constructor() {
-    // Map our agent names to Q /agent names
+  constructor(redisManager, dbManager) {
+    this.redis = redisManager;
+    this.db = dbManager;
     this.agentMapping = {
-      'frontend-developer': 'frontend',
-      'backend-developer': 'backend', 
-      'database-admin': 'database',
-      'qa-devops': 'devops'
+      'roop': 'frontend',
+      'mool': 'backend',
+      'kosh': 'database',
+      'dhar': 'devops',
+      'kalp': 'design',
+      'bandh': 'security',
+      'gati': 'performance',
+      'pal': 'architecture'
     };
   }
 
-  async executeAgent(agentName, task, requirements, projectContext = {}) {
-    const qAgentName = this.agentMapping[agentName] || agentName;
-    const userMessage = this.buildUserMessage(task, requirements, projectContext);
+  async executeAgent(agentName, task, requirements, context = {}) {
+    const startTime = Date.now();
     
+    try {
+      console.log(`Executing ${agentName} agent...`);
+      
+      const qAgentType = this.agentMapping[agentName] || 'general';
+      const result = await this.runQAgent(qAgentType, task, requirements, context);
+      
+      const duration = Date.now() - startTime;
+      
+      // Record performance
+      if (this.db) {
+        await this.db.recordAgentPerformance(agentName, task, duration, true);
+      }
+      
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      // Record failure
+      if (this.db) {
+        await this.db.recordAgentPerformance(agentName, task, duration, false, error.message);
+      }
+      
+      throw error;
+    }
+  }
+
+  async runQAgent(qAgentType, task, requirements, context) {
     return new Promise((resolve, reject) => {
-      const qProcess = spawn('q', ['/agent', qAgentName], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env }
+      const qProcess = spawn('q', ['/agent', qAgentType], {
+        stdio: ['pipe', 'pipe', 'pipe']
       });
 
       let output = '';
@@ -36,49 +64,32 @@ export class QAgentExecutor {
 
       qProcess.on('close', (code) => {
         if (code === 0) {
-          resolve(this.parseAgentResponse(output));
+          resolve(output);
         } else {
-          reject(new Error(`Agent ${qAgentName} failed: ${errorOutput}`));
+          reject(new Error(`Q Agent failed: ${errorOutput}`));
         }
       });
 
-      // Send task directly to /agent (no system prompt needed)
-      const agentInput = `${userMessage}\n\n/quit\n`;
-      qProcess.stdin.write(agentInput);
+      qProcess.on('error', (error) => {
+        reject(new Error(`Failed to start Q Agent: ${error.message}`));
+      });
+
+      // Send task to agent
+      const prompt = this.buildAgentPrompt(task, requirements, context);
+      qProcess.stdin.write(prompt);
       qProcess.stdin.end();
     });
   }
 
-  buildUserMessage(task, requirements, context) {
-    let message = `Task: ${task}\nRequirements: ${requirements}\n`;
-    
-    if (context.projectId) {
-      message += `Project ID: ${context.projectId}\n`;
-    }
-    
-    if (context.currentStage) {
-      message += `Current Stage: ${context.currentStage}\n`;
-    }
-    
-    if (context.dependencies) {
-      message += `Dependencies: ${JSON.stringify(context.dependencies, null, 2)}\n`;
-    }
-    
-    message += '\nPlease provide a complete implementation with code examples and next steps.';
-    
-    return message;
-  }
+  buildAgentPrompt(task, requirements, context) {
+    return `DHRIT AGENT TASK
 
-  parseAgentResponse(output) {
-    // Extract the actual response from Q CLI output
-    const lines = output.split('\n');
-    const responseStart = lines.findIndex(line => line.includes('User:')) + 1;
-    const responseEnd = lines.findIndex(line => line.includes('/quit'));
-    
-    if (responseStart > 0 && responseEnd > responseStart) {
-      return lines.slice(responseStart, responseEnd).join('\n').trim();
-    }
-    
-    return output.trim();
+Task: ${task}
+
+Requirements: ${requirements}
+
+Context: ${JSON.stringify(context, null, 2)}
+
+Please complete this task following Dhrit platform standards and coordination protocols.`;
   }
 }

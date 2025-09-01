@@ -1,63 +1,165 @@
 # Project Coordination Guide
 
-This guide explains how agents coordinate to build complete applications through structured workflows.
+This guide explains how the 8 agents in the Dhrit platform coordinate to build complete applications through structured workflows.
 
 ## Coordination Architecture
 
-### Message Queue System
-- **Location**: `agents/state/{projectId}/messages/`
+### Redis-Based Message Queue
+- **Location**: Redis Streams for real-time coordination
 - **Format**: Structured JSON messages with task details
 - **Status Tracking**: pending → in-progress → completed → failed
 
-### State Machine
-- **Location**: `agents/state/{projectId}/project-state.json`
-- **Stages**: requirements → design → database → backend → frontend → testing → deployment
+### PostgreSQL State Management
+- **Location**: PostgreSQL/Supabase for persistent project state
+- **Stages**: requirements → architecture → design → security → database → backend → frontend → performance → testing → deployment
 - **Transitions**: Automatic progression based on agent completion
 
-## Development Workflow
+## 8-Agent Development Workflow
 
-### 1. Project Initialization
+### Stage 1: Requirements Analysis
+**All agents** review project requirements and prepare for coordination
+
+### Stage 2: Architecture Planning
+**Pal (Architecture)** leads system design
+- Designs overall system architecture
+- Defines scalability requirements
+- Plans service integration patterns
+- Provides architecture guidelines to all agents
+
+### Stage 3: Design System Creation
+**Kalp (Design System)** creates visual foundation
+- Develops design tokens and component systems
+- Creates brand identity and style guides
+- Provides design specifications to **Roop**
+
+### Stage 4: Security Planning
+**Bandh (Security)** audits and plans security
+- Reviews architecture for security requirements
+- Plans authentication and authorization
+- Defines compliance requirements
+- Provides security guidelines to all agents
+
+### Stage 5: Database Design
+**Kosh (Database)** designs data layer
+- Creates database schema based on **Pal's** architecture
+- Implements **Bandh's** security requirements
+- Optimizes for **Gati's** performance requirements
+- Provides schema to **Mool**
+
+### Stage 6: Backend Development
+**Mool (Backend)** develops APIs
+- Implements **Kosh's** database schema
+- Follows **Pal's** architecture patterns
+- Implements **Bandh's** security requirements
+- Provides API specifications to **Roop**
+
+### Stage 7: Frontend Development
+**Roop (Frontend)** builds user interface
+- Implements **Kalp's** design system
+- Integrates with **Mool's** APIs
+- Follows **Bandh's** security patterns
+- Creates user-facing application
+
+### Stage 8: Performance Optimization
+**Gati (Performance)** optimizes all layers
+- Optimizes **Roop's** frontend performance
+- Enhances **Mool's** API performance
+- Optimizes **Kosh's** database queries
+- Implements caching and optimization strategies
+
+### Stage 9: Testing & Quality Assurance
+**Dhar (QA & DevOps)** tests complete system
+- Tests all components from other agents
+- Validates integration between layers
+- Ensures quality and reliability
+- Prepares deployment pipeline
+
+### Stage 10: Deployment
+**Dhar (QA & DevOps)** deploys to production
+- Deploys complete application
+- Sets up monitoring and alerting
+- All agents monitor system health
+
+## Agent Dependencies
+
+### Roop (Frontend) Dependencies
+**Depends on:**
+- **Kalp**: Design tokens, component specifications
+- **Mool**: API specifications, tRPC types
+- **Bandh**: Security requirements, authentication patterns
+- **Gati**: Performance requirements
+
+**Provides to:**
+- **Dhar**: Frontend components for testing
+- **Gati**: Frontend code for optimization
+
+### Mool (Backend) Dependencies
+**Depends on:**
+- **Kosh**: Database schema, Prisma client
+- **Pal**: API architecture, service patterns
+- **Bandh**: Security patterns, authentication
+- **Gati**: Performance requirements, caching strategies
+
+**Provides to:**
+- **Roop**: API specifications, tRPC types
+- **Dhar**: API endpoints for testing
+
+### Kosh (Database) Dependencies
+**Depends on:**
+- **Pal**: Database architecture, scaling requirements
+- **Bandh**: Data security, encryption requirements
+- **Gati**: Performance requirements, indexing strategies
+
+**Provides to:**
+- **Mool**: Database schema, Prisma client, migrations
+- **Dhar**: Database setup for testing
+
+### Enterprise Agent Dependencies
+**Kalp, Bandh, Gati, Pal** provide foundational requirements and guidelines to core agents throughout the development process.
+
+## Coordination Commands
+
+### Initialize Project
 ```bash
-agents___project-init --projectId "my-app" --requirements "Build a user authentication system"
+dhrit___init --projectId "my-app" --requirements "Your app description"
 ```
 
-**Creates**:
-- Project state file
-- Message queue directory
-- Initial requirements documentation
-
-### 2. Agent Coordination Flow
-
-**Database Stage**:
-1. Database Admin receives requirements
-2. Designs schema and creates migrations
-3. Signals completion to Backend Developer
-
-**Backend Stage**:
-1. Backend Developer receives database schema
-2. Creates tRPC routers and API endpoints
-3. Signals completion to Frontend Developer
-
-**Frontend Stage**:
-1. Frontend Developer receives API specifications
-2. Creates React components and pages
-3. Signals completion to QA DevOps
-
-**Testing Stage**:
-1. QA DevOps receives all components
-2. Creates test suites and CI/CD pipelines
-3. Signals deployment readiness
-
-### 3. Full Project Execution
+### Check Project Status
 ```bash
-agents___execute-full-project --projectId "my-app" --requirements "Complete application requirements"
+dhrit___status --projectId "my-app"
 ```
 
-**Automated Flow**:
-- Analyzes requirements
-- Creates execution plan
-- Coordinates all agents in sequence
-- Handles dependencies automatically
+### Execute Full 8-Agent Workflow
+```bash
+dhrit___build --projectId "my-app" --requirements "Complete project requirements"
+```
+
+### Individual Agent Tasks
+```bash
+# Architecture planning
+dhrit___pal --projectId "my-app" --task "Design system architecture" --requirements "Scalable architecture"
+
+# Design system
+dhrit___kalp --projectId "my-app" --task "Create design system" --requirements "Modern brand identity"
+
+# Security planning
+dhrit___bandh --projectId "my-app" --task "Security audit" --requirements "Enterprise security"
+
+# Database design
+dhrit___kosh --projectId "my-app" --task "Create schema" --requirements "User management schema"
+
+# Backend development
+dhrit___mool --projectId "my-app" --task "Create APIs" --requirements "Authentication APIs"
+
+# Frontend development
+dhrit___roop --projectId "my-app" --task "Build UI" --requirements "User dashboard"
+
+# Performance optimization
+dhrit___gati --projectId "my-app" --task "Optimize performance" --requirements "Sub-second load times"
+
+# Testing and deployment
+dhrit___dhar --projectId "my-app" --task "Test and deploy" --requirements "Production deployment"
+```
 
 ## Message Structure
 
@@ -65,8 +167,8 @@ agents___execute-full-project --projectId "my-app" --requirements "Complete appl
 ```json
 {
   "id": "msg_123456789_abc123",
-  "from": "linker",
-  "to": "frontend-developer",
+  "from": "coordinator",
+  "to": "roop",
   "type": "task",
   "payload": {
     "task": "Create login form",
@@ -74,7 +176,7 @@ agents___execute-full-project --projectId "my-app" --requirements "Complete appl
     "context": {
       "projectId": "my-app",
       "currentStage": "frontend",
-      "dependencies": ["backend-auth-api"]
+      "dependencies": ["mool-auth-api", "kalp-design-tokens"]
     }
   },
   "status": "pending",
@@ -82,62 +184,9 @@ agents___execute-full-project --projectId "my-app" --requirements "Complete appl
 }
 ```
 
-### Response Message
-```json
-{
-  "id": "msg_123456790_def456",
-  "from": "frontend-developer",
-  "to": "linker",
-  "type": "response",
-  "payload": {
-    "result": "Login form component created",
-    "files": ["src/components/LoginForm.tsx"],
-    "nextSteps": ["Integrate with backend API"],
-    "originalTaskId": "msg_123456789_abc123"
-  },
-  "status": "completed",
-  "timestamp": "2025-01-01T00:05:00.000Z"
-}
-```
-
-## Agent Dependencies
-
-### Frontend Developer Needs
-- API specifications from Backend Developer
-- tRPC router types and procedures
-- Authentication flow documentation
-
-### Backend Developer Needs
-- Database schema from Database Admin
-- Prisma client and types
-- Business logic requirements
-
-### Database Admin Needs
-- Data requirements and relationships
-- Performance requirements
-- Scalability considerations
-
-### QA DevOps Needs
-- All components from other agents
-- Deployment requirements
-- Testing specifications
-
-## Coordination Commands
-
-### Check Project Status
-```bash
-agents___project-status --projectId "my-app"
-```
-
-### Individual Agent Tasks
-```bash
-# Assign specific task to agent
-agents___frontend-developer --projectId "my-app" --task "Create dashboard" --requirements "User dashboard with navigation"
-```
-
 ## Best Practices
 
-### For Linkers (Users)
+### For Users
 1. **Clear Requirements**: Provide detailed, specific requirements
 2. **Check Dependencies**: Ensure previous stages are complete
 3. **Monitor Progress**: Use project status to track development
@@ -154,4 +203,4 @@ agents___frontend-developer --projectId "my-app" --task "Create dashboard" --req
 **Agents Not Coordinating**: Check protocol training completion
 **Missing Dependencies**: Verify previous agent outputs
 **Stuck Workflow**: Check for blockers in project state
-**Communication Issues**: Verify message queue structure
+**Communication Issues**: Verify Redis and PostgreSQL connections
