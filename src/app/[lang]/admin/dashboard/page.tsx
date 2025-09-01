@@ -232,7 +232,14 @@ export default function AdminDashboard() {
   }, [autoRefreshEnabled, user, userProfile, handleRefresh]);
 
   const loading = dashboardLoading || tournamentLoading;
-  const error = dashboardError?.message || tournamentError?.message || '';
+  
+  // Debug logging
+  console.log('Dashboard Error:', dashboardError);
+  console.log('Tournament Error:', tournamentError);
+  console.log('Dashboard Data:', dashboardData);
+  console.log('Tournament Data:', tournamentData);
+  
+  const error = dashboardError?.message || tournamentError?.message;
   const dashboardOverview = dashboardData?.overview;
   const tournamentOverview = tournamentData?.tournament;
 

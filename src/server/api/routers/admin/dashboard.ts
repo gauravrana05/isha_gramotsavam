@@ -6,15 +6,18 @@ import { db } from "@/lib/db";
 export const adminDashboardRouter = createTRPCRouter({
   // Dashboard Overview
   getDashboardOverview: protectedProcedure
-    .input(z.object({
-      level: z.string().optional().default('all'),
-      includeDetailed: z.boolean().optional().default(false),
-      refreshCache: z.boolean().optional().default(false),
-    }).optional().default({}))
+    .input(z.any().optional())
     .query(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
+
+      // Parse input with defaults
+      const parsedInput = {
+        level: input?.level || 'all',
+        includeDetailed: input?.includeDetailed || false,
+        refreshCache: input?.refreshCache || false,
+      };
 
       // Teams stats
       const [totalTeams, verifiedTeams, rejectedTeams, draftTeams] = await Promise.all([
@@ -164,14 +167,17 @@ export const adminDashboardRouter = createTRPCRouter({
 
   // Tournament Overview
   getTournamentOverview: protectedProcedure
-    .input(z.object({
-      level: z.string().optional().default('all'),
-      status: z.string().optional().default('all'),
-    }).optional().default({}))
+    .input(z.any().optional())
     .query(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
+
+      // Parse input with defaults
+      const parsedInput = {
+        level: input?.level || 'all',
+        status: input?.status || 'all',
+      };
 
       const [totalFixtures, activeFixtures, completedFixtures] = await Promise.all([
         db.fixture.count(),
