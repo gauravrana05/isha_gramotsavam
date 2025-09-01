@@ -56,11 +56,36 @@ export default function VolunteerMainPage() {
     isLoading: assignmentsLoading, 
     error: assignmentsError 
   } = api.volunteers.assignments.getMyAssignments.useQuery(
-    undefined,
     { 
-      enabled: !authLoading && !!user && !!user.id && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || ''),
+      enabled: !authLoading && !!user && !!user.id && ['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user?.role || ''),
     }
   );
+
+  // Debug logging for client-side data
+  useEffect(() => {
+    console.log('🔍 Query enabled check:', {
+      authLoading,
+      hasUser: !!user,
+      userId: user?.id,
+      userRole: user?.role,
+      isRoleIncluded: ['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user?.role || ''),
+      queryEnabled: !authLoading && !!user && !!user.id && ['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user?.role || ''),
+      assignmentsLoading,
+      hasData: assignmentsData !== undefined
+    });
+
+    if (!assignmentsLoading && assignmentsData !== undefined) {
+      console.log('🔍 Client assignments data:', {
+        assignmentsData,
+        isArray: Array.isArray(assignmentsData),
+        length: assignmentsData?.length,
+        hasError: !!assignmentsError,
+        error: assignmentsError?.message,
+        userId: user?.id,
+        userRole: user?.role
+      });
+    }
+  }, [assignmentsData, assignmentsLoading, assignmentsError, user?.id, user?.role, authLoading]);
 
   // Handle redirects for users with language preferences
   useEffect(() => {

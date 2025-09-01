@@ -22,6 +22,7 @@ export default function MatchManagementPage() {
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
   const [resultDialog, setResultDialog] = useState(false);
   const [scheduleDialog, setScheduleDialog] = useState(false);
+  const { addNotification } = useNotification();
 
   const { data: matches, refetch } = api.volunteers.match.getVenueMatchesByStatus.useQuery({
     venueId,
@@ -30,24 +31,33 @@ export default function MatchManagementPage() {
 
   const updateStatusMutation = api.volunteers.match.updateMatchStatus.useMutation({
     onSuccess: () => {
-      toast({ title: 'Match status updated successfully' });
+      addNotification('Match status updated successfully', 'success');
       refetch();
+    },
+    onError: (error) => {
+      addNotification(error.message, 'error');
     }
   });
 
   const recordResultMutation = api.volunteers.match.recordMatchResult.useMutation({
     onSuccess: () => {
-      toast({ title: 'Match result recorded successfully' });
+      addNotification('Match result recorded successfully', 'success');
       setResultDialog(false);
       refetch();
+    },
+    onError: (error) => {
+      addNotification(error.message, 'error');
     }
   });
 
   const scheduleTimeMutation = api.volunteers.match.scheduleMatchTime.useMutation({
     onSuccess: () => {
-      toast({ title: 'Match scheduled successfully' });
+      addNotification('Match scheduled successfully', 'success');
       setScheduleDialog(false);
       refetch();
+    },
+    onError: (error) => {
+      addNotification(error.message, 'error');
     }
   });
 

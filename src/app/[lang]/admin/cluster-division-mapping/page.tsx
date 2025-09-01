@@ -536,7 +536,7 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
   // Filtered division venues based on availability
   const filteredDivisionVenues = useMemo(() => {
     console.log('🔍 Filtering division venues:', {
-      divisionVenuesData: divisionVenuesData?.venueLevelMappings?.length,
+      divisionVenuesData: (divisionVenuesData as any)?.venueLevelMappings?.length,
       allMappingsData: allMappingsData?.length,
       selectedState,
       isEditMode,

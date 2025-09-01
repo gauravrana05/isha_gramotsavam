@@ -30,12 +30,12 @@ const createContext = cache(async () => {
       'x-trpc-source': 'rsc',
     },
     cookies: {},
-  } as CreateNextContextOptions['req']
+  } as unknown as CreateNextContextOptions['req']
 
   const mockRes = {
     setHeader: () => {},
     getHeader: () => undefined,
-  } as CreateNextContextOptions['res']
+  } as unknown as CreateNextContextOptions['res']
 
   return createTRPCContext({
     req: mockReq,

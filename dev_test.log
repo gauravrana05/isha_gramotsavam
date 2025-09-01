@@ -1,0 +1,929 @@
+
+> out@0.1.0 dev
+> next dev --turbopack
+
+   ▲ Next.js 15.4.2 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.168.104:3000
+   - Environments: .env
+   - Experiments (use with caution):
+     · optimizePackageImports
+
+ ✓ Starting...
+ ✓ Ready in 990ms
+ ⚠ Webpack is configured while Turbopack is not, which may cause problems.
+ ⚠ See instructions if you need to configure Turbopack:
+  https://nextjs.org/docs/app/api-reference/next-config-js/turbopack
+
+ ○ Compiling /[lang] ...
+ ✓ Compiled /[lang] in 1357ms
+ GET /en?phone=8351000002 200 in 1751ms
+ ✓ Compiled /_not-found/page in 201ms
+ GET /icons/icon-144x144.png 404 in 250ms
+ ✓ Compiled /api/get-user in 82ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."users"."id", "public"."users"."phone", "public"."users"."email", "public"."users"."role"::text, "public"."users"."language_preference", "public"."users"."profile_complete", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."date_of_birth", "public"."users"."age", "public"."users"."gender"::text, "public"."users"."whatsapp_number", "public"."users"."instagram_handle", "public"."users"."panchayat", "public"."users"."taluk", "public"."users"."district", "public"."users"."state", "public"."users"."pincode", "public"."users"."created_at", "public"."users"."updated_at", "public"."users"."deleted_at" FROM "public"."users" WHERE "public"."users"."phone" = $1 LIMIT $2 OFFSET $3
+prisma:query COMMIT
+ GET /api/get-user?phone=8351000002 200 in 2810ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+ ✓ Compiled /[lang]/volunteer in 336ms
+prisma:query SELECT "public"."users"."id", "public"."users"."phone", "public"."users"."email", "public"."users"."role"::text, "public"."users"."language_preference", "public"."users"."profile_complete", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."date_of_birth", "public"."users"."age", "public"."users"."gender"::text, "public"."users"."whatsapp_number", "public"."users"."instagram_handle", "public"."users"."panchayat", "public"."users"."taluk", "public"."users"."district", "public"."users"."state", "public"."users"."pincode", "public"."users"."created_at", "public"."users"."updated_at", "public"."users"."deleted_at" FROM "public"."users" WHERE "public"."users"."phone" = $1 LIMIT $2 OFFSET $3
+ GET /en/volunteer 200 in 562ms
+prisma:query COMMIT
+ GET /api/get-user?phone=8351000002 200 in 632ms
+ GET /icons/icon-144x144.png 404 in 42ms
+Redis connected successfully
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."email", "public"."users"."phone", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1,$2) OFFSET $3
+prisma:query COMMIT
+❌ tRPC failed on profile.checkCompletion: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received undefined"
+  }
+]
+ GET /api/trpc/profile.checkCompletion?batch=1&input=%7B%220%22%3A%7B%22userId%22%3A%229f73280e-5e79-4d4e-adf7-bcf88ace3431%22%7D%7D 200 in 2594ms
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:05:08.704Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 2023ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:05:09.859Z'
+}
+❌ tRPC failed on profile.checkCompletion: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received undefined"
+  }
+]
+ GET /api/trpc/profile.checkCompletion?batch=1&input=%7B%220%22%3A%7B%22userId%22%3A%229f73280e-5e79-4d4e-adf7-bcf88ace3431%22%7D%7D 200 in 146ms
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 144ms
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query BEGIN
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query DEALLOCATE ALL
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:05:12.024Z'
+}
+❌ tRPC failed on profile.checkCompletion: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received undefined"
+  }
+]
+ GET /api/trpc/profile.checkCompletion,volunteers.assignments.getMyAssignments?batch=1&input=%7B%220%22%3A%7B%22userId%22%3A%229f73280e-5e79-4d4e-adf7-bcf88ace3431%22%7D%7D 200 in 160ms
+prisma:query BEGIN
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query BEGIN
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:05:16.161Z'
+}
+❌ tRPC failed on profile.checkCompletion: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received undefined"
+  }
+]
+ GET /api/trpc/profile.checkCompletion,volunteers.assignments.getMyAssignments?batch=1&input=%7B%220%22%3A%7B%22userId%22%3A%229f73280e-5e79-4d4e-adf7-bcf88ace3431%22%7D%7D 200 in 132ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:05:31.719Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 231ms
+prisma:query SELECT 1
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:05:32.880Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 154ms
+prisma:query SELECT 1
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:05:35.040Z'
+}
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 154ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:05:39.209Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 162ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+ GET /en/volunteer 200 in 78ms
+ GET /icons/icon-144x144.png 404 in 50ms
+ ✓ Compiled /api/auth/me in 40ms
+ GET /api/auth/me?userId=9f73280e-5e79-4d4e-adf7-bcf88ace3431 200 in 1786ms
+prisma:query SELECT 1
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+ GET /api/auth/me?userId=9f73280e-5e79-4d4e-adf7-bcf88ace3431 200 in 604ms
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."email", "public"."users"."phone", "public"."users"."role"::text FROM "public"."users" WHERE ("public"."users"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+prisma:query COMMIT
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:09:14.820Z'
+}
+❌ tRPC failed on profile.checkCompletion: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received undefined"
+  }
+]
+ GET /api/trpc/volunteers.assignments.getMyAssignments,profile.checkCompletion?batch=1&input=%7B%221%22%3A%7B%22userId%22%3A%229f73280e-5e79-4d4e-adf7-bcf88ace3431%22%7D%7D 200 in 924ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:09:15.991Z'
+}
+❌ tRPC failed on profile.checkCompletion: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received undefined"
+  }
+]
+ GET /api/trpc/volunteers.assignments.getMyAssignments,profile.checkCompletion?batch=1&input=%7B%221%22%3A%7B%22userId%22%3A%229f73280e-5e79-4d4e-adf7-bcf88ace3431%22%7D%7D 200 in 160ms
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT 1
+prisma:query BEGIN
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query BEGIN
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:09:18.151Z'
+}
+❌ tRPC failed on profile.checkCompletion: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received undefined"
+  }
+]
+ GET /api/trpc/volunteers.assignments.getMyAssignments,profile.checkCompletion?batch=1&input=%7B%221%22%3A%7B%22userId%22%3A%229f73280e-5e79-4d4e-adf7-bcf88ace3431%22%7D%7D 200 in 153ms
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:09:22.301Z'
+}
+❌ tRPC failed on profile.checkCompletion: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received undefined"
+  }
+]
+ GET /api/trpc/volunteers.assignments.getMyAssignments,profile.checkCompletion?batch=1&input=%7B%221%22%3A%7B%22userId%22%3A%229f73280e-5e79-4d4e-adf7-bcf88ace3431%22%7D%7D 200 in 145ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."email", "public"."users"."phone", "public"."users"."role"::text FROM "public"."users" WHERE ("public"."users"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+prisma:query COMMIT
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:10:22.479Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 1814ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:10:23.637Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 149ms
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query BEGIN
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:10:25.789Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 146ms
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:10:29.957Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 162ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query SELECT 1
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."email", "public"."users"."phone", "public"."users"."role"::text FROM "public"."users" WHERE ("public"."users"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+prisma:query COMMIT
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:12:10.677Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 945ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:12:11.841Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 153ms
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT 1
+prisma:query BEGIN
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query DEALLOCATE ALL
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+🔍 getMyAssignments Debug: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  userRole: 'technical_volunteer',
+  timestamp: '2025-08-31T23:12:21.000Z'
+}
+ GET /api/trpc/volunteers.assignments.getMyAssignments?batch=1&input=%7B%7D 200 in 130ms
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."deleted_at", "public"."volunteer_assignments"."status"::text FROM "public"."volunteer_assignments" WHERE "public"."volunteer_assignments"."volunteer_id" = $1 OFFSET $2
+prisma:query COMMIT
+🔍 All assignments for user: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  totalAssignments: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      volunteerId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+      deletedAt: null,
+      status: 'assigned'
+    }
+  ]
+}
+prisma:query BEGIN
+prisma:query DEALLOCATE ALL
+prisma:query SELECT "public"."volunteer_assignments"."id", "public"."volunteer_assignments"."event_id", "public"."volunteer_assignments"."volunteer_id", "public"."volunteer_assignments"."venue_level_mapping_id", "public"."volunteer_assignments"."volunteer_type"::text, "public"."volunteer_assignments"."contact_phone", "public"."volunteer_assignments"."status"::text, "public"."volunteer_assignments"."assigned_by", "public"."volunteer_assignments"."assigned_at", "public"."volunteer_assignments"."created_at", "public"."volunteer_assignments"."updated_at", "public"."volunteer_assignments"."deleted_at" FROM "public"."volunteer_assignments" WHERE ("public"."volunteer_assignments"."volunteer_id" = $1 AND "public"."volunteer_assignments"."deleted_at" IS NULL) ORDER BY "public"."volunteer_assignments"."created_at" DESC OFFSET $2
+prisma:query SELECT "public"."events"."id", "public"."events"."name", "public"."events"."status"::text FROM "public"."events" WHERE "public"."events"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venue_level_mappings"."id", "public"."venue_level_mappings"."event_id", "public"."venue_level_mappings"."venue_id", "public"."venue_level_mappings"."level"::text, "public"."venue_level_mappings"."max_teams", "public"."venue_level_mappings"."is_active", "public"."venue_level_mappings"."created_at", "public"."venue_level_mappings"."updated_at", "public"."venue_level_mappings"."deleted_at" FROM "public"."venue_level_mappings" WHERE "public"."venue_level_mappings"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."venues"."id", "public"."venues"."name", "public"."venues"."district", "public"."venues"."state", "public"."venues"."panchayat", "public"."venues"."taluk" FROM "public"."venues" WHERE "public"."venues"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."users"."id", "public"."users"."first_name", "public"."users"."last_name", "public"."users"."role"::text FROM "public"."users" WHERE "public"."users"."id" IN ($1) OFFSET $2
+prisma:query COMMIT
+✅ Final assignments result: {
+  userId: '9f73280e-5e79-4d4e-adf7-bcf88ace3431',
+  assignmentsCount: 1,
+  assignments: [
+    {
+      id: '52e02216-d232-4c0e-b9e4-164400d6f8ed',
+      eventName: 'Isha Gramotsavam 2025',
+      venueName: 'Venue 1',
+      status: 'assigned'
+    }
+  ]
+}
+[?25h

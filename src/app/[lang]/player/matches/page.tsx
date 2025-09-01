@@ -48,10 +48,10 @@ export default function PlayerMatchesPage() {
 
   // Fetch player's teams first
   const { 
-    data: teamsData, 
+    data: userTeams, 
     isLoading: teamsLoading 
-  } = api.teams.players.getPlayerTeams.useQuery(
-    { playerId: user?.id || '' },
+  } = api.teams.management.getUserPlayerTeams.useQuery(
+    undefined,
     { enabled: !!user && user.role === 'player' }
   );
 
@@ -60,10 +60,11 @@ export default function PlayerMatchesPage() {
     data: matchesData, 
     isLoading: matchesLoading,
     error: matchesError
-  } = api.matches.getPlayerMatches.useQuery(
-    { playerId: user?.id || '' },
-    { enabled: !!user && !!teamsData }
-  );
+  } = api.matches.getTeamMatches.useQuery({
+    teamIds: userTeams?.map(t => t.teamId) || []
+  }, {
+    enabled: !!userTeams?.length
+  });
 
   // Auth guard
   useEffect(() => {
@@ -87,11 +88,11 @@ export default function PlayerMatchesPage() {
 
   // Process matches data
   const matches = useMemo(() => {
-    if (!matchesData?.matches || !teamsData?.teams) return [];
+    if (!matchesData || !userTeams) return [];
     
-    const playerTeamIds = teamsData.teams.map(t => t.team.id);
+    const playerTeamIds = userTeams.map(t => t.teamId);
     
-    return matchesData.matches.map(match => {
+    return matchesData.map(match => {
       const isMyTeam1 = playerTeamIds.includes(match.team1?.id || '');
       const isMyTeam2 = playerTeamIds.includes(match.team2?.id || '');
       const myTeamName = isMyTeam1 ? match.team1?.name : isMyTeam2 ? match.team2?.name : '';
@@ -108,15 +109,15 @@ export default function PlayerMatchesPage() {
         myTeamName: myTeamName || '',
         isMyTeam1,
         isMyTeam2,
-        scheduledAt: match.scheduledAt,
-        completedAt: match.completedAt,
-        venueName: match.venue?.name || 'TBD',
-        status: match.status,
-        level: match.fixture?.level || 'cluster',
-        round: match.fixture?.round || 'Round 1'
+        scheduledAt: match.scheduledTime ? new Date(match.scheduledTime).toISOString() : '',
+        completedAt: match.completedTime ? new Date(match.completedTime).toISOString() : '',
+        venueName: match.fixture?.venueLevelMapping?.venue?.name || 'TBD',
+        status: match.status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled',
+        level: 'cluster' as const,
+        round: match.roundName || 'Round 1'
       };
     });
-  }, [matchesData?.matches, teamsData?.teams]);
+  }, [matchesData, userTeams]);
 
   // Table columns
   const columns: Column<MatchRow>[] = useMemo(() => [

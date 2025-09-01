@@ -14,7 +14,8 @@ const createQueryClient = () =>
   new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 30 * 1000, // 30 seconds
+        staleTime: process.env.NODE_ENV === 'development' ? 5 * 1000 : 30 * 1000, // 5s in dev, 30s in prod
+        gcTime: process.env.NODE_ENV === 'development' ? 1000 * 60 * 1 : 1000 * 60 * 5, // 1min in dev, 5min in prod
       },
     },
   })
@@ -38,7 +39,7 @@ export function TRPCReactProvider(props: {
 
   const [trpcClient] = useState(() =>
     api.createClient({
-      // transformer: superjson, // Disabled to fix input validation issues
+      transformer: superjson,
       links: [
         loggerLink({
           enabled: (op) =>

@@ -80,6 +80,23 @@ export const volunteersAssignmentsRouter = createTRPCRouter({
       orderBy: { createdAt: 'desc' },
     });
 
+    // Additional debug logging to see what's happening with the joins
+    console.log('🔍 Detailed assignments result:', {
+      userId: ctx.user.id,
+      assignmentsCount: assignments.length,
+      assignments: assignments.map(a => ({
+        id: a.id,
+        status: a.status,
+        eventId: a.eventId,
+        eventName: a.event?.name || 'NO_EVENT',
+        venueLevelMappingId: a.venueLevelMappingId,
+        venueName: a.venueLevelMapping?.venue?.name || 'NO_VENUE',
+        hasVenueLevelMapping: !!a.venueLevelMapping,
+        hasEvent: !!a.event,
+        createdAt: a.createdAt
+      }))
+    });
+
     console.log('✅ Final assignments result:', {
       userId: ctx.user.id,
       assignmentsCount: assignments.length,

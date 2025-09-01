@@ -2,15 +2,16 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { api } from '~/trpc/react';
-import { Button } from '~/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
-import { Badge } from '~/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '~/components/ui/dialog';
-import { Input } from '~/components/ui/input';
-import { Label } from '~/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
-import { toast } from '~/hooks/use-toast';
+import { api } from '@/server/trpc/react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
+import { useAlert } from '@/hooks/useAlert';
+import { useNotification } from '@/context/NotificationContext';
 import { Trophy, Users, Plus, Eye } from 'lucide-react';
 import Link from 'next/link';
 
@@ -18,6 +19,7 @@ export default function AdminFixturesPage() {
   const params = useParams();
   const venueId = params.venueId as string;
   const [createDialog, setCreateDialog] = useState(false);
+  const { addNotification } = useNotification();
 
   const { data: fixtures, refetch } = api.volunteers.fixture.getVenueFixtures.useQuery({
     venueId
@@ -29,7 +31,7 @@ export default function AdminFixturesPage() {
 
   const createFixtureMutation = api.volunteers.fixture.createFixture.useMutation({
     onSuccess: () => {
-      toast({ title: 'Fixture created successfully' });
+      addNotification('Fixture created successfully', 'success');
       setCreateDialog(false);
       refetch();
     }

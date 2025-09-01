@@ -5,9 +5,9 @@ export const userRoleSchema = z.enum([
   'admin',
   'captain',
   'player',
-  'volunteer',
+  'general_volunteer',
   'technical_volunteer',
-  'verification',
+  'verification_volunteer',
   'public',
 ])
 

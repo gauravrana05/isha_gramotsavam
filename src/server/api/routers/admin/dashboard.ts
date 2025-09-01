@@ -6,12 +6,26 @@ import { db } from "@/lib/db";
 export const adminDashboardRouter = createTRPCRouter({
   // Dashboard Overview
   getDashboardOverview: protectedProcedure
-    .input(z.object({
-      level: z.enum(['all', 'cluster', 'division', 'state']).default('all'),
-      includeDetailed: z.boolean().default(false),
-      refreshCache: z.boolean().default(false),
+    .use(async ({ ctx, next, rawInput }) => {
+      console.log('🔍 getDashboardOverview middleware:', { 
+        rawInput, 
+        ctxUser: ctx.user?.id,
+        inputType: typeof rawInput,
+        inputStringified: JSON.stringify(rawInput)
+      });
+      return next();
+    })
+    .input(z.any().transform(val => {
+      console.log('🔍 getDashboardOverview input transform:', { val, type: typeof val, stringified: JSON.stringify(val) });
+      return {
+        level: val?.level ?? 'all',
+        includeDetailed: val?.includeDetailed ?? false,
+        refreshCache: val?.refreshCache ?? false,
+      };
     }))
     .query(async ({ input, ctx }) => {
+      console.log('🔍 getDashboardOverview query:', { input, parsedInput: JSON.stringify(input) });
+      
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
@@ -164,11 +178,25 @@ export const adminDashboardRouter = createTRPCRouter({
 
   // Tournament Overview
   getTournamentOverview: protectedProcedure
-    .input(z.object({
-      level: z.enum(['all', 'cluster', 'division', 'final']).default('all'),
-      status: z.enum(['all', 'active', 'completed']).default('all'),
+    .use(async ({ ctx, next, rawInput }) => {
+      console.log('🔍 getTournamentOverview middleware:', { 
+        rawInput, 
+        ctxUser: ctx.user?.id,
+        inputType: typeof rawInput,
+        inputStringified: JSON.stringify(rawInput)
+      });
+      return next();
+    })
+    .input(z.any().transform(val => {
+      console.log('🔍 getTournamentOverview input transform:', { val, type: typeof val, stringified: JSON.stringify(val) });
+      return {
+        level: val?.level ?? 'all',
+        status: val?.status ?? 'all',
+      };
     }))
     .query(async ({ input, ctx }) => {
+      console.log('🔍 getTournamentOverview query:', { input, parsedInput: JSON.stringify(input) });
+      
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }

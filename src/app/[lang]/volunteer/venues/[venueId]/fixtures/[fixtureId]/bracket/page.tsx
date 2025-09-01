@@ -1,10 +1,10 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { api } from '~/trpc/react';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
-import { Badge } from '~/components/ui/badge';
-import { Button } from '~/components/ui/button';
+import { api } from '@/server/trpc/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Trophy, Clock, Users } from 'lucide-react';
 import Link from 'next/link';
 

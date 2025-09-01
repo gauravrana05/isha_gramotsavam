@@ -361,7 +361,7 @@ export default function AdminEventsPage() {
   const handleDeleteEvent = (eventId: string) => {
     const event = events.find(e => e.id === eventId);
     if (event) {
-      setEventToDelete(event);
+      setEventToDelete(event as any);
       setShowDeleteConfirm(true);
     }
   };
@@ -410,7 +410,7 @@ export default function AdminEventsPage() {
 
       {/* AdvancedTable */}
       <AdvancedTable<EventData>
-        data={events}
+        data={events as unknown as EventData[]}
         columns={columns}
         actions={actions}
         loading={eventsLoading}

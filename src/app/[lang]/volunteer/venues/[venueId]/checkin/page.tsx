@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { api } from '~/trpc/react';
-import { Button } from '~/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
-import { Badge } from '~/components/ui/badge';
-import { Input } from '~/components/ui/input';
-import { Label } from '~/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '~/components/ui/dialog';
-import { toast } from '~/hooks/use-toast';
+import { api } from '@/server/trpc/react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useNotification } from '@/context/NotificationContext';
 import { Search, Users, CheckCircle, Clock, Camera } from 'lucide-react';
 
 export default function TeamCheckInPage() {
@@ -18,6 +18,7 @@ export default function TeamCheckInPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [photoDialog, setPhotoDialog] = useState(false);
+  const { addNotification } = useNotification();
 
   // Get teams assigned to this venue
   const { data: teams, refetch } = api.volunteers.team.getVenueTeams.useQuery({
@@ -26,14 +27,14 @@ export default function TeamCheckInPage() {
 
   const checkInMutation = api.volunteers.team.checkInTeam.useMutation({
     onSuccess: () => {
-      toast({ title: 'Team checked in successfully' });
+      addNotification('Team checked in successfully', 'success');
       refetch();
     }
   });
 
   const uploadPhotoMutation = api.volunteers.team.uploadTeamPhoto.useMutation({
     onSuccess: () => {
-      toast({ title: 'Team photo uploaded successfully' });
+      addNotification('Team photo uploaded successfully', 'success');
       setPhotoDialog(false);
       refetch();
     }
@@ -57,7 +58,7 @@ export default function TeamCheckInPage() {
     const photoFile = formData.get('photo') as File;
 
     if (!photoFile) {
-      toast({ title: 'Please select a photo', variant: 'destructive' });
+      addNotification('Please select a photo', 'error');
       return;
     }
 

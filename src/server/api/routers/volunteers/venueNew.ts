@@ -109,45 +109,8 @@ export const volunteersVenueRouter = createTRPCRouter({
         level: fixture.level,
         status: fixture.status,
         assignedTeams: fixture.fixtureTeams.map(ft => ft.team),
-        scheduledStartTime: fixture.scheduledStartTime,
-        actualStartTime: fixture.actualStartTime,
-        completedTime: fixture.completedTime
+        completedAt: fixture.completedAt
       }));
-    }),
-
-  getFixtureDetails: protectedProcedure
-    .input(z.object({ fixtureId: z.string() }))
-    .query(async ({ input }) => {
-      const fixture = await db.fixture.findUnique({
-        where: { id: input.fixtureId },
-        include: {
-          sport: { select: { name: true } },
-          venue: { select: { name: true, location: true } },
-          fixtureTeams: {
-            include: {
-              team: {
-                select: {
-                  id: true,
-                  name: true,
-                  status: true,
-                  captainUser: {
-                    select: { firstName: true, lastName: true, phone: true }
-                  },
-                }
-              }
-            }
-          }
-        }
-      });
-
-      if (!fixture) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Fixture not found'
-        });
-      }
-
-      return fixture;
     }),
 
   getTodayMatches: protectedProcedure
@@ -251,7 +214,7 @@ export const volunteersVenueRouter = createTRPCRouter({
           firstName: true,
           lastName: true,
           phone: true,
-          dob: true,
+          dateOfBirth: true,
           gender: true
         }
       });
@@ -268,7 +231,7 @@ export const volunteersVenueRouter = createTRPCRouter({
       captainDetails: z.object({
         firstName: z.string(),
         lastName: z.string(),
-        dob: z.string(),
+        dateOfBirth: z.string(),
         gender: z.enum(['M', 'F'])
       }),
       location: z.object({
@@ -299,7 +262,7 @@ export const volunteersVenueRouter = createTRPCRouter({
             phone: captainPhone,
             firstName: captainDetails.firstName,
             lastName: captainDetails.lastName,
-            dob: new Date(captainDetails.dob),
+            dateOfBirth: new Date(captainDetails.dateOfBirth),
             gender: captainDetails.gender,
             role: 'captain',
             profileCompleted: true
@@ -312,7 +275,7 @@ export const volunteersVenueRouter = createTRPCRouter({
           data: {
             firstName: captain.firstName || captainDetails.firstName,
             lastName: captain.lastName || captainDetails.lastName,
-            dob: captain.dob || new Date(captainDetails.dob),
+            dateOfBirth: captain.dateOfBirth || new Date(captainDetails.dateOfBirth),
             gender: captain.gender || captainDetails.gender,
           }
         });

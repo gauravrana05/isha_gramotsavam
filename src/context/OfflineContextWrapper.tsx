@@ -33,6 +33,7 @@ export const useOffline = () => {
   }
 
   // Dynamic import for browser
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useOffline: useOfflineHook } = require('./OfflineContext');
   return useOfflineHook();
 };

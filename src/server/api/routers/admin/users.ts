@@ -59,8 +59,8 @@ export const adminUsersRouter = createTRPCRouter({
       }
 
       // Profile completeness filter
-      if (input.profileComplete !== 'all') {
-        where.profileComplete = input.profileComplete === 'complete';
+      if (input.isProfileComplete !== 'all') {
+        where.profileComplete = input.isProfileComplete === 'complete';
       }
 
       // Search filter

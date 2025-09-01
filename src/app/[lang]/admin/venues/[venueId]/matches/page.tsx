@@ -2,17 +2,17 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { api } from '~/trpc/react';
-import { Button } from '~/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
-import { Badge } from '~/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '~/components/ui/dialog';
-import { Input } from '~/components/ui/input';
-import { Label } from '~/components/ui/label';
-import { Textarea } from '~/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
-import { toast } from '~/hooks/use-toast';
+import { api } from '@/server/trpc/react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useNotification } from '@/context/NotificationContext';
 import { Clock, Trophy, Users, Calendar, Edit } from 'lucide-react';
 
 type MatchStatus = 'scheduled' | 'ready' | 'in_progress' | 'completed';
@@ -23,6 +23,7 @@ export default function AdminMatchesPage() {
   const [selectedStatus, setSelectedStatus] = useState<MatchStatus>('ready');
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
   const [resultDialog, setResultDialog] = useState(false);
+  const { addNotification } = useNotification();
 
   const { data: matches, refetch } = api.volunteers.match.getVenueMatchesByStatus.useQuery({
     venueId,
@@ -31,14 +32,14 @@ export default function AdminMatchesPage() {
 
   const updateStatusMutation = api.volunteers.match.updateMatchStatus.useMutation({
     onSuccess: () => {
-      toast({ title: 'Match status updated successfully' });
+      addNotification('Match status updated successfully', 'success');
       refetch();
     }
   });
 
   const recordResultMutation = api.volunteers.match.recordMatchResult.useMutation({
     onSuccess: () => {
-      toast({ title: 'Match result recorded successfully' });
+      addNotification('Match result recorded successfully', 'success');
       setResultDialog(false);
       refetch();
     }

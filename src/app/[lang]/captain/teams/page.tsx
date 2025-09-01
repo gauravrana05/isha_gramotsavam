@@ -179,7 +179,7 @@ export default function CaptainTeamsPage() {
             : player.verificationStatus === 'pending'
             ? 'bg-yellow-100 text-yellow-800'
             : 'bg-red-100 text-red-800'
-        }`}>
+        }`} title="Verification status is managed by tournament officials">
           {player.verificationStatus === 'verified' || player.verificationStatus === 'approved' ? (
             <>
               <CheckCircle className="w-3 h-3 mr-1" />
@@ -296,6 +296,34 @@ export default function CaptainTeamsPage() {
           </div>
         </div>
       </div>
+
+      {/* Verification Info */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="flex items-start space-x-3">
+          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+          <div>
+            <p className="text-blue-900 font-medium">Player Verification</p>
+            <p className="text-blue-700 text-sm">
+              Verification status is managed by tournament officials. Contact admin if verification issues arise.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Team Status Info */}
+      {isReadOnly && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div>
+              <p className="text-amber-900 font-medium">Team Submitted</p>
+              <p className="text-amber-700 text-sm">
+                Your team has been submitted and player changes are no longer allowed. Contact admin for any modifications.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Players Table */}
       <AdvancedTable<TeamPlayer>

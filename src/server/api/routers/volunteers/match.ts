@@ -214,6 +214,27 @@ export const volunteersMatchRouter = createTRPCRouter({
       return { success: true, match };
     }),
 
+  // Bulk schedule matches
+  bulkScheduleMatches: protectedProcedure
+    .input(z.object({
+      schedules: z.array(z.object({
+        matchId: z.string(),
+        scheduledTime: z.date()
+      }))
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const updates = await Promise.all(
+        input.schedules.map(schedule =>
+          ctx.db.match.update({
+            where: { id: schedule.matchId },
+            data: { scheduledTime: schedule.scheduledTime }
+          })
+        )
+      );
+
+      return { success: true, updatedMatches: updates.length };
+    }),
+
   // Get fixture bracket
   getFixtureBracket: protectedProcedure
     .input(z.object({

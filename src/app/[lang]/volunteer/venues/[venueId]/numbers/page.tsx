@@ -2,14 +2,14 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { api } from '~/trpc/react';
-import { Button } from '~/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
-import { Input } from '~/components/ui/input';
-import { Label } from '~/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
-import { toast } from '~/hooks/use-toast';
-import { Badge } from '~/components/ui/badge';
+import { api } from '@/server/trpc/react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useNotification } from '@/context/NotificationContext';
+import { Badge } from '@/components/ui/badge';
 import { Users, Hash, Save, Shuffle } from 'lucide-react';
 
 interface TeamAssignment {
@@ -26,6 +26,7 @@ export default function TournamentNumbersPage() {
   const [selectedGender, setSelectedGender] = useState<string>('');
   const [selectedVenueMapping, setSelectedVenueMapping] = useState<string>('');
   const [assignments, setAssignments] = useState<TeamAssignment[]>([]);
+  const { addNotification } = useNotification();
 
   // Get venue level mappings
   const { data: venueMappings } = api.volunteers.venue.getVenueLevelMappings.useQuery({
@@ -46,7 +47,7 @@ export default function TournamentNumbersPage() {
 
   const assignNumbersMutation = api.volunteers.team.assignTournamentNumbers.useMutation({
     onSuccess: () => {
-      toast({ title: 'Tournament numbers assigned successfully' });
+      addNotification('Tournament numbers assigned successfully', 'success');
       refetchTeams();
       setAssignments([]);
     }
@@ -89,7 +90,7 @@ export default function TournamentNumbersPage() {
 
   const handleSave = () => {
     if (!selectedVenueMapping || !selectedSport || !selectedGender) {
-      toast({ title: 'Please select all filters', variant: 'destructive' });
+      addNotification('Please select all filters', 'error');
       return;
     }
 
@@ -98,11 +99,10 @@ export default function TournamentNumbersPage() {
     const duplicates = numbers.filter((num, index) => numbers.indexOf(num) !== index);
     
     if (duplicates.length > 0) {
-      toast({ 
-        title: 'Duplicate numbers found', 
-        description: `Numbers ${duplicates.join(', ')} are assigned to multiple teams`,
-        variant: 'destructive' 
-      });
+      addNotification(
+        `Duplicate numbers found: ${duplicates.join(', ')} are assigned to multiple teams`,
+        'error'
+      );
       return;
     }
 

@@ -247,7 +247,7 @@ export default function AdminMediaPage() {
           >
             {item.type === 'image' ? (
               <Image 
-                src={item.url} 
+                src={item.url || ''} 
                 alt={item.title || 'Media item'}
                 width={64}
                 height={64}

@@ -69,8 +69,12 @@ export default function SportPage() {
 
   // Fetch profile completion data for gender validation
   const profileDataQuery = api.profile.checkCompletion.useQuery(
-    { userId: user?.id || '' },
-    { enabled: !!user?.id }
+    { userId: user?.id! },
+    { 
+      enabled: !!user?.id && 
+               user.id.length > 0 && 
+               !['admin', 'general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user.role)
+    }
   )
   const userGender = profileDataQuery.data?.gender || user?.gender || null
 

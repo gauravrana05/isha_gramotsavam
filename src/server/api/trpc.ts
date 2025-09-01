@@ -2,16 +2,27 @@ import { initTRPC, TRPCError } from '@trpc/server'
 import { type CreateNextContextOptions } from '@trpc/server/adapters/next'
 import superjson from 'superjson'
 import { ZodError } from 'zod'
-import { redis, safeRedisOperation } from '@/lib/redis'; // Import the Redis client
+import { redis, safeRedisOperation } from '@/lib/redis'
+import { db } from '@/lib/db'
 
 const STALE_TIME = 60; // 60 seconds
+
+// Define proper user type
+interface ContextUser {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string;
+  role: string;
+}
 
 // Create context for tRPC
 export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   const { req, res } = opts
 
   // Get user from session/cookies
-  let user = null;
+  let user: ContextUser | null = null;
   try {
     // Check for user ID in cookies or headers
     const userId = req.cookies?.userId || req.headers.userid as string;
@@ -30,9 +41,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
 
       // If not in cache, fetch from database
       if (!user) {
-        // Import db here to avoid circular dependency issues
-        const { db } = await import('@/lib/db');
-        user = await db.user.findUnique({
+        const dbUser = await db.user.findUnique({
           where: { id: userId },
           select: {
             id: true,
@@ -44,8 +53,9 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
           }
         });
         
-        // Cache the user if found
-        if (user) {
+        if (dbUser) {
+          user = dbUser;
+          // Cache the user if found
           await safeRedisOperation(
             async (redis) => {
               await redis.set(`user:${userId}`, JSON.stringify(user), 'EX', STALE_TIME);
@@ -63,21 +73,15 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     req,
     res,
     user,
+    db, // Add db to context
   }
-}
-
-// Alternative context creation for App Router
-export const createTRPCContextApp = () => {
-  // TODO: Add authentication context when Isha SSO is implemented
-  // For now, return basic context
-  return {}
 }
 
 export type Context = Awaited<ReturnType<typeof createTRPCContext>>
 
 // Initialize tRPC
 const t = initTRPC.context<Context>().create({
-  // transformer: superjson, // Temporarily disable to debug
+  transformer: superjson,
   errorFormatter({ shape, error }) {
     return {
       ...shape,
@@ -113,8 +117,12 @@ export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
 
 // Admin procedure - for admin-only operations
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  // TODO: Check if user is admin
-  // For now, just pass through - will be updated with role-based auth
+  if (ctx.user.role !== 'admin') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Admin access required',
+    })
+  }
   return next({
     ctx,
   })

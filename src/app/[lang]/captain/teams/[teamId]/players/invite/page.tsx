@@ -136,6 +136,8 @@ export default function CaptainTeamsInvitePage() {
     };
   }, [teamData, players]);
 
+  const isReadOnly = teamData?.status !== 'draft';
+
   // Table columns
   const columns: Column<TeamPlayerRow>[] = useMemo(() => [
     {
@@ -218,7 +220,7 @@ export default function CaptainTeamsInvitePage() {
             : status === 'pending'
             ? 'bg-yellow-100 text-yellow-800'
             : 'bg-red-100 text-red-800'
-        }`}>
+        }`} title="Verification status is managed by tournament officials">
           {status === 'approved' ? (
             <>
               <CheckCircle className="w-3 h-3 mr-1" />
@@ -317,6 +319,34 @@ export default function CaptainTeamsInvitePage() {
             icon={teamData.status === 'active' ? CheckCircle : Clock}
             color={teamData.status === 'active' ? 'success' : 'warning'}
           />
+        </div>
+      )}
+
+      {/* Verification Info */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="flex items-start space-x-3">
+          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+          <div>
+            <p className="text-blue-900 font-medium">Player Verification</p>
+            <p className="text-blue-700 text-sm">
+              Verification status is managed by tournament officials. Contact admin if verification issues arise.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Team Status Info */}
+      {isReadOnly && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div>
+              <p className="text-amber-900 font-medium">Team Submitted</p>
+              <p className="text-amber-700 text-sm">
+                Your team has been submitted and player changes are no longer allowed. Contact admin for any modifications.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -436,15 +466,16 @@ export default function CaptainTeamsInvitePage() {
             {/* Verification Status */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">Verification Status</h3>
-              <div className="flex items-center">
-                {selectedPlayer.verificationStatus === 'approved' ? (
-                  <div className="flex items-center text-green-600">
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    <span className="font-medium">Verified</span>
-                  </div>
-                ) : selectedPlayer.verificationStatus === 'pending' ? (
-                  <div className="flex items-center text-yellow-600">
-                    <Clock className="w-5 h-5 mr-2" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  {selectedPlayer.verificationStatus === 'approved' ? (
+                    <div className="flex items-center text-green-600">
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      <span className="font-medium">Verified</span>
+                    </div>
+                  ) : selectedPlayer.verificationStatus === 'pending' ? (
+                    <div className="flex items-center text-yellow-600">
+                      <Clock className="w-5 h-5 mr-2" />
                     <span className="font-medium">Pending Verification</span>
                   </div>
                 ) : (
@@ -453,6 +484,8 @@ export default function CaptainTeamsInvitePage() {
                     <span className="font-medium">Rejected</span>
                   </div>
                 )}
+                </div>
+                <p className="text-xs text-gray-500">Managed by officials</p>
               </div>
             </div>
           </div>

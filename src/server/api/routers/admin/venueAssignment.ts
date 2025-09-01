@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '@/server/api/trpc';
 import { TRPCError } from '@trpc/server';
 import { db } from '@/lib/db';
+import type { VolunteerType } from '@prisma/client';
 
 interface TeamLocationData {
   panchayat: string;
@@ -292,7 +293,7 @@ export const venueAssignmentRouter = createTRPCRouter({
       volunteerIds: z.array(z.string().uuid()),
       venueLevelMappingId: z.string().uuid(),
       eventId: z.string().uuid().optional(), // If not provided, will use the first ongoing event
-      volunteerType: z.enum(['general_volunteer', 'technical_volunteer', 'verification_volunteer']).optional(),
+      volunteerType: z.enum(['general_volunteer', 'technical_volunteer', 'technical_volunteer']).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
@@ -339,7 +340,7 @@ export const venueAssignmentRouter = createTRPCRouter({
         const volunteers = await db.user.findMany({
           where: { 
             id: { in: input.volunteerIds },
-            role: { in: ['general_volunteer', 'technical_volunteer', 'verification_volunteer'] }
+            role: { in: ['general_volunteer', 'technical_volunteer', 'technical_volunteer'] }
           }
         });
 
@@ -368,11 +369,11 @@ export const venueAssignmentRouter = createTRPCRouter({
           existingAssignments.map(async (assignment) => {
             const volunteer = volunteers.find(v => v.id === assignment.volunteerId);
             // Use proper type assertion with UserRole enum values
-            const validVolunteerRoles: Array<'general_volunteer' | 'technical_volunteer' | 'verification_volunteer'> = 
-              ['general_volunteer', 'technical_volunteer', 'verification_volunteer'];
+            const validVolunteerRoles: Array<'general_volunteer' | 'technical_volunteer' | 'technical_volunteer'> = 
+              ['general_volunteer', 'technical_volunteer', 'technical_volunteer'];
             
             const volunteerRole = volunteer?.role && validVolunteerRoles.includes(volunteer.role as typeof validVolunteerRoles[number]) 
-              ? volunteer.role as 'general_volunteer' | 'technical_volunteer' | 'verification_volunteer'
+              ? volunteer.role as 'general_volunteer' | 'technical_volunteer' | 'technical_volunteer'
               : 'general_volunteer';
               
             const assignmentType = input.volunteerType || volunteerRole;
@@ -407,11 +408,11 @@ export const venueAssignmentRouter = createTRPCRouter({
           newVolunteerIds.map(async (volunteerId) => {
             const volunteer = volunteers.find(v => v.id === volunteerId);
             // Use proper type assertion with UserRole enum values
-            const validVolunteerRoles: Array<'general_volunteer' | 'technical_volunteer' | 'verification_volunteer'> = 
-              ['general_volunteer', 'technical_volunteer', 'verification_volunteer'];
+            const validVolunteerRoles: Array<'general_volunteer' | 'technical_volunteer' | 'technical_volunteer'> = 
+              ['general_volunteer', 'technical_volunteer', 'technical_volunteer'];
             
             const volunteerRole = volunteer?.role && validVolunteerRoles.includes(volunteer.role as typeof validVolunteerRoles[number]) 
-              ? volunteer.role as 'general_volunteer' | 'technical_volunteer' | 'verification_volunteer'
+              ? volunteer.role as 'general_volunteer' | 'technical_volunteer' | 'technical_volunteer'
               : 'general_volunteer';
               
             const assignmentType = input.volunteerType || volunteerRole;

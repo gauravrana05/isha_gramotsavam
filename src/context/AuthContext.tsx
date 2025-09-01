@@ -26,9 +26,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Fetch profile image data using tRPC
   const profileImageQuery = api.profile.checkCompletion.useQuery(
-    { userId: user?.id || '' },
+    { userId: user?.id! },
     { 
-      enabled: !!user?.id && user.id.length > 0,
+      enabled: !!user?.id && 
+               user.id.length > 0 && 
+               !['admin', 'general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user.role),
       staleTime: 10 * 60 * 1000,
       gcTime: 15 * 60 * 1000,
       refetchOnWindowFocus: false,

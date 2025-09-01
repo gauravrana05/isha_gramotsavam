@@ -29,9 +29,11 @@ export default function Header({ lang }: HeaderProps) {
 
   // Fetch profile image data for authenticated users
   const profileImageQuery = api.profile.checkCompletion.useQuery(
-    { userId: user?.id || '' },
+    { userId: user?.id! },
     { 
-      enabled: !!user?.id,
+      enabled: !!user?.id && 
+               user.id.length > 0 && 
+               !['admin', 'general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user.role),
       staleTime: 10 * 60 * 1000, // Consider data fresh for 10 minutes in header
       gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
       refetchOnWindowFocus: false, // Don't refetch on window focus

@@ -43,24 +43,25 @@ export default function CaptainMatchesPage() {
   const { lang } = useParams();
   const { user, userProfile, loading: authLoading } = useAuth();
 
-  // Fetch captain's team
+  // Fetch captain's teams
   const { 
-    data: teamData, 
+    data: userTeams, 
     isLoading: teamLoading 
-  } = api.teams.management.getMyTeam.useQuery(
+  } = api.teams.management.getUserTeams.useQuery(
     undefined,
     { enabled: !!user && user.role === 'captain' }
   );
 
-  // Fetch matches for captain's team
+  // Fetch matches for captain's teams
   const { 
     data: matchesData, 
     isLoading: matchesLoading,
     error: matchesError
-  } = api.matches.getTeamMatches.useQuery(
-    { teamId: teamData?.id || '' },
-    { enabled: !!teamData?.id }
-  );
+  } = api.matches.getTeamMatches.useQuery({
+    teamIds: userTeams?.map(t => t.id) || []
+  }, {
+    enabled: !!userTeams?.length
+  });
 
   // Auth guard
   useEffect(() => {
@@ -84,9 +85,9 @@ export default function CaptainMatchesPage() {
 
   // Process matches data
   const matches = useMemo(() => {
-    if (!matchesData?.matches) return [];
+    if (!matchesData) return [];
     
-    return matchesData.matches.map(match => ({
+    return matchesData.map(match => ({
       id: match.id,
       fixtureName: match.fixture?.name || 'Unknown Fixture',
       sportName: match.fixture?.sport?.name || 'Unknown Sport',
@@ -95,14 +96,14 @@ export default function CaptainMatchesPage() {
       team1Score: match.team1Score,
       team2Score: match.team2Score,
       winnerName: match.winner?.name,
-      scheduledAt: match.scheduledAt,
-      completedAt: match.completedAt,
-      venueName: match.venue?.name || 'TBD',
-      status: match.status,
-      level: match.fixture?.level || 'cluster',
-      round: match.fixture?.round || 'Round 1'
+      scheduledAt: match.scheduledTime ? new Date(match.scheduledTime).toISOString() : '',
+      completedAt: match.completedTime ? new Date(match.completedTime).toISOString() : '',
+      venueName: match.fixture?.venueLevelMapping?.venue?.name || 'TBD',
+      status: match.status as 'scheduled' | 'in_progress' | 'completed' | 'cancelled',
+      level: 'cluster' as const,
+      round: match.roundName || 'Round 1'
     }));
-  }, [matchesData?.matches]);
+  }, [matchesData]);
 
   // Table columns
   const columns: Column<MatchRow>[] = useMemo(() => [

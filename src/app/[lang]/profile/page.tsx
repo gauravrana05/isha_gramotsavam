@@ -66,9 +66,11 @@ export default function ProfilePage() {
   // tRPC mutations
   const updateProfileMutation = api.profile.updateComplete.useMutation();
   const profileDataQuery = api.profile.checkCompletion.useQuery(
-    { userId: user?.id || '' },
+    { userId: user?.id! },
     { 
-      enabled: !!user?.id,
+      enabled: !!user?.id && 
+               user.id.length > 0 && 
+               !['admin', 'general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user.role),
       staleTime: 2 * 60 * 1000, // Consider fresh for 2 minutes (profile page can be more reactive)
       gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
       refetchOnWindowFocus: true, // Allow refetch on focus for profile page

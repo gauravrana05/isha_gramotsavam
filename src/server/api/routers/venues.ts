@@ -28,7 +28,7 @@ export const venuesRouter = createTRPCRouter({
       const venue = await db.venue.findUnique({
         where: { id },
         include: {
-          venueLevelMapping: includeLocationMappings ? {
+          venueLevelMappings: includeLocationMappings ? {
             include: {
               event: {
                 select: {

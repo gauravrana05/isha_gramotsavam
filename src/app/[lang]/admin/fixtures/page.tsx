@@ -64,7 +64,7 @@ export default function AdminFixturesPage() {
   const fixtures = fixturesResponse?.fixtures || [];
 
   // Transform fixtures to match FixtureData interface
-  const transformedFixtures: FixtureData[] = fixtures.map(fixture => ({
+  const transformedFixtures = fixtures.map(fixture => ({
     id: fixture.id,
     name: fixture.name,
     genderCategory: fixture.genderCategory,
@@ -265,7 +265,7 @@ export default function AdminFixturesPage() {
 
       {/* AdvancedTable */}
       <AdvancedTable<FixtureData>
-        data={transformedFixtures}
+        data={transformedFixtures as unknown as FixtureData[]}
         columns={columns}
         actions={actions}
         loading={loading}

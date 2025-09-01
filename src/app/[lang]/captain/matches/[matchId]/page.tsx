@@ -1,392 +1,143 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
+import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { api } from '@/server/trpc/react';
-import Link from "next/link";
-import Image from "next/image";
-import { 
-  ArrowLeft,
-  Loader2, 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
-  Play,
-  Trophy,
-  MapPin,
-  Users,
-  Target,
-  Calendar,
-  Hash,
-  Star,
-  Award
-} from "lucide-react";
-
-interface CaptainMatchDetail {
-  id: string;
-  name: string;
-  status: string;
-  genderCategory: string;
-  level: string;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-  event: {
-    id: string;
-    name: string;
-    status: string;
-  } | null;
-  fixtureTeams: {
-    team: {
-      id: string;
-      name: string;
-      captainUser: {
-        firstName: string | null;
-        lastName: string | null;
-      };
-    };
-  }[];
-  // Computed properties for backward compatibility
-  isCaptainInvolved?: boolean;
-  roundName?: string;
-  sportName?: string;
-  captainTeamSide?: 'team1' | 'team2' | null;
-  team1?: {
-    teamId: string;
-    teamName: string;
-    tournamentNumber?: number;
-  } | null;
-  team2?: {
-    teamId: string;
-    teamName: string;
-    tournamentNumber?: number;
-  } | null;
-}
+import { ArrowLeft, Trophy, Clock, MapPin, Users, Loader2, AlertCircle } from 'lucide-react';
 
 export default function CaptainMatchDetailPage() {
+  const { matchId, lang } = useParams();
   const router = useRouter();
-  const { lang, matchId } = useParams();
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const { user } = useAuth();
 
-  // Get match details using tRPC
-  const { data: matches, isLoading: matchLoading, error: matchError } = api.teams.management.getMyTeamMatches.useQuery(
-    undefined,
-    {
-      enabled: !authLoading && !!user && userProfile?.profileComplete && user.role === 'captain'
-    }
+  const { data: match, isLoading, error } = api.volunteers.match.getMatchDetails.useQuery(
+    { matchId: matchId as string },
+    { enabled: !!matchId }
   );
 
-  const match = useMemo(() => {
-    if (!matches) return undefined;
-    const foundMatch = matches.find(m => m.id === matchId);
-    if (foundMatch) {
-      const teams = foundMatch.fixtureTeams.slice(0, 2); // Get first 2 teams
-      return {
-        ...foundMatch,
-        isCaptainInvolved: foundMatch.fixtureTeams.length > 0,
-        roundName: foundMatch.event?.name || 'Event',
-        sportName: foundMatch.genderCategory,
-        captainTeamSide: teams.length > 0 ? 'team1' : null,
-        team1: teams[0] ? {
-          teamId: teams[0].team.id,
-          teamName: teams[0].team.name,
-          tournamentNumber: undefined
-        } : null,
-        team2: teams[1] ? {
-          teamId: teams[1].team.id,
-          teamName: teams[1].team.name,
-          tournamentNumber: undefined
-        } : null
-      } as CaptainMatchDetail;
-    }
-    return undefined;
-  }, [matches, matchId]);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
+      </div>
+    );
+  }
 
-  const loading = authLoading || matchLoading;
-  const error = matchError?.message;
-
-  useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
-    }
-
-    if (!userProfile?.profileComplete) {
-      router.push(`/${lang}/profile/complete`);
-      return;
-    }
-  }, [user, userProfile, authLoading, router, lang]);
+  if (error || !match) {
+    return (
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-600">Match not found</p>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
       case 'in_progress': return 'bg-blue-100 text-blue-800';
       case 'ready': return 'bg-yellow-100 text-yellow-800';
-      case 'scheduled': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return <CheckCircle className="w-4 h-4" />;
-      case 'in_progress': return <Play className="w-4 h-4" />;
-      case 'ready': return <Clock className="w-4 h-4" />;
-      case 'scheduled': return <AlertCircle className="w-4 h-4" />;
-      default: return <AlertCircle className="w-4 h-4" />;
-    }
-  };
-
-  if (authLoading || loading) {
-    return (
-      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#F28C38]" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!match) {
-    return (
-      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Match Not Found</h1>
-          <p className="text-gray-600 mb-4">The match you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.</p>
-          <Link
-            href={`/${lang}/captain/matches`}
-            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors inline-flex items-center"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Matches
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="lg:min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center">
-            <Link
-              href={`/${lang}/captain/matches`}
-              className="mr-4 p-2 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </Link>
-            <div>
-              <div className="flex items-center mb-2">
-                <Image 
-                  src="https://ishalogin.sadhguru.org/app/images/3e8fd38d1d957c44372b.svg" 
-                  alt="Isha Logo" 
-                  width={40} 
-                  height={40} 
-                  className="mr-3"
-                />
-                <div>
-                  <div className="flex items-center">
-                    <Hash className="w-5 h-5 text-gray-400 mr-1" />
-                    <h1 className="text-2xl font-bold text-[#4A2F1D]">Match {match.name}</h1>
-                    {match.fixtureTeams.length > 0 && (
-                      <Star className="w-5 h-5 text-yellow-500 ml-2" />
-                    )}
-                  </div>
-                  <p className="text-gray-600">
-                    {match.name} • {match.event?.name || "Event"}
-                  </p>
-                  {match.sportName && (
-                    <p className="text-sm text-gray-500">
-                      {match.sportName} • {match.genderCategory}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${getStatusColor(match.status)}`}>
-            {getStatusIcon(match.status)}
-            <span className="ml-2 capitalize">{match.status.replace('_', ' ')}</span>
-          </span>
+    <div className="min-h-screen bg-[#F3F0E5] font-fira">
+      {/* Header */}
+      <div className="bg-[#4A2F1D] text-white py-6">
+        <div className="max-w-4xl mx-auto px-4">
+          <button
+            onClick={() => router.push(`/${lang}/captain/matches`)}
+            className="flex items-center space-x-2 text-cream-200 hover:text-white mb-4 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>Back to Matches</span>
+          </button>
+          
+          <h1 className="text-3xl font-bold mb-2">Match Details</h1>
+          <p className="text-cream-200">{match.fixture?.name}</p>
         </div>
+      </div>
 
-        {/* Match Overview */}
-        <div className="bg-white rounded-lg shadow-sm border p-8 mb-8">
-          <div className="text-center mb-6">
-            <h2 className="text-lg font-semibold text-[#4A2F1D] mb-4">Match Details</h2>
-            
-            {/* Teams Display */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-              {/* Team 1 */}
-              <div className={`p-6 rounded-lg border-2 ${
-                match.captainTeamSide === 'team1' ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'
-              }`}>
-                <div className="text-center">
-                  <div className={`text-lg font-bold mb-2 ${
-                    match.captainTeamSide === 'team1' ? 'text-blue-600' : 'text-gray-900'
-                  }`}>
-                    {match.team1?.teamName || 'TBD'}
-                  </div>
-                  {match.team1?.tournamentNumber && (
-                    <div className="text-sm text-gray-600 mb-2">
-                      Tournament #{match.team1.tournamentNumber}
-                    </div>
-                  )}
-                  {match.captainTeamSide === 'team1' && (
-                    <div className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
-                      <Star className="w-4 h-4 mr-1" />
-                      Your Team
-                    </div>
-                  )}
-                  {match.result && match.result.winnerTeamId === match.team1?.teamId && (
-                    <div className="mt-2">
-                      <Award className="w-6 h-6 text-yellow-500 mx-auto" />
-                      <div className="text-sm text-yellow-600 font-medium mt-1">Winner!</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* VS / Score */}
-              <div className="text-center">
-                {match.result ? (
-                  <div>
-                    <div className="text-3xl font-bold text-gray-900 mb-2">
-                      {match.result.score.team1Score} - {match.result.score.team2Score}
-                    </div>
-                    <div className="text-sm text-gray-600">Final Score</div>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="text-3xl font-bold text-gray-400 mb-2">VS</div>
-                    <div className="text-sm text-gray-500">
-                      {match.status === 'scheduled' ? 'Scheduled' : 
-                       match.status === 'ready' ? 'Ready to Start' : 
-                       match.status === 'in_progress' ? 'In Progress' : 'Pending'}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Team 2 */}
-              <div className={`p-6 rounded-lg border-2 ${
-                match.captainTeamSide === 'team2' ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-gray-50'
-              }`}>
-                <div className="text-center">
-                  <div className={`text-lg font-bold mb-2 ${
-                    match.captainTeamSide === 'team2' ? 'text-red-600' : 'text-gray-900'
-                  }`}>
-                    {match.team2?.teamName || 'TBD'}
-                  </div>
-                  {match.team2?.tournamentNumber && (
-                    <div className="text-sm text-gray-600 mb-2">
-                      Tournament #{match.team2.tournamentNumber}
-                    </div>
-                  )}
-                  {match.captainTeamSide === 'team2' && (
-                    <div className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full">
-                      <Star className="w-4 h-4 mr-1" />
-                      Your Team
-                    </div>
-                  )}
-                  {match.result && match.result.winnerTeamId === match.team2?.teamId && (
-                    <div className="mt-2">
-                      <Award className="w-6 h-6 text-yellow-500 mx-auto" />
-                      <div className="text-sm text-yellow-600 font-medium mt-1">Winner!</div>
-                    </div>
-                  )}
-                </div>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Match Info Card */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-4">
+              <Trophy className="w-6 h-6 text-[#F28C38]" />
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{match.fixture?.sport?.name}</h2>
+                <p className="text-gray-600">{match.roundName}</p>
               </div>
             </div>
-
-            {/* Result Message for Captain */}
-            {match.result && match.fixtureTeams.length > 0 && (
-              <div className={`mt-6 p-4 rounded-lg ${
-                match.isCaptainTeamWinner ? 'bg-green-100 border border-green-200' : 'bg-red-100 border border-red-200'
-              }`}>
-                <div className={`text-lg font-bold ${
-                  match.isCaptainTeamWinner ? 'text-green-800' : 'text-red-800'
-                }`}>
-                  {match.isCaptainTeamWinner ? '🎉 Congratulations! Your team won!' : '😔 Your team lost this match.'}
-                </div>
-                <div className={`text-sm mt-1 ${
-                  match.isCaptainTeamWinner ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  Winner: {match.result.winnerName}
-                </div>
-              </div>
-            )}
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(match.status)}`}>
+              {match.status}
+            </span>
           </div>
-        </div>
 
-        {/* Match Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Venue Info */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <div className="flex items-center mb-4">
-              <MapPin className="w-5 h-5 text-[#F28C38] mr-2" />
-              <h3 className="text-lg font-semibold text-[#4A2F1D]">Venue</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="flex items-center space-x-2">
+              <Clock className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-600">
+                {match.scheduledTime ? new Date(match.scheduledTime).toLocaleString() : 'Not scheduled'}
+              </span>
             </div>
-            <div>
-              <p className="font-medium text-gray-900">{match.venue.name}</p>
-              <p className="text-sm text-gray-600 mt-1">{match.venue.address}</p>
+            <div className="flex items-center space-x-2">
+              <MapPin className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-600">
+                {match.fixture?.venueLevelMapping?.venue?.name || 'Venue TBD'}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Users className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-600">
+                {match.fixture?.genderCategory}
+              </span>
             </div>
           </div>
 
-          {/* Tournament Info */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <div className="flex items-center mb-4">
-              <Trophy className="w-5 h-5 text-[#F28C38] mr-2" />
-              <h3 className="text-lg font-semibold text-[#4A2F1D]">Tournament</h3>
+          {/* Teams */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="text-center p-4 border border-gray-200 rounded-lg">
+              <h3 className="font-bold text-lg text-gray-900 mb-2">
+                {match.team1?.name || 'TBD'}
+              </h3>
+              {match.team1?.tournamentNumber && (
+                <p className="text-sm text-gray-500 mb-2">#{match.team1.tournamentNumber}</p>
+              )}
+              {match.status === 'completed' && (
+                <div className="text-3xl font-bold text-[#F28C38]">
+                  {match.team1Score || 0}
+                </div>
+              )}
             </div>
-            <div>
-              <p className="font-medium text-gray-900">{match.name}</p>
-              <p className="text-sm text-gray-600 mt-1">Round: {match.event?.name || "Event"}</p>
-              {match.sportName && (
-                <p className="text-sm text-gray-600">{match.sportName} • {match.genderCategory}</p>
+
+            <div className="text-center p-4 border border-gray-200 rounded-lg">
+              <h3 className="font-bold text-lg text-gray-900 mb-2">
+                {match.team2?.name || 'TBD'}
+              </h3>
+              {match.team2?.tournamentNumber && (
+                <p className="text-sm text-gray-500 mb-2">#{match.team2.tournamentNumber}</p>
+              )}
+              {match.status === 'completed' && (
+                <div className="text-3xl font-bold text-[#F28C38]">
+                  {match.team2Score || 0}
+                </div>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-center space-x-4">
-          <Link
-            href={`/${lang}/captain/fixtures/${match.fixtureId}`}
-            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors inline-flex items-center"
-          >
-            <Trophy className="w-4 h-4 mr-2" />
-            View Tournament
-          </Link>
-          <Link
-            href={`/${lang}/captain/teams`}
-            className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors inline-flex items-center"
-          >
-            <Users className="w-4 h-4 mr-2" />
-            Manage Teams
-          </Link>
+          {/* Winner */}
+          {match.winner && (
+            <div className="mt-6 text-center p-4 bg-green-50 border border-green-200 rounded-lg">
+              <Trophy className="w-6 h-6 text-green-600 mx-auto mb-2" />
+              <p className="text-green-800 font-medium">
+                Winner: {match.winner.name}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

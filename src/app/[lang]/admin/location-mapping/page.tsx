@@ -289,7 +289,7 @@ export default function LocationMappingPage({ params }: { params: Promise<{ lang
         </div>
 
         <AdvancedTable<LocationMappingData>
-          data={(mappings || []) as LocationMappingData[]}
+          data={(mappings || []) as unknown as LocationMappingData[]}
           columns={columns}
           loading={eventsLoading || mappingsLoading}
           selectedRows={selectedMappings}

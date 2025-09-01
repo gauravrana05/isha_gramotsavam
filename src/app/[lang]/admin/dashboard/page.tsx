@@ -23,7 +23,8 @@ import {
   Pause,
   Play,
   Timer,
-  Link
+  Link,
+  Trash2
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 
@@ -60,6 +61,9 @@ export default function AdminDashboard() {
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const previousDataRef = useRef<any>(null);
 
+  // Get tRPC utils for cache management
+  const utils = api.useUtils();
+
   // tRPC queries with real-time refetch
   const {
     data: dashboardData,
@@ -71,10 +75,10 @@ export default function AdminDashboard() {
     includeDetailed: true,
     refreshCache: true // Enable cache refresh for real-time data
   }, {
-    enabled: !!user && userProfile?.role === 'admin',
+    enabled: !!user && user.role === 'admin',
     refetchOnWindowFocus: true,
     refetchOnMount: true,
-    staleTime: 1000 * 20, // Consider data stale after 20 seconds
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 1000 * 20, // No cache in dev, 20s in prod
   });
 
   const {
@@ -86,10 +90,10 @@ export default function AdminDashboard() {
     level: 'all',
     status: 'all'
   }, {
-    enabled: !!user && userProfile?.role === 'admin',
+    enabled: !!user && user.role === 'admin',
     refetchOnWindowFocus: true,
     refetchOnMount: true,
-    staleTime: 1000 * 20,
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 1000 * 20, // No cache in dev, 20s in prod
   });
 
   // Auth check
@@ -101,11 +105,28 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (userProfile?.role !== 'admin') {
+    if (user.role !== 'admin') {
       router.push(`/${lang}/player/dashboard`);
       return;
     }
   }, [user, userProfile, authLoading, lang, router]);
+
+  // Cache clearing function
+  const handleClearCache = useCallback(async () => {
+    try {
+      // Clear all admin dashboard related queries
+      await utils.admin.dashboard.invalidate();
+      console.log('✅ Dashboard cache cleared');
+      
+      // Force refetch
+      await Promise.all([
+        refetchDashboard(),
+        refetchTournament()
+      ]);
+    } catch (error) {
+      console.error('❌ Failed to clear cache:', error);
+    }
+  }, [utils, refetchDashboard, refetchTournament]);
 
   // Real-time refresh functionality with change detection
   const handleRefresh = useCallback(async () => {
@@ -420,9 +441,21 @@ export default function AdminDashboard() {
                 onClick={handleRefresh}
                 disabled={loading}
                 className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                title="Refresh Data"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
+              
+              {process.env.NODE_ENV === 'development' && (
+                <button
+                  onClick={handleClearCache}
+                  className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded transition-colors"
+                  title="Clear tRPC Cache (Dev Only)"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+              
               <button
                 onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
                 className={`p-1.5 rounded transition-colors ${
@@ -430,6 +463,7 @@ export default function AdminDashboard() {
                     ? 'text-green-600 bg-green-50 hover:bg-green-100' 
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
+                title={autoRefreshEnabled ? 'Disable Auto Refresh' : 'Enable Auto Refresh'}
               >
                 {autoRefreshEnabled ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
@@ -736,15 +770,15 @@ export default function AdminDashboard() {
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Total Assigned</span>
-                <span className="font-medium">{dashboardOverview?.volunteers?.assigned || 0}</span>
+                <span className="font-medium">{(dashboardOverview as any)?.volunteers?.assigned || 0}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Available</span>
-                <span className="font-medium text-green-600">{dashboardOverview?.volunteers?.available || 0}</span>
+                <span className="font-medium text-green-600">{(dashboardOverview as any)?.volunteers?.available || 0}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Assignment Gaps</span>
-                <span className="font-medium text-orange-600">{dashboardOverview?.volunteers?.gaps || 0}</span>
+                <span className="font-medium text-orange-600">{(dashboardOverview as any)?.volunteers?.gaps || 0}</span>
               </div>
             </div>
             <Link href={`/${lang}/admin/users/volunteers`} className="mt-3 block text-xs text-blue-600 hover:text-blue-800">
@@ -761,15 +795,15 @@ export default function AdminDashboard() {
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Active Events</span>
-                <span className="font-medium">{dashboardOverview?.events?.active || 0}</span>
+                <span className="font-medium">{(dashboardOverview as any)?.events?.active || 0}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Registration Open</span>
-                <span className="font-medium text-green-600">{dashboardOverview?.events?.registrationOpen || 0}</span>
+                <span className="font-medium text-green-600">{(dashboardOverview as any)?.events?.registrationOpen || 0}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Upcoming Matches</span>
-                <span className="font-medium text-blue-600">{dashboardOverview?.matches?.upcoming || 0}</span>
+                <span className="font-medium text-blue-600">{(dashboardOverview as any)?.matches?.upcoming || 0}</span>
               </div>
             </div>
             <Link href={`/${lang}/admin/events`} className="mt-3 block text-xs text-blue-600 hover:text-blue-800">
@@ -786,15 +820,15 @@ export default function AdminDashboard() {
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Total Files</span>
-                <span className="font-medium">{dashboardOverview?.media?.total || 0}</span>
+                <span className="font-medium">{(dashboardOverview as any)?.media?.total || 0}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Pending Approval</span>
-                <span className="font-medium text-orange-600">{dashboardOverview?.media?.pending || 0}</span>
+                <span className="font-medium text-orange-600">{(dashboardOverview as any)?.media?.pending || 0}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Storage Used</span>
-                <span className="font-medium">{dashboardOverview?.media?.storageUsed || '0 MB'}</span>
+                <span className="font-medium">{(dashboardOverview as any)?.media?.storageUsed || '0 MB'}</span>
               </div>
             </div>
             <Link href={`/${lang}/admin/media`} className="mt-3 block text-xs text-blue-600 hover:text-blue-800">
@@ -811,11 +845,11 @@ export default function AdminDashboard() {
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Recent Registrations</span>
-                <span className="font-medium">{dashboardOverview?.users?.recentRegistrations || 0}</span>
+                <span className="font-medium">{(dashboardOverview as any)?.users?.recentRegistrations || 0}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Active Sessions</span>
-                <span className="font-medium text-green-600">{dashboardOverview?.users?.activeSessions || 0}</span>
+                <span className="font-medium text-green-600">{(dashboardOverview as any)?.users?.activeSessions || 0}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Verification Queue</span>

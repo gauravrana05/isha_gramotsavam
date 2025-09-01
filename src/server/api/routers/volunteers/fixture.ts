@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '../../trpc';
 import { TRPCError } from '@trpc/server';
+import type { GenderCategory } from '@prisma/client';
 
 export const volunteersFixtureRouter = createTRPCRouter({
   // Get venue fixtures
@@ -330,6 +331,17 @@ export const volunteersFixtureRouter = createTRPCRouter({
           data: { status: 'in_progress' }
         });
 
+        // Create FixtureTeam relationships for all participating teams
+        await tx.fixtureTeam.createMany({
+          data: teams.map(team => ({
+            fixtureId: input.fixtureId,
+            teamId: team.id,
+            checkedIn: true,
+            checkedInAt: new Date()
+          })),
+          skipDuplicates: true
+        });
+
         // Create matches with proper dependencies
         const matchIdMap = new Map<string, string>();
         const matches = [];
@@ -339,10 +351,8 @@ export const volunteersFixtureRouter = createTRPCRouter({
           const bracketMatch = bracket.matches[i];
           const tempId = `temp_${i}`;
           
-import type { GenderCategory } from '@prisma/client'
-
-// In the input validation, ensure genderCategory is properly typed
-const validGenderCategories: GenderCategory[] = ['men', 'women', 'mixed'];
+          // Validate gender category
+          const validGenderCategories: GenderCategory[] = ['men', 'women', 'mixed'];
 
 // In the match creation:
           const match = await tx.match.create({

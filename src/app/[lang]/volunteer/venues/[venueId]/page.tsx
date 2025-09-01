@@ -2,11 +2,11 @@
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { api } from '~/trpc/react';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
-import { Button } from '~/components/ui/button';
-import { Badge } from '~/components/ui/badge';
-import { Progress } from '~/components/ui/progress';
+import { api } from '@/server/trpc/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { 
   Users, 
   Trophy, 
