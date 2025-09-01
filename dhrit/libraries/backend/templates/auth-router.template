@@ -1,2 +1,36 @@
-// Backend Agent Library - Auth Router Template
-// TODO: Template for generating authentication routers
+import { z } from 'zod';
+import { router, publicProcedure, protectedProcedure } from '../trpc';
+import { TRPCError } from '@trpc/server';
+
+export const {{routerName}}Router = router({
+  // Public endpoints
+  register: publicProcedure
+    .input(z.object({
+      email: z.string().email(),
+      password: z.string().min(8),
+      name: z.string().min(2),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Implementation here
+    }),
+
+  login: publicProcedure
+    .input(z.object({
+      email: z.string().email(),
+      password: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Implementation here
+    }),
+
+  // Protected endpoints
+  me: protectedProcedure
+    .query(async ({ ctx }) => {
+      // Implementation here
+    }),
+
+  logout: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      // Implementation here
+    }),
+});

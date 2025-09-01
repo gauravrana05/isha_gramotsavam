@@ -44,7 +44,7 @@ const createContext = cache(async () => {
 })
 
 export const api = createTRPCProxyClient<AppRouter>({
-  // transformer: superjson, // Disabled to fix input validation issues
+  // transformer: superjson, // Temporarily disabled
   links: [
     loggerLink({
       enabled: (op) =>

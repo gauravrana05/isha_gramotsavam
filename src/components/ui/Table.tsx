@@ -346,7 +346,7 @@ const EmptyState = ({
 
 // Loading state component
 const LoadingState = ({ 
-  rows = 5, 
+  rows = 3, 
   columns = [], 
   selectable = false, 
   expandable = false 
@@ -414,8 +414,14 @@ const LoadingState = ({
   };
 
   return (
-    <div className="bg-white sm:rounded-lg sm:border overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="bg-white sm:rounded-lg sm:border overflow-hidden min-h-96 flex flex-col">
+      <div 
+        className="overflow-x-auto flex-1"
+        style={{ 
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'var(--isha-saffron) var(--isha-background)'
+        }}
+      >
         <table className="w-full divide-y divide-gray-200 text-sm" style={{ minWidth: '600px' }}>
           {/* Headers */}
           <thead className="bg-gray-50">
@@ -635,9 +641,9 @@ export function Table<T>({
   return (
     <div className={cn('w-full', className)} {...rest}>
       {/* Table Container with horizontal scroll */}
-      <div className="bg-white sm:rounded-lg sm:border overflow-hidden">
+      <div className="bg-white sm:rounded-lg sm:border overflow-hidden min-h-96 flex flex-col">
         <div 
-          className="overflow-x-auto"
+          className="overflow-x-auto flex-1"
           style={{ 
             scrollbarWidth: 'thin',
             scrollbarColor: 'var(--isha-saffron) var(--isha-background)'

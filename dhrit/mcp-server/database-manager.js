@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 import pkg from 'pg';
 const { Pool } = pkg;
 import dotenv from 'dotenv';
@@ -7,20 +6,13 @@ dotenv.config();
 
 export class DatabaseManager {
   constructor() {
-    this.supabase = null;
     this.pgPool = null;
     this.isConnected = false;
-    this.useSupabase = !!process.env.SUPABASE_URL;
   }
 
   async connect() {
     try {
-      if (this.useSupabase) {
-        await this.connectSupabase();
-      } else {
-        await this.connectPostgreSQL();
-      }
-      
+      await this.connectPostgreSQL();
       await this.initializeTables();
       this.isConnected = true;
       return true;
@@ -30,26 +22,12 @@ export class DatabaseManager {
     }
   }
 
-  async connectSupabase() {
-    this.supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY
-    );
-
-    // Test connection
-    const { data, error } = await this.supabase.from('projects').select('count').limit(1);
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "table not found" which is ok
-      throw error;
-    }
-  }
-
   async connectPostgreSQL() {
     this.pgPool = new Pool({
-      host: process.env.POSTGRES_HOST || 'localhost',
-      port: process.env.POSTGRES_PORT || 5432,
-      database: process.env.POSTGRES_DB || 'dhrit_platform',
-      user: process.env.POSTGRES_USER,
-      password: process.env.POSTGRES_PASSWORD,
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false
+      },
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
@@ -164,212 +142,97 @@ export class DatabaseManager {
   }
 
   async query(text, params = []) {
-    if (this.useSupabase) {
-      // For Supabase, we'll use the REST API
-      throw new Error('Raw SQL queries not supported with Supabase. Use specific methods.');
-    } else {
-      const client = await this.pgPool.connect();
-      try {
-        const result = await client.query(text, params);
-        return result;
-      } finally {
-        client.release();
-      }
+    const client = await this.pgPool.connect();
+    try {
+      const result = await client.query(text, params);
+      return result;
+    } finally {
+      client.release();
     }
   }
 
   // Project methods
   async createProject(projectId, name, requirements) {
-    const projectData = {
-      id: projectId,
-      name,
-      requirements,
-      current_stage: 'initialization',
-      status: 'active',
-      metadata: {}
-    };
-
-    if (this.useSupabase) {
-      const { data, error } = await this.supabase
-        .from('projects')
-        .insert([projectData])
-        .select();
-      
-      if (error) throw error;
-      return data[0];
-    } else {
-      const result = await this.query(
-        'INSERT INTO projects (id, name, requirements, current_stage, status, metadata) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [projectId, name, requirements, 'initialization', 'active', JSON.stringify({})]
-      );
-      return result.rows[0];
-    }
+    const result = await this.query(
+      'INSERT INTO projects (id, name, requirements, current_stage, status, metadata) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [projectId, name, requirements, 'initialization', 'active', JSON.stringify({})]
+    );
+    return result.rows[0];
   }
 
   async getProject(projectId) {
-    if (this.useSupabase) {
-      const { data, error } = await this.supabase
-        .from('projects')
-        .select('*')
-        .eq('id', projectId)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
-      return data;
-    } else {
-      const result = await this.query('SELECT * FROM projects WHERE id = $1', [projectId]);
-      return result.rows[0];
-    }
+    const result = await this.query('SELECT * FROM projects WHERE id = $1', [projectId]);
+    return result.rows[0];
   }
 
   async updateProjectStage(projectId, stage) {
-    if (this.useSupabase) {
-      const { data, error } = await this.supabase
-        .from('projects')
-        .update({ current_stage: stage, updated_at: new Date().toISOString() })
-        .eq('id', projectId)
-        .select();
-      
-      if (error) throw error;
-      return data[0];
-    } else {
-      const result = await this.query(
-        'UPDATE projects SET current_stage = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
-        [stage, projectId]
-      );
-      return result.rows[0];
-    }
+    const result = await this.query(
+      'UPDATE projects SET current_stage = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [stage, projectId]
+    );
+    return result.rows[0];
   }
 
   // Agent task methods
   async createAgentTask(projectId, agentName, taskType, requirements) {
-    const taskData = {
-      project_id: projectId,
-      agent_name: agentName,
-      task_type: taskType,
-      requirements,
-      status: 'pending'
-    };
-
-    if (this.useSupabase) {
-      const { data, error } = await this.supabase
-        .from('agent_tasks')
-        .insert([taskData])
-        .select();
-      
-      if (error) throw error;
-      return data[0];
-    } else {
-      const result = await this.query(
-        'INSERT INTO agent_tasks (project_id, agent_name, task_type, requirements, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [projectId, agentName, taskType, requirements, 'pending']
-      );
-      return result.rows[0];
-    }
+    const result = await this.query(
+      'INSERT INTO agent_tasks (project_id, agent_name, task_type, requirements, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [projectId, agentName, taskType, requirements, 'pending']
+    );
+    return result.rows[0];
   }
 
   async updateAgentTaskStatus(taskId, status, result = null) {
-    const updateData = { status };
-    if (result) updateData.result = result;
-    if (status === 'completed') updateData.completed_at = new Date().toISOString();
-    if (status === 'in_progress') updateData.started_at = new Date().toISOString();
-
-    if (this.useSupabase) {
-      const { data, error } = await this.supabase
-        .from('agent_tasks')
-        .update(updateData)
-        .eq('id', taskId)
-        .select();
-      
-      if (error) throw error;
-      return data[0];
-    } else {
-      const setClause = Object.keys(updateData).map((key, i) => `${key} = $${i + 2}`).join(', ');
-      const values = [taskId, ...Object.values(updateData)];
-      
-      const result = await this.query(
-        `UPDATE agent_tasks SET ${setClause} WHERE id = $1 RETURNING *`,
-        values
-      );
-      return result.rows[0];
+    const updateData = [status];
+    let query = 'UPDATE agent_tasks SET status = $1';
+    
+    if (result) {
+      query += ', result = $2';
+      updateData.push(result);
     }
+    
+    if (status === 'completed') {
+      query += ', completed_at = CURRENT_TIMESTAMP';
+    }
+    
+    if (status === 'in_progress') {
+      query += ', started_at = CURRENT_TIMESTAMP';
+    }
+    
+    query += ' WHERE id = $' + (updateData.length + 1) + ' RETURNING *';
+    updateData.push(taskId);
+    
+    const queryResult = await this.query(query, updateData);
+    return queryResult.rows[0];
   }
 
   // Agent library methods
   async saveToAgentLibrary(agentName, libraryType, componentName, componentData) {
-    const libraryData = {
-      agent_name: agentName,
-      library_type: libraryType,
-      component_name: componentName,
-      component_data: componentData
-    };
-
-    if (this.useSupabase) {
-      const { data, error } = await this.supabase
-        .from('agent_libraries')
-        .upsert([libraryData])
-        .select();
-      
-      if (error) throw error;
-      return data[0];
-    } else {
-      const result = await this.query(
-        `INSERT INTO agent_libraries (agent_name, library_type, component_name, component_data) 
-         VALUES ($1, $2, $3, $4) 
-         ON CONFLICT (agent_name, library_type, component_name) 
-         DO UPDATE SET component_data = $4, updated_at = CURRENT_TIMESTAMP 
-         RETURNING *`,
-        [agentName, libraryType, componentName, JSON.stringify(componentData)]
-      );
-      return result.rows[0];
-    }
+    const result = await this.query(
+      `INSERT INTO agent_libraries (agent_name, library_type, component_name, component_data) 
+       VALUES ($1, $2, $3, $4) 
+       ON CONFLICT (agent_name, library_type, component_name) 
+       DO UPDATE SET component_data = $4, updated_at = CURRENT_TIMESTAMP 
+       RETURNING *`,
+      [agentName, libraryType, componentName, JSON.stringify(componentData)]
+    );
+    return result.rows[0];
   }
 
   async getFromAgentLibrary(agentName, libraryType, componentName) {
-    if (this.useSupabase) {
-      const { data, error } = await this.supabase
-        .from('agent_libraries')
-        .select('*')
-        .eq('agent_name', agentName)
-        .eq('library_type', libraryType)
-        .eq('component_name', componentName)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
-      return data;
-    } else {
-      const result = await this.query(
-        'SELECT * FROM agent_libraries WHERE agent_name = $1 AND library_type = $2 AND component_name = $3',
-        [agentName, libraryType, componentName]
-      );
-      return result.rows[0];
-    }
+    const result = await this.query(
+      'SELECT * FROM agent_libraries WHERE agent_name = $1 AND library_type = $2 AND component_name = $3',
+      [agentName, libraryType, componentName]
+    );
+    return result.rows[0];
   }
 
   // Performance tracking
   async recordAgentPerformance(agentName, taskType, duration, success, errorMessage = null) {
-    const performanceData = {
-      agent_name: agentName,
-      task_type: taskType,
-      duration_ms: duration,
-      success,
-      error_message: errorMessage
-    };
-
-    if (this.useSupabase) {
-      const { data, error } = await this.supabase
-        .from('agent_performance')
-        .insert([performanceData])
-        .select();
-      
-      if (error) throw error;
-      return data[0];
-    } else {
-      const result = await this.query(
-        'INSERT INTO agent_performance (agent_name, task_type, duration_ms, success, error_message) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [agentName, taskType, duration, success, errorMessage]
-      );
-      return result.rows[0];
-    }
+    const result = await this.query(
+      'INSERT INTO agent_performance (agent_name, task_type, duration_ms, success, error_message) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [agentName, taskType, duration, success, errorMessage]
+    );
+    return result.rows[0];
   }
 }

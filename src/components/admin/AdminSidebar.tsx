@@ -72,7 +72,7 @@ export default function AdminSidebar({
       // Show content after animation completes when expanding
       const timer = setTimeout(() => {
         setShowContent(true);
-      }, 200); // Reduced delay for better responsiveness
+      }, 100); // Optimized for better responsiveness
       return () => clearTimeout(timer);
     }
   }, [isDesktopCollapsed]);
@@ -248,8 +248,8 @@ export default function AdminSidebar({
         fixed inset-y-0 z-50 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
         md:left-0 md:right-auto md:translate-x-0 md:fixed md:top-0 md:bottom-0 md:flex-shrink-0 md:transition-[width] md:duration-300 md:ease-in-out
         ${isMobileOpen ? 'right-0 translate-x-0' : 'right-0 translate-x-full'}
-        ${isDesktopCollapsed ? 'md:w-16' : 'md:w-68'} 
-        w-full md:w-auto
+        ${isDesktopCollapsed ? 'md:w-16' : 'md:w-[280px]'} 
+        w-full
         ${className}
       `}>
         <div className="flex flex-col h-full">

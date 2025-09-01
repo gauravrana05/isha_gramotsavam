@@ -104,16 +104,39 @@ export async function GET(request: NextRequest) {
     console.log('User sub:', userInfo.sub);
     console.log('User email:', userInfo.email);
     console.log('User phone:', userInfo.phone_number);
+    console.log('All user info keys:', Object.keys(userInfo));
+    console.log('Full user info:', JSON.stringify(userInfo, null, 2));
     
+    // Extract phone number with better fallback logic
+    const extractPhoneNumber = (info: any) => {
+      const phoneFields = [
+        'phone_number', 'phone', 'phoneNumber', 'mobile', 
+        'mobileNumber', 'mobile_number', 'cellphone', 'tel'
+      ];
+      
+      for (const field of phoneFields) {
+        if (info[field]) {
+          const phone = String(info[field]).trim();
+          if (phone && phone !== 'null' && phone !== 'undefined') {
+            console.log(`Phone found in field '${field}':`, phone);
+            return phone;
+          }
+        }
+      }
+      
+      console.log('No phone number found in any field');
+      return null;
+    };
+
     // Map OIDC user info to our User model
     const userData = {
       email: userInfo.email || null,
-      phone: userInfo.phone_number || userInfo.phone || userInfo.phoneNumber || userInfo.mobile || null,
+      phone: extractPhoneNumber(userInfo),
       firstName: userInfo.given_name || userInfo.name?.split(' ')[0] || null,
       lastName: userInfo.family_name || userInfo.name?.split(' ').slice(1).join(' ') || null,
       dateOfBirth: userInfo.birthdate ? new Date(userInfo.birthdate) : null,
       gender: userInfo.gender || null,
-      whatsappNumber: userInfo.whatsapp_number || userInfo.phone_number || userInfo.phone || null,
+      whatsappNumber: userInfo.whatsapp_number || extractPhoneNumber(userInfo),
       instagramHandle: userInfo.instagram_handle || null,
       panchayat: userInfo.address?.panchayat || null,
       taluk: userInfo.address?.taluk || null,
@@ -127,6 +150,11 @@ export async function GET(request: NextRequest) {
     // Create or update user in database
     let user: any;
     const phone = userData.phone;
+    
+    console.log('=== PHONE DETECTION RESULT ===');
+    console.log('Extracted phone:', phone);
+    console.log('Phone type:', typeof phone);
+    console.log('Is phone truthy:', !!phone);
      
     if (!phone) {
       // Store user info temporarily for phone collection

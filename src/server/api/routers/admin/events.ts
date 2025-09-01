@@ -5,12 +5,31 @@ import { db } from "@/lib/db";
 import { calculateEventStatus, validateEventDates } from '@/lib/eventStatus';
 
 export const adminEventsRouter = createTRPCRouter({
+  // Test mutation with minimal setup
+  testDelete: protectedProcedure
+    .mutation(async () => {
+      console.log('=== TEST DELETE MUTATION - NO INPUT ===');
+      return "success";
+    }),
+
   // Get Sports
   getSports: protectedProcedure
-    .input(z.object({
-      includeInactive: z.boolean().default(false),
-      includeTeamCounts: z.boolean().default(false),
-      includeGenderCategories: z.boolean().default(false),
+    .input(z.union([
+      z.object({
+        includeInactive: z.boolean().default(false),
+        includeTeamCounts: z.boolean().default(false),
+        includeGenderCategories: z.boolean().default(false),
+      }),
+      z.undefined()
+    ]).transform((input) => {
+      if (input === undefined) {
+        return {
+          includeInactive: false,
+          includeTeamCounts: false,
+          includeGenderCategories: false,
+        };
+      }
+      return input;
     }))
     .query(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
@@ -169,73 +188,122 @@ export const adminEventsRouter = createTRPCRouter({
 
   // Get Events
   getEvents: protectedProcedure
-    .input(z.object({
-      limit: z.number().default(50),
-      offset: z.number().default(0),
-      status: z.enum(['all', 'upcoming', 'ongoing', 'completed']).default('all'),
-      sportId: z.string().optional(),
-      venueId: z.string().optional(),
-      searchQuery: z.string().optional(),
+    .input(z.union([
+      z.object({
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+        status: z.enum(['all', 'upcoming', 'ongoing', 'completed']).default('all'),
+        sportId: z.string().optional(),
+        venueId: z.string().optional(),
+        searchQuery: z.string().optional(),
+      }),
+      z.undefined()
+    ]).transform((input) => {
+      if (input === undefined) {
+        return {
+          limit: 50,
+          offset: 0,
+          status: 'all' as const,
+          sportId: undefined,
+          venueId: undefined,
+          searchQuery: undefined,
+        };
+      }
+      return input;
     }))
     .query(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const where: any = {};
-      
-      if (input.sportId) {
-        where.sportId = input.sportId;
-      }
-      
-      if (input.venueId) {
-        where.venueId = input.venueId;
-      }
-      
-      if (input.searchQuery) {
-        where.OR = [
-          { name: { contains: input.searchQuery, mode: 'insensitive' } },
-          { description: { contains: input.searchQuery, mode: 'insensitive' } },
-        ];
-      }
 
-      if (input.status === 'upcoming') {
-        where.status = 'draft';
-      } else if (input.status === 'ongoing') {
-        where.status = { in: ['registration_open', 'registration_closed', 'active'] };
-      } else if (input.status === 'completed') {
-        where.status = { in: ['completed', 'cancelled'] };
-      }
+      try {
+        const where: any = {};
+        
+        if (input.sportId) {
+          where.sportId = input.sportId;
+        }
+        
+        if (input.venueId) {
+          where.venueId = input.venueId;
+        }
+        
+        if (input.searchQuery) {
+          where.OR = [
+            { name: { contains: input.searchQuery, mode: 'insensitive' } },
+            { description: { contains: input.searchQuery, mode: 'insensitive' } },
+          ];
+        }
 
-      const [events, totalCount] = await Promise.all([
-        db.event.findMany({
-          where,
-          include: {
-            createdByUser: {
-              select: {
-                firstName: true,
-                lastName: true,
+        if (input.status === 'upcoming') {
+          where.status = 'draft';
+        } else if (input.status === 'ongoing') {
+          where.status = { in: ['registration_open', 'registration_closed', 'active'] };
+        } else if (input.status === 'completed') {
+          where.status = { in: ['completed', 'cancelled'] };
+        }
+
+        const [events, totalCount] = await Promise.all([
+          db.event.findMany({
+            where,
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              status: true,
+              startDate: true,
+              endDate: true,
+              registrationStartDate: true,
+              registrationEndDate: true,
+              createdAt: true,
+              updatedAt: true,
+              createdByUser: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+              _count: {
+                select: {
+                  fixtures: true,
+                  teams: true,
+                },
               },
             },
-            _count: {
-              select: {
-                fixtures: true,
-                teams: true,
-              },
-            },
-          },
-          orderBy: { startDate: 'asc' },
-          skip: input.offset,
-          take: input.limit,
-        }),
-        db.event.count({ where }),
-      ]);
+            orderBy: { startDate: 'asc' },
+            skip: input.offset,
+            take: input.limit,
+          }),
+          db.event.count({ where }),
+        ]);
 
-      return {
-        events,
-        totalCount,
-        hasMore: input.offset + input.limit < totalCount,
-      };
+
+        // Convert dates to strings to avoid serialization issues without superjson
+        const serializedEvents = events.map(event => ({
+          ...event,
+          startDate: event.startDate?.toISOString() || null,
+          endDate: event.endDate?.toISOString() || null,
+          registrationStartDate: event.registrationStartDate?.toISOString() || null,
+          registrationEndDate: event.registrationEndDate?.toISOString() || null,
+          createdAt: event.createdAt?.toISOString() || null,
+          updatedAt: event.updatedAt?.toISOString() || null,
+        }));
+
+        const response = {
+          events: serializedEvents,
+          totalCount,
+          hasMore: input.offset + input.limit < totalCount,
+        };
+
+
+        return response;
+      } catch (error) {
+        
+        throw new TRPCError({ 
+          code: 'INTERNAL_SERVER_ERROR', 
+          message: `Failed to fetch events: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        });
+      }
     }),
 
   // Create Event
@@ -289,7 +357,16 @@ export const adminEventsRouter = createTRPCRouter({
         },
       });
 
-      return event;
+      // Serialize dates to strings for response
+      return {
+        ...event,
+        startDate: event.startDate?.toISOString() || null,
+        endDate: event.endDate?.toISOString() || null,
+        registrationStartDate: event.registrationStartDate?.toISOString() || null,
+        registrationEndDate: event.registrationEndDate?.toISOString() || null,
+        createdAt: event.createdAt?.toISOString() || null,
+        updatedAt: event.updatedAt?.toISOString() || null,
+      };
     }),
 
   // Update Event
@@ -361,7 +438,16 @@ export const adminEventsRouter = createTRPCRouter({
         },
       });
 
-      return event;
+      // Serialize dates to strings for response
+      return {
+        ...event,
+        startDate: event.startDate?.toISOString() || null,
+        endDate: event.endDate?.toISOString() || null,
+        registrationStartDate: event.registrationStartDate?.toISOString() || null,
+        registrationEndDate: event.registrationEndDate?.toISOString() || null,
+        createdAt: event.createdAt?.toISOString() || null,
+        updatedAt: event.updatedAt?.toISOString() || null,
+      };
     }),
 
   // Refresh Event Statuses
@@ -399,6 +485,94 @@ export const adminEventsRouter = createTRPCRouter({
     }),
 
   // Delete Event
+  // Update event status
+  updateEventStatus: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      status: z.enum(['draft', 'registration_open', 'registration_closed', 'ongoing', 'completed', 'cancelled']),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      const event = await db.event.update({
+        where: { id: input.id },
+        data: { status: input.status },
+        include: {
+          createdByUser: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      });
+
+      return event;
+    }),
+
+  // Bulk delete events
+  bulkDeleteEvents: protectedProcedure
+    .input(z.object({
+      ids: z.array(z.string()),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (ctx.user.role !== 'admin') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+      }
+
+      try {
+        // Check for related records for all events
+        const eventsWithCounts = await db.event.findMany({
+          where: { id: { in: input.ids } },
+          include: {
+            _count: {
+              select: {
+                fixtures: true,
+                matches: true,
+                teams: true,
+                posts: true,
+                userRoles: true,
+              }
+            }
+          }
+        });
+
+        const eventsWithRelations = eventsWithCounts.filter(event => 
+          event._count.fixtures > 0 ||
+          event._count.matches > 0 ||
+          event._count.teams > 0 ||
+          event._count.posts > 0 ||
+          event._count.userRoles > 0
+        );
+
+        if (eventsWithRelations.length > 0) {
+          const eventNames = eventsWithRelations.map(e => e.name).join(', ');
+          throw new TRPCError({ 
+            code: 'BAD_REQUEST', 
+            message: `Cannot delete events with related records: ${eventNames}. Please remove related records first.` 
+          });
+        }
+
+        const result = await db.event.deleteMany({
+          where: { id: { in: input.ids } },
+        });
+
+        return { success: true, deletedCount: result.count };
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        
+        throw new TRPCError({ 
+          code: 'INTERNAL_SERVER_ERROR', 
+          message: 'Failed to delete events' 
+        });
+      }
+    }),
+
+  // Delete Event - Simplified to avoid transformation issues
   deleteEvent: protectedProcedure
     .input(z.object({
       id: z.string(),
@@ -408,11 +582,24 @@ export const adminEventsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      await db.event.delete({
-        where: { id: input.id },
-      });
+      try {
+        await db.event.delete({
+          where: { id: input.id },
+        });
 
-      return { success: true };
+        return true;
+      } catch (error) {
+        console.error('Delete event error:', error);
+        
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        
+        throw new TRPCError({ 
+          code: 'INTERNAL_SERVER_ERROR', 
+          message: 'Failed to delete event' 
+        });
+      }
     }),
 
   // Get Event By ID
@@ -447,7 +634,16 @@ export const adminEventsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Event not found' });
       }
 
-      return event;
+      // Serialize dates to strings for response
+      return {
+        ...event,
+        startDate: event.startDate?.toISOString() || null,
+        endDate: event.endDate?.toISOString() || null,
+        registrationStartDate: event.registrationStartDate?.toISOString() || null,
+        registrationEndDate: event.registrationEndDate?.toISOString() || null,
+        createdAt: event.createdAt?.toISOString() || null,
+        updatedAt: event.updatedAt?.toISOString() || null,
+      };
     }),
 
   // Get Fixtures

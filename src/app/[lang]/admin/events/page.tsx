@@ -76,16 +76,49 @@ export default function AdminEventsPage() {
   });
 
   // tRPC query with enhanced parameters
+  const eventsQuery = api.admin.events.getEvents.useQuery({
+    limit: 100,
+    status: 'all'
+  }, {
+    enabled: !!user,
+    onSuccess: (data) => {
+      console.log('=== QUERY SUCCESS ===');
+      console.log('Success data:', data);
+    },
+    onError: (error) => {
+      console.error('=== EVENTS QUERY ERROR (CLIENT) ===');
+      console.error('Error object:', error);
+      console.error('Error message:', error.message);
+      console.error('Error data:', error.data);
+      console.error('Error shape:', error.shape);
+    }
+  });
+
   const {
     data: eventsData,
     isPending: eventsLoading,
     error: eventsError,
     refetch: refetchEvents
-  } = api.admin.events.getEvents.useQuery({
-    limit: 100,
-    status: 'all'
-  }, {
-    enabled: !!user
+  } = eventsQuery;
+
+  // Log error if it exists
+  useEffect(() => {
+    if (eventsError) {
+      console.error('=== EVENTS ERROR STATE ===');
+      console.error('Error:', eventsError);
+      console.error('Error message:', eventsError.message);
+      console.error('Error data:', eventsError.data);
+    }
+  }, [eventsError]);
+
+  // Test delete mutation
+  const testDeleteMutation = api.admin.events.testDelete.useMutation({
+    onSuccess: () => {
+      refetchEvents();
+    },
+    onError: (error) => {
+      console.error('Error deleting event:', error);
+    }
   });
 
   // Delete event mutation
@@ -154,17 +187,7 @@ export default function AdminEventsPage() {
   const error = eventsError?.message || '';
   const events = eventsData?.events || [];
 
-  // Debug logging
-  console.log('Debug Events Page:', {
-    user: user,
-    userRole: user?.role,
-    userProfileRole: userProfile?.role,
-    eventsLoading,
-    eventsError,
-    eventsData,
-    eventsDataEvents: eventsData?.events,
-    events: events.length,
-  });
+
 
   // Define table columns
   const columns: Column<EventData>[] = useMemo(() => [
@@ -340,8 +363,62 @@ export default function AdminEventsPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Form validation
+  const validateForm = () => {
+    const errors: string[] = [];
+    
+    if (!formData.name.trim()) {
+      errors.push('Event name is required');
+    }
+    
+    if (!formData.registrationStartDate) {
+      errors.push('Registration start date is required');
+    }
+    
+    if (!formData.registrationEndDate) {
+      errors.push('Registration end date is required');
+    }
+    
+    if (!formData.startDate) {
+      errors.push('Event start date is required');
+    }
+    
+    if (!formData.endDate) {
+      errors.push('Event end date is required');
+    }
+    
+    // Date range validation
+    if (formData.registrationStartDate && formData.registrationEndDate) {
+      if (new Date(formData.registrationStartDate) >= new Date(formData.registrationEndDate)) {
+        errors.push('Registration start date must be before registration end date');
+      }
+    }
+    
+    if (formData.startDate && formData.endDate) {
+      if (new Date(formData.startDate) >= new Date(formData.endDate)) {
+        errors.push('Event start date must be before event end date');
+      }
+    }
+    
+    if (formData.registrationEndDate && formData.startDate) {
+      if (new Date(formData.registrationEndDate) > new Date(formData.startDate)) {
+        errors.push('Registration must end before event starts');
+      }
+    }
+    
+    return errors;
+  };
+
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    
+    // Validate form
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      validationErrors.forEach(error => addNotification(error, 'error'));
+      return;
+    }
+    
     try {
       // Convert date strings to ISO datetime format
       const formatDateToISO = (dateString: string) => {
@@ -384,8 +461,26 @@ export default function AdminEventsPage() {
     }
   };
 
+  // Bulk delete events
+  const bulkDeleteEvents = async () => {
+    if (selectedEvents.size === 0) return;
+    
+    try {
+      const eventIds = Array.from(selectedEvents);
+      await api.admin.events.bulkDeleteEvents.useQuery({ ids: eventIds });
+      refetchEvents();
+      setSelectedEvents(new Set());
+      addNotification(`${eventIds.length} events deleted successfully`, 'success');
+    } catch (error) {
+      console.error('Failed to bulk delete events:', error);
+      addNotification('Failed to delete events. Please try again.', 'error');
+    }
+  };
+
+  // Delete event using query approach
   const confirmDeleteEvent = async () => {
     if (!eventToDelete) return;
+    
     try {
       await deleteEventMutation.mutateAsync({ id: eventToDelete.id });
       setSelectedEvents(new Set()); // Clear selection after delete
@@ -396,22 +491,22 @@ export default function AdminEventsPage() {
     }
   };
 
-  // Header actions for selected events
+  // Single selection delete action
   const getHeaderActionsSingle = (selectedItems: EventData[]) => {
     const selectedEvent = selectedItems[0];
     if (!selectedEvent) return null;
 
     return (
-      <Button
-        onClick={() => handleDeleteEvent(selectedEvent.id)}
-        leftIcon={Trash2}
-        variant="danger"
-        size="sm"
-        className="text-red-600 border-red-300 hover:bg-red-50"
-        disabled={deleteEventMutation.isPending}
+      <button
+        onClick={() => {
+          setEventToDelete(selectedEvent);
+          setShowDeleteConfirm(true);
+        }}
+        className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
       >
-        {deleteEventMutation.isPending ? 'Removing...' : 'Remove Event'}
-      </Button>
+        <Trash2 className="w-4 h-4 mr-2" />
+        Delete
+      </button>
     );
   };
 
@@ -427,8 +522,8 @@ export default function AdminEventsPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-full">
 
       {/* AdvancedTable */}
-      <AdvancedTable<EventData>
-        data={events as unknown as EventData[]}
+      <AdvancedTable
+        data={events}
         columns={columns}
         actions={actions}
         loading={eventsLoading}
@@ -442,20 +537,45 @@ export default function AdminEventsPage() {
         onRowClick={handleRowClick}
         keyExtractor={(event) => event.id}
         headerActions={
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            leftIcon={Plus}
-            variant="primary"
-            size="sm"
-          >
-            Create Event
-          </Button>
+          <div className="flex items-center gap-2">
+            {selectedEvents.size > 0 && (
+              <button
+                onClick={bulkDeleteEvents}
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Selected ({selectedEvents.size})
+              </button>
+            )}
+            <button
+              onClick={() => {
+                resetForm();
+                setShowCreateModal(true);
+              }}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Event
+            </button>
+          </div>
         }
         headerActionsSingle={getHeaderActionsSingle}
         emptyState={{
           icon: Calendar,
           title: 'No events found',
-          description: 'No events have been created yet.'
+          description: 'No events have been created yet.',
+          action: {
+            label: 'Create Event',
+            onClick: () => {
+              resetForm();
+              setShowCreateModal(true);
+            }
+          }
+        }}
+        noSearchResultsEmptyState={{
+          icon: Calendar,
+          title: 'No matching events',
+          description: 'Try adjusting your search or filters to find what you\'re looking for.',
         }}
       />
 

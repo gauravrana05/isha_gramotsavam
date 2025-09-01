@@ -81,7 +81,7 @@ export type Context = Awaited<ReturnType<typeof createTRPCContext>>
 
 // Initialize tRPC
 const t = initTRPC.context<Context>().create({
-  transformer: superjson,
+  // transformer: superjson, // Temporarily disabled
   errorFormatter({ shape, error }) {
     return {
       ...shape,

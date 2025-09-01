@@ -1,2 +1,65 @@
-// QA Agent Library - Component Test Template
-// TODO: Template for generating component tests
+import { render, screen, fireEvent } from '@testing-library/react';
+import { {{ComponentName}} } from '@/components/{{componentPath}}';
+
+describe('{{ComponentName}}', () => {
+  const defaultProps = {
+    // Add default props here
+  };
+
+  it('renders correctly', () => {
+    render(<{{ComponentName}} {...defaultProps} />);
+    
+    // Add assertions here
+    expect(screen.getByRole('{{role}}')).toBeInTheDocument();
+  });
+
+  it('handles props correctly', () => {
+    const customProps = {
+      ...defaultProps,
+      // Add custom props here
+    };
+    
+    render(<{{ComponentName}} {...customProps} />);
+    
+    // Add assertions for prop handling
+  });
+
+  it('handles user interactions', () => {
+    const mockHandler = jest.fn();
+    const props = {
+      ...defaultProps,
+      onClick: mockHandler,
+    };
+    
+    render(<{{ComponentName}} {...props} />);
+    
+    const element = screen.getByRole('{{role}}');
+    fireEvent.click(element);
+    
+    expect(mockHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('displays correct content', () => {
+    const props = {
+      ...defaultProps,
+      children: 'Test content',
+    };
+    
+    render(<{{ComponentName}} {...props} />);
+    
+    expect(screen.getByText('Test content')).toBeInTheDocument();
+  });
+
+  it('applies correct styling', () => {
+    render(<{{ComponentName}} {...defaultProps} />);
+    
+    const element = screen.getByRole('{{role}}');
+    expect(element).toHaveClass('{{expectedClass}}');
+  });
+
+  it('is accessible', async () => {
+    const { container } = render(<{{ComponentName}} {...defaultProps} />);
+    
+    await expectToBeAccessible(container);
+  });
+});

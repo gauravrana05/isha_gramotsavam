@@ -1,5 +1,6 @@
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
 import { type NextRequest } from 'next/server'
+import superjson from 'superjson'
 
 import { env } from '@/lib/env'
 import { appRouter } from '@/server/api/root'
@@ -10,6 +11,7 @@ const handler = (req: NextRequest) =>
     endpoint: '/api/trpc',
     req,
     router: appRouter,
+    // transformer: superjson, // Temporarily disabled
     createContext: async ({ req, resHeaders }) => {
       // Create mock req/res objects that match what createTRPCContext expects
       const mockReq = {

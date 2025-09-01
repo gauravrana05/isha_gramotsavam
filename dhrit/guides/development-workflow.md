@@ -1,244 +1,304 @@
-# Development Workflow Guide
+# Dhrit Platform - Development Workflow Guide
 
-This guide provides step-by-step workflows for using the Dhrit Platform to build applications with 8 specialized AI agents.
+This guide explains how to use the Dhrit platform to build complete applications through coordinated AI agents.
 
-## Quick Start Workflow
+## 🚀 Complete Development Workflow
 
-### 1. Setup and Training
+### Phase 1: Platform Setup
+
+#### 1. Initial Setup
 ```bash
-# First time setup - train all 8 agents
-dhrit___train-all-agents
-
-# Verify training completed successfully
-# Check for "TRAINING COMPLETE" responses
+cd dhrit
+cp .env.example .env
+npm install
 ```
 
-### 2. Project Initialization
+#### 2. Train All Agents
 ```bash
-# Create new project
-dhrit___init --projectId "blog-app" --requirements "Build a blog platform with user authentication, post creation, and commenting system"
+# Train domain expertise
+./train-and-populate.sh
 
-# Check initial project state
-dhrit___status --projectId "blog-app"
+# Train coordination protocols
+train-protocol --agentName "pal" --protocols "coordination,handoff,dependencies"
+train-protocol --agentName "kalp" --protocols "coordination,handoff,dependencies"
+train-protocol --agentName "bandh" --protocols "coordination,handoff,dependencies"
+train-protocol --agentName "kosh" --protocols "coordination,handoff,dependencies"
+train-protocol --agentName "mool" --protocols "coordination,handoff,dependencies"
+train-protocol --agentName "roop" --protocols "coordination,handoff,dependencies"
+train-protocol --agentName "gati" --protocols "coordination,handoff,dependencies"
+train-protocol --agentName "dhar" --protocols "coordination,handoff,dependencies"
 ```
 
-### 3. Automated 8-Agent Development
+### Phase 2: Project Development
+
+#### 1. Project Initialization
 ```bash
-# Let all 8 agents coordinate automatically
-dhrit___build --projectId "blog-app" --requirements "Complete blog platform with authentication, posts, comments, and admin dashboard"
+# Create new project with Next.js structure
+init --projectId "my-app" --projectType "nextjs"
 ```
 
-## Manual Workflow (Step-by-Step)
+#### 2. Sequential Agent Coordination
 
-### Phase 1: Architecture & Design Foundation
+##### Architecture Design (Pal)
 ```bash
-# Step 1: System Architecture Design
-dhrit___pal --projectId "blog-app" --task "Design system architecture" --requirements "Scalable blog platform with user management, content creation, and real-time features"
-
-# Step 2: Design System Creation
-dhrit___kalp --projectId "blog-app" --task "Create design system" --requirements "Modern blog design with clean typography, responsive layout, and accessible components"
-
-# Step 3: Security Planning
-dhrit___bandh --projectId "blog-app" --task "Plan security architecture" --requirements "User authentication, content security, data protection, and GDPR compliance"
-
-# Check foundation progress
-dhrit___status --projectId "blog-app"
+pal --projectId "my-app" --task "Design system architecture" --requirements "Build a [description] with [tech stack]. Requirements: [list requirements]"
 ```
 
-### Phase 2: Data & Backend Layer
+**Expected Output:**
+- System architecture diagrams
+- Technology stack decisions
+- Scalability patterns
+- Integration guidelines
+
+##### Design System (Kalp)
 ```bash
-# Step 4: Database Design
-dhrit___kosh --projectId "blog-app" --task "Design blog database schema" --requirements "Users, posts, comments, tags, categories with proper relationships and indexes"
-
-# Step 5: Backend API Development
-dhrit___mool --projectId "blog-app" --task "Create blog API" --requirements "tRPC routers for authentication, posts CRUD, comments, user management with proper validation and security"
-
-# Check backend progress
-dhrit___status --projectId "blog-app"
+kalp --projectId "my-app" --task "Create design system" --requirements "Design [style description] interface inspired by [references]. Include [components needed]"
 ```
 
-### Phase 3: Frontend & Optimization
+**Expected Output:**
+- Design tokens (colors, typography, spacing)
+- Component specifications
+- Layout patterns
+- Brand guidelines
+
+##### Security Planning (Bandh)
 ```bash
-# Step 6: Frontend Development
-dhrit___roop --projectId "blog-app" --task "Create blog frontend" --requirements "Next.js app with login, post creation/editing, comment system, responsive design using design system"
-
-# Step 7: Performance Optimization
-dhrit___gati --projectId "blog-app" --task "Optimize blog performance" --requirements "Fast loading, efficient caching, optimized images, and sub-second response times"
-
-# Check frontend progress
-dhrit___status --projectId "blog-app"
+bandh --projectId "my-app" --task "Security architecture" --requirements "Secure [application type] with [security requirements]. Include [compliance needs]"
 ```
 
-### Phase 4: Testing and Deployment
-```bash
-# Step 8: Testing & Deployment
-dhrit___dhar --projectId "blog-app" --task "Setup testing and deployment" --requirements "Unit tests, E2E tests, CI/CD pipeline, AWS Amplify deployment configuration"
+**Expected Output:**
+- Security architecture
+- Threat modeling
+- Compliance checklist
+- Security policies
 
-# Final project status
-dhrit___status --projectId "blog-app"
+##### Database Design (Kosh)
+```bash
+kosh --projectId "my-app" --task "Design database schema" --requirements "Database for [entities] with [relationships]. Optimize for [performance requirements]"
 ```
 
-## Specialized Workflows
+**Expected Output:**
+- Prisma schema
+- Migration scripts
+- Indexing strategy
+- Performance optimizations
 
-### E-commerce Platform (8-Agent Coordination)
+##### Backend Development (Mool)
 ```bash
-# Initialize e-commerce project
-dhrit___init --projectId "ecommerce" --requirements "E-commerce platform with products, cart, payments, orders, inventory management"
-
-# Architecture & Foundation
-dhrit___pal --projectId "ecommerce" --task "Design e-commerce architecture" --requirements "Microservices architecture with payment processing, inventory management, and order fulfillment"
-
-dhrit___kalp --projectId "ecommerce" --task "Create e-commerce design system" --requirements "Professional e-commerce design with product showcases, shopping cart, and checkout flow"
-
-dhrit___bandh --projectId "ecommerce" --task "Plan e-commerce security" --requirements "PCI compliance, secure payments, user data protection, fraud prevention"
-
-# Data & Backend
-dhrit___kosh --projectId "ecommerce" --task "Design e-commerce schema" --requirements "Products, categories, users, orders, payments, inventory, reviews with optimized queries"
-
-dhrit___mool --projectId "ecommerce" --task "Create e-commerce API" --requirements "Product catalog, cart management, Stripe payment integration, order processing, inventory tracking"
-
-# Frontend & Optimization
-dhrit___roop --projectId "ecommerce" --task "Build e-commerce UI" --requirements "Product listings, shopping cart, checkout flow, user dashboard, admin panel, mobile-responsive"
-
-dhrit___gati --projectId "ecommerce" --task "Optimize e-commerce performance" --requirements "Fast product search, optimized images, efficient caching, CDN integration"
-
-# Testing & Deployment
-dhrit___dhar --projectId "ecommerce" --task "E-commerce testing and deployment" --requirements "Payment testing, load testing, security testing, production deployment"
+mool --projectId "my-app" --task "Build backend APIs" --requirements "tRPC APIs for [functionality]. Include [authentication/features]"
 ```
 
-### SaaS Dashboard (Enterprise Focus)
+**Expected Output:**
+- tRPC API routes
+- Authentication system
+- Business logic
+- API documentation
+
+##### Frontend Development (Roop)
 ```bash
-# Initialize SaaS project
-dhrit___init --projectId "saas-dashboard" --requirements "Multi-tenant SaaS dashboard with user management, analytics, billing, and API access"
-
-# Enterprise Architecture
-dhrit___pal --projectId "saas-dashboard" --task "Design SaaS architecture" --requirements "Multi-tenant architecture with tenant isolation, scalable infrastructure, and API management"
-
-dhrit___bandh --projectId "saas-dashboard" --task "Plan SaaS security" --requirements "Multi-tenancy security, SOC2 compliance, API security, audit logging"
-
-# Multi-tenant Foundation
-dhrit___kalp --projectId "saas-dashboard" --task "Create SaaS design system" --requirements "Professional SaaS interface with dashboards, data visualization, and white-label capabilities"
-
-dhrit___kosh --projectId "saas-dashboard" --task "Design multi-tenant schema" --requirements "Tenant isolation, user roles, subscriptions, usage tracking, audit logs"
-
-# SaaS Backend & Frontend
-dhrit___mool --projectId "saas-dashboard" --task "Create SaaS API" --requirements "Multi-tenancy, role-based access, Stripe billing, usage metering, API rate limiting"
-
-dhrit___roop --projectId "saas-dashboard" --task "Build SaaS dashboard" --requirements "Admin dashboard, user management, analytics charts, billing interface, API documentation"
-
-# Enterprise Optimization & Deployment
-dhrit___gati --projectId "saas-dashboard" --task "Optimize SaaS performance" --requirements "Multi-tenant performance optimization, efficient queries, caching strategies"
-
-dhrit___dhar --projectId "saas-dashboard" --task "Enterprise testing setup" --requirements "Multi-tenant testing, security testing, performance testing, compliance validation"
+roop --projectId "my-app" --task "Build user interface" --requirements "React interface implementing [design]. Include [features] with [interactions]"
 ```
 
-## Iterative Development
+**Expected Output:**
+- React components
+- Page layouts
+- User interactions
+- Responsive design
 
-### Feature Addition Workflow
+##### Performance Optimization (Gati)
 ```bash
-# Get current project status
-dhrit___status --projectId "my-app"
-
-# Add new feature with coordinated agents
-dhrit___pal --projectId "my-app" --task "Plan social features architecture" --requirements "User following, activity feeds, real-time notifications"
-
-dhrit___kalp --projectId "my-app" --task "Design social UI components" --requirements "Follow buttons, activity feed design, notification components"
-
-dhrit___bandh --projectId "my-app" --task "Review social features security" --requirements "Privacy controls, content moderation, user safety"
-
-dhrit___kosh --projectId "my-app" --task "Add social features schema" --requirements "User following, post likes, activity tracking, notifications"
-
-dhrit___mool --projectId "my-app" --task "Implement social API" --requirements "Follow/unfollow endpoints, like system, activity feed generation, real-time notifications"
-
-dhrit___roop --projectId "my-app" --task "Build social UI" --requirements "Follow buttons, like buttons, activity feed, user profiles, notification center"
-
-dhrit___gati --projectId "my-app" --task "Optimize social features" --requirements "Efficient activity feed queries, real-time performance, notification delivery"
-
-dhrit___dhar --projectId "my-app" --task "Test social features" --requirements "Social interaction testing, real-time feature testing, notification testing"
+gati --projectId "my-app" --task "Optimize performance" --requirements "Optimize for [performance targets]. Focus on [specific areas]"
 ```
 
-### Refinement Workflow
+**Expected Output:**
+- Performance audit
+- Optimization recommendations
+- Caching strategies
+- Monitoring setup
+
+##### Testing & Deployment (Dhar)
 ```bash
-# Refine specific aspects with relevant agents
-dhrit___kalp --projectId "my-app" --task "Improve design system" --requirements "Add dark mode support, improve accessibility, enhance mobile experience"
-
-dhrit___gati --projectId "my-app" --task "Performance audit" --requirements "Identify bottlenecks, optimize database queries, improve Core Web Vitals"
-
-dhrit___bandh --projectId "my-app" --task "Security audit" --requirements "Vulnerability assessment, security best practices review, compliance check"
+dhar --projectId "my-app" --task "Test and deploy" --requirements "Deploy to [platform] with [testing requirements]. Include [monitoring needs]"
 ```
 
-## Best Practices
+**Expected Output:**
+- Test suites
+- CI/CD pipeline
+- Deployment configuration
+- Live application URL
 
-### Project Planning
-1. **Clear Requirements**: Provide detailed, specific requirements for each agent
-2. **Scope Definition**: Define MVP vs full feature set clearly
-3. **Technology Choices**: Specify preferred technologies and constraints
-4. **Performance Goals**: Include performance and scalability requirements
+### Phase 3: Agent Coordination
 
-### 8-Agent Coordination
-1. **Sequential Execution**: Follow architecture → design → security → database → backend → frontend → performance → testing order
-2. **Dependency Management**: Ensure each agent has required inputs from previous agents
-3. **Progress Monitoring**: Check project status between phases
-4. **Error Handling**: Address blockers before proceeding to next agent
+#### Agent-to-Agent Communication
 
-### Quality Assurance
-1. **Incremental Testing**: Test after each agent phase completion
-2. **Integration Testing**: Verify agent outputs work together
-3. **Performance Testing**: Include performance requirements throughout
-4. **Security Review**: Ensure security best practices at each stage
-
-### Deployment Strategy
-1. **Environment Setup**: Define development, staging, production environments
-2. **CI/CD Pipeline**: Automate testing and deployment with Dhar
-3. **Monitoring**: Include logging and monitoring setup
-4. **Rollback Plan**: Prepare for deployment issues
-
-## Common Patterns
-
-### Authentication System (8-Agent Pattern)
+##### Request Pattern
 ```bash
-# Complete authentication system with all agents
-dhrit___pal --task "Auth architecture" --requirements "Scalable authentication with JWT, sessions, and OAuth"
-dhrit___kalp --task "Auth UI design" --requirements "Login, register, password reset, profile management UI"
-dhrit___bandh --task "Auth security" --requirements "Secure authentication, password policies, session management"
-dhrit___kosh --task "User schema" --requirements "Users, sessions, password reset, email verification"
-dhrit___mool --task "Auth API" --requirements "JWT authentication, password hashing, email verification, session management"
-dhrit___roop --task "Auth UI" --requirements "Login, register, password reset, email verification forms"
-dhrit___gati --task "Auth performance" --requirements "Fast authentication, efficient session management"
-dhrit___dhar --task "Auth testing" --requirements "Authentication flow testing, security testing"
+request --fromAgent "[requesting-agent]" --toAgent "[target-agent]" --projectId "my-app" --requestType "[type]" --message "[detailed request]"
 ```
 
-### Real-time Features (Performance-Focused)
+**Common Request Types:**
+- `types` - TypeScript interfaces
+- `review` - Code/design review
+- `approval` - Security/architecture approval
+- `feedback` - Performance/quality feedback
+- `changes` - Modification requests
+
+##### Response Pattern
 ```bash
-# Real-time functionality with performance optimization
-dhrit___pal --task "Real-time architecture" --requirements "WebSocket architecture, real-time data synchronization"
-dhrit___mool --task "Real-time backend" --requirements "WebSocket connections, real-time updates, presence tracking"
-dhrit___roop --task "Real-time UI" --requirements "Live updates, connection status, optimistic updates"
-dhrit___gati --task "Real-time optimization" --requirements "Efficient WebSocket usage, minimal latency, connection management"
+respond --requestId "[request-id]" --fromAgent "[responding-agent]" --response "[detailed response]" --status "[status]"
 ```
 
-## Troubleshooting Workflows
+**Response Statuses:**
+- `approved` - Request approved, work can proceed
+- `completed` - Work completed successfully
+- `needs_changes` - Changes required before approval
+- `rejected` - Request rejected with reasons
 
-### Agent Not Responding
-1. Check agent training status with individual training commands
-2. Verify Q CLI availability and `/agent` command functionality
-3. Check project state integrity with `dhrit___status`
-4. Restart coordination if needed
+#### Common Coordination Scenarios
 
-### Coordination Issues
-1. Verify protocol training completion for all 8 agents
-2. Check Redis and PostgreSQL connections
-3. Review agent dependencies and handoffs
-4. Clear and reinitialize project state if corrupted
+##### 1. Type Sharing (Mool → Roop)
+```bash
+# Roop requests types
+request --fromAgent "roop" --toAgent "mool" --projectId "my-app" --requestType "types" --message "I need TypeScript interfaces for User, Task, and Project entities to build the frontend components"
 
-### Quality Issues
-1. Review agent outputs for completeness and integration
-2. Test integration between agent components
-3. Provide more specific requirements to agents
-4. Iterate with refinement tasks using relevant agents
+# Mool provides types
+respond --requestId "req_123..." --fromAgent "mool" --response "TypeScript types: interface User { id: string; name: string; email: string; }..." --status "completed"
+```
 
-### Performance Issues
-1. Monitor system resources during 8-agent coordination
-2. Break large tasks into smaller, agent-specific tasks
-3. Use parallel execution where agents don't have dependencies
-4. Optimize Redis and PostgreSQL performance
+##### 2. Security Review (Kosh → Bandh)
+```bash
+# Kosh requests security review
+request --fromAgent "kosh" --toAgent "bandh" --projectId "my-app" --requestType "security_review" --message "Database schema ready for security review. Please check user data encryption and access controls"
+
+# Bandh reviews and approves/requests changes
+respond --requestId "req_456..." --fromAgent "bandh" --response "Schema approved with minor changes: encrypt email field and add audit trail" --status "needs_changes"
+```
+
+##### 3. Performance Feedback (Gati → Roop)
+```bash
+# Gati provides optimization feedback
+request --fromAgent "gati" --toAgent "roop" --projectId "my-app" --requestType "feedback" --message "Component bundle is 45KB, needs optimization. Implement code splitting and lazy loading"
+
+# Roop implements optimizations
+respond --requestId "req_789..." --fromAgent "roop" --response "Optimizations implemented: bundle reduced to 12KB, lazy loading added" --status "completed"
+```
+
+### Phase 4: Project Management
+
+#### Status Monitoring
+```bash
+# Check overall project status
+status --projectId "my-app"
+
+# Expected output shows agent progress and coordination status
+```
+
+#### Project Structure
+```
+dhrit/projects/my-app/
+├── code/                    # Actual Next.js application
+├── architecture/            # Pal's system designs
+├── design/                  # Kalp's design specifications
+├── security/                # Bandh's security documentation
+├── database/                # Kosh's schemas and migrations
+├── backend/                 # Mool's API specifications
+├── frontend/                # Roop's component documentation
+├── performance/             # Gati's optimization reports
+├── qa/                      # Dhar's test plans and configs
+├── coordination/            # Agent communication logs
+│   └── requests/            # Request/response files
+└── project-metadata.json   # Project tracking data
+```
+
+## 🎯 Best Practices
+
+### 1. Clear Requirements
+- Provide detailed, specific requirements for each agent
+- Include technology preferences and constraints
+- Specify performance and quality targets
+
+### 2. Iterative Development
+- Use agent coordination for feedback loops
+- Request changes when outputs don't meet requirements
+- Iterate until quality standards are met
+
+### 3. Quality Gates
+- Let Bandh review all security-sensitive components
+- Have Gati optimize performance before deployment
+- Ensure Dhar tests everything thoroughly
+
+### 4. Documentation
+- Each agent generates comprehensive documentation
+- Coordination logs provide audit trail
+- Project metadata tracks progress and decisions
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### Agent Not Responding
+```bash
+# Check agent training status
+[agent] --mode "train"
+
+# Retrain if necessary
+train-protocol --agentName "[agent]" --protocols "coordination,handoff,dependencies"
+```
+
+#### Coordination Failures
+```bash
+# Check project status
+status --projectId "my-app"
+
+# Review coordination logs
+ls dhrit/projects/my-app/coordination/requests/
+```
+
+#### Quality Issues
+```bash
+# Request review from quality agents
+request --fromAgent "[agent]" --toAgent "bandh" --projectId "my-app" --requestType "review" --message "Please review for security issues"
+request --fromAgent "[agent]" --toAgent "gati" --projectId "my-app" --requestType "review" --message "Please review for performance issues"
+```
+
+### Performance Optimization
+
+#### Agent Response Times
+- Ensure Redis is running for coordination
+- Check database connections for persistence
+- Monitor agent workload and dependencies
+
+#### Project Build Times
+- Use incremental builds where possible
+- Optimize agent handoff timing
+- Parallel execution for independent tasks
+
+## 🚀 Advanced Workflows
+
+### Multi-Project Management
+```bash
+# Initialize multiple projects
+init --projectId "frontend-app" --projectType "nextjs"
+init --projectId "backend-service" --projectType "node"
+init --projectId "mobile-app" --projectType "react"
+
+# Coordinate across projects
+request --fromAgent "roop" --toAgent "mool" --projectId "frontend-app" --requestType "api_integration" --message "Need API endpoints for mobile and web clients"
+```
+
+### Custom Agent Workflows
+```bash
+# Skip certain agents for simple projects
+pal → kalp → roop → dhar  # Simple frontend-only project
+
+# Add extra coordination for complex projects
+pal → kalp → bandh → kosh → mool → roop → gati → dhar → gati → dhar  # Multiple optimization cycles
+```
+
+### Integration with External Tools
+- Git integration for version control
+- CI/CD pipeline integration
+- Monitoring and alerting setup
+- Custom deployment targets
+
+This workflow enables building production-ready applications through coordinated AI agents, from initial requirements to deployed applications.

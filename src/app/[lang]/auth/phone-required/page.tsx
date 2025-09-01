@@ -35,8 +35,8 @@ export default function PhoneRequiredPage() {
         throw new Error(errorData.error || 'Failed to complete registration');
       }
 
-      // Redirect to success page
-      router.push('/en?auth=success');
+      // Redirect to public page
+      router.push('/en/public');
     } catch (error) {
       console.error('Registration completion failed:', error);
       setError(error instanceof Error ? error.message : 'Registration failed');
