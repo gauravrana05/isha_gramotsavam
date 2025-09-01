@@ -65,7 +65,7 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-4 text-primary-600">Sports</h3>
             <ul className="space-y-2">
-              {sportsQuery.data?.map((sport) => (
+              {Array.isArray(sportsQuery.data) && sportsQuery.data.map((sport) => (
                 <li key={sport.id}>
                   <Link 
                     href={`/${lang}/public/sports/${sport.id}`} 

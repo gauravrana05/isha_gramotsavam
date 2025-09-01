@@ -109,7 +109,7 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
     )
   }
 
-  const sports = sportsQuery.data?.map(transformSportData) || []
+  const sports = Array.isArray(sportsQuery.data) ? sportsQuery.data.map(transformSportData) : []
 
   return (
     <section id="sports-preview" className="bg-isha font-fira py-16 lg:py-24">

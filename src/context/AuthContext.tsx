@@ -127,80 +127,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const mockUser = urlParams.get('mockUser');
         const phone = urlParams.get('phone');
 
-        const roleToPhone: { [key: string]: string } = {
-          admin: '9876543210',
-          public: '9876543211',
-          verification_volunteer: '9876543212',
-          technical_volunteer: '9876543213',
-        };
-
-        const mockPhone = phone || (mockUser && roleToPhone[mockUser]);
-
-        // Handle mock authentication for testing
-        if (mockPhone) {
-          try {
-            const response = await fetch(`/api/get-user?phone=${mockPhone}`, {
-              method: 'GET',
-              credentials: 'include',
-            });
-            
-            if (response.ok) {
-              const { user } = await response.json();
-              if (user) {
-                sessionStorage.setItem('userId', user.id);
-                setUser(user);
-                
-                // Clean up URL parameters
-                const newUrl = new URL(window.location.href);
-                newUrl.searchParams.delete('mockUser');
-                newUrl.searchParams.delete('phone');
-                window.history.replaceState({}, '', newUrl.toString());
-                setLoading(false);
-                return;
-              }
-            }
-          } catch (error) {
-            console.error('Mock auth failed:', error);
-          }
-        }
-
-        if (authSuccess === 'success' && userId) {
-          // Store userId in session storage for persistence
-          sessionStorage.setItem('userId', userId);
-          
-          // Clean up URL parameters
-          const newUrl = new URL(window.location.href);
-          newUrl.searchParams.delete('auth');
-          newUrl.searchParams.delete('userId');
-          window.history.replaceState({}, '', newUrl.toString());
-        }
-
-        // Try to get userId from session storage
-        const storedUserId = userId || sessionStorage.getItem('userId');
-
-        if (storedUserId) {
-          const response = await fetch(`/api/auth/me?userId=${storedUserId}`, {
+        // Handle mock authentication or callback
+        if (mockUser || authSuccess || userId || phone) {
+          // Try to get current user from session
+          const response = await fetch('/api/auth/me', {
             method: 'GET',
             credentials: 'include',
           });
+          
+          if (response.ok) {
+            const { user } = await response.json();
+            if (user) {
+              sessionStorage.setItem('userId', user.id);
+              setUser(user);
+              
+              // Clean up URL parameters
+              const newUrl = new URL(window.location.href);
+              newUrl.searchParams.delete('auth');
+              newUrl.searchParams.delete('userId');
+              newUrl.searchParams.delete('mockUser');
+              newUrl.searchParams.delete('phone');
+              
+              if (newUrl.href !== window.location.href) {
+                window.history.replaceState({}, '', newUrl.href);
+              }
+              
+              setLoading(false);
+              return;
+            }
+          }
+        }
 
+        // Try to restore session from storage or cookie
+        const storedUserId = sessionStorage.getItem('userId');
+        if (storedUserId) {
+          const response = await fetch('/api/auth/me', {
+            method: 'GET',
+            credentials: 'include',
+          });
+          
           if (response.ok) {
             const { user } = await response.json();
             if (user) {
               setUser(user);
-            } else {
-              // Clear invalid session
-              sessionStorage.removeItem('userId');
+              setLoading(false);
+              return;
             }
-          } else {
-            // Clear invalid session
-            sessionStorage.removeItem('userId');
           }
+          
+          // Clear invalid session
+          sessionStorage.removeItem('userId');
         }
+
+        // No valid session found
+        setUser(null);
+        setLoading(false);
       } catch (error) {
         console.error('Auth initialization failed:', error);
-        sessionStorage.removeItem('userId');
-      } finally {
+        setUser(null);
         setLoading(false);
       }
     };

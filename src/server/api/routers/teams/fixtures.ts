@@ -8,7 +8,7 @@ export const teamsFixturesRouter = createTRPCRouter({
   getUpcomingMatches: protectedProcedure
     .input(z.object({
       limit: z.number().min(1).max(50).default(5),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       const team = await db.team.findFirst({
         where: { captainId: ctx.user.id },

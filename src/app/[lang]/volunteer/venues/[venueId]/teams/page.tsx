@@ -96,8 +96,8 @@ export default function TeamsPage() {
     error: teamsError,
     refetch: refetchTeams
   } = api.volunteers.venue.getVenueTeams.useQuery(
-    { venueId },
-    { enabled: !!user && !!venueId }
+    { venueId: venueId || '' },
+    { enabled: !!user && !!venueId && venueId.length > 0 }
   );
 
   const teams = teamsData || [];

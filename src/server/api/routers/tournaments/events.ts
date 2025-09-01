@@ -118,7 +118,7 @@ export const tournamentsEventsRouter = createTRPCRouter({
 
   // Delete event
   delete: adminProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string() }).optional().default({}))
     .mutation(async ({ input }) => {
       await db.event.delete({
         where: { id: input.id },

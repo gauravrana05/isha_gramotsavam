@@ -14,8 +14,32 @@ export const volunteersVenueRouter = createTRPCRouter({
   getVenueTeams: protectedProcedure
     .input(z.object({
       venueId: z.string().uuid(),
-    }))
-    .query(async ({ input }) => {
+    }).optional().default({}))
+    .query(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can access venue operations',
+        });
+      }
+
+      // Verify venue assignment
+      const assignment = await db.volunteerAssignment.findFirst({
+        where: { 
+          userId: ctx.user.id, 
+          venueId: input.venueId,
+          status: 'active'
+        }
+      });
+
+      if (!assignment) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not assigned to this venue',
+        });
+      }
+
       // Get teams through fixture teams relationship
       const fixtureTeams = await db.fixtureTeam.findMany({
         where: {
@@ -82,7 +106,7 @@ export const volunteersVenueRouter = createTRPCRouter({
     }),
 
   getVenueFixtures: protectedProcedure
-    .input(z.object({ venueId: z.string() }))
+    .input(z.object({ venueId: z.string() }).optional().default({}))
     .query(async ({ input }) => {
       const fixtures = await db.fixture.findMany({
         where: { 
@@ -117,7 +141,7 @@ export const volunteersVenueRouter = createTRPCRouter({
     .input(z.object({ 
       venueId: z.string(),
       date: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ input }) => {
       const startOfDay = new Date(input.date);
       startOfDay.setHours(0, 0, 0, 0);
@@ -153,7 +177,7 @@ export const volunteersVenueRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       eventId: z.string(),
-    }))
+    }).optional().default({}))
     .query(async ({ input }) => {
       const checkedInTeams = await db.fixtureTeam.findMany({
         where: {
@@ -200,7 +224,7 @@ export const volunteersVenueRouter = createTRPCRouter({
 
   // Team management endpoints
   searchUserByPhone: protectedProcedure
-    .input(z.object({ phone: z.string() }))
+    .input(z.object({ phone: z.string() }).optional().default({}))
     .query(async ({ input }) => {
       const user = await db.user.findFirst({
         where: {
@@ -241,7 +265,7 @@ export const volunteersVenueRouter = createTRPCRouter({
         taluk: z.string().optional()
       }),
       venueId: z.string()
-    }))
+    }).optional().default({}))
     .mutation(async ({ input, ctx }) => {
       const { captainPhone, captainDetails, location, ...teamData } = input;
 
@@ -306,7 +330,7 @@ export const volunteersVenueRouter = createTRPCRouter({
   getVenueMediaAndPosts: protectedProcedure
     .input(z.object({
       venueId: z.string().uuid(),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       // Check if user is technical volunteer or admin
       if (!['admin', 'technical_volunteer'].includes(ctx.user.role)) {
@@ -397,7 +421,7 @@ export const volunteersVenueRouter = createTRPCRouter({
     .input(z.object({
       limit: z.number().min(1).max(50).default(20),
       offset: z.number().min(0).default(0),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       if (!['admin', 'technical_volunteer'].includes(ctx.user.role)) {
         throw new TRPCError({

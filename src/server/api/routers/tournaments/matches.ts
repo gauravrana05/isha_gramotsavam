@@ -137,7 +137,7 @@ export const tournamentsMatchesRouter = createTRPCRouter({
 
   // Get match by ID
   getById: publicProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string() }).optional().default({}))
     .query(async ({ input }) => {
       const match = await db.match.findUnique({
         where: { id: input.id },
@@ -161,7 +161,7 @@ export const tournamentsMatchesRouter = createTRPCRouter({
       eventId: z.string().optional(),
       teamId: z.string().optional(),
       status: z.enum(['scheduled', 'ongoing', 'completed']).optional(),
-    }))
+    }).optional().default({}))
     .query(async ({ input }) => {
       const { limit, offset, eventId, teamId, status } = input
 

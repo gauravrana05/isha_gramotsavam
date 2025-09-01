@@ -7,7 +7,7 @@ export const matchesRouter = createTRPCRouter({
   getTeamMatches: protectedProcedure
     .input(z.object({
       teamIds: z.array(z.string())
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       if (input.teamIds.length === 0) {
         return [];

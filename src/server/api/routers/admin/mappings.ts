@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../../trpc";
+import { createTRPCRouter, adminProcedure } from "../../trpc";
 import { TRPCError } from "@trpc/server";
 import { db } from "@/lib/db";
 
 export const adminMappingsRouter = createTRPCRouter({
   // Get Location Cluster Mappings
-  getLocationClusterMappings: protectedProcedure
+  getLocationClusterMappings: adminProcedure
     .input(z.object({
       eventId: z.string(),
       locationType: z.enum(['district', 'taluk']).optional(),
@@ -14,10 +14,6 @@ export const adminMappingsRouter = createTRPCRouter({
       locationName: z.string().optional(),
     }))
     .query(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       const where: any = {
         eventId: input.eventId,
       };
@@ -71,7 +67,7 @@ export const adminMappingsRouter = createTRPCRouter({
     }),
 
   // Create Location Cluster Mapping (Bulk)
-  createLocationClusterMapping: protectedProcedure
+  createLocationClusterMapping: adminProcedure
     .input(z.object({
       eventId: z.string(),
       locationType: z.enum(['district', 'taluk']),
@@ -81,10 +77,6 @@ export const adminMappingsRouter = createTRPCRouter({
       clusterVenueMappingId: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       const { eventId, locationType, locationNames, state, district, clusterVenueMappingId } = input;
 
       // Validate district requirement for taluk mappings
@@ -132,15 +124,11 @@ export const adminMappingsRouter = createTRPCRouter({
     }),
 
   // Delete Location Cluster Mappings
-  deleteLocationClusterMappings: protectedProcedure
+  deleteLocationClusterMappings: adminProcedure
     .input(z.object({
       mappingIds: z.array(z.string()),
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       await db.locationClusterMapping.deleteMany({
         where: {
           id: { in: input.mappingIds },
@@ -151,15 +139,11 @@ export const adminMappingsRouter = createTRPCRouter({
     }),
 
   // Get Cluster Division Mappings (unchanged)
-  getClusterDivisionMappings: protectedProcedure
+  getClusterDivisionMappings: adminProcedure
     .input(z.object({
       eventId: z.string(),
     }))
     .query(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       const mappings = await db.clusterDivisionMapping.findMany({
         where: {
           eventId: input.eventId,
@@ -186,7 +170,7 @@ export const adminMappingsRouter = createTRPCRouter({
     }),
 
   // Create Cluster Division Mapping (unchanged)
-  createClusterDivisionMapping: protectedProcedure
+  createClusterDivisionMapping: adminProcedure
     .input(z.object({
       eventId: z.string(),
       clusterVenueMappingId: z.string(),
@@ -194,10 +178,6 @@ export const adminMappingsRouter = createTRPCRouter({
       state: z.string(), // Add state parameter
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       // Check if mapping already exists
       const existingMapping = await db.clusterDivisionMapping.findFirst({
         where: {
@@ -234,7 +214,7 @@ export const adminMappingsRouter = createTRPCRouter({
     }),
 
   // Create Bulk Cluster Division Mappings
-  createBulkClusterDivisionMappings: protectedProcedure
+  createBulkClusterDivisionMappings: adminProcedure
     .input(z.object({
       eventId: z.string(),
       clusterVenueMappingIds: z.array(z.string()),
@@ -242,10 +222,6 @@ export const adminMappingsRouter = createTRPCRouter({
       state: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       const { eventId, clusterVenueMappingIds, divisionVenueMappingId, state } = input;
 
       // Check for existing mappings
@@ -306,15 +282,11 @@ export const adminMappingsRouter = createTRPCRouter({
     }),
 
   // Delete Cluster Division Mappings (plural - unchanged)
-  deleteClusterDivisionMappings: protectedProcedure
+  deleteClusterDivisionMappings: adminProcedure
     .input(z.object({
       mappingIds: z.array(z.string()),
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       await db.clusterDivisionMapping.deleteMany({
         where: {
           id: { in: input.mappingIds },
@@ -325,15 +297,11 @@ export const adminMappingsRouter = createTRPCRouter({
     }),
 
   // Delete Cluster Division Mapping (singular)
-  deleteClusterDivisionMapping: protectedProcedure
+  deleteClusterDivisionMapping: adminProcedure
     .input(z.object({
       mappingIds: z.array(z.string()),
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       await db.clusterDivisionMapping.deleteMany({
         where: {
           id: { in: input.mappingIds },
@@ -344,7 +312,7 @@ export const adminMappingsRouter = createTRPCRouter({
     }),
 
   // Update Cluster Division Mapping
-  updateClusterDivisionMapping: protectedProcedure
+  updateClusterDivisionMapping: adminProcedure
     .input(z.object({
       eventId: z.string(),
       divisionVenueMappingId: z.string(),
@@ -352,10 +320,6 @@ export const adminMappingsRouter = createTRPCRouter({
       state: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       // First, delete existing mappings for this division venue
       await db.clusterDivisionMapping.deleteMany({
         where: {
@@ -390,17 +354,13 @@ export const adminMappingsRouter = createTRPCRouter({
     }),
 
   // Add missing methods
-  getTalukClusterMappings: protectedProcedure
+  getTalukClusterMappings: adminProcedure
     .input(z.object({
       eventId: z.string(),
       state: z.string().optional(),
       district: z.string().optional(),
     }))
     .query(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       return await db.locationClusterMapping.findMany({
         where: {
           eventId: input.eventId,
@@ -430,15 +390,11 @@ export const adminMappingsRouter = createTRPCRouter({
       });
     }),
 
-  deleteLocationClusterMapping: protectedProcedure
+  deleteLocationClusterMapping: adminProcedure
     .input(z.object({
       id: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       await db.locationClusterMapping.delete({
         where: { id: input.id },
       });
@@ -446,15 +402,11 @@ export const adminMappingsRouter = createTRPCRouter({
       return { success: true, message: 'Mapping deleted successfully' };
     }),
 
-  deleteTalukClusterMapping: protectedProcedure
+  deleteTalukClusterMapping: adminProcedure
     .input(z.object({
       id: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== 'admin') {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
-      }
-
       await db.locationClusterMapping.delete({
         where: { id: input.id },
       });

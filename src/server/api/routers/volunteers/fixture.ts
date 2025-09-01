@@ -8,7 +8,7 @@ export const volunteersFixtureRouter = createTRPCRouter({
   getVenueFixtures: protectedProcedure
     .input(z.object({
       venueId: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       // Check volunteer permissions
       if (!['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
@@ -92,7 +92,7 @@ export const volunteersFixtureRouter = createTRPCRouter({
   getAvailableSportsForFixture: protectedProcedure
     .input(z.object({
       venueId: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       // First check if this user has an assignment for this venue
       const volunteerAssignment = await ctx.db.volunteerAssignment.findFirst({
@@ -411,7 +411,7 @@ export const volunteersFixtureRouter = createTRPCRouter({
   getFixtureDetails: protectedProcedure
     .input(z.object({
       fixtureId: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const fixture = await ctx.db.fixture.findUnique({
         where: { id: input.fixtureId },
@@ -447,7 +447,7 @@ export const volunteersFixtureRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       date: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       // First check if this user has an assignment for this venue
       const volunteerAssignment = await ctx.db.volunteerAssignment.findFirst({

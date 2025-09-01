@@ -149,14 +149,26 @@ export const teamsPlayersRouter = createTRPCRouter({
         })
       }
 
-      await db.teamPlayer.delete({
-        where: {
-          teamId_userId: {
-            teamId,
-            userId,
+      // Use transaction for atomic operations
+      await db.$transaction(async (tx) => {
+        await tx.teamPlayer.delete({
+          where: {
+            teamId_userId: {
+              teamId,
+              userId,
+            },
           },
-        },
-      })
+        });
+
+        // Update user's current team if this was their active team
+        await tx.user.updateMany({
+          where: { 
+            id: userId,
+            currentTeamId: teamId
+          },
+          data: { currentTeamId: null }
+        });
+      });
 
       return { success: true }
     }),
@@ -241,7 +253,7 @@ export const teamsPlayersRouter = createTRPCRouter({
     .input(z.object({
       teamId: z.string(),
       userId: z.string(),
-    }))
+    }).optional().default({}))
     .query(async ({ input }) => {
       const { teamId, userId } = input
 
@@ -293,7 +305,7 @@ export const teamsPlayersRouter = createTRPCRouter({
   getTeamPlayers: protectedProcedure
     .input(z.object({
       teamId: z.string(),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       return await db.teamPlayer.findMany({
         where: {

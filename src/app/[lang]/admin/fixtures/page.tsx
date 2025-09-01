@@ -265,7 +265,11 @@ export default function AdminFixturesPage() {
 
       {/* AdvancedTable */}
       <AdvancedTable<FixtureData>
-        data={transformedFixtures as unknown as FixtureData[]}
+        data={transformedFixtures.filter((fixture): fixture is FixtureData => 
+          fixture && 
+          typeof fixture.id === 'string' &&
+          typeof fixture.sport === 'string'
+        )}
         columns={columns}
         actions={actions}
         loading={loading}

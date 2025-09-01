@@ -116,7 +116,7 @@ export default function AdminSportsPage() {
 
   // Transform sports data and apply client-side filtering for gender categories
   const sports = useMemo(() => {
-    if (!sportsData) {
+    if (!sportsData || !Array.isArray(sportsData)) {
       return [];
     }
     

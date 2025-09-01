@@ -139,7 +139,7 @@ export const postsRouter = createTRPCRouter({
       entityType: z.enum(['fixture', 'match']),
       entityId: z.string().uuid(),
       visibility: z.enum(['public', 'private', 'all']).default('public'),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       const where: any = {
         entityType: input.entityType,
@@ -182,7 +182,7 @@ export const postsRouter = createTRPCRouter({
     }),
 
   delete: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().uuid() }).optional().default({}))
     .mutation(async ({ input, ctx }) => {
       const post = await db.post.findUnique({
         where: { id: input.id },

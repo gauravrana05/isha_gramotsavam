@@ -517,7 +517,7 @@ export const teamsManagementRouter = createTRPCRouter({
   getMyTeamFixtures: protectedProcedure
     .input(z.object({
       fixtureId: z.string().optional(),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       const team = await db.team.findFirst({
         where: { captainId: ctx.user.id },
@@ -574,7 +574,7 @@ export const teamsManagementRouter = createTRPCRouter({
   getMyTeamMatches: protectedProcedure
     .input(z.object({
       matchId: z.string().optional(),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       const team = await db.team.findFirst({
         where: { captainId: ctx.user.id },

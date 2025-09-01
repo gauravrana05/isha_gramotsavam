@@ -61,7 +61,7 @@ export const chatRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       limit: z.number().min(1).max(50).default(20),
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const { venueId, limit } = input;
 
@@ -131,7 +131,7 @@ export const chatRouter = createTRPCRouter({
   getVenueParticipants: protectedProcedure
     .input(z.object({
       venueId: z.string(),
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const { venueId } = input;
 

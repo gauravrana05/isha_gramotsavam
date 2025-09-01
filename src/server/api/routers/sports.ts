@@ -44,7 +44,7 @@ export const sportsRouter = createTRPCRouter({
     .input(z.object({
       identifier: z.string(),
       userGender: z.enum(['M', 'F', 'O']).nullable().optional(),
-    }))
+    }).optional().default({}))
     .query(async ({ input }) => {
       try {
         // Try to find by ID first, then by name
@@ -127,7 +127,7 @@ export const sportsRouter = createTRPCRouter({
   getForGender: publicProcedure
     .input(z.object({
       gender: z.enum(['M', 'F', 'O']),
-    }))
+    }).optional().default({}))
     .query(async ({ input }) => {
       try {
         // Determine which gender categories to look for

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch real user from database based on role
-    const user = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: { 
         role: role === 'admin' ? 'admin' : 
               role === 'captain' ? 'captain' : 
@@ -26,6 +26,14 @@ export async function GET(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: `No ${role} user found in database` }, { status: 404 });
+    }
+
+    // Ensure admin and special roles have profileComplete set to true
+    if ((role === 'admin' || role.includes('volunteer') || role === 'public') && !user.profileComplete) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { profileComplete: true }
+      });
     }
 
     // Set userId in cookie for tRPC context

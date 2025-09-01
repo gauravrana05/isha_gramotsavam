@@ -42,8 +42,8 @@ export default function AssignTeamNumbersPage() {
 
   // Get teams for this fixture
   const { data: teams } = api.volunteers.venue.getVenueTeams.useQuery(
-    { venueId },
-    { enabled: !!user && !!venueId }
+    { venueId: venueId || '' },
+    { enabled: !!user && !!venueId && venueId.length > 0 }
   );
 
   // Assign team numbers mutation

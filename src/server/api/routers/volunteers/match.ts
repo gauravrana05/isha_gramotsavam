@@ -7,7 +7,7 @@ export const volunteersMatchRouter = createTRPCRouter({
   getMatchDetails: protectedProcedure
     .input(z.object({
       matchId: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const match = await ctx.db.match.findUnique({
         where: { id: input.matchId },
@@ -168,7 +168,7 @@ export const volunteersMatchRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       status: z.enum(['scheduled', 'ready', 'in_progress', 'completed']).optional()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const venueLevelMappings = await ctx.db.venueLevelMapping.findMany({
         where: { venueId: input.venueId, isActive: true }
@@ -239,7 +239,7 @@ export const volunteersMatchRouter = createTRPCRouter({
   getFixtureBracket: protectedProcedure
     .input(z.object({
       fixtureId: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const matches = await ctx.db.match.findMany({
         where: { fixtureId: input.fixtureId },

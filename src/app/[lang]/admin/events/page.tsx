@@ -85,7 +85,7 @@ export default function AdminEventsPage() {
     limit: 100,
     status: 'all'
   }, {
-    enabled: !!user && userProfile?.role === 'admin'
+    enabled: !!user
   });
 
   // Delete event mutation
@@ -102,7 +102,8 @@ export default function AdminEventsPage() {
 
   // Create event mutation
   const createEventMutation = api.admin.events.createEvent.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Event created successfully:', data);
       refetchEvents();
       setShowCreateModal(false);
       resetForm();
@@ -112,6 +113,8 @@ export default function AdminEventsPage() {
     },
     onError: (error) => {
       console.error('Error creating event:', error);
+      console.error('Error data:', error.data);
+      console.error('Error cause:', error.cause);
       const errorMessage = error.message || 'Failed to create event. Please try again.';
       addNotification(errorMessage, 'error');
     },
@@ -150,6 +153,18 @@ export default function AdminEventsPage() {
 
   const error = eventsError?.message || '';
   const events = eventsData?.events || [];
+
+  // Debug logging
+  console.log('Debug Events Page:', {
+    user: user,
+    userRole: user?.role,
+    userProfileRole: userProfile?.role,
+    eventsLoading,
+    eventsError,
+    eventsData,
+    eventsDataEvents: eventsData?.events,
+    events: events.length,
+  });
 
   // Define table columns
   const columns: Column<EventData>[] = useMemo(() => [
@@ -336,13 +351,16 @@ export default function AdminEventsPage() {
 
       const eventData = {
         name: formData.name,
-        description: formData.description || undefined,
         registrationStartDate: formData.registrationStartDate || new Date().toISOString().split('T')[0],
         registrationEndDate: formData.registrationEndDate || new Date().toISOString().split('T')[0],
         startDate: formData.startDate || new Date().toISOString().split('T')[0],
         endDate: formData.endDate || new Date().toISOString().split('T')[0],
+        ...(formData.description && { description: formData.description }),
         ...(isEditMode && { status: formData.status }), // Include status only for edit mode
       };
+
+      console.log('Submitting event data:', eventData);
+      console.log('Form data:', formData);
 
       if (isEditMode && eventToEdit) {
         await updateEventMutation.mutateAsync({

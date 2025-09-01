@@ -332,7 +332,7 @@ export const venuesRouter = createTRPCRouter({
     }),
 
   delete: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().uuid() }).optional().default({}))
     .mutation(async ({ input }) => {
       try {
         // Check if venue has any active mappings
@@ -438,7 +438,7 @@ export const venuesRouter = createTRPCRouter({
     }),
 
   deleteLocationMapping: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().uuid() }).optional().default({}))
     .mutation(async ({ input }) => {
       try {
         // Check if any teams are assigned to this venue mapping

@@ -22,7 +22,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
   getDashboardStats: protectedProcedure
     .input(z.object({
       venueId: z.string().uuid()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const { venueId } = input;
       // const { db, session } = ctx;
@@ -196,7 +196,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
   getQuickActions: protectedProcedure
     .input(z.object({
       venueId: z.string().uuid()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const { venueId } = input;
       // const { db, session } = ctx;
@@ -316,7 +316,7 @@ export const volunteersDashboardRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string().uuid(),
       limit: z.number().min(1).max(50).optional().default(10)
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const { venueId, limit } = input;
       // const { db, session } = ctx;

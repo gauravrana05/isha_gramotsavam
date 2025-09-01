@@ -68,8 +68,8 @@ export default function VolunteerDashboard({ params }: PageProps) {
     isLoading: teamsLoading, 
     error: teamsError 
   } = api.volunteers.venue.getVenueTeams.useQuery(
-    { venueId },
-    { enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
+    { venueId: venueId || '' },
+    { enabled: !authLoading && !!user && !!venueId && venueId.length > 0 && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
   );
 
   const { 

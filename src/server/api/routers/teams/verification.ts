@@ -11,7 +11,7 @@ export const teamsVerificationRouter = createTRPCRouter({
       offset: z.number().default(0),
       status: z.enum(['pending', 'verified', 'rejected']).default('pending'),
       venueId: z.string().optional(),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       // Check if user has verification permissions
       if (!['admin', 'verification_volunteer', 'technical_volunteer'].includes(ctx.user.role)) {
@@ -74,7 +74,7 @@ export const teamsVerificationRouter = createTRPCRouter({
   getForVerificationDetail: protectedProcedure
     .input(z.object({
       teamId: z.string(),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       // Check if user has verification permissions
       if (!['admin', 'verification_volunteer', 'technical_volunteer'].includes(ctx.user.role)) {

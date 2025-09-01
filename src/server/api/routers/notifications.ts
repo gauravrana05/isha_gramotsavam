@@ -136,7 +136,7 @@ export const notificationsRouter = createTRPCRouter({
       limit: z.number().min(1).max(100).default(20),
       offset: z.number().min(0).default(0),
       unreadOnly: z.boolean().default(false),
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const notifications = await ctx.db.notification.findMany({
         where: {
@@ -420,7 +420,7 @@ export const notificationsRouter = createTRPCRouter({
     .input(z.object({
       category: z.enum(['general', 'match', 'team', 'verification', 'system', 'emergency']).optional(),
       active: z.boolean().default(true),
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       return await ctx.db.notificationTemplate.findMany({
         where: {
@@ -460,7 +460,7 @@ export const notificationsRouter = createTRPCRouter({
     .input(z.object({
       limit: z.number().min(1).max(100).default(20),
       offset: z.number().min(0).default(0),
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       // Check permissions
       if (!['admin', 'verification_volunteer', 'technical_volunteer'].includes(ctx.user.role)) {
@@ -548,7 +548,7 @@ export const notificationsRouter = createTRPCRouter({
       roles: z.array(z.enum(['admin', 'captain', 'player', 'general_volunteer', 'technical_volunteer', 'verification_volunteer', 'public'])).optional(),
       venueIds: z.array(z.string().uuid()).optional(),
       search: z.string().optional(),
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       // Check permissions
       if (!['admin', 'verification_volunteer', 'technical_volunteer'].includes(ctx.user.role)) {

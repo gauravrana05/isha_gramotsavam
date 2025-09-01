@@ -15,7 +15,7 @@ const INDIAN_STATES = [
 
 export const locationRouter = createTRPCRouter({
   getLocationByPincode: publicProcedure
-    .input(z.object({ pincode: z.string().length(6) }))
+    .input(z.object({ pincode: z.string().length(6) }).optional().default({}))
     .query(async ({ input }) => {
       try {
         const locationData = await pincodeService.getAddressByPincode(input.pincode);
@@ -31,7 +31,7 @@ export const locationRouter = createTRPCRouter({
     }),
 
   getDistricts: publicProcedure
-    .input(z.object({ state: z.string() }))
+    .input(z.object({ state: z.string() }).optional().default({}))
     .query(async ({ input }) => {
       try {
         const districts = await pincodeService.getDistrictsByState(input.state);
@@ -45,7 +45,7 @@ export const locationRouter = createTRPCRouter({
     .input(z.object({ 
       state: z.string(),
       district: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ input }) => {
       try {
         const { taluks } = await pincodeService.getTaluksByDistrict(input.state, input.district);
@@ -60,7 +60,7 @@ export const locationRouter = createTRPCRouter({
       state: z.string(),
       district: z.string(),
       taluk: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ input }) => {
       try {
         const panchayats = await pincodeService.getPanchayatsByTaluk(input.state, input.district, input.taluk);

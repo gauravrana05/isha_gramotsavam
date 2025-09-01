@@ -12,7 +12,7 @@ export const profileRouter = createTRPCRouter({
   testWithInput: publicProcedure
     .input(z.object({
       userId: z.string().uuid(),
-    }))
+    }).optional().default({}))
     .query(async ({ input }) => {
       console.log('testWithInput received:', input);
       return { message: "Input received successfully!", userId: input.userId }
@@ -21,7 +21,7 @@ export const profileRouter = createTRPCRouter({
   checkCompletion: protectedProcedure
     .input(z.object({
       userId: z.string().uuid(),
-    }))
+    }).optional().default({}))
     .query(async ({ input }) => {
       try {
         const user = await db.user.findUnique({
@@ -184,7 +184,7 @@ export const profileRouter = createTRPCRouter({
       district: z.string().optional(),
       state: z.string().optional(),
       languagePreference: z.enum(['en', 'ta', 'hi', 'ml', 'te', 'kn', 'or']).optional(),
-    }))
+    }).optional().default({}))
     .mutation(async ({ input, ctx }) => {
       try {
         const updateData: any = { ...input };
@@ -226,7 +226,7 @@ export const profileRouter = createTRPCRouter({
       district: z.string().min(1, 'District is required'),
       state: z.string().min(1, 'State is required'),
       preferredLanguage: z.string().optional(),
-    }))
+    }).optional().default({}))
     .mutation(async ({ input }) => {
       const { userId, dateOfBirth, ...updateData } = input
 

@@ -87,7 +87,7 @@ export default function SportsOverviewPage({ params }: SportsOverviewPageProps) 
     )
   }
   
-  const sports = sportsQuery.data?.map(transformSportData) || []
+  const sports = Array.isArray(sportsQuery.data) ? sportsQuery.data.map(transformSportData) : []
   
   return (
     <div className="bg-[#F3F0E5]">

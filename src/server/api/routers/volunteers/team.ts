@@ -7,7 +7,7 @@ export const volunteersTeamRouter = createTRPCRouter({
   getVenueTeams: protectedProcedure
     .input(z.object({
       venueId: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       // Get venue level mappings
       const venueLevelMappings = await ctx.db.venueLevelMapping.findMany({
@@ -112,7 +112,7 @@ export const volunteersTeamRouter = createTRPCRouter({
   getTeamDetails: protectedProcedure
     .input(z.object({
       teamId: z.string()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const team = await ctx.db.team.findUnique({
         where: { id: input.teamId },
@@ -222,7 +222,7 @@ export const volunteersTeamRouter = createTRPCRouter({
   getTeamsPendingVerification: protectedProcedure
     .input(z.object({
       venueId: z.string().optional()
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       const whereClause: any = {
         status: 'submitted'
@@ -286,19 +286,21 @@ export const volunteersTeamRouter = createTRPCRouter({
         });
       }
 
-      // Update teams with tournament numbers
-      await Promise.all(
-        input.assignments.map(assignment =>
-          ctx.db.team.update({
-            where: { id: assignment.teamId },
-            data: {
-              tournamentNumber: assignment.number,
-              tournamentNumberAssignedAt: new Date(),
-              tournamentNumberVenueMappingId: input.venueLevelMappingId
-            }
-          })
-        )
-      );
+      // Update teams with tournament numbers using transaction
+      await db.$transaction(async (tx) => {
+        await Promise.all(
+          input.assignments.map(assignment =>
+            tx.team.update({
+              where: { id: assignment.teamId },
+              data: {
+                tournamentNumber: assignment.number,
+                tournamentNumberAssignedAt: new Date(),
+                tournamentNumberVenueMappingId: input.venueLevelMappingId
+              }
+            })
+          )
+        );
+      });
 
       return { success: true };
     }),
@@ -309,7 +311,7 @@ export const volunteersTeamRouter = createTRPCRouter({
       venueLevelMappingId: z.string(),
       sportId: z.string(),
       genderCategory: z.enum(['men', 'women', 'mixed'])
-    }))
+    }).optional().default({}))
     .query(async ({ ctx, input }) => {
       // Get team venue assignments for this venue level mapping
       const teamAssignments = await ctx.db.teamVenueAssignment.findMany({

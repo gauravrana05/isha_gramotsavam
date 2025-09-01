@@ -133,7 +133,7 @@ export default function Header({ lang }: HeaderProps) {
 
                 {isSportsDropdownOpen && (
                   <div className="absolute top-full left-0 mt-1 w-48 bg-white shadow-lg rounded-md border border-gray-200 py-2 z-50">
-                    {sportsQuery.data?.map((sport) => (
+                    {Array.isArray(sportsQuery.data) && sportsQuery.data.map((sport) => (
                       <Link
                         key={sport.id}
                         href={`/${lang}/public/sports/${sport.id}`}
@@ -266,7 +266,7 @@ export default function Header({ lang }: HeaderProps) {
               <div>
                 <div className="text-white font-medium mb-2">Sports</div>
                 <div className="pl-4 space-y-2">
-                  {sportsQuery.data?.map((sport) => (
+                  {Array.isArray(sportsQuery.data) && sportsQuery.data.map((sport) => (
                     <Link
                       key={sport.id}
                       href={`/${lang}/public/sports/${sport.id}`}

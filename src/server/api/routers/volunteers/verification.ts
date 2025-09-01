@@ -8,7 +8,7 @@ export const volunteersVerificationRouter = createTRPCRouter({
   getTeamForMatchDay: protectedProcedure
     .input(z.object({
       teamId: z.string(),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       // Check verification permissions
       if (!['admin', 'verification_volunteer', 'technical_volunteer'].includes(ctx.user.role)) {
@@ -157,7 +157,7 @@ export const volunteersVerificationRouter = createTRPCRouter({
     .input(z.object({
       teamIds: z.array(z.string()),
       includePlayerDetails: z.boolean().default(true),
-    }))
+    }).optional().default({}))
     .query(async ({ input, ctx }) => {
       // Check volunteer permissions
       if (!['admin', 'general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
