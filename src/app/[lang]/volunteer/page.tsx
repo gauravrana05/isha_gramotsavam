@@ -51,13 +51,25 @@ export default function VolunteerMainPage() {
   });
   
   // Assignments query for redirect logic and display
+  const queryEnabled = !authLoading && !!user && !!user.id && ['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user?.role || '');
+  
+  console.log('🔍 Query enabled check:', {
+    authLoading,
+    hasUser: !!user,
+    userId: user?.id,
+    userRole: user?.role,
+    isRoleIncluded: ['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user?.role || ''),
+    queryEnabled
+  });
+
   const { 
     data: assignmentsData, 
     isLoading: assignmentsLoading, 
     error: assignmentsError 
   } = api.volunteers.assignments.getMyAssignments.useQuery(
+    undefined, // Remove the object parameter since the query doesn't expect any input
     { 
-      enabled: !authLoading && !!user && !!user.id && ['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user?.role || ''),
+      enabled: queryEnabled,
     }
   );
 
@@ -82,24 +94,56 @@ export default function VolunteerMainPage() {
         hasError: !!assignmentsError,
         error: assignmentsError?.message,
         userId: user?.id,
-        userRole: user?.role
+        userRole: user?.role,
+        assignmentsDataType: typeof assignmentsData,
+        assignmentsDataKeys: assignmentsData ? Object.keys(assignmentsData) : null,
+        assignmentsDataStringified: JSON.stringify(assignmentsData)
       });
     }
   }, [assignmentsData, assignmentsLoading, assignmentsError, user?.id, user?.role, authLoading]);
 
   // Handle redirects for users with language preferences
   useEffect(() => {
+    console.log('🔍 Redirect useEffect triggered:', {
+      authLoading,
+      assignmentsLoading,
+      hasUser: !!user,
+      hasUserProfile: !!userProfile,
+      hasLang: !!lang,
+      userRole: userProfile?.role,
+      userRoleFromUser: user?.role,
+      showLanguageModal,
+      hasLanguagePreference: !!userProfile?.languagePreference,
+      languagePreference: userProfile?.languagePreference,
+      assignmentsDataLength: assignmentsData?.length || 0,
+      assignmentsData: assignmentsData
+    });
+
     if (authLoading || assignmentsLoading || !user || !userProfile || !lang) {
+      console.log('🔍 Early return - missing required data:', {
+        authLoading,
+        assignmentsLoading,
+        hasUser: !!user,
+        hasUserProfile: !!userProfile,
+        hasLang: !!lang
+      });
       return;
     }
 
-    // Only handle volunteer roles
-    if (!['general_volunteer', 'technical_volunteer'].includes(userProfile.role || '')) {
+    // Only handle volunteer roles - check both user and userProfile
+    const roleToCheck = userProfile?.role || user?.role;
+    if (!['general_volunteer', 'technical_volunteer'].includes(roleToCheck || '')) {
+      console.log('🔍 Early return - not a volunteer role:', {
+        userProfileRole: userProfile?.role,
+        userRole: user?.role,
+        roleToCheck
+      });
       return;
     }
 
     // Skip redirect if showing language modal
     if (showLanguageModal) {
+      console.log('🔍 Early return - showing language modal');
       return;
     }
 
@@ -111,21 +155,73 @@ export default function VolunteerMainPage() {
       }).catch(console.error);
     }
 
+    // TEMPORARY: Force redirect for testing
+    if (userProfile.languagePreference && user?.id === '9f73280e-5e79-4d4e-adf7-bcf88ace3431') {
+      console.log('🔍 FORCE REDIRECT TEST - bypassing assignment check');
+      // Use a test venue ID from the logs
+      router.push(`/${lang}/volunteer/venues/550e8400-e29b-41d4-a716-446655440201/dashboard`);
+      return;
+    }
+
     // If user has language preference and assignments, redirect to venue dashboard
-    if (userProfile.languagePreference && assignmentsData && assignmentsData.length > 0) {
-      const firstAssignment = assignmentsData[0];
-      const venueId = firstAssignment?.venueLevelMapping?.venue?.id;
-      if (venueId) {
-        // Preload full venue data before redirect
-        preloadVolunteerData(user.id, {
-          priorityLevel: 'full',
-          venueId: venueId,
-          forceRefresh: false
-        }).catch(console.error);
-        
-        router.push(`/${lang}/volunteer/venues/${venueId}/dashboard`);
-        return;
+    if (userProfile.languagePreference && assignmentsData) {
+      // Handle different possible data structures
+      let assignments = null;
+      
+      if (Array.isArray(assignmentsData)) {
+        assignments = assignmentsData;
+      } else if (assignmentsData && typeof assignmentsData === 'object') {
+        // Check if it's wrapped in an object
+        if (assignmentsData.assignments && Array.isArray(assignmentsData.assignments)) {
+          assignments = assignmentsData.assignments;
+        } else if (assignmentsData.data && Array.isArray(assignmentsData.data)) {
+          assignments = assignmentsData.data;
+        }
       }
+      
+      console.log('🔍 Processed assignments:', {
+        originalData: assignmentsData,
+        processedAssignments: assignments,
+        assignmentsLength: assignments?.length || 0
+      });
+      
+      if (assignments && assignments.length > 0) {
+        const firstAssignment = assignments[0];
+        console.log('🔍 First assignment for redirect:', {
+          assignment: firstAssignment,
+          hasVenueLevelMapping: !!firstAssignment?.venueLevelMapping,
+          hasVenue: !!firstAssignment?.venueLevelMapping?.venue,
+          venueId: firstAssignment?.venueLevelMapping?.venue?.id,
+          venueName: firstAssignment?.venueLevelMapping?.venue?.name
+        });
+        
+        const venueId = firstAssignment?.venueLevelMapping?.venue?.id;
+        
+        if (venueId) {
+          console.log('🔍 Redirecting to venue dashboard:', venueId);
+          // Preload full venue data before redirect
+          preloadVolunteerData(user.id, {
+            priorityLevel: 'full',
+            venueId: venueId,
+            forceRefresh: false
+          }).catch(console.error);
+          
+          router.push(`/${lang}/volunteer/venues/${venueId}/dashboard`);
+          return;
+        } else {
+          console.log('🔍 No venue ID found in assignment data structure');
+          console.log('🔍 Assignment structure:', JSON.stringify(firstAssignment, null, 2));
+        }
+      } else {
+        console.log('🔍 No assignments found after processing');
+      }
+    } else {
+      console.log('🔍 No redirect - conditions not met:', {
+        hasLanguagePreference: !!userProfile?.languagePreference,
+        hasAssignments: !!assignmentsData,
+        languagePreference: userProfile?.languagePreference,
+        assignmentsCount: assignmentsData?.length || 0
+      });
     }
   }, [authLoading, assignmentsLoading, assignmentsData, user, userProfile, lang, showLanguageModal, router, preloadVolunteerData]);
 
@@ -259,12 +355,12 @@ export default function VolunteerMainPage() {
         <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
         <p className="text-gray-600">{t('volunteer.loading', 'Loading...')}</p>
         
-        {/* Connection Quality Indicator */}
+        {/* Connection Status Indicator */}
         <div className="mt-4 flex items-center justify-center gap-2 text-sm text-gray-500">
           {isOnline ? (
             <>
               <Wifi className="w-4 h-4 text-green-500" />
-              <span>Online ({connectionQuality})</span>
+              <span>Online</span>
             </>
           ) : (
             <>

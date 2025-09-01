@@ -34,7 +34,15 @@ export async function GET(request: NextRequest) {
     console.log('=== PKCE VERIFICATION ===');
     console.log('Code verifier from cookie:', codeVerifier ? 'Present' : 'Missing');
     console.log('Code verifier length:', codeVerifier?.length);
+    console.log('Code verifier (first 10 chars):', codeVerifier?.substring(0, 10));
     console.log('Authorization code:', code.substring(0, 10) + '...');
+    
+    // DEBUGGING: Regenerate code challenge to verify
+    if (codeVerifier) {
+      const crypto = require('crypto');
+      const regeneratedChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+      console.log('Regenerated code challenge:', regeneratedChallenge.substring(0, 10) + '...');
+    }
     
     if (!codeVerifier) {
       console.error('Code verifier missing from cookies');

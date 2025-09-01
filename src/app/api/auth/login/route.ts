@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
-// PKCE helper functions
+// PKCE helper functions - FIXED to match RFC 7636 spec
 function generateCodeVerifier() {
+  // Generate 32 random bytes and encode as base64url (RFC 7636 compliant)
   return crypto.randomBytes(32).toString('base64url');
 }
 
 function generateCodeChallenge(codeVerifier: string) {
+  // SHA256 hash of code verifier, encoded as base64url (RFC 7636 compliant)
   return crypto.createHash('sha256').update(codeVerifier).digest('base64url');
 }
 

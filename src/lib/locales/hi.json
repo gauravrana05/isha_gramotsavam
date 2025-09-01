@@ -44,6 +44,86 @@
     "volunteer_dashboard_description": "स्वयंसेवक के रूप में इशा ग्रामोत्सव घटनाओं का समर्थन करें।",
     "volunteer_technical_dashboard_title": "तकनीकी स्वयंसेवक डैशबोर्ड",
     "volunteer_technical_dashboard_description": "इशा ग्रामोत्सव घटनाओं के तकनीकी पहलुओं का प्रबंधन करें।",
+  "volunteer": {
+    "loading": "लोड हो रहा है...",
+    "loading_assignment": "आपका असाइनमेंट लोड हो रहा है...",
+    "refresh": "रीफ्रेश करें",
+    "no_venue_assignments": "कोई स्थान असाइनमेंट नहीं",
+    "no_venue_assignments_desc": "आपको अभी तक किसी स्थान पर नियुक्त नहीं किया गया है। कृपया अपने समन्वयक से संपर्क करें।",
+    "dashboard": {
+      "title": "स्वयंसेवक डैशबोर्ड",
+      "welcome": "स्वागत है, स्वयंसेवक!",
+      "assignments": "आपके असाइनमेंट",
+      "quick_actions": "त्वरित कार्य"
+    },
+    "guide": {
+      "title": "स्वयंसेवक गाइड",
+      "subtitle": "एक स्वयंसेवक के रूप में आपको जो कुछ जानना चाहिए",
+      "progress": "आपकी प्रगति",
+      "steps": "पूरा करने के लिए चरण",
+      "appLocation": "ऐप स्थान",
+      "tips": {
+        "title": "उपयोगी सुझाव"
+      },
+      "quickActions": {
+        "title": "त्वरित कार्य",
+        "camera": "फोटो लें",
+        "checkIn": "चेक इन",
+        "emergency": "आपातकाल",
+        "support": "सहायता प्राप्त करें"
+      }
+    },
+    "media": {
+      "title": "मीडिया प्रबंधन",
+      "upload": "मीडिया अपलोड करें",
+      "venue_media": "स्थान मीडिया",
+      "venue_posts": "स्थान पोस्ट",
+      "public_posts": "सार्वजनिक पोस्ट",
+      "no_media": "अभी तक कोई मीडिया अपलोड नहीं किया गया",
+      "upload_first": "पहला मीडिया अपलोड करें"
+    },
+    "profile": {
+      "title": "स्वयंसेवक प्रोफाइल",
+      "edit": "प्रोफाइल संपादित करें",
+      "save": "परिवर्तन सहेजें"
+    }
+  },
+  "common": {
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "saving": "सहेज रहा है...",
+    "loading": "लोड हो रहा है...",
+    "error": "त्रुटि",
+    "success": "सफलता",
+    "upload": "अपलोड करें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "view": "देखें",
+    "close": "बंद करें",
+    "continue": "जारी रखें",
+    "back": "वापस",
+    "next": "अगला",
+    "submit": "जमा करें",
+    "confirm": "पुष्टि करें"
+  },
+  "posts": {
+    "associate_with": "के साथ जोड़ें",
+    "create": "पोस्ट बनाएं",
+    "title": "पोस्ट शीर्षक",
+    "content": "पोस्ट सामग्री",
+    "visibility": "दृश्यता",
+    "public": "सार्वजनिक",
+    "private": "निजी"
+  },
+  "media": {
+    "upload": "मीडिया अपलोड करें",
+    "select_files": "फाइलें चुनें",
+    "drag_drop": "फाइलों को यहां खींचें और छोड़ें",
+    "file_types": "समर्थित: चित्र और वीडियो",
+    "max_size": "अधिकतम आकार: प्रति फाइल 10MB"
+  },
+    "volunteer_technical_dashboard_title": "तकनीकी स्वयंसेवक डैशबोर्ड",
+    "volunteer_technical_dashboard_description": "इशा ग्रामोत्सव घटनाओं के तकनीकी पहलुओं का प्रबंधन करें।",
     "player_dashboard_title": "खिलाड़ी डैशबोर्ड",
     "player_dashboard_description": "अपने इशा ग्रामोत्सव घटनाओं और टीम को देखें।",
     "guest_dashboard_title": "अतिथि डैशबोर्ड",

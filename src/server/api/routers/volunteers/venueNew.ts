@@ -301,4 +301,140 @@ export const volunteersVenueRouter = createTRPCRouter({
 
       return { success: true, teamId: team.id };
     }),
+
+  // Get venue media and posts for technical volunteers
+  getVenueMediaAndPosts: protectedProcedure
+    .input(z.object({
+      venueId: z.string().uuid(),
+    }))
+    .query(async ({ input, ctx }) => {
+      // Check if user is technical volunteer or admin
+      if (!['admin', 'technical_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only technical volunteers and admins can access venue media',
+        });
+      }
+
+      // For technical volunteers, verify they're assigned to this venue
+      if (ctx.user.role === 'technical_volunteer') {
+        const assignment = await db.volunteerAssignment.findFirst({
+          where: {
+            volunteerId: ctx.user.id,
+            venueLevelMapping: {
+              venueId: input.venueId
+            }
+          }
+        });
+
+        if (!assignment) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You are not assigned to this venue',
+          });
+        }
+      }
+
+      // Get venue media
+      const venueMedia = await db.media.findMany({
+        where: {
+          entityType: 'venue',
+          entityId: input.venueId,
+          status: 'approved'
+        },
+        include: {
+          uploadedByUser: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      // Get venue posts (from fixtures at this venue)
+      const venuePosts = await db.post.findMany({
+        where: {
+          entityType: 'fixture',
+          entityId: {
+            in: await db.fixture.findMany({
+              where: {
+                venueLevelMapping: {
+                  venueId: input.venueId
+                }
+              },
+              select: { id: true }
+            }).then(fixtures => fixtures.map(f => f.id))
+          }
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            }
+          },
+          media: true,
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      return {
+        venueMedia,
+        posts: venuePosts,
+      };
+    }),
+
+  // Get public posts from other volunteers
+  getPublicPosts: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(50).default(20),
+      offset: z.number().min(0).default(0),
+    }))
+    .query(async ({ input, ctx }) => {
+      if (!['admin', 'technical_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only technical volunteers and admins can view public posts',
+        });
+      }
+
+      const posts = await db.post.findMany({
+        where: {
+          visibility: 'public',
+          authorId: {
+            not: ctx.user.id // Exclude own posts
+          },
+          author: {
+            role: {
+              in: ['technical_volunteer', 'admin']
+            }
+          }
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            }
+          },
+          media: true,
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: input.limit,
+        skip: input.offset,
+      });
+
+      return posts;
+    }),
 });

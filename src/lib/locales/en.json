@@ -56,7 +56,84 @@
   "captain_dashboard_title": "Captain Dashboard",
   "captain_dashboard_description": "Welcome to the captain dashboard, where you can manage your team.",
   "volunteer_dashboard_title": "Volunteer Dashboard",
-  "volunteer_dashboard_description": "Support Isha Gramotsavam events as a volunteer.",
+  "volunteer": {
+    "loading": "Loading...",
+    "loading_assignment": "Loading your assignment...",
+    "refresh": "Refresh",
+    "no_venue_assignments": "No Venue Assignments",
+    "no_venue_assignments_desc": "You haven't been assigned to any venues yet. Please contact your coordinator.",
+    "dashboard": {
+      "title": "Volunteer Dashboard",
+      "welcome": "Welcome, Volunteer!",
+      "assignments": "Your Assignments",
+      "quick_actions": "Quick Actions"
+    },
+    "guide": {
+      "title": "Volunteer Guide",
+      "subtitle": "Everything you need to know as a volunteer",
+      "progress": "Your Progress",
+      "steps": "Steps to Complete",
+      "appLocation": "App Location",
+      "tips": {
+        "title": "Helpful Tips"
+      },
+      "quickActions": {
+        "title": "Quick Actions",
+        "camera": "Take Photo",
+        "checkIn": "Check In",
+        "emergency": "Emergency",
+        "support": "Get Support"
+      }
+    },
+    "media": {
+      "title": "Media Management",
+      "upload": "Upload Media",
+      "venue_media": "Venue Media",
+      "venue_posts": "Venue Posts",
+      "public_posts": "Public Posts",
+      "no_media": "No media uploaded yet",
+      "upload_first": "Upload First Media"
+    },
+    "profile": {
+      "title": "Volunteer Profile",
+      "edit": "Edit Profile",
+      "save": "Save Changes"
+    }
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "upload": "Upload",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "close": "Close",
+    "continue": "Continue",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "confirm": "Confirm"
+  },
+  "posts": {
+    "associate_with": "Associate with",
+    "create": "Create Post",
+    "title": "Post Title",
+    "content": "Post Content",
+    "visibility": "Visibility",
+    "public": "Public",
+    "private": "Private"
+  },
+  "media": {
+    "upload": "Upload Media",
+    "select_files": "Select Files",
+    "drag_drop": "Drag and drop files here",
+    "file_types": "Supported: Images and Videos",
+    "max_size": "Max size: 10MB per file"
+  },
   "volunteer_technical_dashboard_title": "Technical Volunteer Dashboard",
   "volunteer_technical_dashboard_description": "Manage technical aspects of Isha Gramotsavam events.",
   "player_dashboard_title": "Player Dashboard",

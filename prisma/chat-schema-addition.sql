@@ -1,0 +1,34 @@
+-- Add these to schema.prisma
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  content   String
+  venueId   String
+  senderId  String
+  senderRole String  // 'volunteer', 'admin'
+  targetType String  // 'all', 'captains', 'players', 'individual'
+  targetId  String?  // specific user ID if individual
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  venue     Venue    @relation(fields: [venueId], references: [id])
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@map("chat_messages")
+}
+
+model ChatParticipant {
+  id       String @id @default(cuid())
+  venueId  String
+  userId   String
+  role     String // 'volunteer', 'player', 'captain'
+  isActive Boolean @default(true)
+  lastSeen DateTime @default(now())
+
+  venue    Venue  @relation(fields: [venueId], references: [id])
+  user     User   @relation("ChatParticipant", fields: [userId], references: [id])
+
+  @@unique([venueId, userId])
+  @@map("chat_participants")
+}

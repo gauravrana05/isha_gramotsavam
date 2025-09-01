@@ -626,6 +626,7 @@ model User {
   profileComplete     Boolean @default(false) @map("profile_complete")
   firstName           String? @db.VarChar(100) @map("first_name")
   lastName            String? @db.VarChar(100) @map("last_name")
+  fullName            String? @db.VarChar(200) @map("full_name") // Computed from firstName + lastName
   dateOfBirth         DateTime? @db.Date @map("date_of_birth")
   age                 Int?
   gender              Gender?
@@ -671,6 +672,10 @@ model User {
   notificationTemplatesCreated NotificationTemplate[] @relation("NotificationTemplatesCreated")
   notificationBroadcastsCreated NotificationBroadcast[] @relation("NotificationBroadcastsCreated")
   notificationSettings NotificationSettings?
+
+  // Chat relations
+  sentMessages        ChatMessage[] @relation("SentMessages")
+  chatParticipations  ChatParticipant[] @relation("ChatParticipant")
 
   @@map("users")
 }
@@ -748,6 +753,10 @@ model Venue {
 
   // Relations
   venueLevelMappings VenueLevelMapping[]
+  
+  // Chat relations
+  chatMessages      ChatMessage[]
+  chatParticipants  ChatParticipant[]
 
   @@map("venues")
 
@@ -976,4 +985,49 @@ enum NotificationBroadcastStatus {
   sent
   failed
   cancelled
+}
+
+// Chat System Models
+model ChatMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  content   String   @db.Text
+  venueId   String   @map("venue_id") @db.Uuid
+  senderId  String   @map("sender_id") @db.Uuid
+  senderRole String  @map("sender_role") @db.VarChar(50)
+  targetType String  @map("target_type") @db.VarChar(20) // 'all', 'captains', 'players', 'individual'
+  targetId  String?  @map("target_id") @db.Uuid // specific user ID if individual
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+  @@index([venueId], map: "idx_chat_message_venue")
+  @@index([senderId], map: "idx_chat_message_sender")
+  @@index([targetType], map: "idx_chat_message_target_type")
+  @@index([createdAt], map: "idx_chat_message_created_at")
+}
+
+model ChatParticipant {
+  id       String   @id @default(uuid()) @db.Uuid
+  venueId  String   @map("venue_id") @db.Uuid
+  userId   String   @map("user_id") @db.Uuid
+  role     String   @db.VarChar(50) // 'volunteer', 'player', 'captain'
+  isActive Boolean  @default(true) @map("is_active")
+  lastSeen DateTime @default(now()) @map("last_seen") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venue    Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user     User   @relation("ChatParticipant", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, userId], map: "unique_venue_user")
+  @@map("chat_participants")
+  @@index([venueId], map: "idx_chat_participant_venue")
+  @@index([userId], map: "idx_chat_participant_user")
+  @@index([role], map: "idx_chat_participant_role")
 }

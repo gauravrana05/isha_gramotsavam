@@ -36,6 +36,8 @@ interface AdminSidebarProps {
   className?: string;
   isDesktopCollapsed?: boolean;
   onDesktopToggle?: () => void;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 interface NavItem {
@@ -49,9 +51,10 @@ interface NavItem {
 export default function AdminSidebar({ 
   className = '', 
   isDesktopCollapsed = false, 
-  onDesktopToggle 
+  onDesktopToggle,
+  isMobileOpen = false,
+  onMobileClose
 }: AdminSidebarProps) {
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>(['Venues', 'Teams', 'Users']);
   const [showContent, setShowContent] = useState(!isDesktopCollapsed);
   
@@ -169,7 +172,7 @@ export default function AdminSidebar({
                 ? 'bg-[#F28C38] text-white shadow-sm'
                 : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
             }`}
-            onClick={() => setIsMobileOpen(false)}
+            onClick={() => onMobileClose?.()}
             title={isDesktopCollapsed ? item.name : undefined}
           >
             <item.icon className={`w-4 h-4 flex-shrink-0 ${
@@ -230,31 +233,23 @@ export default function AdminSidebar({
 
   return (
     <>
-      {/* Mobile menu button */}
-      <div className="lg:hidden">
-        <button
-          onClick={() => setIsMobileOpen(true)}
-          className="fixed top-4 left-4 z-50 p-2 rounded-md bg-white shadow-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-        >
-          <Menu width={64} height={64} className="w-5 h-5 text-gray-700" />
-        </button>
-      </div>
 
       {/* Mobile overlay */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={() => setIsMobileOpen(false)}
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          onClick={() => onMobileClose?.()}
         />
       )}
 
 
       {/* Sidebar */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
-        lg:translate-x-0 lg:fixed lg:top-0 lg:bottom-0 lg:flex-shrink-0 lg:transition-[width] lg:duration-300 lg:ease-in-out
-        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${isDesktopCollapsed ? 'lg:w-16' : 'lg:w-64'} w-64
+        fixed inset-y-0 z-50 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
+        md:left-0 md:right-auto md:translate-x-0 md:fixed md:top-0 md:bottom-0 md:flex-shrink-0 md:transition-[width] md:duration-300 md:ease-in-out
+        ${isMobileOpen ? 'right-0 translate-x-0' : 'right-0 translate-x-full'}
+        ${isDesktopCollapsed ? 'md:w-16' : 'md:w-64'} 
+        w-full md:w-auto
         ${className}
       `}>
         <div className="flex flex-col h-full">
@@ -279,7 +274,7 @@ export default function AdminSidebar({
               {onDesktopToggle && (
                 <button
                   onClick={onDesktopToggle}
-                  className="hidden lg:block p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                  className="hidden md:block p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                   title={isDesktopCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
                   {isDesktopCollapsed ? (
@@ -291,14 +286,12 @@ export default function AdminSidebar({
               )}
               
               {/* Mobile close button */}
-              {showContent && (
-                <button
-                  onClick={() => setIsMobileOpen(false)}
-                  className="lg:hidden p-1 rounded-md hover:bg-gray-100"
-                >
-                  <X width={64} height={64} className="w-4 h-4 text-gray-500" />
-                </button>
-              )}
+              <button
+                onClick={() => onMobileClose?.()}
+                className="md:hidden p-1 rounded-md hover:bg-gray-100"
+              >
+                <X width={64} height={64} className="w-4 h-4 text-gray-500" />
+              </button>
             </div>
           </div>
 
@@ -345,7 +338,7 @@ export default function AdminSidebar({
               className={`flex items-center text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9 ${
                 isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
               }`}
-              onClick={() => setIsMobileOpen(false)}
+              onClick={() => onMobileClose?.()}
               title={isDesktopCollapsed ? 'Profile' : undefined}
             >
               <User className={`w-4 h-4 flex-shrink-0 ${isDesktopCollapsed ? '' : 'mr-2'}`} />
@@ -357,7 +350,7 @@ export default function AdminSidebar({
               className={`flex items-center text-xs font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-9 ${
                 isDesktopCollapsed ? 'justify-center px-2' : 'px-3'
               }`}
-              onClick={() => setIsMobileOpen(false)}
+              onClick={() => onMobileClose?.()}
               title={isDesktopCollapsed ? 'Back to App' : undefined}
             >
               <Home className={`w-4 h-4 flex-shrink-0 ${isDesktopCollapsed ? '' : 'mr-2'}`} />

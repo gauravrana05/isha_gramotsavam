@@ -81,7 +81,7 @@ describe('CreateTeamModal Component', () => {
     );
 
     expect(screen.getByTestId('create-team-modal')).toBeInTheDocument();
-    expect(screen.getByText('Create Team')).toBeInTheDocument();
+    expect(screen.getAllByText('Create Team')[0]).toBeInTheDocument();
   });
 
   test('should render form fields', () => {

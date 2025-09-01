@@ -15,13 +15,94 @@ export const postsRouter = createTRPCRouter({
       mediaIds: z.array(z.string().uuid()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // TODO: Auto-detect volunteer's current fixture/match context
-      // For now, we'll require entityId to be passed
+      // Validate technical volunteer permissions
+      if (!['admin', 'technical_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only technical volunteers and admins can create posts',
+        });
+      }
+
       if (!input.entityId) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Entity ID is required for now.',
+          message: 'Entity ID is required.',
         });
+      }
+
+      // For technical volunteers, verify they're assigned to the venue
+      if (ctx.user.role === 'technical_volunteer') {
+        let venueId: string | null = null;
+
+        if (input.entityType === 'fixture') {
+          const fixture = await db.fixture.findUnique({
+            where: { id: input.entityId },
+            include: {
+              venueLevelMapping: {
+                select: { venueId: true }
+              }
+            }
+          });
+          venueId = fixture?.venueLevelMapping.venueId || null;
+        } else if (input.entityType === 'match') {
+          const match = await db.match.findUnique({
+            where: { id: input.entityId },
+            include: {
+              fixture: {
+                include: {
+                  venueLevelMapping: {
+                    select: { venueId: true }
+                  }
+                }
+              }
+            }
+          });
+          venueId = match?.fixture.venueLevelMapping.venueId || null;
+        }
+
+        if (!venueId) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Entity not found or venue not assigned',
+          });
+        }
+
+        // Check volunteer assignment
+        const assignment = await db.volunteerAssignment.findFirst({
+          where: {
+            volunteerId: ctx.user.id,
+            venueLevelMapping: {
+              venueId: venueId
+            }
+          }
+        });
+
+        if (!assignment) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You are not assigned to this venue',
+          });
+        }
+      }
+
+      // Get event ID from entity
+      let eventId: string;
+      if (input.entityType === 'fixture') {
+        const fixture = await db.fixture.findUnique({
+          where: { id: input.entityId },
+          select: { eventId: true }
+        });
+        eventId = fixture?.eventId || "00000000-0000-0000-0000-000000000000";
+      } else {
+        const match = await db.match.findUnique({
+          where: { id: input.entityId },
+          include: {
+            fixture: {
+              select: { eventId: true }
+            }
+          }
+        });
+        eventId = match?.fixture.eventId || "00000000-0000-0000-0000-000000000000";
       }
 
       const post = await db.post.create({
@@ -32,8 +113,7 @@ export const postsRouter = createTRPCRouter({
           entityId: input.entityId,
           visibility: input.visibility,
           authorId: ctx.user.id,
-          // TODO: This is a placeholder, need to get the event from the entity
-          eventId: "00000000-0000-0000-0000-000000000000", 
+          eventId: eventId,
         },
       });
 
@@ -70,7 +150,7 @@ export const postsRouter = createTRPCRouter({
         where.visibility = input.visibility;
       }
 
-      // If user is not admin, only show public posts
+      // If user is not admin, only show public posts or own posts
       if (ctx.user.role !== 'admin' && input.visibility === 'all') {
         where.OR = [
           { visibility: 'public' },
@@ -79,7 +159,6 @@ export const postsRouter = createTRPCRouter({
       } else if (ctx.user.role !== 'admin') {
         where.visibility = 'public';
       }
-      
 
       const posts = await db.post.findMany({
         where,

@@ -5,6 +5,8 @@ import { useRedirect } from '@/lib/utils/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { PageLoader } from '@/components/ui/loaders';
 import CaptainSidebar from '@/components/navigation/SimpleSidebar';
+import { AuthenticatedMobileHeader } from '@/components/navigation/AuthenticatedMobileHeader';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function CaptainLayout({
   children,
@@ -12,6 +14,8 @@ export default function CaptainLayout({
   children: React.ReactNode;
 }) {
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const pageTitle = usePageTitle();
   useRedirect(['captain']);
   const { user, loading } = useAuth();
 
@@ -26,16 +30,25 @@ export default function CaptainLayout({
   }
 
   return (
-    <div className="lg:min-h-screen bg-gray-50">
+    <div className="md:min-h-screen bg-gray-50">
+      {/* Mobile Header */}
+      <AuthenticatedMobileHeader
+        title={pageTitle}
+        onMenuToggle={() => setIsMobileSidebarOpen(true)}
+        showBackButton={true}
+      />
+
       <CaptainSidebar 
         isDesktopCollapsed={isDesktopSidebarCollapsed}
         onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileClose={() => setIsMobileSidebarOpen(false)}
       />
+      
       <div className={`${
-        isDesktopSidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
+        isDesktopSidebarCollapsed ? 'md:ml-16' : 'md:ml-64'
       } transition-[margin] duration-300 ease-in-out`}>
-        <div className="lg:hidden h-16"></div>
-        <main className="lg:min-h-screen">
+        <main className="md:min-h-screen">
           {children}
         </main>
       </div>

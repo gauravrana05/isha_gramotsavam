@@ -41,25 +41,18 @@ class IshaSSO {
   }
 
   /**
-   * Generate PKCE code verifier and challenge
+   * Generate PKCE code verifier and challenge - FIXED to match Node.js implementation
    */
   private generateCodeVerifier(): string {
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    return btoa(String.fromCharCode.apply(null, Array.from(array)))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+    // Use Node.js crypto for consistency with login route
+    const crypto = require('crypto');
+    return crypto.randomBytes(32).toString('base64url');
   }
 
   private async generateCodeChallenge(codeVerifier: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(codeVerifier);
-    const digest = await crypto.subtle.digest('SHA-256', data);
-    return btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(digest))))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+    // Use Node.js crypto for consistency with login route
+    const crypto = require('crypto');
+    return crypto.createHash('sha256').update(codeVerifier).digest('base64url');
   }
 
   /**

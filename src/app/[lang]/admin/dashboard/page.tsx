@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/server/trpc/react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { 
   Users, 
   Trophy, 
@@ -23,7 +24,6 @@ import {
   Pause,
   Play,
   Timer,
-  Link,
   Trash2
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
@@ -252,7 +252,6 @@ export default function AdminDashboard() {
     setNextRefreshIn(newInterval);
   };
 
-
   // Dashboard Skeleton Component
   const DashboardSkeleton = () => (
     <div className="lg:min-h-screen bg-gray-50">
@@ -412,7 +411,6 @@ export default function AdminDashboard() {
     <div className="lg:min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         
-        {/* Header */}
         {/* Compact Control Bar */}
         <div className="bg-white border-b border-gray-200 px-4 py-2 mb-4">
           <div className="flex items-center justify-between">
@@ -477,6 +475,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+
         {/* Critical Alerts */}
         {criticalAlerts.length > 0 && (
           <div className="mb-4">
@@ -501,11 +500,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-gray-600 text-sm">Total Teams</p>
                 <p className="text-2xl font-bold text-[#4A2F1D]">
-                  {loading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    dashboardOverview?.teams?.total || 0
-                  )}
+                  {dashboardOverview?.teams?.total || 0}
                 </p>
                 <p className="text-xs text-green-600">
                   {dashboardOverview?.teams?.verificationRate || 0}% verified
@@ -525,11 +520,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-gray-600 text-sm">Total Players</p>
                 <p className="text-2xl font-bold text-[#4A2F1D]">
-                  {loading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    dashboardOverview?.players?.total || 0
-                  )}
+                  {dashboardOverview?.players?.total || 0}
                 </p>
                 <p className="text-xs text-blue-600">
                   Avg age: {dashboardOverview?.players?.averageAge || 0}
@@ -549,11 +540,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-gray-600 text-sm">Verification Queue</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  {loading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    dashboardOverview?.verification?.pending || 0
-                  )}
+                  {dashboardOverview?.verification?.pending || 0}
                 </p>
                 <p className="text-xs text-gray-600">
                   {dashboardOverview?.verification?.backlogDays || 0} days backlog
@@ -573,11 +560,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-gray-600 text-sm">Active Venues</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {loading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    dashboardOverview?.venues?.active || 0
-                  )}
+                  {dashboardOverview?.venues?.active || 0}
                 </p>
                 <p className="text-xs text-gray-600">
                   {dashboardOverview?.venues?.utilizationRate || 0}% utilized
@@ -594,96 +577,85 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tournament Progress */}
-        {tournamentOverview && (
-          <div className={`mb-4 bg-white rounded-md shadow-sm border p-4 ${loading ? 'animate-pulse' : ''}`}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-900">Tournament Progress</h3>
-              <div className="text-xs text-gray-500">
-                {loading ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  `${tournamentOverview.summary.overallProgress}% Complete`
-                )}
+        <div className={`mb-4 bg-white rounded-md shadow-sm border p-4 ${loading ? 'animate-pulse' : ''}`}>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-gray-900">Tournament Progress</h3>
+            <div className="text-xs text-gray-500">
+              {`${tournamentOverview?.summary?.overallProgress || 0}% Complete`}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="font-medium text-gray-900 mb-2">Matches</h3>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Completed</span>
+                  <span className="font-medium">{tournamentOverview?.stats?.matches?.completed || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>In Progress</span>
+                  <span className="font-medium">{tournamentOverview?.stats?.matches?.inProgress || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Scheduled</span>
+                  <span className="font-medium">{tournamentOverview?.stats?.matches?.scheduled || 0}</span>
+                </div>
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-medium text-gray-900 mb-2">Matches</h3>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Completed</span>
-                    <span className="font-medium">{tournamentOverview.stats.matches.completed}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>In Progress</span>
-                    <span className="font-medium">{tournamentOverview.stats.matches.inProgress}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Scheduled</span>
-                    <span className="font-medium">{tournamentOverview.stats.matches.scheduled}</span>
-                  </div>
+
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="font-medium text-gray-900 mb-2">Fixtures</h3>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Total</span>
+                  <span className="font-medium">{tournamentOverview?.stats?.fixtures?.total || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Active</span>
+                  <span className="font-medium">{tournamentOverview?.summary?.activeFixtures || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Completed</span>
+                  <span className="font-medium">{tournamentOverview?.summary?.completedTournaments || 0}</span>
                 </div>
               </div>
+            </div>
 
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-medium text-gray-900 mb-2">Fixtures</h3>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Total</span>
-                    <span className="font-medium">{tournamentOverview.stats.fixtures.total}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Active</span>
-                    <span className="font-medium">{tournamentOverview.summary.activeFixtures}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Completed</span>
-                    <span className="font-medium">{tournamentOverview.summary.completedTournaments}</span>
-                  </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="font-medium text-gray-900 mb-2">Teams Advanced</h3>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Total</span>
+                  <span className="font-medium">{tournamentOverview?.summary?.teamsAdvanced || 0}</span>
                 </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-medium text-gray-900 mb-2">Teams Advanced</h3>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span>Total</span>
-                    <span className="font-medium">{tournamentOverview.summary.teamsAdvanced}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Cluster→Division</span>
-                    <span className="font-medium">{tournamentOverview.stats.progression.clusterToDiv}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Division→Final</span>
-                    <span className="font-medium">{tournamentOverview.stats.progression.divToFinal}</span>
-                  </div>
+                <div className="flex justify-between">
+                  <span>Cluster→Division</span>
+                  <span className="font-medium">{tournamentOverview?.stats?.progression?.clusterToDiv || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Division→Final</span>
+                  <span className="font-medium">{tournamentOverview?.stats?.progression?.divToFinal || 0}</span>
                 </div>
               </div>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Multi-Level Venue Statistics */}
-        {dashboardOverview?.venues && (
-          <div className={`mb-6 bg-white rounded-lg shadow-sm border p-6 ${loading ? 'animate-pulse' : ''}`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center">
-                <h2 className="text-lg font-semibold text-gray-900 font-fira mr-3">Multi-Level Venue System</h2>
-                {autoRefreshEnabled && !loading && (
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-                )}
-              </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <MapPin className="w-4 h-4 mr-1" />
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  `${dashboardOverview.venues.total} Total Venues`
-                )}
-              </div>
+        <div className={`mb-6 bg-white rounded-lg shadow-sm border p-6 ${loading ? 'animate-pulse' : ''}`}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <h2 className="text-lg font-semibold text-gray-900 font-fira mr-3">Multi-Level Venue System</h2>
+              {autoRefreshEnabled && !loading && (
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+              )}
             </div>
+            <div className="flex items-center text-sm text-gray-600">
+              <MapPin className="w-4 h-4 mr-1" />
+              {`${dashboardOverview?.venues?.total || 0} Total Venues`}
+            </div>
+          </div>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-blue-50 rounded-lg p-4">
@@ -692,14 +664,10 @@ export default function AdminDashboard() {
                   Cluster Venues
                 </h3>
                 <div className="text-2xl font-bold text-blue-600">
-                  {loading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    dashboardOverview.venues.mappings?.cluster || 0
-                  )}
+                  {dashboardOverview?.venues?.mappings?.cluster || 0}
                 </div>
                 <div className="text-sm text-blue-700 mt-1">
-                  {dashboardOverview.venueAssignments?.cluster || 0} teams assigned
+                  {dashboardOverview?.venueAssignments?.cluster || 0} teams assigned
                 </div>
               </div>
 
@@ -709,14 +677,10 @@ export default function AdminDashboard() {
                   Division Venues
                 </h3>
                 <div className="text-2xl font-bold text-green-600">
-                  {loading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    dashboardOverview.venues.mappings?.division || 0
-                  )}
+                  {dashboardOverview?.venues?.mappings?.division || 0}
                 </div>
                 <div className="text-sm text-green-700 mt-1">
-                  {dashboardOverview.venueAssignments?.division || 0} teams assigned
+                  {dashboardOverview?.venueAssignments?.division || 0} teams assigned
                 </div>
               </div>
 
@@ -726,14 +690,10 @@ export default function AdminDashboard() {
                   Final Venues
                 </h3>
                 <div className="text-2xl font-bold text-purple-600">
-                  {loading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    dashboardOverview.venues.mappings?.final || 0
-                  )}
+                  {dashboardOverview?.venues?.mappings?.final || 0}
                 </div>
                 <div className="text-sm text-purple-700 mt-1">
-                  {dashboardOverview.venueAssignments?.final || 0} teams assigned
+                  {dashboardOverview?.venueAssignments?.final || 0} teams assigned
                 </div>
               </div>
 
@@ -743,13 +703,9 @@ export default function AdminDashboard() {
                   Total Assignments
                 </h3>
                 <div className="text-2xl font-bold text-orange-600">
-                  {loading ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    (dashboardOverview.venueAssignments?.cluster || 0) + 
-                    (dashboardOverview.venueAssignments?.division || 0) + 
-                    (dashboardOverview.venueAssignments?.final || 0)
-                  )}
+                  {(dashboardOverview?.venueAssignments?.cluster || 0) + 
+                   (dashboardOverview?.venueAssignments?.division || 0) + 
+                   (dashboardOverview?.venueAssignments?.final || 0)}
                 </div>
                 <div className="text-sm text-orange-700 mt-1">
                   Across all levels
@@ -763,7 +719,6 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-        )}
 
         {/* New Admin Sections */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
