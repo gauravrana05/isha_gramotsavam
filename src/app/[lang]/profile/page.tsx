@@ -66,7 +66,7 @@ export default function ProfilePage() {
   // tRPC mutations
   const updateProfileMutation = api.profile.updateComplete.useMutation();
   const profileDataQuery = api.profile.checkCompletion.useQuery(
-    { userId: user?.id! },
+    { userId: user?.id || '' },
     { 
       enabled: !!user?.id && 
                user.id.length > 0 && 

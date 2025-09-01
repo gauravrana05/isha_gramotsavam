@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Fetch profile image data using tRPC
   const profileImageQuery = api.profile.checkCompletion.useQuery(
-    { userId: user?.id! },
+    { userId: user?.id || "" },
     { 
       enabled: !!user?.id && 
                user.id.length > 0 && 

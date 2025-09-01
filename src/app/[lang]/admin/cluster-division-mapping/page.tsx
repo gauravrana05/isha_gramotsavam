@@ -505,7 +505,7 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
       const venue = venueMapping.venue;
       const isVenueUsed = usedClusterIds.includes(venueMapping.id);
       
-      // In edit mode, don't filter by state initially - let all venues load first
+      // In edit mode, don&apos;t filter by state initially - let all venues load first
       if (isEditMode) {
         return !isVenueUsed;
       }
@@ -563,7 +563,7 @@ function EditClusterDivisionMappingModal({ isOpen, onClose, mapping, selectedEve
       const venue = venueMapping.venue;
       const isVenueUsed = usedDivisionIds.includes(venueMapping.id);
       
-      // In edit mode, don't filter by state initially - let all venues load first
+      // In edit mode, don&apos;t filter by state initially - let all venues load first
       if (isEditMode) {
         return !isVenueUsed;
       }

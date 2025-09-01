@@ -29,7 +29,7 @@ export default function Header({ lang }: HeaderProps) {
 
   // Fetch profile image data for authenticated users
   const profileImageQuery = api.profile.checkCompletion.useQuery(
-    { userId: user?.id! },
+    { userId: user?.id || "" },
     { 
       enabled: !!user?.id && 
                user.id.length > 0 && 

@@ -329,7 +329,7 @@ export default function VerificationDashboardPage() {
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-4">
-            {error?.message || "You don't have permission to access this page."}
+            {error?.message || "You don&apos;t have permission to access this page."}
           </p>
           <button 
             onClick={() => router.push(`/${lang}/login`)}

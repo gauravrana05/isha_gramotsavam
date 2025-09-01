@@ -535,7 +535,7 @@ export default function VolunteersManagement() {
         setSelectedAssignmentType('');
       }
       
-      // For now, keep venue as none since we don't have venue ID in volunteer data
+      // For now, keep venue as none since we don&apos;t have venue ID in volunteer data
       // TODO: Include venue assignment ID in volunteer query response
       setSelectedAssignmentVenue('none');
     }

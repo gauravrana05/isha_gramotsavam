@@ -211,7 +211,7 @@ export default function CaptainTeamsPage() {
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">No Team Found</h1>
-          <p className="text-gray-600 mb-4">You don't have a team yet. Create one to get started.</p>
+          <p className="text-gray-600 mb-4">You don&apos;t have a team yet. Create one to get started.</p>
           <button 
             onClick={() => router.push(`/${lang}/captain/dashboard`)}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"

@@ -37,7 +37,7 @@ export default function TeamRegistrationPage() {
 
   // Fetch profile completion data using the new API
   const profileDataQuery = api.profile.checkCompletion.useQuery(
-    { userId: user?.id! },
+    { userId: user?.id || '' },
     { 
       enabled: !!user?.id && 
                user.id.length > 0 && 
