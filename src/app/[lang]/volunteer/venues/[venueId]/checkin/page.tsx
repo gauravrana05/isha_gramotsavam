@@ -6,7 +6,7 @@ import { api } from '@/server/trpc/react';
 import { Button }  from '@/components/ui'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Badge } from '@/components/ui/badge';
-import   Input  from '@/components/ui';
+import  { Input }  from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useNotification } from '@/context/NotificationContext';
