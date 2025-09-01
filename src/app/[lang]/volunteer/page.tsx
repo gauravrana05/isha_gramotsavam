@@ -155,14 +155,6 @@ export default function VolunteerMainPage() {
       }).catch(console.error);
     }
 
-    // TEMPORARY: Force redirect for testing
-    if (userProfile.languagePreference && user?.id === '9f73280e-5e79-4d4e-adf7-bcf88ace3431') {
-      console.log('🔍 FORCE REDIRECT TEST - bypassing assignment check');
-      // Use a test venue ID from the logs
-      router.push(`/${lang}/volunteer/venues/550e8400-e29b-41d4-a716-446655440201/dashboard`);
-      return;
-    }
-
     // If user has language preference and assignments, redirect to venue dashboard
     if (userProfile.languagePreference && assignmentsData) {
       // Handle different possible data structures

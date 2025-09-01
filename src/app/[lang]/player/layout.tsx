@@ -7,6 +7,8 @@ import { PageLoader } from '@/components/ui/loaders';
 import PlayerSidebar from '@/components/navigation/PlayerSidebar';
 import { AuthenticatedMobileHeader } from '@/components/navigation/AuthenticatedMobileHeader';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { PlayerOfflineProvider } from '@/context/PlayerOfflineContext';
+import { PlayerOfflineIndicator } from '@/components/player/PlayerOfflineIndicator';
 
 export default function PlayerLayout({
   children,
@@ -30,28 +32,36 @@ export default function PlayerLayout({
   }
 
   return (
-    <div className="md:min-h-screen bg-gray-50">
-      {/* Mobile Header */}
-      <AuthenticatedMobileHeader
-        title={pageTitle}
-        onMenuToggle={() => setIsMobileSidebarOpen(true)}
-        showBackButton={true}
-      />
+    <PlayerOfflineProvider>
+      <div className="md:min-h-screen bg-gray-50">
+        {/* Offline indicator */}
+        <PlayerOfflineIndicator />
+        
+        {/* Mobile header */}
+        <div className="md:hidden">
+          <AuthenticatedMobileHeader
+            title={pageTitle}
+            onMenuClick={() => setIsMobileSidebarOpen(true)}
+          />
+        </div>
 
-      <PlayerSidebar 
-        isDesktopCollapsed={isDesktopSidebarCollapsed}
-        onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
-        isMobileOpen={isMobileSidebarOpen}
-        onMobileClose={() => setIsMobileSidebarOpen(false)}
-      />
-      
-      <div className={`flex flex-col md:min-h-screen ${
-        isDesktopSidebarCollapsed ? 'md:ml-16' : 'md:ml-64'
-      } transition-[margin] duration-300 ease-in-out`}>
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <div className="flex h-screen pt-16 md:pt-0">
+          {/* Sidebar */}
+          <PlayerSidebar
+            isDesktopCollapsed={isDesktopSidebarCollapsed}
+            isMobileOpen={isMobileSidebarOpen}
+            onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
+            onMobileClose={() => setIsMobileSidebarOpen(false)}
+          />
+
+          {/* Main content */}
+          <div className="flex-1 overflow-auto">
+            <main className="h-full">
+              {children}
+            </main>
+          </div>
+        </div>
       </div>
-    </div>
+    </PlayerOfflineProvider>
   );
 }

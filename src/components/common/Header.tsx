@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ChevronDown, Menu, X, User as UserIcon } from 'lucide-react'
-import LanguageSelector from './LanguageSelector'
+import PublicLanguageSwitcher from '@/components/public/PublicLanguageSwitcher'
 import { useAuth } from '@/context/AuthContext'
 import { api } from '@/server/trpc/react'
 import { useLanguage } from '@/context/LanguageContext'
@@ -238,10 +238,9 @@ export default function Header({ lang }: HeaderProps) {
 
           <div className="flex items-center space-x-4">
             {/* Mobile Language Selector */}
-            <LanguageSelector 
-              variant="small" 
-              className="w-32 text-xs" 
-              showNativeNames={true}
+            <PublicLanguageSwitcher 
+              isCollapsed={true}
+              showText={false}
             />
 
             {/* Mobile Menu Button */}

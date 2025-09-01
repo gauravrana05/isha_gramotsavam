@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import PlayerLanguageSwitcher from '@/components/player/PlayerLanguageSwitcher';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -129,7 +130,7 @@ export default function PlayerSidebar({
                 ? 'bg-[#F28C38] text-white shadow-sm'
                 : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
             }`}
-            onClick={() => onMobileClose?.())
+            onClick={() => onMobileClose?.()}
             title={isDesktopCollapsed ? item.name : undefined}
           >
             <item.icon className={`w-5 h-5 ${depth > 0 ? 'mr-2' : 'mr-3'} flex-shrink-0`} />
@@ -198,7 +199,7 @@ export default function PlayerSidebar({
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={() => onMobileClose?.())
+          onClick={() => onMobileClose?.()}
         />
       )}
 
@@ -294,12 +295,20 @@ export default function PlayerSidebar({
 
           {/* Footer Actions */}
           <div className="border-t border-gray-200 p-4 space-y-2">
+            {/* Language Switcher */}
+            <div className="px-4 py-2">
+              <PlayerLanguageSwitcher 
+                isCollapsed={isDesktopCollapsed} 
+                showText={showContent}
+              />
+            </div>
+
             {/* Back to Admin Dashboard - only show when admin is accessing */}
             {isAdminAccessing && (
               <Link
                 href={`/${lang}/admin/dashboard`}
                 className="flex items-center px-4 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-12"
-                onClick={() => onMobileClose?.())
+                onClick={() => onMobileClose?.()}
                 title={isDesktopCollapsed ? 'Back to Admin Dashboard' : undefined}
               >
                 <Settings width={64} height={64} className="w-5 h-5 mr-3 flex-shrink-0" />

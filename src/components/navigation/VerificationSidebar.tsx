@@ -117,7 +117,7 @@ export default function VerificationSidebar({
                 ? 'bg-[#F28C38] text-white shadow-sm'
                 : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
             }`}
-            onClick={() => onMobileClose?.())
+            onClick={() => onMobileClose?.()}
             title={isDesktopCollapsed ? item.name : undefined}
           >
             <item.icon className={`w-5 h-5 ${depth > 0 ? 'mr-2' : 'mr-3'} flex-shrink-0`} />
@@ -185,7 +185,7 @@ export default function VerificationSidebar({
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={() => onMobileClose?.())
+          onClick={() => onMobileClose?.()}
         />
       )}
 
@@ -236,7 +236,7 @@ export default function VerificationSidebar({
               {/* Mobile close button */}
               {showContent && (
                 <button
-                  onClick={() => onMobileClose?.())
+                  onClick={() => onMobileClose?.()}
                   className="md:hidden p-1 rounded-md hover:bg-gray-100"
                 >
                   <X width={64} height={64} className="w-5 h-5 text-gray-500" />
@@ -288,7 +288,7 @@ export default function VerificationSidebar({
               <Link
                 href={`/${lang}/admin/dashboard`}
                 className="flex items-center px-4 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors h-12"
-                onClick={() => onMobileClose?.())
+                onClick={() => onMobileClose?.()}
                 title={isDesktopCollapsed ? 'Back to Admin Dashboard' : undefined}
               >
                 <Settings width={64} height={64} className="w-5 h-5 mr-3 flex-shrink-0" />

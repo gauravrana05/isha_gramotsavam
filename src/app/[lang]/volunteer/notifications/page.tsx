@@ -1,7 +1,7 @@
 'use client'
 import React from 'react';
 import { VolunteerNotificationPanel } from '@/components/notifications/VolunteerNotificationPanel';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 import { EmptyState } from '@/components/ui';
 import { AlertCircle } from 'lucide-react';
 
