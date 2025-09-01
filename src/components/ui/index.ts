@@ -8,8 +8,8 @@ export { Input } from './Input';
 export { Label } from './Label';
 export { Progress } from './Progress';
 export { Textarea } from './Textarea';
-export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './Dialog';
-export { Tabs, TabsList, TabsTrigger, TabsContent } from './Tabs';
+export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './dialog';
+export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs';
 
 // Advanced components
 export { default as AdvancedTable } from './AdvancedTable';

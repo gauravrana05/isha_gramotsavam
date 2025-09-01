@@ -1,1 +1,12 @@
-export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './Dialog';
+export { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogOverlay,
+  DialogPortal,
+  DialogClose,
+  DialogFooter,
+  DialogDescription
+} from './AdvancedDialog';

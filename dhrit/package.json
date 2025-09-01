@@ -1,0 +1,35 @@
+{
+  "name": "dhrit-platform",
+  "version": "1.0.0",
+  "description": "Dhrit - Multi-Agent Development Platform with specialized AI agents",
+  "type": "module",
+  "main": "mcp-server/server.js",
+  "scripts": {
+    "start": "node mcp-server/server.js",
+    "dev": "node --watch mcp-server/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "development",
+    "automation",
+    "mcp",
+    "dhrit"
+  ],
+  "author": "Dhrit Platform",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "ioredis": "^5.3.2",
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
