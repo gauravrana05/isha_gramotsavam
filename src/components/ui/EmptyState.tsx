@@ -12,7 +12,7 @@ import {
   Plus
 } from 'lucide-react';
 import { cn, BaseComponentProps } from '@/lib/component-patterns';
-import { Button } from './Button';
+import Button from './Button';
 
 // Empty state props
 export interface EmptyStateProps extends BaseComponentProps {
