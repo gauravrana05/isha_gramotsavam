@@ -38,28 +38,24 @@ export default function CaptainLayout({
         <CaptainOfflineIndicator />
         
         {/* Mobile header */}
-        <div className="md:hidden">
-          <AuthenticatedMobileHeader
-            title={pageTitle}
-            onMenuClick={() => setIsMobileSidebarOpen(true)}
-          />
-        </div>
+        <AuthenticatedMobileHeader
+          title={pageTitle}
+          onMenuClick={() => setIsMobileSidebarOpen(true)}
+        />
 
-        <div className="flex h-screen pt-16 md:pt-0">
-          {/* Sidebar */}
-          <CaptainSidebar
-            isDesktopCollapsed={isDesktopSidebarCollapsed}
-            isMobileOpen={isMobileSidebarOpen}
-            onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
-            onMobileClose={() => setIsMobileSidebarOpen(false)}
-          />
-
-          {/* Main content */}
-          <div className="flex-1 overflow-auto">
-            <main className="h-full">
-              {children}
-            </main>
-          </div>
+        <CaptainSidebar
+          isDesktopCollapsed={isDesktopSidebarCollapsed}
+          isMobileOpen={isMobileSidebarOpen}
+          onDesktopToggle={() => setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
+          onMobileClose={() => setIsMobileSidebarOpen(false)}
+        />
+        
+        <div className={`flex flex-col md:min-h-screen ${
+          isDesktopSidebarCollapsed ? 'md:ml-16' : 'md:ml-[280px]'
+        } transition-[margin] duration-300 ease-in-out`}>
+          <main className="flex-1 overflow-auto">
+            {children}
+          </main>
         </div>
       </div>
     </CaptainOfflineProvider>

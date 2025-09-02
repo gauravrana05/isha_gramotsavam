@@ -1,9 +1,24 @@
 import { spawn } from 'child_process';
+import { PalAgent } from './agents/pal-agent.js';
+import { KoshAgent } from './agents/kosh-agent.js';
+import { DharAgent } from './agents/dhar-agent.js';
+import { MoolAgent } from './agents/mool-agent.js';
+import { RoopAgent } from './agents/roop-agent.js';
 
 export class QAgentExecutor {
   constructor(redisManager, dbManager) {
     this.redis = redisManager;
     this.db = dbManager;
+    
+    // Initialize individual agents
+    this.agents = {
+      pal: new PalAgent(),
+      kosh: new KoshAgent(),
+      dhar: new DharAgent(),
+      mool: new MoolAgent(),
+      roop: new RoopAgent(),
+    };
+    
     this.agentMapping = {
       'roop': 'frontend',
       'mool': 'backend',
@@ -22,6 +37,15 @@ export class QAgentExecutor {
     try {
       console.log(`Executing ${agentName} agent...`);
       
+      // Use individual agent if available
+      if (this.agents[agentName]) {
+        const result = await this.agents[agentName].execute(task, requirements, context.projectId);
+        const duration = Date.now() - startTime;
+        console.error(`✅ ${agentName.toUpperCase()} completed in ${duration}ms`);
+        return result;
+      }
+      
+      // Fallback to legacy method
       const qAgentType = this.agentMapping[agentName] || 'general';
       const result = await this.runQAgent(qAgentType, task, requirements, context);
       

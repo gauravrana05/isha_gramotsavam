@@ -1,0 +1,11 @@
+{
+  "requestId": "req_1756794188557_o1llq53wc",
+  "fromAgent": "mool",
+  "toAgent": "kosh",
+  "projectId": "real-nextjs-app",
+  "requestType": "schema-request",
+  "message": "I need the User model from your Prisma schema to build authentication APIs",
+  "priority": "medium",
+  "status": "pending",
+  "createdAt": "2025-09-02T06:23:08.557Z"
+}

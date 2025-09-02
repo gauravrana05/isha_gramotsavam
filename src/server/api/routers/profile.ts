@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { createTRPCRouter, publicProcedure, protectedProcedure } from '../trpc'
+import { normalizePhoneNumber } from '@/lib/utils/phone'
 
 export const profileRouter = createTRPCRouter({
   test: publicProcedure
@@ -192,6 +193,11 @@ export const profileRouter = createTRPCRouter({
         // Convert dateOfBirth string to Date if provided
         if (input.dateOfBirth) {
           updateData.dateOfBirth = new Date(input.dateOfBirth);
+        }
+        
+        // Normalize whatsappNumber if provided
+        if (input.whatsappNumber) {
+          updateData.whatsappNumber = normalizePhoneNumber(input.whatsappNumber);
         }
         
         const updatedUser = await db.user.update({

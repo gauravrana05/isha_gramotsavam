@@ -101,18 +101,15 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       <button
         onClick={handleFileSelect}
         disabled={uploading}
-        className="bg-[#CE4520] text-white px-6 py-2 rounded-lg cursor-pointer hover:bg-[#1565C0] transition-colors font-fira disabled:opacity-50 disabled:cursor-not-allowed"
+        className="bg-[#CE4520] text-white px-8 py-2 rounded-lg cursor-pointer hover:bg-[#1565C0] transition-colors font-fira disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]"
       >
         {uploading ? (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center justify-center w-48 space-x-1">
             <LoadingSpinner size="xs" color="white" />
             <span>Uploading...</span>
           </div>
         ) : (
-          <div className="flex items-center space-x-2">
-            <Camera width={64} height={64} className="w-4 h-4" />
-            <span>{currentUrl ? 'Change Photo' : 'Upload Photo'}</span>
-          </div>
+          <span>{currentUrl ? 'Change' : 'Upload'}</span>
         )}
       </button>
 

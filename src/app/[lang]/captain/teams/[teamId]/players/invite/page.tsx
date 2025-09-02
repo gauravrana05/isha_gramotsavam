@@ -1,496 +1,419 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
+import { AdvancedTable, type Column } from '@/components/ui';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { 
   Users, 
   UserPlus, 
   CheckCircle, 
   Clock, 
   AlertCircle,
-  Eye,
-  Edit,
   Trash2,
   Phone,
-  Mail,
   MapPin,
   Calendar,
-  Loader2
+  Edit
 } from 'lucide-react';
-import Link from 'next/link';
-import { AdvancedTable, SingleStatCard, PageLoader } from '@/components/ui';
-import { EnhancedModal } from '@/components/ui/EnhancedModal';
-import type { Column, ActionButton } from '@/components/ui/Table';
 
-interface TeamPlayerRow {
+interface TeamPlayer {
   id: string;
   userId: string;
+  position: 'main' | 'substitute';
+  status: 'pending' | 'verified' | 'rejected';
   firstName: string;
   lastName: string;
   phone: string;
   whatsappNumber?: string;
   age: number;
   gender: 'M' | 'F' | 'O';
-  position: 'player' | 'substitute';
-  verificationStatus: 'pending' | 'approved' | 'rejected';
   panchayat: string;
   taluk: string;
   district: string;
   state: string;
-  addedAt: string;
+  createdAt: Date;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    age: number;
+    gender: 'M' | 'F' | 'O';
+  };
 }
 
-export default function CaptainTeamsInvitePage() {
+export default function CaptainTeamPlayersPage() {
   const router = useRouter();
   const { lang, teamId } = useParams();
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { addNotification } = useNotification();
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayer | null>(null);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    whatsappNumber: '',
+    age: '',
+    gender: 'M' as 'M' | 'F' | 'O',
+    position: 'main' as 'main' | 'substitute',
+    panchayat: '',
+    taluk: '',
+    district: '',
+    state: '',
+  });
 
-  // State
-  const [selectedPlayers, setSelectedPlayers] = useState<Set<string | number>>(new Set());
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayerRow | null>(null);
+  const { data: players, isLoading, refetch } = api.teams.players.getTeamPlayers.useQuery({
+    teamId: teamId as string,
+  });
 
-  // Fetch captain's team
-  const { 
-    data: teamData, 
-    isLoading: teamLoading, 
-    error: teamError,
-    refetch: refetchTeam
-  } = api.teams.management.getMyTeam.useQuery(
-    undefined,
-    { enabled: !!user && user.role === 'captain' }
-  );
+  const addPlayerMutation = api.teams.players.addPlayer.useMutation({
+    onSuccess: () => {
+      addNotification('Player added successfully', 'success');
+      setIsModalOpen(false);
+      resetForm();
+      refetch();
+    },
+    onError: (error) => {
+      addNotification(error.message, 'error');
+    },
+  });
 
-  // Fetch team players
-  const { 
-    data: playersData, 
-    isLoading: playersLoading,
-    refetch: refetchPlayers
-  } = api.teams.players.getTeamPlayers.useQuery(
-    { teamId: teamId as string },
-    { enabled: !!teamId }
-  );
+  const updatePlayerMutation = api.teams.players.updatePlayer.useMutation({
+    onSuccess: () => {
+      addNotification('Player updated successfully', 'success');
+      setIsModalOpen(false);
+      resetForm();
+      refetch();
+    },
+    onError: (error) => {
+      addNotification(error.message, 'error');
+    },
+  });
 
-  // Auth guard
-  useEffect(() => {
-    if (authLoading) return;
-    
-    if (!user) {
-      router.push(`/${lang}/login`);
-      return;
-    }
+  const removePlayerMutation = api.teams.players.removePlayer.useMutation({
+    onSuccess: () => {
+      addNotification('Player removed successfully', 'success');
+      refetch();
+    },
+    onError: (error) => {
+      addNotification(error.message, 'error');
+    },
+  });
 
-    if (user.role !== 'captain') {
-      router.push(`/${lang}/dashboard`);
-      return;
-    }
-
-    if (!userProfile?.profileComplete) {
-      router.push(`/${lang}/profile/complete`);
-      return;
-    }
-  }, [user, userProfile, authLoading, router, lang]);
-
-  // Process players data
-  const players = useMemo(() => {
-    if (!playersData?.players) return [];
-    
-    return playersData.players.map(player => ({
-      id: player.id,
-      userId: player.userId,
-      firstName: player.firstName,
-      lastName: player.lastName,
-      phone: player.phone,
-      whatsappNumber: player.whatsappNumber,
-      age: player.age,
-      gender: player.gender,
-      position: player.position,
-      verificationStatus: player.verificationStatus,
-      panchayat: player.panchayat,
-      taluk: player.taluk,
-      district: player.district,
-      state: player.state,
-      addedAt: player.addedAt
-    }));
-  }, [playersData?.players]);
-
-  // Calculate stats
-  const stats = useMemo(() => {
-    if (!teamData || !players) return null;
-
-    const totalPlayers = players.length;
-    const verifiedPlayers = players.filter(p => p.verificationStatus === 'approved').length;
-    const pendingPlayers = players.filter(p => p.verificationStatus === 'pending').length;
-    const maxPlayers = teamData.sport?.maxPlayersPerTeam || 11;
-
-    return {
-      totalPlayers,
-      verifiedPlayers,
-      pendingPlayers,
-      maxPlayers,
-      isComplete: totalPlayers >= maxPlayers
-    };
-  }, [teamData, players]);
-
-  const isReadOnly = teamData?.status !== 'draft';
-
-  // Table columns
-  const columns: Column<TeamPlayerRow>[] = useMemo(() => [
+  const columns: Column<TeamPlayer>[] = [
     {
-      key: 'player',
-      header: 'Player',
-      accessor: 'firstName',
-      sortable: true,
-      minWidth: 200,
-      render: (_, player) => (
-        <div className="flex items-center">
-          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mr-3">
-            <Users className="w-5 h-5 text-gray-500" />
+      key: 'name',
+      header: 'Name',
+      render: (player) => (
+        <div>
+          <div className="font-medium text-gray-900">
+            {player.user?.firstName || player.firstName} {player.user?.lastName || player.lastName}
           </div>
-          <div>
-            <div className="font-medium text-gray-900">
-              {player.firstName} {player.lastName}
-            </div>
-            <div className="text-sm text-gray-500">{player.phone}</div>
+          <div className="flex items-center gap-1 text-sm text-gray-500">
+            <Phone className="w-3 h-3" />
+            {player.user?.phone || player.phone}
           </div>
         </div>
-      )
+      ),
     },
     {
       key: 'details',
       header: 'Details',
-      accessor: 'age',
-      sortable: true,
-      minWidth: 150,
-      render: (_, player) => (
+      render: (player) => (
         <div className="text-sm">
-          <div className="text-gray-900">Age: {player.age}</div>
-          <div className="text-gray-500">
-            {player.gender === 'M' ? 'Male' : player.gender === 'F' ? 'Female' : 'Other'}
-          </div>
+          <div>Age: {player.user?.age || player.age} • {(player.user?.gender || player.gender) === 'M' ? 'Male' : (player.user?.gender || player.gender) === 'F' ? 'Female' : 'Other'}</div>
+          <div className="text-gray-500 capitalize">{player.position}</div>
         </div>
-      )
+      ),
     },
     {
       key: 'location',
       header: 'Location',
-      accessor: 'district',
-      sortable: true,
-      minWidth: 180,
-      render: (_, player) => (
-        <div className="text-sm">
-          <div className="flex items-center text-gray-900">
-            <MapPin className="w-4 h-4 mr-1" />
-            {player.district}
-          </div>
-          <div className="text-gray-500">{player.panchayat}</div>
+      render: (player) => (
+        <div className="flex items-center gap-1 text-sm">
+          <MapPin className="w-3 h-3 text-gray-400" />
+          <span>{player.district}, {player.state}</span>
         </div>
-      )
-    },
-    {
-      key: 'position',
-      header: 'Position',
-      accessor: 'position',
-      sortable: true,
-      minWidth: 120,
-      render: (position) => (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          position === 'player' 
-            ? 'bg-blue-100 text-blue-800' 
-            : 'bg-gray-100 text-gray-800'
-        }`}>
-          {position === 'player' ? 'Main' : 'Substitute'}
-        </span>
-      )
+      ),
     },
     {
       key: 'status',
       header: 'Status',
-      accessor: 'verificationStatus',
-      sortable: true,
-      minWidth: 120,
-      render: (status) => (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          status === 'approved' 
-            ? 'bg-green-100 text-green-800' 
-            : status === 'pending'
-            ? 'bg-yellow-100 text-yellow-800'
-            : 'bg-red-100 text-red-800'
-        }`} title="Verification status is managed by tournament officials">
-          {status === 'approved' ? (
-            <>
-              <CheckCircle className="w-3 h-3 mr-1" />
-              Verified
-            </>
-          ) : status === 'pending' ? (
-            <>
-              <Clock className="w-3 h-3 mr-1" />
-              Pending
-            </>
-          ) : (
-            <>
-              <AlertCircle className="w-3 h-3 mr-1" />
-              Rejected
-            </>
-          )}
-        </span>
-      )
-    }
-  ], []);
+      render: (player) => {
+        const statusConfig = {
+          pending: { icon: Clock, color: 'text-yellow-600 bg-yellow-50', label: 'Pending' },
+          verified: { icon: CheckCircle, color: 'text-green-600 bg-green-50', label: 'Verified' },
+          rejected: { icon: AlertCircle, color: 'text-red-600 bg-red-50', label: 'Rejected' },
+        };
+        const config = statusConfig[player.status];
+        const Icon = config.icon;
+        
+        return (
+          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+            <Icon className="w-3 h-3" />
+            {config.label}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'addedAt',
+      header: 'Added',
+      render: (player) => (
+        <div className="flex items-center gap-1 text-sm text-gray-500">
+          <Calendar className="w-3 h-3" />
+          {new Date(player.createdAt).toLocaleDateString()}
+        </div>
+      ),
+    },
+  ];
 
-  const handleRowClick = (player: TeamPlayerRow) => {
-    setSelectedPlayer(player);
-    setShowViewModal(true);
+  const resetForm = () => {
+    setFormData({
+      firstName: '',
+      lastName: '',
+      phone: '',
+      whatsappNumber: '',
+      age: '',
+      gender: 'M',
+      position: 'main',
+      panchayat: '',
+      taluk: '',
+      district: '',
+      state: '',
+    });
+    setSelectedPlayer(null);
   };
 
-  if (authLoading || teamLoading) {
-    return <PageLoader message="Loading team data..." />;
-  }
+  const handleAddPlayer = () => {
+    setSelectedPlayer(null);
+    resetForm();
+    setIsModalOpen(true);
+  };
 
-  if (teamError || !teamData) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">No Team Found</h1>
-          <p className="text-gray-600 mb-4">You don&apos;t have a team yet. Create one to get started.</p>
-          <Link 
-            href={`/${lang}/register/team`}
-            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
-          >
-            Create Team
-          </Link>
-        </div>
-      </div>
-    );
+  const handleRowClick = (player: TeamPlayer) => {
+    setSelectedPlayer(player);
+    setFormData({
+      firstName: player.user?.firstName || player.firstName || '',
+      lastName: player.user?.lastName || player.lastName || '',
+      phone: player.user?.phone || player.phone || '',
+      whatsappNumber: player.whatsappNumber || '',
+      age: (player.user?.age || player.age || 0).toString(),
+      gender: player.user?.gender || player.gender || 'M',
+      position: player.position || 'main',
+      panchayat: player.panchayat || '',
+      taluk: player.taluk || '',
+      district: player.district || '',
+      state: player.state || '',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleRemovePlayer = (players: TeamPlayer[]) => {
+    if (players.length === 1) {
+      removePlayerMutation.mutate({
+        teamId: teamId as string,
+        playerId: players[0].id,
+      });
+    }
+  };
+
+  const handleSubmit = () => {
+    const playerData = {
+      teamId: teamId as string,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      phone: formData.phone,
+      whatsappNumber: formData.whatsappNumber || undefined,
+      age: parseInt(formData.age),
+      gender: formData.gender,
+      position: formData.position,
+      panchayat: formData.panchayat,
+      taluk: formData.taluk,
+      district: formData.district,
+      state: formData.state,
+    };
+
+    if (selectedPlayer) {
+      updatePlayerMutation.mutate({
+        playerId: selectedPlayer.id,
+        ...playerData,
+      });
+    } else {
+      addPlayerMutation.mutate(playerData);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F28C38]"></div></div>;
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-full">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{teamData.name}</h1>
-            <p className="text-gray-600 mt-2">Manage your team players and invitations</p>
-          </div>
-          <Link
-            href={`/${lang}/captain/teams/${teamData.id}/players/invite`}
-            className="bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors flex items-center"
+    <div className="p-6">
+      <AdvancedTable
+        data={players || []}
+        columns={columns}
+        title="Team Players"
+        subtitle="Manage your team players"
+        onRowClick={handleRowClick}
+        headerActions={
+          <button
+            onClick={handleAddPlayer}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#F28C38] hover:bg-[#E07B2A] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#F28C38] transition-colors"
           >
             <UserPlus className="w-4 h-4 mr-2" />
-            Invite Players
-          </Link>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <SingleStatCard
-            title="Total Players"
-            value={`${stats.totalPlayers}/${stats.maxPlayers}`}
-            icon={Users}
-            color={stats.isComplete ? 'success' : 'warning'}
-            trend={stats.isComplete ? 'Complete' : 'Incomplete'}
-          />
-          
-          <SingleStatCard
-            title="Verified Players"
-            value={stats.verifiedPlayers}
-            icon={CheckCircle}
-            color="success"
-          />
-          
-          <SingleStatCard
-            title="Pending Verification"
-            value={stats.pendingPlayers}
-            icon={Clock}
-            color="warning"
-          />
-          
-          <SingleStatCard
-            title="Team Status"
-            value={teamData.status}
-            icon={teamData.status === 'active' ? CheckCircle : Clock}
-            color={teamData.status === 'active' ? 'success' : 'warning'}
-          />
-        </div>
-      )}
-
-      {/* Verification Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div className="flex items-start space-x-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-          <div>
-            <p className="text-blue-900 font-medium">Player Verification</p>
-            <p className="text-blue-700 text-sm">
-              Verification status is managed by tournament officials. Contact admin if verification issues arise.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Team Status Info */}
-      {isReadOnly && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-          <div className="flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-            <div>
-              <p className="text-amber-900 font-medium">Team Submitted</p>
-              <p className="text-amber-700 text-sm">
-                Your team has been submitted and player changes are no longer allowed. Contact admin for any modifications.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Players Table */}
-      <AdvancedTable<TeamPlayerRow>
-        data={players}
-        columns={columns}
-        loading={playersLoading}
-
-        searchable={true}
-        searchPlaceholder="Search players by name, phone..."
-
-        sortable={true}
-        defaultSort={[{ key: 'firstName', direction: 'asc' }]}
-
-        pagination={{ enabled: true }}
-
-        selectable={true}
-        selectedRows={selectedPlayers}
-        onSelectionChange={setSelectedPlayers}
-        onRowClick={handleRowClick}
-        keyExtractor={(player) => player.id}
-
-        emptyState={{
-          icon: Users,
-          title: 'No players found',
-          description: 'Your team doesn\'t have any players yet.',
-          action: {
-            label: 'Invite Players',
-            onClick: () => router.push(`/${lang}/captain/teams/${teamData.id}/players/invite`)
-          }
-        }}
+            Add Player
+          </button>
+        }
+        headerActionsSingle={(players) => (
+          <button
+            onClick={() => handleRemovePlayer(players)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Remove Player
+          </button>
+        )}
+        showPagination={false}
       />
 
-      {/* View Player Modal */}
-      {selectedPlayer && (
-        <EnhancedModal
-          isOpen={showViewModal}
-          onClose={() => {
-            setShowViewModal(false);
-            setSelectedPlayer(null);
-          }}
-          title="Player Details"
-          subtitle={`${selectedPlayer.firstName} ${selectedPlayer.lastName}`}
-          size="md"
-        >
-          <div className="space-y-6">
-            {/* Personal Information */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Personal Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Name</label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {selectedPlayer.firstName} {selectedPlayer.lastName}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Age</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.age}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Gender</label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {selectedPlayer.gender === 'M' ? 'Male' : selectedPlayer.gender === 'F' ? 'Female' : 'Other'}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Position</label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    {selectedPlayer.position === 'player' ? 'Main Player' : 'Substitute'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Contact Information */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Contact Information</h3>
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Phone</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.phone}</p>
-                </div>
-                {selectedPlayer.whatsappNumber && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">WhatsApp</label>
-                    <p className="mt-1 text-sm text-gray-900">{selectedPlayer.whatsappNumber}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Location Information */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Location</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">District</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.district}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">State</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.state}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Taluk</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.taluk}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Panchayat</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedPlayer.panchayat}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Verification Status */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">Verification Status</h3>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  {selectedPlayer.verificationStatus === 'approved' ? (
-                    <div className="flex items-center text-green-600">
-                      <CheckCircle className="w-5 h-5 mr-2" />
-                      <span className="font-medium">Verified</span>
-                    </div>
-                  ) : selectedPlayer.verificationStatus === 'pending' ? (
-                    <div className="flex items-center text-yellow-600">
-                      <Clock className="w-5 h-5 mr-2" />
-                    <span className="font-medium">Pending Verification</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center text-red-600">
-                    <AlertCircle className="w-5 h-5 mr-2" />
-                    <span className="font-medium">Rejected</span>
-                  </div>
-                )}
-                </div>
-                <p className="text-xs text-gray-500">Managed by officials</p>
-              </div>
-            </div>
+      <EnhancedModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={selectedPlayer ? 'Edit Player' : 'Add Player'}
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={addPlayerMutation.isLoading || updatePlayerMutation.isLoading}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-md hover:bg-[#E07B2A] disabled:opacity-50"
+            >
+              {selectedPlayer ? <Edit className="w-4 h-4 mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
+              {selectedPlayer ? 'Update' : 'Add'} Player
+            </button>
           </div>
-        </EnhancedModal>
-      )}
+        }
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+            <input
+              type="text"
+              value={formData.firstName}
+              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+            <input
+              type="text"
+              value={formData.lastName}
+              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp (Optional)</label>
+            <input
+              type="tel"
+              value={formData.whatsappNumber}
+              onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Age</label>
+            <input
+              type="number"
+              value={formData.age}
+              onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+            <select
+              value={formData.gender}
+              onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'M' | 'F' | 'O' })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            >
+              <option value="M">Male</option>
+              <option value="F">Female</option>
+              <option value="O">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+            <select
+              value={formData.position}
+              onChange={(e) => setFormData({ ...formData, position: e.target.value as 'main' | 'substitute' })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            >
+              <option value="main">Main Player</option>
+              <option value="substitute">Substitute</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
+            <input
+              type="text"
+              value={formData.district}
+              onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+            <input
+              type="text"
+              value={formData.state}
+              onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Taluk</label>
+            <input
+              type="text"
+              value={formData.taluk}
+              onChange={(e) => setFormData({ ...formData, taluk: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Panchayat</label>
+            <input
+              type="text"
+              value={formData.panchayat}
+              onChange={(e) => setFormData({ ...formData, panchayat: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+            />
+          </div>
+        </div>
+      </EnhancedModal>
     </div>
   );
 }

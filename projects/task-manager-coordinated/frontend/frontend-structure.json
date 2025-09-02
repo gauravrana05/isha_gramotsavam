@@ -1,0 +1,8 @@
+{
+  "projectId": "task-manager-coordinated",
+  "architecture": {
+    "framework": "Next.js 15 with App Router",
+    "styling": "Tailwind CSS with design tokens",
+    "stateManagement": "Zustand for global state"
+  }
+}

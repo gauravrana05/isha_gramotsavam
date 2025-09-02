@@ -169,6 +169,28 @@ export const teamsManagementRouter = createTRPCRouter({
     });
   }),
 
+  // Get user captain teams - for captain/teams page
+  getUserCaptainTeams: protectedProcedure.query(async ({ ctx }) => {
+    return await db.team.findMany({
+      where: {
+        captainId: ctx.user.id
+      },
+      include: {
+        sport: {
+          select: {
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            players: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  }),
+
   // Get user player teams (as player) - for player pages
   getUserPlayerTeams: protectedProcedure.query(async ({ ctx }) => {
     return await db.teamPlayer.findMany({
@@ -208,29 +230,46 @@ export const teamsManagementRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createTeamSchema)
     .mutation(async ({ input, ctx }) => {
-      const team = await db.team.create({
-        data: {
-          ...input,
-          captainId: ctx.user.id,
-        },
-        include: {
-          sport: true,
-          captainUser: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              phone: true,
+      const result = await db.$transaction(async (tx) => {
+        const team = await tx.team.create({
+          data: {
+            ...input,
+            captainId: ctx.user.id,
+          },
+          include: {
+            sport: true,
+            captainUser: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+              },
             },
           },
-        },
-      })
+        })
+
+        // Add captain as team player
+        await tx.teamPlayer.create({
+          data: {
+            teamId: team.id,
+            userId: ctx.user.id,
+            position: 'main',
+            firstName: team.captainUser.firstName || 'Unknown',
+            lastName: team.captainUser.lastName || '',
+            phone: team.captainUser.phone,
+            status: 'verified',
+          },
+        })
+
+        return team;
+      });
 
       // Automatic venue assignment using 3-tier system
       if (input.eventId) {
         try {
           const venueAssignmentResult = await assignVenueToTeam(
-            team.id,
+            result.id,
             {
               panchayat: input.panchayat || '',
               district: input.district,
@@ -242,14 +281,14 @@ export const teamsManagementRouter = createTRPCRouter({
           )
           
           // Log assignment result for admin monitoring
-          console.log(`Team ${team.name} venue assignment:`, venueAssignmentResult.message)
+          console.log(`Team ${result.name} venue assignment:`, venueAssignmentResult.message)
         } catch (error) {
           // Don't fail team creation if venue assignment fails
           console.error('Venue assignment failed during team creation:', error)
         }
       }
 
-      return team
+      return result
     }),
 
   // Create team and promote user to captain

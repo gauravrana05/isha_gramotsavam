@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { redis } from '@/lib/redis';
+import { safeRedisOperation } from '@/lib/redis';
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
@@ -18,15 +18,20 @@ export async function GET(request: NextRequest) {
     let redisStatus = 'unavailable';
     let redisLatency = -1;
     
-    if (redis) {
-      try {
-        const redisStartTime = Date.now();
+    const redisStartTime = Date.now();
+    const redisResult = await safeRedisOperation(
+      async (redis) => {
         await redis.ping();
-        redisLatency = Date.now() - redisStartTime;
-        redisStatus = 'connected';
-      } catch (error) {
-        redisStatus = 'error';
-      }
+        return 'connected';
+      },
+      async () => 'unavailable'
+    );
+    
+    if (redisResult === 'connected') {
+      redisLatency = Date.now() - redisStartTime;
+      redisStatus = 'connected';
+    } else {
+      redisStatus = 'unavailable';
     }
 
     const response = {

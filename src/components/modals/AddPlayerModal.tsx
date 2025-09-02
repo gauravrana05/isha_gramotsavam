@@ -5,6 +5,7 @@ import { Loader2, X } from 'lucide-react';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { api } from '@/server/trpc/react';
+import { normalizePhoneNumber } from '@/lib/utils/phone';
 
 // Types
 interface TeamData {
@@ -115,29 +116,6 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
   }, [editingPlayer]);
 
   // Helper functions
-  const normalizePhone = (phone: string): string => {
-    const digitsOnly = phone.replace(/\D/g, "");
-
-    if (digitsOnly.length === 10) {
-      return `+91${digitsOnly}`;
-    }
-
-    if (digitsOnly.startsWith("91") && digitsOnly.length === 12) {
-      return `+${digitsOnly}`;
-    }
-
-    if (phone.startsWith("+91") && digitsOnly.length === 12) {
-      return phone;
-    }
-
-    if (digitsOnly.length >= 10) {
-      const last10Digits = digitsOnly.slice(-10);
-      return `+91${last10Digits}`;
-    }
-
-    throw new Error(`Invalid phone number format: ${phone}. Please enter a 10-digit mobile number.`);
-  };
-
   const calculateAge = (dob: string): number => {
     const today = new Date();
     const birthDate = new Date(dob);
@@ -173,7 +151,8 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
       setIsSearching(true);
       try {
         console.log('Searching for phone:', phone);
-        const result = await utils.admin.users.searchUserByPhone.fetch({ phone });
+        const normalizedPhone = normalizePhoneNumber(phone);
+        const result = await utils.admin.users.searchUserByPhone.fetch({ phone: normalizedPhone || phone });
         console.log('Search result:', result);
         
         if (result.success && result.user) {
@@ -269,7 +248,7 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({
         teamId: teamData.id,
         firstName: playerFormData.firstName,
         lastName: playerFormData.lastName,
-        phone: normalizePhone(playerFormData.phone),
+        phone: normalizePhoneNumber(playerFormData.phone) || playerFormData.phone,
         whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
         dateOfBirth: new Date(playerFormData.dob),
         age: calculateAge(playerFormData.dob),

@@ -27,9 +27,10 @@ export const volunteersVenueRouter = createTRPCRouter({
       // Verify venue assignment
       const assignment = await db.volunteerAssignment.findFirst({
         where: { 
-          userId: ctx.user.id, 
-          venueId: input.venueId,
-          status: 'active'
+          volunteerId: ctx.user.id, 
+          venueLevelMapping: {
+            venueId: input.venueId
+          }
         }
       });
 
@@ -176,16 +177,34 @@ export const volunteersVenueRouter = createTRPCRouter({
   getVenueCheckedInTeams: protectedProcedure
     .input(z.object({
       venueId: z.string(),
-      eventId: z.string(),
+      eventId: z.string().optional(),
     }).optional().default({}))
     .query(async ({ input }) => {
+      // Get eventId from input or find current ongoing event
+      let eventId = input.eventId;
+      if (!eventId) {
+        const ongoingEvent = await db.event.findFirst({
+          where: {
+            status: {
+              in: ['registration_open', 'registration_closed', 'active']
+            }
+          },
+          select: { id: true }
+        });
+        eventId = ongoingEvent?.id;
+      }
+
+      if (!eventId) {
+        return [];
+      }
+
       const checkedInTeams = await db.fixtureTeam.findMany({
         where: {
           fixture: {
             venueLevelMapping: {
               venueId: input.venueId,
-              eventId: input.eventId
-            }
+            },
+            eventId: eventId,
           },
           team: {
             status: 'checked_in'

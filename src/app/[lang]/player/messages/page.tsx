@@ -13,7 +13,7 @@ export default function PlayerMessagesPage() {
   const [selectedVenueId, setSelectedVenueId] = useState<string>('');
 
   // Get venues where user has teams/matches
-  const { data: userVenues } = api.venue.getUserVenues.useQuery();
+  const { data: userVenues } = api.volunteers.venue.getVenueTeams.useQuery();
 
   return (
     <div className="container mx-auto p-6">

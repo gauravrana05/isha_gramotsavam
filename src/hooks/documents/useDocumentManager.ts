@@ -144,11 +144,11 @@ export const useDocumentManager = (options: UseDocumentManagerOptions = {}): Use
   }, [documentContext]);
 
   const getUploadProgress = useCallback((type: DocumentType): number => {
-    return documentContext.documents[type].progress;
+    return documentContext.documents[type]?.progress || 0;
   }, [documentContext.documents]);
 
   const getError = useCallback((type: DocumentType): string | null => {
-    return documentContext.documents[type].error;
+    return documentContext.documents[type]?.error || null;
   }, [documentContext.documents]);
 
   const clearError = useCallback((type: DocumentType) => {

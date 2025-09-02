@@ -293,6 +293,64 @@ export const venuesRouter = createTRPCRouter({
       }
     }),
 
+  // Get venues assigned to current user (for captains, volunteers, etc.)
+  getUserVenues: protectedProcedure
+    .query(async ({ ctx }) => {
+      const userId = ctx.user.id;
+      const userRole = ctx.user.role;
+
+      // For captains - get venues where their teams are assigned
+      if (userRole === 'captain') {
+        const venues = await db.venue.findMany({
+          where: {
+            venueLevelMappings: {
+              some: {
+                teamVenueAssignments: {
+                  some: {
+                    team: {
+                      captainUserId: userId
+                    }
+                  }
+                }
+              }
+            }
+          },
+          select: {
+            id: true,
+            name: true,
+            district: true,
+            state: true,
+          },
+          orderBy: { name: 'asc' }
+        });
+        return venues;
+      }
+
+      // For volunteers - get venues they're assigned to
+      if (userRole.includes('volunteer')) {
+        const venues = await db.venue.findMany({
+          where: {
+            volunteerAssignments: {
+              some: {
+                userId: userId
+              }
+            }
+          },
+          select: {
+            id: true,
+            name: true,
+            district: true,
+            state: true,
+          },
+          orderBy: { name: 'asc' }
+        });
+        return venues;
+      }
+
+      // For other roles, return empty array
+      return [];
+    }),
+
   // Protected procedures (Admin only for venue management)
   create: adminProcedure
     .input(createVenueSchema)

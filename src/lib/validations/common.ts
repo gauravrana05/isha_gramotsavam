@@ -79,7 +79,20 @@ export const notificationTypeSchema = z.enum([
 ])
 
 // Common field validations
-export const phoneSchema = z.string().min(10).max(20)
+export const phoneSchema = z.string()
+  .min(10)
+  .max(20)
+  .transform((phone) => {
+    // Import here to avoid circular dependencies
+    const { normalizePhoneNumber } = require('@/lib/utils/phone');
+    return normalizePhoneNumber(phone);
+  })
+  .refine((phone) => {
+    const { isValidIndianMobile } = require('@/lib/utils/phone');
+    return isValidIndianMobile(phone);
+  }, {
+    message: "Please enter a valid Indian mobile number"
+  })
 export const emailSchema = z.string().email().optional()
 export const pincodeSchema = z.string().min(6).max(10).optional()
 export const uuidSchema = z.string().uuid()

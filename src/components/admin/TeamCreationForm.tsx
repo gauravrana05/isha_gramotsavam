@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Users, Plus, Loader2, MapPin } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { api } from '@/server/trpc/react';
+import { normalizePhoneNumber } from '@/lib/utils/phone';
 
 export interface TeamCreationFormValues {
   name: string;
@@ -171,7 +172,8 @@ export const TeamCreationForm: React.FC<TeamCreationFormProps> = ({
     if (phone.length === 10) {
       setIsSearching(true);
       try {
-        const result = await utils.admin.users.searchUserByPhone.fetch({ phone });
+        const normalizedPhone = normalizePhoneNumber(phone);
+        const result = await utils.admin.users.searchUserByPhone.fetch({ phone: normalizedPhone || phone });
         
         if (result?.user) {
           setPlayerExists(true);

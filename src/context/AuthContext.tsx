@@ -127,8 +127,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const mockUser = urlParams.get('mockUser');
         const phone = urlParams.get('phone');
 
-        // Handle mock authentication or callback
+        // Handle mock authentication, callback, or phone authentication
         if (mockUser || authSuccess || userId || phone) {
+          // If phone parameter is present, try phone authentication first
+          if (phone && !mockUser && !authSuccess && !userId) {
+            console.log('🔍 Phone auth detected:', phone);
+            try {
+              const phoneResponse = await fetch('/api/auth/phone', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone }),
+                credentials: 'include',
+              });
+              
+              if (phoneResponse.ok) {
+                const { user } = await phoneResponse.json();
+                if (user) {
+                  console.log('✅ Phone auth successful:', user);
+                  sessionStorage.setItem('userId', user.id);
+                  setUser(user);
+                  
+                  // Clean up URL parameters
+                  const newUrl = new URL(window.location.href);
+                  newUrl.searchParams.delete('phone');
+                  window.history.replaceState({}, '', newUrl.toString());
+                  setLoading(false);
+                  return;
+                }
+              } else {
+                console.error('❌ Phone auth failed');
+              }
+            } catch (error) {
+              console.error('❌ Phone auth error:', error);
+            }
+          }
+          
           // Try to get current user from session
           const response = await fetch('/api/auth/me', {
             method: 'GET',

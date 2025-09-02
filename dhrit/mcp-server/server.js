@@ -11,6 +11,8 @@ import { RedisManager } from './redis-manager.js';
 import { DatabaseManager } from './database-manager.js';
 import { ProjectStorage } from './project-storage.js';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 
 // Load environment variables
 dotenv.config();
@@ -303,6 +305,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await handleProjectInit(args);
       case 'status':
         return await handleProjectStatus(args);
+      case 'build':
+        return await handleFullProjectBuild(args);
 
       // Training
       case 'train-domain':
@@ -311,14 +315,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await handleProtocolTraining(args);
       case 'train-all-agents':
         return await handleTrainAllAgents(args);
-
-      // Project Management
-      case 'init':
-        return await handleProjectInit(args);
-      case 'status':
-        return await handleProjectStatus(args);
-      case 'build':
-        return await handleFullProjectBuild(args);
 
       default:
         throw new Error(`Unknown tool: ${name}`);
@@ -412,9 +408,7 @@ async function handleAgentRequest(args) {
       createdAt: new Date().toISOString()
     };
     
-    const path = await import('path');
-    const fs = await import('fs');
-    const requestPath = path.join(process.cwd(), 'dhrit', 'projects', projectId, 'coordination', 'requests');
+    const requestPath = path.join(process.cwd(), 'projects', projectId, 'coordination', 'requests');
     
     if (!fs.existsSync(requestPath)) {
       fs.mkdirSync(requestPath, { recursive: true });
@@ -453,10 +447,7 @@ async function handleAgentResponse(args) {
   const { requestId, fromAgent, response, status } = args;
   
   try {
-    const path = await import('path');
-    const fs = await import('fs');
-    
-    const projectsPath = path.join(process.cwd(), 'dhrit', 'projects');
+    const projectsPath = path.join(process.cwd(), 'projects');
     const projects = fs.readdirSync(projectsPath);
     
     let requestFile = null;
@@ -514,9 +505,6 @@ async function handleProjectInit(args) {
   const { projectId, requirements } = args;
   
   try {
-    const fs = await import('fs');
-    const path = await import('path');
-    
     // Create project structure
     const projectPath = path.join(process.cwd(), 'projects', projectId);
     
@@ -659,9 +647,6 @@ async function handleProjectStatus(args) {
 async function trainAgentFromSavedData(agentName) {
   try {
     // Read saved training data
-    const fs = await import('fs');
-    const path = await import('path');
-    
     const trainingFile = path.join(process.cwd(), 'training', 'domains', `${agentName}-training.json`);
     
     if (!fs.existsSync(trainingFile)) {
@@ -711,9 +696,6 @@ async function handleProtocolTraining(args) {
   
   try {
     // Read saved protocol data
-    const fs = await import('fs');
-    const path = await import('path');
-    
     const protocolFile = path.join(process.cwd(), 'dhrit', 'training', 'protocols', `${agentName}-protocols.json`);
     
     if (!fs.existsSync(protocolFile)) {
@@ -822,9 +804,16 @@ async function handleFullProjectBuild(args) {
 }
 
 async function main() {
-  // Initialize Redis and Database connections
+  // Initialize Redis connection
   await redisManager.connect();
-  await dbManager.connect();
+  
+  // Initialize database connection
+  try {
+    await dbManager.connect();
+    console.error('Database connected successfully');
+  } catch (error) {
+    console.error('Database connection failed:', error.message);
+  }
   
   const transport = new StdioServerTransport();
   await server.connect(transport);

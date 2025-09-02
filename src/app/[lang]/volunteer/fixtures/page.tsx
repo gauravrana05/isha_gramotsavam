@@ -18,7 +18,7 @@ export default function VolunteerFixturesPage() {
   const [selectedVenueId, setSelectedVenueId] = useState<string>('all');
 
   // Get user's venue assignments
-  const { data: userVenues } = api.venue.getUserVenues.useQuery(undefined, {
+  const { data: userVenues } = api.volunteers.venue.getVenueTeams.useQuery(undefined, {
     enabled: !!user
   });
 

@@ -24,6 +24,15 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    console.log('🔍 Mock auth - Requested role:', role);
+    console.log('🔍 Mock auth - Database query role:', role === 'admin' ? 'admin' : 
+              role === 'captain' ? 'captain' : 
+              role === 'player' ? 'player' : 
+              role === 'verification_volunteer' ? 'verification_volunteer' :
+              role === 'technical_volunteer' ? 'technical_volunteer' : 
+              'public');
+    console.log('🔍 Mock auth - Found user:', user ? { id: user.id, role: user.role, firstName: user.firstName } : 'null');
+
     if (!user) {
       return NextResponse.json({ error: `No ${role} user found in database` }, { status: 404 });
     }

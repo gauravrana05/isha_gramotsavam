@@ -41,7 +41,7 @@ export default function CaptainDashboard() {
   const { 
     data: matchesData, 
     isLoading: matchesLoading 
-  } = api.fixtures.getUpcomingMatches.useQuery(
+  } = api.teams.fixtures.getUpcomingMatches.useQuery(
     { limit: 5 },
     { enabled: !!teamsData }
   );
@@ -205,14 +205,14 @@ export default function CaptainDashboard() {
                 )
               }
             ]}
-            headerActions={() => (
+            headerActions={
               <Link
                 href={`/${lang}/captain/teams/${team.id}`}
                 className="text-[#F28C38] hover:text-[#E67A26] font-medium text-sm"
               >
                 Manage Team
               </Link>
-            )}
+            }
             onRowClick={() => {}}
             showPagination={false}
           />

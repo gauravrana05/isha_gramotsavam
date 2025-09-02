@@ -54,7 +54,7 @@ export default function VolunteerLayout({
       />
       
       <div className={`flex flex-col md:min-h-screen ${
-        isDesktopSidebarCollapsed ? 'md:ml-16' : 'md:ml-64'
+        isDesktopSidebarCollapsed ? 'md:ml-16' : 'md:ml-[280px]'
       } transition-[margin] duration-300 ease-in-out`}>
         <main className="flex-1 overflow-auto">
           {children}

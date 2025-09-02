@@ -282,6 +282,7 @@ export const AdvancedTable = <T,>({
   onSelectionChange,
   filterFields,
   getRowActions,
+  showPagination,
   
   className,
   ...domProps

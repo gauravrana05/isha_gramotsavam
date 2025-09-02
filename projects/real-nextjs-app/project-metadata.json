@@ -1,0 +1,8 @@
+{
+  "projectId": "real-nextjs-app",
+  "requirements": "Generate real deployable Next.js code with authentication",
+  "createdAt": "2025-09-02T04:05:23.047Z",
+  "status": "initialized",
+  "currentStage": "architecture",
+  "agents": {}
+}

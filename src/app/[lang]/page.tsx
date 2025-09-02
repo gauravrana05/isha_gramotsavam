@@ -5,7 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { PageLoader } from "@/components/ui/loaders";
 import { useTranslation } from "@/lib/utils/i18n";
-import { handleRedirect } from "@/lib/utils/navigation";
+import { handleRedirect, getDashboardRoute } from "@/lib/utils/navigation";
 
 export default function Home() {
   const { lang } = useParams();
@@ -19,29 +19,34 @@ export default function Home() {
     // Handle mock authentication
     const mockRole = searchParams.get('role') || searchParams.get('mockUser');
     
-    if (mockRole && !user && !loading && !mockAuthProcessed) {
+    if (mockRole && !mockAuthProcessed) {
       console.log('🔍 Mock auth detected:', mockRole);
       setMockAuthProcessed(true);
       
-      // Call mock auth endpoint
-      fetch(`/api/auth/mock?role=${mockRole}`)
+      // First clear any existing session
+      fetch('/api/auth/logout', { method: 'POST' })
+        .then(() => {
+          console.log('🔍 Cleared existing session');
+          // Then call mock auth endpoint
+          return fetch(`/api/auth/mock?role=${mockRole}`);
+        })
         .then(response => response.json())
         .then(data => {
           if (data.user) {
             console.log('✅ Mock auth successful:', data.user);
-            // Remove mock params and redirect to appropriate dashboard
+            console.log('🔍 User role:', data.user.role);
+            console.log('🔍 Language preference:', data.user.languagePreference);
+            
+            // Remove mock params
             const newUrl = new URL(window.location.href);
             newUrl.searchParams.delete('mockUser');
             newUrl.searchParams.delete('role');
             
-            // Redirect based on role
-            const redirectPath = data.user.role === 'admin' ? `/${lang}/admin/dashboard` :
-                               data.user.role === 'captain' ? `/${lang}/captain/dashboard` :
-                               data.user.role === 'player' ? `/${lang}/player/dashboard` :
-                               data.user.role === 'verification_volunteer' ? `/${lang}/verification/dashboard` :
-                               data.user.role === 'technical_volunteer' ? `/${lang}/volunteer/dashboard` :
-                               `/${lang}/public/dashboard`;
+            // Use the proper getDashboardRoute function
+            const redirectPath = getDashboardRoute(data.user.role, lang as string, Boolean(data.user.languagePreference));
+            console.log('🔍 Redirect path:', redirectPath);
             
+            // Force a full page reload to ensure session is properly set
             window.location.href = redirectPath;
           } else {
             console.error('❌ Mock auth failed:', data);
@@ -54,7 +59,7 @@ export default function Home() {
       return;
     }
 
-    if (!loading && !mockRole) {
+    if (!loading && !mockRole && !mockAuthProcessed) {
       handleRedirect(user, lang as string, router);
     }
   }, [user, loading, router, lang, searchParams, mockAuthProcessed]);

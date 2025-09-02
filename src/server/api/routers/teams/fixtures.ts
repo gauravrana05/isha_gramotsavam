@@ -48,7 +48,9 @@ export const teamsFixturesRouter = createTRPCRouter({
                 select: {
                   id: true,
                   name: true,
-                  location: true,
+                  address: true,
+                  district: true,
+                  state: true,
                 },
               },
             },

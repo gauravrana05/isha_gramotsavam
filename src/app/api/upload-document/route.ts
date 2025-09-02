@@ -3,12 +3,22 @@ import { documentUploadService } from '@/lib/services/documentUploadService';
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('📄 Document upload started');
+    
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const userId = formData.get('userId') as string;
     const documentType = formData.get('documentType') as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack';
 
+    console.log('📄 Upload params:', { 
+      fileName: file?.name, 
+      fileSize: file?.size, 
+      userId, 
+      documentType 
+    });
+
     if (!file || !userId || !documentType) {
+      console.error('📄 Missing required fields');
       return NextResponse.json(
         { error: 'Missing required fields: file, userId, documentType' },
         { status: 400 }
@@ -17,6 +27,7 @@ export async function POST(request: NextRequest) {
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
+      console.error('📄 File too large:', file.size);
       return NextResponse.json(
         { error: 'File size must be less than 5MB' },
         { status: 400 }
@@ -25,6 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
+      console.error('📄 Invalid file type:', file.type);
       return NextResponse.json(
         { error: 'Only image files are allowed' },
         { status: 400 }
@@ -32,6 +44,8 @@ export async function POST(request: NextRequest) {
     }
 
     let downloadURL: string;
+
+    console.log('📄 Starting upload for type:', documentType);
 
     // Use appropriate upload method based on document type
     switch (documentType) {
@@ -45,18 +59,22 @@ export async function POST(request: NextRequest) {
         downloadURL = await documentUploadService.uploadAadhaarBack(userId, file);
         break;
       default:
+        console.error('📄 Invalid document type:', documentType);
         return NextResponse.json(
           { error: `Invalid document type: ${documentType}` },
           { status: 400 }
         );
     }
 
+    console.log('📄 Upload successful, URL:', downloadURL);
+
     return NextResponse.json({
       success: true,
       url: downloadURL,
     });
   } catch (error) {
-    console.error('Document upload error:', error);
+    console.error('📄 Document upload error:', error);
+    console.error('📄 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Upload failed' },
       { status: 500 }

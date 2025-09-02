@@ -4,6 +4,7 @@ import React from 'react';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { PlayerDocumentUpload } from "@/components/players";
 import DocumentPreview from "@/components/documents/DocumentPreview";
+import { formatPhoneForDisplay } from '@/lib/utils/phone';
 
 // Types
 interface TeamPlayer {
@@ -142,7 +143,7 @@ export const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={`${selectedPlayer.firstName} ${selectedPlayer.lastName}`}
-      subtitle={selectedPlayer.phone}
+      subtitle={formatPhoneForDisplay(selectedPlayer.phone)}
       size="xl"
       mobileFullScreen={true}
       scrollableBody={true}

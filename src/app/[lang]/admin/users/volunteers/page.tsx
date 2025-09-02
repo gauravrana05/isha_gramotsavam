@@ -32,6 +32,7 @@ import {
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { cn } from '@/lib/component-patterns';
+import { formatPhoneForDisplay } from '@/lib/utils/phone';
 import Link from 'next/link';
 
 type VolunteerRole = 'verification_volunteer' | 'general_volunteer' | 'technical_volunteer';
@@ -618,7 +619,7 @@ export default function VolunteersManagement() {
         <div className="text-sm text-gray-900">
           <div className="flex items-center gap-2">
             <Phone className="w-4 h-4 text-gray-400" />
-            <span>{v.phoneNumber}</span>
+            <span>{formatPhoneForDisplay(v.phoneNumber)}</span>
           </div>
         </div>
       )
@@ -910,7 +911,7 @@ export default function VolunteersManagement() {
 
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Phone Number</h3>
-                <p className="text-gray-900">{selectedVolunteer.phoneNumber}</p>
+                <p className="text-gray-900">{formatPhoneForDisplay(selectedVolunteer.phoneNumber)}</p>
               </div>
 
               <div>

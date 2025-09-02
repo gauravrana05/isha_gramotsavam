@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
+import { normalizePhoneNumber } from '@/lib/utils/phone';
 
 interface CreateTeamModalProps {
   isOpen: boolean;
@@ -214,7 +215,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
       name: formData.name.trim(),
       description: formData.description.trim(),
       sportId: formData.sportId,
-      captainPhone: formData.captainPhone,
+      captainPhone: normalizePhoneNumber(formData.captainPhone) || formData.captainPhone,
       captainDetails: {
         firstName: formData.captainFirstName.trim(),
         lastName: formData.captainLastName.trim(),

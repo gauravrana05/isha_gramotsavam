@@ -65,7 +65,7 @@ export default function TeamRegistrationPage() {
   );
 
   // Get ongoing events for venue assignment
-  const { data: eventsData } = api.admin.events.getEvents.useQuery({
+  const { data: eventsData } = api.tournaments.events.getAll.useQuery({
     limit: 1,
     status: 'ongoing',
   }, {
@@ -174,6 +174,9 @@ export default function TeamRegistrationPage() {
       
       // Refresh user data to get updated role before navigating
       await refreshUser();
+      
+      // Small delay to ensure role update is processed
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Navigate to team invite page
       router.push(`/${lang}/captain/teams/${result.id}/players/invite`);

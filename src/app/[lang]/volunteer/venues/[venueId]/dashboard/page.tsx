@@ -242,7 +242,11 @@ export default function VolunteerDashboard({ params }: PageProps) {
   };
 
   if (authLoading || loading) {
-    return <PageLoader />;
+    return (
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38]"></div>
+      </div>
+    );
   }
 
   if (error) {

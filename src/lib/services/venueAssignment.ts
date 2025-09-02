@@ -346,6 +346,12 @@ async function createVenueAssignment(
   assignmentMethod: 'auto_assigned' | 'manual_assigned'
 ) {
   try {
+    // Check if mappingId is provided
+    if (!venueInfo.mappingId) {
+      console.error('❌ Venue assignment failed: Missing mappingId', venueInfo);
+      throw new Error('Venue mapping ID is required for assignment');
+    }
+
     const assignment = await db.teamVenueAssignment.create({
       data: {
         teamId,
@@ -353,7 +359,9 @@ async function createVenueAssignment(
         level: 'cluster',
         clusterVenueMappingId: venueInfo.mappingId,
         assignmentMethod,
-        assignedBy: assignedByUserId,
+        assignedByUser: {
+          connect: { id: assignedByUserId }
+        },
         assignedAt: new Date()
       },
       include: {

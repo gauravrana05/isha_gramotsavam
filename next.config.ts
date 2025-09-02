@@ -30,6 +30,11 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'mvvbnuzqngloikfyzjya.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
     ],
   },
   serverExternalPackages: ['@prisma/client'],
