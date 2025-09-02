@@ -119,11 +119,16 @@ export default function VolunteerSidebar({
   ];
 
   const baseGeneralNavigation = [
-    // When not in venue context, show message to go to venue
+    // When not in venue context, show general overview pages
     {
       name: t('volunteer.sidebar.my_venues', 'My Venues'),
       href: `/${lang}/volunteer`,
       icon: MapPin,
+    },
+    {
+      name: t('volunteer.sidebar.all_fixtures', 'All Fixtures'),
+      href: `/${lang}/volunteer/fixtures`,
+      icon: Trophy,
     },
   ];
 

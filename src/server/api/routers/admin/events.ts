@@ -685,6 +685,19 @@ export const adminEventsRouter = createTRPCRouter({
                 status: true,
               },
             },
+            sport: {
+              select: {
+                id: true,
+                name: true,
+                displayName: true,
+              },
+            },
+            matches: {
+              select: {
+                id: true,
+                status: true,
+              },
+            },
           },
           orderBy: { createdAt: 'asc' },
           skip: input.offset,

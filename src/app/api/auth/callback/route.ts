@@ -116,8 +116,14 @@ export async function GET(request: NextRequest) {
       
       for (const field of phoneFields) {
         if (info[field]) {
-          const phone = String(info[field]).trim();
+          let phone = String(info[field]).trim();
           if (phone && phone !== 'null' && phone !== 'undefined') {
+            // Remove country code if present (+91)
+            if (phone.startsWith('+91')) {
+              phone = phone.substring(3);
+            } else if (phone.startsWith('91') && phone.length === 12) {
+              phone = phone.substring(2);
+            }
             console.log(`Phone found in field '${field}':`, phone);
             return phone;
           }
@@ -156,13 +162,62 @@ export async function GET(request: NextRequest) {
     console.log('Phone type:', typeof phone);
     console.log('Is phone truthy:', !!phone);
      
-    if (!phone) {
-      // Store user info temporarily for phone collection
+    // Check if user already exists in our database 
+    const existingUser = await prisma.user.findUnique({
+      where: { 
+        email: userData.email || `${userInfo.sub}@isha.local`
+      }
+    });
+
+    const hasLanguageInOurDB = existingUser?.languagePreference;
+
+    // Decision tree based on phone from OIDC + language in our DB
+    if (phone && hasLanguageInOurDB) {
+      // Case 1: Has phone from OIDC + language in our DB → Direct login
+      console.log('=== CASE 1: Direct login (phone + language) ===');
+      // Continue to user creation/update below
+      
+    } else if (phone && !hasLanguageInOurDB) {
+      // Case 2: Has phone from OIDC but no language in our DB → Collect language only
+      console.log('=== CASE 2: Collect language only ===');
       const tempUserData = {
         email: userData.email,
         firstName: userData.firstName,
         lastName: userData.lastName,
         sub: userInfo.sub,
+        hasPhoneFromOIDC: true,
+        phoneFromOIDC: phone,
+        hasLanguageFromDB: false,
+        ...userInfo
+      };
+      
+      const redirectUrl = new URL('/en/auth/phone-required', request.url);
+      const response = NextResponse.redirect(redirectUrl);
+      
+      response.cookies.set('temp_user_data', JSON.stringify(tempUserData), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 10 * 60,
+      });
+      
+      // Clear PKCE cookies
+      response.cookies.delete('oidc_state');
+      response.cookies.delete('code_verifier');
+      
+      return response;
+      
+    } else {
+      // Case 3: No phone from OIDC → Collect phone + language
+      console.log('=== CASE 3: Collect phone + language ===');
+      const tempUserData = {
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        sub: userInfo.sub,
+        hasPhoneFromOIDC: false,
+        hasLanguageFromDB: !!hasLanguageInOurDB,
+        existingLanguage: hasLanguageInOurDB,
         ...userInfo
       };
       
@@ -183,16 +238,19 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { phone: phone }
-    });
+    // Use phone from OIDC or existing user
+    const finalPhone = phone || existingUser?.phone;
+    if (finalPhone) {
+      userData.phone = finalPhone;
+    }
 
+    // Find user by phone or create new one
     if (existingUser) {
       user = await prisma.user.update({
-        where: { phone: phone },
+        where: { id: existingUser.id },
         data: {
           ...userData,
-          role: existingUser.role,
+          role: existingUser.role || 'public',
           updatedAt: new Date(),
         }
       });

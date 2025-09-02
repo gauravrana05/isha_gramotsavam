@@ -57,7 +57,7 @@ export default function HeroSection({ lang }: HeroSectionProps) {
         {/* Mobile Background */}
         <Image
           src="/images/backgrounds/mobile_public_background.png"
-          alt="Isha Gramotsavam Mobile Background"
+          alt={t('hero.background_alt', 'Isha Gramotsavam Mobile Background')}
           fill
           className="object-cover md:hidden"
           priority
@@ -67,7 +67,7 @@ export default function HeroSection({ lang }: HeroSectionProps) {
         {/* Desktop/Web Background */}
         <Image
           src="/images/backgrounds/web_public_background.jpg"
-          alt="Isha Gramotsavam Web Background"
+          alt={t('hero.background_alt', 'Isha Gramotsavam Web Background')}
           fill
           className="hidden object-cover md:block"
           priority
@@ -90,7 +90,7 @@ export default function HeroSection({ lang }: HeroSectionProps) {
             <div className="absolute inset-0 -z-10">
               <Image
                 src="/images/backgrounds/public_vector_background.png"
-                alt="Content Background"
+                alt={t('hero.content_background_alt', 'Content Background')}
                 fill
                 className="object-cover"
                 quality={100}
@@ -100,15 +100,15 @@ export default function HeroSection({ lang }: HeroSectionProps) {
             {/* Actual Text Content */}
             <div className="relative z-10">
               <h1 className="font-fira text-4xl font-extrabold text-black md:text-5xl lg:text-4xl">
-                {t('hero_title', 'Isha Gramotsavam')}
+                {t('hero.title', 'Isha Gramotsavam')}
               </h1>
 
               <div className="font-fira mb-6 text-xl font-semibold text-black md:text-2xl">
-                {t('hero_subtitle', 'Sporting Spirit of Bharat')}
+                {t('hero.subtitle', 'Sporting Spirit of Bharat')}
               </div>
 
               <p className="font-fira md:text-md mx-auto mb-8 max-w-3xl text-lg leading-relaxed text-[#4A2F1D] md:mx-36">
-                {t('hero_description', 'Aims to rejuvenate the spirit of rural India and foster a sense of community, tradition and healthy competition')}
+                {t('hero.description', 'Aims to rejuvenate the spirit of rural India and foster a sense of community, tradition and healthy competition')}
               </p>
 
               <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -118,7 +118,7 @@ export default function HeroSection({ lang }: HeroSectionProps) {
                   className="min-w-[200px]"
                   onClick={scrollToSports}
                 >
-                  {t('register_now', 'Register Now')}
+                  {t('hero.register_now', 'Register Now')}
                 </Button>
               </div>
             </div>
@@ -130,7 +130,7 @@ export default function HeroSection({ lang }: HeroSectionProps) {
       <div className="relative z-10 bg-[#F28C38] py-4 text-white">
         <Container>
           <p className="font-fira text-center text-lg font-semibold">
-            Aug - Sep 2025
+            {t('hero.event_dates', 'Aug - Sep 2025')}
           </p>
         </Container>
       </div>

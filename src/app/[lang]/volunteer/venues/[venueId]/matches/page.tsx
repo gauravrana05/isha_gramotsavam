@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useOffline } from '@/context/OfflineContext';
+import { useOffline } from '@/context/OfflineContextWrapper';
 import { api } from '@/server/trpc/react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';

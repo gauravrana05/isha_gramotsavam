@@ -48,313 +48,189 @@
   "error_no_phone": "Please enter your phone number",
   "error_no_otp": "Please enter the OTP",
   "error_no_code_sent": "Please send code first",
-  "error_recaptcha_expired": "reCAPTCHA expired. Please try again.",
-  "error_upload_failed": "Failed to upload files. Please check permissions.",
-  "logout": "Logout",
-  "admin_dashboard_title": "Admin Dashboard",
-  "admin_dashboard_description": "Manage Isha Gramotsavam events and users.",
-  "captain_dashboard_title": "Captain Dashboard",
-  "captain_dashboard_description": "Welcome to the captain dashboard, where you can manage your team.",
-  "volunteer_dashboard_title": "Volunteer Dashboard",
-  "volunteer": {
-    "loading": "Loading...",
-    "loading_assignment": "Loading your assignment...",
-    "refresh": "Refresh",
-    "no_venue_assignments": "No Venue Assignments",
-    "no_venue_assignments_desc": "You haven't been assigned to any venues yet. Please contact your coordinator.",
-    "dashboard": {
-      "title": "Volunteer Dashboard",
-      "welcome": "Welcome, Volunteer!",
-      "assignments": "Your Assignments",
-      "quick_actions": "Quick Actions"
-    },
-    "guide": {
-      "title": "Volunteer Guide",
-      "subtitle": "Everything you need to know as a volunteer",
-      "progress": "Your Progress",
-      "steps": "Steps to Complete",
-      "appLocation": "App Location",
-      "tips": {
-        "title": "Helpful Tips"
-      },
-      "quickActions": {
-        "title": "Quick Actions",
-        "camera": "Take Photo",
-        "checkIn": "Check In",
-        "emergency": "Emergency",
-        "support": "Get Support"
-      }
-    },
-    "media": {
-      "title": "Media Management",
-      "upload": "Upload Media",
-      "venue_media": "Venue Media",
-      "venue_posts": "Venue Posts",
-      "public_posts": "Public Posts",
-      "no_media": "No media uploaded yet",
-      "upload_first": "Upload First Media"
-    },
-    "profile": {
-      "title": "Volunteer Profile",
-      "edit": "Edit Profile",
-      "save": "Save Changes"
+  
+  "hero": {
+    "title": "Isha Gramotsavam",
+    "subtitle": "Sporting Spirit of Bharat",
+    "description": "Aims to rejuvenate the spirit of rural India and foster a sense of community, tradition and healthy competition",
+    "register_now": "Register Now",
+    "event_dates": "Aug - Sep 2025",
+    "background_alt": "Isha Gramotsavam Background",
+    "content_background_alt": "Content Background"
+  },
+  
+  "sports": {
+    "title": "Sports & Events",
+    "description": "Experience the thrill of traditional and modern sports in the heart of rural India",
+    "loading": "Loading sports...",
+    "error_title": "Unable to Load Sports",
+    "error_message": "Please try again later or contact support if the problem persists.",
+    "default_description": "Join this exciting sport and showcase your skills!",
+    "learn_more": "Learn More",
+    "register_team": "Register Team",
+    "view_all": "View All Sports",
+    "prize_amount": "INR 5,00,000",
+    "players_per_team": "{{main}} + {{subs}} Players Per Team",
+    "for_categories": "For {{categories}}",
+    "category_tbd": "Category TBD",
+    "registration_restricted": "This sport is only available for {{categories}}",
+    "categories": {
+      "men": "Men",
+      "women": "Women",
+      "mixed": "Mixed",
+      "mixed_teams": "mixed teams"
     }
   },
-  "common": {
-    "save": "Save",
+  
+  "quote": {
+    "text": "Sports have the power to unite communities and preserve our cultural heritage while building physical and mental strength",
+    "author": "Sadhguru",
+    "designation": "Founder, Isha Foundation"
+  },
+  
+  "vision": {
+    "title": "Our Vision",
+    "subtitle": "Reviving Rural Sports Culture",
+    "description": "Isha Gramotsavam aims to revive the sporting culture in rural India, bringing communities together through healthy competition and traditional games.",
+    "points": {
+      "community": "Building stronger communities through sports",
+      "tradition": "Preserving traditional Indian games",
+      "health": "Promoting physical and mental well-being",
+      "youth": "Engaging rural youth in positive activities"
+    }
+  },
+  
+  "key_components": {
+    "title": "Key Components",
+    "subtitle": "What Makes Gramotsavam Special",
+    "community_engagement": {
+      "title": "Community Engagement",
+      "description": "Bringing villages together through sports and cultural activities"
+    },
+    "traditional_sports": {
+      "title": "Traditional Sports",
+      "description": "Celebrating and preserving India's rich sporting heritage"
+    },
+    "youth_development": {
+      "title": "Youth Development",
+      "description": "Empowering rural youth through sports and skill development"
+    },
+    "cultural_celebration": {
+      "title": "Cultural Celebration",
+      "description": "Showcasing the vibrant culture and traditions of rural India"
+    }
+  },
+  
+  "testimonials": {
+    "title": "What People Say",
+    "subtitle": "Voices from the Community",
+    "celebrity_quote": "Gramotsavam brings out the true spirit of rural India and showcases the incredible talent that exists in our villages.",
+    "participant_testimonial": "Participating in Gramotsavam was a life-changing experience. It brought our entire village together and gave us a platform to showcase our skills."
+  },
+  
+  "transformation": {
+    "title": "Tales of Transformation",
+    "subtitle": "Stories of Change and Growth",
+    "story_1": {
+      "title": "Village Unity Through Sports",
+      "description": "How Gramotsavam brought together a divided community"
+    },
+    "story_2": {
+      "title": "Youth Empowerment",
+      "description": "Young athletes finding their path through sports"
+    },
+    "story_3": {
+      "title": "Cultural Revival",
+      "description": "Traditional games making a comeback"
+    }
+  },
+  
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "subtitle": "Everything you need to know about Isha Gramotsavam",
+    "questions": {
+      "eligibility": {
+        "question": "Who can participate in Isha Gramotsavam?",
+        "answer": "Any individual from rural areas can participate. Teams must be formed from the same village or panchayat."
+      },
+      "registration": {
+        "question": "How do I register my team?",
+        "answer": "You can register online through our website or visit your local registration center. Team captains need to provide necessary documents."
+      },
+      "dates": {
+        "question": "When is Isha Gramotsavam 2025?",
+        "answer": "The event will be held from August to September 2025. Specific dates will be announced soon."
+      },
+      "sports": {
+        "question": "What sports are included?",
+        "answer": "We feature both traditional Indian sports like Throwball and modern sports like Volleyball, with separate categories for men, women, and mixed teams."
+      },
+      "prizes": {
+        "question": "What are the prizes?",
+        "answer": "Winners receive cash prizes, trophies, and certificates. The total prize pool is over INR 50 lakhs across all sports."
+      },
+      "accommodation": {
+        "question": "Is accommodation provided?",
+        "answer": "Yes, we provide accommodation and meals for all participating teams during the event period."
+      }
+    }
+  },
+  
+  "cultural_events": {
+    "title": "Cultural Events",
+    "subtitle": "Celebrating India's Rich Heritage",
+    "folk_dance": "Traditional Folk Dance",
+    "music": "Classical & Folk Music",
+    "art": "Local Arts & Crafts",
+    "food": "Regional Cuisine Festival"
+  },
+  
+  "awards": {
+    "title": "Awards & Recognition",
+    "subtitle": "Celebrating Excellence",
+    "champion": "Champion Trophy",
+    "runner_up": "Runner-up Medal",
+    "participation": "Participation Certificate",
+    "special": "Special Recognition Awards"
+  },
+  
+  "navigation": {
+    "home": "Home",
+    "about": "About",
+    "sports": "Sports",
+    "events": "Events",
+    "register": "Register",
+    "contact": "Contact",
+    "language": "Language"
+  },
+  
+  "footer": {
+    "about_isha": "About Isha Foundation",
+    "contact_us": "Contact Us",
+    "privacy_policy": "Privacy Policy",
+    "terms_service": "Terms of Service",
+    "follow_us": "Follow Us",
+    "copyright": "© 2025 Isha Foundation. All rights reserved."
+  },
+  
+  "buttons": {
+    "submit": "Submit",
     "cancel": "Cancel",
-    "saving": "Saving...",
-    "loading": "Loading...",
-    "error": "Error",
-    "success": "Success",
-    "upload": "Upload",
-    "delete": "Delete",
+    "save": "Save",
     "edit": "Edit",
-    "view": "View",
-    "close": "Close",
-    "continue": "Continue",
+    "delete": "Delete",
     "back": "Back",
     "next": "Next",
-    "submit": "Submit",
+    "previous": "Previous",
+    "close": "Close",
     "confirm": "Confirm"
   },
-  "posts": {
-    "associate_with": "Associate with",
-    "create": "Create Post",
-    "title": "Post Title",
-    "content": "Post Content",
-    "visibility": "Visibility",
-    "public": "Public",
-    "private": "Private"
-  },
-  "media": {
-    "upload": "Upload Media",
-    "select_files": "Select Files",
-    "drag_drop": "Drag and drop files here",
-    "file_types": "Supported: Images and Videos",
-    "max_size": "Max size: 10MB per file"
-  },
-  "volunteer_technical_dashboard_title": "Technical Volunteer Dashboard",
-  "volunteer_technical_dashboard_description": "Manage technical aspects of Isha Gramotsavam events.",
-  "player_dashboard_title": "Player Dashboard",
-  "player_dashboard_description": "View your Isha Gramotsavam events and team.",
-  "guest_dashboard_title": "Guest Dashboard",
-  "guest_dashboard_description": "Explore Isha Gramotsavam events as a guest.",
-  "hero_title": "Isha Gramotsavam",
-  "hero_subtitle": "Sporting Spirit of Bharat",
-  "hero_description": "Aims to rejuvenate the spirit of rural India and foster a sense of community, tradition and healthy competition",
-  "learn_more": "Learn More",
-  "register_now": "Register Now",
-  "about_title": "About Isha Gramotsavam",
-  "about_description": "A celebration of rural sports and traditional games that brings communities together.",
-  "sports_title": "Sports & Games",
-  "sports_description": "Traditional and modern sports for all age groups.",
-  "community_title": "Community",
-  "community_description": "Building stronger communities through sports.",
-  "vision_title": "Our Vision",
-  "vision_description": "To revive and celebrate rural sporting traditions across India.",
-  "contact_title": "Contact Us",
-  "contact_description": "Get in touch with our team.",
-  "email_label": "Email",
-  "message_label": "Message",
-  "send_message": "Send Message",
-  "follow_us": "Follow Us",
-  "quick_links": "Quick Links",
-  "home": "Home",
-  "about": "About",
-  "sports": "Sports",
-  "events": "Events",
-  "gallery": "Gallery",
-  "contact": "Contact",
-  "privacy_policy": "Privacy Policy",
-  "terms_of_service": "Terms of Service",
-  "copyright": "© 2024 Isha Gramotsavam. All rights reserved.",
-  "navigation_menu": "Navigation Menu",
-  "close_menu": "Close Menu",
-  "open_menu": "Open Menu",
-  "search": "Search",
-  "no_results": "No results found",
-  "loading_text": "Loading...",
-  "error_occurred": "An error occurred",
-  "success_message": "Success!",
-  "warning_message": "Warning",
-  "info_message": "Information",
-  "back": "Back",
-  "next": "Next",
-  "previous": "Previous",
-  "save": "Save",
-  "cancel": "Cancel",
-  "delete": "Delete",
-  "edit": "Edit",
-  "view": "View",
-  "download": "Download",
-  "upload": "Upload",
-  "submit": "Submit",
-  "reset": "Reset",
-  "confirm": "Confirm",
-  "yes": "Yes",
-  "no": "No",
-  "player_dashboard": "Player Dashboard",
-  "captain_dashboard": "Captain Dashboard",
-  "admin_dashboard": "Admin Dashboard",
-  "volunteer_dashboard": "Volunteer Dashboard",
-  "verification_dashboard": "Verification Dashboard",
-  "welcome_back_player": "Welcome back, {name}! Track your team memberships and profile.",
-  "welcome_back_captain": "Welcome back, {name}! Manage your teams and players.",
-  "welcome_back_admin": "Welcome back, {name}! Manage system and users.",
-  "welcome_back_volunteer": "Welcome back, {name}! Support event operations.",
-  "welcome_back_verification": "Welcome back, {name}! Verify team registrations.",
-  "complete_your_profile": "Complete Your Profile",
-  "upload_documents_message": "Upload your documents (Profile Photo, Aadhaar Front & Back) to participate in teams.",
-  "upload_documents": "Upload Documents",
-  "teams": "Teams",
-  "verified": "Verified",
-  "pending": "Pending",
-  "documents": "Documents",
-  "your_teams": "Your Teams",
-  "no_team_memberships": "No team memberships",
-  "no_team_memberships_message": "You haven't joined any teams yet. Contact team captains to get added to teams.",
-  "team": "Team",
-  "sport": "Sport",
-  "captain": "Captain",
-  "location": "Location",
-  "status": "Status",
-  "joined": "Joined",
-  "actions": "Actions",
-  "view_team": "View Team",
-  "phone": "Phone",
-  "unknown": "Unknown",
-  "draft": "Draft",
-  "submitted": "Submitted",
-  "rejected": "Rejected",
-  "approved": "Approved",
-  "loading_player_dashboard": "Loading Player Dashboard...",
-  "loading_captain_dashboard": "Loading Captain Dashboard...",
-  "loading_admin_dashboard": "Loading Admin Dashboard...",
-  "loading_volunteer_dashboard": "Loading Volunteer Dashboard...",
-  "loading_verification_dashboard": "Loading Verification Dashboard...",
-  "error": "Error",
-  "retry": "Retry",
-  "something_went_wrong": "Something went wrong",
-  "failed_to_load_dashboard": "Failed to load dashboard data",
-  "players_registered": "Players Registered",
-  "main_players": "Main Players",
-  "venue_tbd": "Venue TBD",
-  "fixtures_soon": "Fixtures Soon",
-  "no_team_found": "No Team Found",
-  "no_team_registered_message": "You don't have any team registered yet.",
-  "women": "Women",
-  "men": "Men",
-  "mixed": "Mixed",
-
-  "_comment_volunteer_section": "=== VOLUNTEER INTERFACE TRANSLATIONS ===",
   
-  "volunteer": {
-    "title": "Volunteer Panel",
-    "loading_assignment": "Loading your assignment...",
-    "no_venue_assignments": "No Venue Assignments",
-    "no_venue_assignments_desc": "You haven't been assigned to any venues yet. Please contact your administrator.",
-    "redirecting_venue": "Redirecting to your venue...",
-    "refresh": "Refresh",
-    "loading_dashboard": "Loading Volunteer Dashboard...",
-    
-    "sidebar": {
-      "admin_panel": "Admin Panel",
-      "volunteer_panel": "Volunteer Panel",
-      "isha_gramotsavam": "Isha Gramotsavam",
-      "expand_sidebar": "Expand sidebar",
-      "collapse_sidebar": "Collapse sidebar",
-      "venue_overview": "Venue Overview",
-      "teams": "Teams",
-      "fixtures": "Fixtures",
-      "matches": "Matches",
-      "media": "Media",
-      "my_venues": "My Venues",
-      "profile": "Profile",
-      "back_to_admin_dashboard": "Back to Admin Dashboard",
-      "back_to_app": "Back to App",
-      "sign_out": "Sign Out"
-    },
-
-    "profile": {
-      "title": "Volunteer Profile",
-      "subtitle": "Your personal information",
-      "incomplete_profile": "Your profile is incomplete. Please complete it to volunteer effectively.",
-      "personal_details": "Personal Details",
-      "edit_profile": "Edit Profile",
-      "contact_information": "Contact Information",
-      "profile_summary": "Profile Summary",
-      "basic_details": "Basic Details",
-      "profile_status": "Profile Status",
-      "complete": "Complete",
-      "incomplete": "Incomplete",
-      "needs_completion": "Needs Completion",
-      "complete_profile": "Complete Profile",
-      "first_name": "First Name",
-      "last_name": "Last Name",
-      "phone_number": "Phone Number",
-      "whatsapp_number": "WhatsApp Number",
-      "date_of_birth": "Date of Birth",
-      "gender": "Gender",
-      "preferred_language": "Preferred Language",
-      "role": "Role",
-      "email": "Email",
-      "instagram_handle": "Instagram Handle",
-      "not_available": "Not Available",
-      "male": "Male",
-      "female": "Female",
-      "others": "Others",
-      "volunteer": "Volunteer"
-    },
-
-    "dashboard": {
-      "venue_dashboard": "Volunteer Dashboard",
-      "technical_station": "Technical Volunteer Station",
-      "match_day_management": "Match Day Management",
-      "total_teams": "Total Teams",
-      "checked_in": "Checked In",
-      "confirmed": "Confirmed",
-      "unconfirmed": "Unconfirmed",
-      "my_profile": "My Profile",
-      "no_actions_available": "No actions available",
-      "check_assignment_status": "Check your volunteer assignment status.",
-      "active_tournaments": "Active Tournaments",
-      "teams_status": "teams • Status:",
-      "manage": "Manage",
-      "live": "Live",
-      "view_all_tournaments": "View All {count} Tournaments",
-      "create_new_post": "Create a New Post",
-      "error": "Error",
-      "retry": "Retry",
-      "volunteer_information": "Volunteer Information",
-      "name": "Name",
-      "venue_id": "Venue ID",
-      "close": "Close",
-      
-      "quick_actions": {
-        "team_verification": "Team Verification",
-        "team_verification_desc": "Verify and check-in teams for tournaments",
-        "tournament_management": "Tournament Management", 
-        "tournament_management_desc": "Create and manage tournament brackets",
-        "match_management": "Match Management",
-        "match_management_desc": "Score matches and update results",
-        "media_upload": "Media Upload",
-        "media_upload_desc": "Upload photos and videos",
-        "action": "Action",
-        "count": "Count",
-        "status": "Status",
-        "completed": "Completed",
-        "active": "Active",
-        "pending": "Pending",
-        "open": "Open"
-      }
-    },
-
-    "language_selection": {
-      "title": "Choose Your Language",
-      "subtitle": "Select your preferred language for the volunteer interface",
-      "save_preference": "Save Language Preference",
-      "cancel": "Cancel"
-    }
+  "forms": {
+    "required_field": "This field is required",
+    "invalid_email": "Please enter a valid email address",
+    "invalid_phone": "Please enter a valid phone number",
+    "password_too_short": "Password must be at least 8 characters",
+    "passwords_dont_match": "Passwords do not match"
   }
 }

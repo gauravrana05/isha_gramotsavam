@@ -12,7 +12,7 @@ import {
   type Column,
   type ActionButton,
 } from '@/components/ui';
-import { type FixtureData } from '@/lib/types';
+import { type FixtureData } from '@/lib/types/api/fixtures';
 import { 
   Plus, 
   Trophy,
@@ -64,7 +64,7 @@ export default function AdminFixturesPage() {
   const fixtures = fixturesResponse?.fixtures || [];
 
   // Transform fixtures to match FixtureData interface
-  const transformedFixtures = fixtures.map(fixture => ({
+  const transformedFixtures: FixtureData[] = fixtures.map(fixture => ({
     id: fixture.id,
     name: fixture.name,
     genderCategory: fixture.genderCategory,
@@ -74,8 +74,8 @@ export default function AdminFixturesPage() {
     sportId: fixture.sportId,
     venueLevelMappingId: fixture.venueLevelMappingId,
     eventName: fixture.event?.name || 'No Event',
-    sportName: 'Unknown Sport', // Will be populated by separate query if needed
-    matchCount: 0, // Will be populated by separate query if needed
+    sportName: fixture.sport?.name || 'Unknown Sport',
+    matchCount: fixture.matches?.length || 0,
     createdAt: fixture.createdAt,
     updatedAt: fixture.updatedAt,
     deletedAt: fixture.deletedAt
@@ -268,7 +268,7 @@ export default function AdminFixturesPage() {
         data={transformedFixtures.filter((fixture): fixture is FixtureData => 
           fixture && 
           typeof fixture.id === 'string' &&
-          typeof fixture.sport === 'string'
+          typeof fixture.sportId === 'string'
         )}
         columns={columns}
         actions={actions}

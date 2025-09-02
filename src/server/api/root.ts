@@ -15,6 +15,7 @@ import { matchesRouter } from './routers/matches'
 import { notificationsRouter } from './routers/notifications'
 import { chatRouter } from './routers/chat'
 import { playersRouter } from './routers/players'
+import { captainRouter } from './routers/captain'
 
 /**
  * This is the primary router for your server.
@@ -38,6 +39,7 @@ export const appRouter = createTRPCRouter({
   notifications: notificationsRouter,
   chat: chatRouter,
   players: playersRouter,
+  captain: captainRouter,
 })
 
 // Export type definition of API

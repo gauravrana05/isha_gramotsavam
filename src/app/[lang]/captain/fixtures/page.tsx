@@ -6,13 +6,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/Button';
 import { Trophy, Users, Eye, Calendar } from 'lucide-react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 
 export default function CaptainFixturesPage() {
-  const { data: userTeams } = api.teams.management.getUserTeams.useQuery();
+  const { lang } = useParams();
+  const { data: captainTeams } = api.teams.management.getUserTeams.useQuery();
+  
+  // Extract team IDs from captain teams
+  const teamIds = captainTeams?.map(team => team.id) || [];
+  
   const { data: fixtures } = api.fixtures.getTeamFixtures.useQuery({
-    teamIds: userTeams?.map(t => t.id) || []
+    teamIds
   }, {
-    enabled: !!userTeams?.length
+    enabled: teamIds.length > 0
   });
 
   const getStatusColor = (status: string) => {
@@ -70,13 +76,13 @@ export default function CaptainFixturesPage() {
                   )}
                 </div>
                 <div className="flex space-x-2">
-                  <Link href={`/captain/fixtures/${fixture.id}/bracket`}>
+                  <Link href={`/${lang}/captain/fixtures/${fixture.id}/bracket`}>
                     <Button variant="outline" size="sm">
                       <Eye className="h-4 w-4 mr-2" />
                       View Bracket
                     </Button>
                   </Link>
-                  <Link href={`/captain/fixtures/${fixture.id}/matches`}>
+                  <Link href={`/${lang}/captain/fixtures/${fixture.id}/matches`}>
                     <Button size="sm">
                       <Calendar className="h-4 w-4 mr-2" />
                       My Matches
@@ -93,7 +99,7 @@ export default function CaptainFixturesPage() {
             <CardContent className="text-center py-8">
               <Trophy className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">
-                {userTeams?.length === 0 
+                {teamIds.length === 0 
                   ? 'You are not captain of any teams' 
                   : 'No fixtures found for your teams'
                 }

@@ -6,13 +6,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/Button';
 import { Trophy, Users, Eye, Calendar } from 'lucide-react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 
 export default function PlayerFixturesPage() {
-  const { data: userTeams } = api.teams.management.getUserPlayerTeams.useQuery();
+  const { lang } = useParams();
+  const { data: userPlayerTeams } = api.teams.management.getUserPlayerTeams.useQuery();
+  
+  // Extract team IDs from player teams
+  const teamIds = userPlayerTeams?.map(playerTeam => playerTeam.teamId) || [];
+  
   const { data: fixtures } = api.fixtures.getTeamFixtures.useQuery({
-    teamIds: userTeams?.map(t => t.teamId) || []
+    teamIds
   }, {
-    enabled: !!userTeams?.length
+    enabled: teamIds.length > 0
   });
 
   const getStatusColor = (status: string) => {
@@ -70,13 +76,13 @@ export default function PlayerFixturesPage() {
                   )}
                 </div>
                 <div className="flex space-x-2">
-                  <Link href={`/player/fixtures/${fixture.id}/bracket`}>
+                  <Link href={`/${lang}/player/fixtures/${fixture.id}/bracket`}>
                     <Button variant="outline" size="sm">
                       <Eye className="h-4 w-4 mr-2" />
                       View Bracket
                     </Button>
                   </Link>
-                  <Link href={`/player/fixtures/${fixture.id}/matches`}>
+                  <Link href={`/${lang}/player/fixtures/${fixture.id}/matches`}>
                     <Button size="sm">
                       <Calendar className="h-4 w-4 mr-2" />
                       My Matches
@@ -93,7 +99,7 @@ export default function PlayerFixturesPage() {
             <CardContent className="text-center py-8">
               <Trophy className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">
-                {userTeams?.length === 0 
+                {teamIds.length === 0 
                   ? 'You are not part of any teams' 
                   : 'No fixtures found for your teams'
                 }

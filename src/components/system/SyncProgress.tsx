@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useOffline, SyncStatus } from '@/context/OfflineContext';
+import { useOffline, SyncStatus } from '@/context/OfflineContextWrapper';
 import { RefreshCw, CheckCircle, AlertTriangle, X } from 'lucide-react';
 
 interface SyncProgressProps {

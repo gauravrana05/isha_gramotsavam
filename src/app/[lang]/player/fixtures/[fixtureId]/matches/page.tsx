@@ -11,15 +11,17 @@ import Link from 'next/link';
 export default function PlayerFixtureMatchesPage() {
   const params = useParams();
   const fixtureId = params.fixtureId as string;
+  const lang = params.lang as string;
 
   const { data: fixture } = api.volunteers.fixture.getFixtureDetails.useQuery({
     fixtureId
   });
 
-  const { data: userTeams } = api.teams.management.getUserPlayerTeams.useQuery();
+  const { data: userPlayerTeams } = api.teams.management.getUserPlayerTeams.useQuery();
+  const teamIds = userPlayerTeams?.map(playerTeam => playerTeam.teamId) || [];
 
   const myMatches = fixture?.fixture.matches.filter(match => 
-    userTeams?.some(playerTeam => playerTeam.teamId === match.team1Id || playerTeam.teamId === match.team2Id)
+    teamIds.some(teamId => teamId === match.team1Id || teamId === match.team2Id)
   ) || [];
 
   const getStatusColor = (status: string) => {
@@ -33,7 +35,7 @@ export default function PlayerFixtureMatchesPage() {
   };
 
   const getMyTeam = (match: any) => {
-    const playerTeam = userTeams?.find(pt => pt.teamId === match.team1Id || pt.teamId === match.team2Id);
+    const playerTeam = userPlayerTeams?.find(pt => pt.teamId === match.team1Id || pt.teamId === match.team2Id);
     return playerTeam ? { id: playerTeam.teamId, name: playerTeam.team.name } : null;
   };
 
@@ -52,7 +54,7 @@ export default function PlayerFixtureMatchesPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <div className="flex items-center space-x-2 mb-2">
-            <Link href={`/player/fixtures/${fixtureId}/bracket`}>
+            <Link href={`/${lang}/player/fixtures/${fixtureId}/bracket`}>
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Bracket

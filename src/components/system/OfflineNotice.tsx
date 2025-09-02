@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useOffline, ConnectionQuality } from '@/context/OfflineContext';
+import { useOffline, ConnectionQuality } from '@/context/OfflineContextWrapper';
 import { WifiOff, AlertCircle, CheckCircle, X, RefreshCw } from 'lucide-react';
 
 interface OfflineNoticeProps {

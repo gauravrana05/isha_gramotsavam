@@ -1,26 +1,63 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { api } from '@/server/trpc/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/Button';
-import { Trophy, Clock, Calendar, ArrowLeft, MapPin } from 'lucide-react';
+import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Textarea';
+import { Trophy, Clock, Calendar, ArrowLeft, MapPin, Play, CheckCircle, Upload, Medal } from 'lucide-react';
 import Link from 'next/link';
+import { useNotification } from '@/context/NotificationContext';
 
 export default function CaptainFixtureMatchesPage() {
   const params = useParams();
   const fixtureId = params.fixtureId as string;
+  const lang = params.lang as string;
+  const { addNotification } = useNotification();
+  
+  // State for match result submission
+  const [selectedMatch, setSelectedMatch] = useState<any>(null);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [team1Score, setTeam1Score] = useState(0);
+  const [team2Score, setTeam2Score] = useState(0);
+  const [scoreDetails, setScoreDetails] = useState('');
 
+  // Get fixture details for header info
   const { data: fixture } = api.volunteers.fixture.getFixtureDetails.useQuery({
     fixtureId
   });
 
-  const { data: userTeams } = api.teams.management.getUserTeams.useQuery();
+  // Get captain's team matches for this fixture
+  const { data: myMatches, refetch: refetchMatches } = api.captain.match.getTeamMatches.useQuery({
+    fixtureId
+  });
 
-  const myMatches = fixture?.fixture.matches.filter(match => 
-    userTeams?.some(team => team.id === match.team1Id || team.id === match.team2Id)
-  ) || [];
+  const { data: captainTeams } = api.teams.management.getUserTeams.useQuery();
+
+  // Mutations
+  const submitResultMutation = api.captain.match.submitMatchResult.useMutation({
+    onSuccess: () => {
+      addNotification('Match result submitted successfully!', 'success');
+      setShowResultModal(false);
+      refetchMatches();
+    },
+    onError: (error) => {
+      addNotification(error.message, 'error');
+    }
+  });
+
+  const updateMatchStatusMutation = api.captain.match.updateMatchStatus.useMutation({
+    onSuccess: () => {
+      addNotification('Match status updated!', 'success');
+      refetchMatches();
+    },
+    onError: (error) => {
+      addNotification(error.message, 'error');
+    }
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -33,7 +70,47 @@ export default function CaptainFixtureMatchesPage() {
   };
 
   const getMyTeam = (match: any) => {
-    return userTeams?.find(team => team.id === match.team1Id || team.id === match.team2Id);
+    return captainTeams?.find(team => team.id === match.team1Id || team.id === match.team2Id);
+  };
+
+  const handleStartMatch = (match: any) => {
+    updateMatchStatusMutation.mutate({
+      matchId: match.id,
+      status: 'in_progress'
+    });
+  };
+
+  const handleSubmitResult = (match: any) => {
+    setSelectedMatch(match);
+    setTeam1Score(match.team1Score || 0);
+    setTeam2Score(match.team2Score || 0);
+    setScoreDetails(match.scoreDetails || '');
+    setShowResultModal(true);
+  };
+
+  const handleResultSubmission = () => {
+    if (!selectedMatch) return;
+    
+    const winnerId = team1Score > team2Score ? selectedMatch.team1Id : 
+                    team2Score > team1Score ? selectedMatch.team2Id : null;
+
+    if (!winnerId) {
+      addNotification('Please enter a valid score with a winner', 'error');
+      return;
+    }
+
+    if (team1Score === team2Score) {
+      addNotification('Matches cannot end in a tie. Please enter different scores.', 'error');
+      return;
+    }
+
+    submitResultMutation.mutate({
+      matchId: selectedMatch.id,
+      team1Score,
+      team2Score,
+      scoreDetails: scoreDetails.trim() || undefined,
+      winnerId
+    });
   };
 
   const getOpponentTeam = (match: any) => {
@@ -51,7 +128,7 @@ export default function CaptainFixtureMatchesPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <div className="flex items-center space-x-2 mb-2">
-            <Link href={`/captain/fixtures/${fixtureId}/bracket`}>
+            <Link href={`/${lang}/captain/fixtures/${fixtureId}/bracket`}>
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Bracket
@@ -170,6 +247,31 @@ export default function CaptainFixtureMatchesPage() {
                     </div>
                   )}
 
+                  {/* Match Actions */}
+                  <div className="flex space-x-2">
+                    {match.status === 'ready' && (
+                      <Button 
+                        onClick={() => handleStartMatch(match)}
+                        disabled={updateMatchStatusMutation.isPending}
+                        className="flex-1"
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Start Match
+                      </Button>
+                    )}
+                    
+                    {match.status === 'in_progress' && (
+                      <Button 
+                        onClick={() => handleSubmitResult(match)}
+                        disabled={submitResultMutation.isPending}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Submit Result
+                      </Button>
+                    )}
+                  </div>
+
                   {/* Next Match Info */}
                   {isWinner && match.nextMatch && (
                     <div className="text-sm text-green-600 font-medium bg-green-100 p-2 rounded">
@@ -193,6 +295,110 @@ export default function CaptainFixtureMatchesPage() {
           </Card>
         )}
       </div>
+
+      {/* Result Submission Modal */}
+      {showResultModal && selectedMatch && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">
+              Submit Match Result
+            </h3>
+            
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm font-medium text-gray-900">
+                {selectedMatch.roundName} - Match #{selectedMatch.matchNumber}
+              </div>
+              <div className="text-sm text-gray-600">
+                {selectedMatch.team1?.name} vs {selectedMatch.team2?.name}
+              </div>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {selectedMatch.team1?.name} Score
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={team1Score}
+                    onChange={(e) => setTeam1Score(parseInt(e.target.value) || 0)}
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {selectedMatch.team2?.name} Score
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={team2Score}
+                    onChange={(e) => setTeam2Score(parseInt(e.target.value) || 0)}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Additional Details (Optional)
+                </label>
+                <Textarea
+                  value={scoreDetails}
+                  onChange={(e) => setScoreDetails(e.target.value)}
+                  placeholder="Any additional match details, notes, or highlights..."
+                  rows={3}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Score Validation */}
+              {team1Score === team2Score && (team1Score > 0 || team2Score > 0) && (
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                  ⚠️ Matches cannot end in a tie. Please enter different scores.
+                </div>
+              )}
+              
+              {team1Score !== team2Score && (team1Score > 0 || team2Score > 0) && (
+                <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
+                  ✓ Winner: {team1Score > team2Score ? selectedMatch.team1?.name : selectedMatch.team2?.name}
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-3">
+              <Button
+                onClick={() => setShowResultModal(false)}
+                variant="outline"
+                className="flex-1"
+                disabled={submitResultMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleResultSubmission}
+                disabled={submitResultMutation.isPending || team1Score === team2Score}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                {submitResultMutation.isPending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Submit Result
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

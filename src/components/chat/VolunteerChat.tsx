@@ -17,7 +17,7 @@ interface VolunteerChatProps {
 export default function VolunteerChat({ venueId }: VolunteerChatProps) {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
-  const [targetType, setTargetType] = useState<'all' | 'captains' | 'players' | 'individual'>('all');
+  const [targetType, setTargetType] = useState<'all' | 'captains' | 'players' | 'individual' | 'volunteers'>('all');
   const [targetId, setTargetId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -73,6 +73,8 @@ export default function VolunteerChat({ venueId }: VolunteerChatProps) {
         return <Badge variant="outline"><Crown className="w-3 h-3 mr-1" />Captains</Badge>;
       case 'players':
         return <Badge variant="outline"><User className="w-3 h-3 mr-1" />Players</Badge>;
+      case 'volunteers':
+        return <Badge variant="outline"><Users className="w-3 h-3 mr-1" />Volunteers</Badge>;
       case 'individual':
         return <Badge variant="destructive">Private</Badge>;
       default:

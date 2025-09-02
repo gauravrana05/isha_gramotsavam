@@ -24,7 +24,8 @@ import {
   User,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
-  Zap
+  Zap,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -95,6 +96,11 @@ export default function CaptainSidebar({
       name: 'Matches',
       href: `/${lang}/captain/matches`,
       icon: Zap,
+    },
+    {
+      name: 'Chat',
+      href: `/${lang}/captain/chat`,
+      icon: MessageSquare,
     }
   ];
 

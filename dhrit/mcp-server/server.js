@@ -511,69 +511,87 @@ async function handleAgentResponse(args) {
 }
 
 async function handleProjectInit(args) {
-  const { projectId, projectType = 'nextjs', location } = args;
+  const { projectId, requirements } = args;
   
   try {
-    const { spawn } = await import('child_process');
+    const fs = await import('fs');
     const path = await import('path');
     
-    // Determine project location
-    const projectLocation = location || path.join(process.cwd(), 'dhrit', 'projects', projectId, 'code');
+    // Create project structure
+    const projectPath = path.join(process.cwd(), 'projects', projectId);
     
-    // Initialize project storage structure
-    projectStorage.initializeProject(projectId);
-    
-    // Create actual code project
-    let createCommand, createArgs;
-    
-    switch (projectType) {
-      case 'nextjs':
-        createCommand = 'npx';
-        createArgs = ['create-next-app@latest', projectLocation, '--typescript', '--tailwind', '--eslint', '--app', '--src-dir', '--import-alias', '@/*'];
-        break;
-      case 'react':
-        createCommand = 'npx';
-        createArgs = ['create-react-app', projectLocation, '--template', 'typescript'];
-        break;
-      case 'node':
-        createCommand = 'npm';
-        createArgs = ['init', '-y'];
-        break;
-      default:
-        throw new Error(`Unsupported project type: ${projectType}`);
+    if (fs.existsSync(projectPath)) {
+      return {
+        content: [{
+          type: 'text',
+          text: `❌ Project "${projectId}" already exists!`
+        }],
+        isError: true
+      };
     }
     
-    return new Promise((resolve, reject) => {
-      const process = spawn(createCommand, createArgs, { stdio: 'pipe' });
-      
-      let output = '';
-      let errorOutput = '';
-      
-      process.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-      
-      process.stderr.on('data', (data) => {
-        errorOutput += data.toString();
-      });
-      
-      process.on('close', (code) => {
-        if (code === 0) {
-          resolve({
-            content: [{
-              type: 'text',
-              text: `✅ Project "${projectId}" initialized successfully!\n\n📁 Location: ${projectLocation}\n🚀 Type: ${projectType}\n\n${output}\n\n🔄 Ready for agent coordination. Start with:\npal --projectId "${projectId}" --task "Design architecture" --requirements "Your requirements"`
-            }]
-          });
-        } else {
-          reject(new Error(`Project initialization failed: ${errorOutput || 'Unknown error'}`));
-        }
-      });
-      
-      process.on('error', (error) => {
-        reject(new Error(`Failed to initialize project: ${error.message}`));
-      });
+    // Create project folders
+    const folders = [
+      'architecture',
+      'design', 
+      'security',
+      'database',
+      'backend',
+      'frontend',
+      'performance',
+      'qa',
+      'coordination/requests',
+      'coordination/responses',
+      'code'
+    ];
+    
+    folders.forEach(folder => {
+      fs.mkdirSync(path.join(projectPath, folder), { recursive: true });
     });
+    
+    // Create project metadata
+    const metadata = {
+      projectId,
+      requirements,
+      createdAt: new Date().toISOString(),
+      status: 'initialized',
+      currentStage: 'architecture',
+      agents: {}
+    };
+    
+    fs.writeFileSync(
+      path.join(projectPath, 'project-metadata.json'),
+      JSON.stringify(metadata, null, 2)
+    );
+    
+    // Initialize project storage
+    projectStorage.initializeProject(projectId);
+    
+    return {
+      content: [{
+        type: 'text',
+        text: `✅ Project "${projectId}" initialized successfully!
+
+📁 **Project Structure Created:**
+- architecture/ - System design documents
+- design/ - Design system and UI specifications  
+- security/ - Security architecture and compliance
+- database/ - Schema design and migrations
+- backend/ - API specifications and code
+- frontend/ - UI components and pages
+- performance/ - Optimization reports
+- qa/ - Testing plans and deployment configs
+- coordination/ - Agent communication logs
+- code/ - Actual application code
+
+🚀 **Ready for Agent Coordination!**
+
+**Next Steps:**
+1. pal --projectId "${projectId}" --task "Design architecture" --requirements "${requirements}"
+2. kalp --projectId "${projectId}" --task "Create design system" --requirements "Modern, professional interface"
+3. bandh --projectId "${projectId}" --task "Security architecture" --requirements "Secure authentication and data protection"`
+      }]
+    };
     
   } catch (error) {
     return {

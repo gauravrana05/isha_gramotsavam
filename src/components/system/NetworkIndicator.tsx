@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useOffline, ConnectionQuality, SyncStatus } from '@/context/OfflineContext';
+import { useOffline, ConnectionQuality, SyncStatus } from '@/context/OfflineContextWrapper';
 import { Wifi, WifiOff, Signal, Clock, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface NetworkIndicatorProps {

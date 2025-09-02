@@ -38,4 +38,7 @@ export const useOffline = () => {
   return useOfflineHook();
 };
 
+// Re-export types for convenience
+export { ConnectionQuality, SyncStatus } from './OfflineContext';
+
 export default OfflineContextWrapper;

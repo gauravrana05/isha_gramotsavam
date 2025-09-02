@@ -1,0 +1,8 @@
+{
+  "projectId": "task-manager-coordinated",
+  "requirements": "Build a comprehensive Team Task Manager with coordinated multi-agent development. Features: user authentication, team management, project management, task management with real-time collaboration. Use Next.js 15, tRPC, PostgreSQL, and follow the complete coordinated workflow.",
+  "createdAt": "2025-09-02T03:18:12.465Z",
+  "status": "initialized",
+  "currentStage": "architecture",
+  "agents": {}
+}

@@ -4,6 +4,59 @@ import { TRPCError } from '@trpc/server';
 import type { GenderCategory } from '@prisma/client';
 
 export const volunteersFixtureRouter = createTRPCRouter({
+  // Get all fixtures across user's assigned venues
+  getAllUserFixtures: protectedProcedure
+    .query(async ({ ctx }) => {
+      // Check volunteer permissions
+      if (!['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Insufficient permissions' });
+      }
+
+      // Get all venue assignments for this volunteer
+      const volunteerAssignments = await ctx.db.volunteerAssignment.findMany({
+        where: {
+          volunteerId: ctx.user.id,
+          deletedAt: null
+        },
+        include: {
+          venueLevelMapping: {
+            include: {
+              venue: true,
+              fixtures: {
+                include: {
+                  sport: true,
+                  matches: {
+                    select: { id: true, status: true, roundName: true }
+                  }
+                },
+                orderBy: { createdAt: 'desc' }
+              }
+            }
+          }
+        }
+      });
+
+      if (!volunteerAssignments || volunteerAssignments.length === 0) {
+        console.warn(`⚠️ Volunteer ${ctx.user.id} has no venue assignments`);
+        return [];
+      }
+
+      // Flatten fixtures from all venue level mappings
+      const fixtures = volunteerAssignments
+        .filter(assignment => assignment.venueLevelMapping && assignment.venueLevelMapping.fixtures)
+        .flatMap(assignment => 
+          assignment.venueLevelMapping!.fixtures.map(fixture => ({
+            ...fixture,
+            level: assignment.venueLevelMapping!.level,
+            venueName: assignment.venueLevelMapping!.venue?.name || 'Unknown Venue',
+            venueId: assignment.venueLevelMapping!.venueId,
+            venueLevelMappingId: assignment.venueLevelMapping!.id
+          }))
+        );
+      
+      return fixtures;
+    }),
+
   // Get venue fixtures
   getVenueFixtures: protectedProcedure
     .input(z.object({

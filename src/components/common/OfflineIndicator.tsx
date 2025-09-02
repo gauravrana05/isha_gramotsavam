@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useOffline } from "@/context/OfflineContext"; // Adjust import path if different
+import { useOffline } from "@/context/OfflineContextWrapper";
 
 const OfflineIndicator: React.FC = () => {
   const { isOffline } = useOffline();
