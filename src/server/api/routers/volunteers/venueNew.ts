@@ -11,6 +11,163 @@ type TeamWithRelations = Team & {
 }
 
 export const volunteersVenueRouter = createTRPCRouter({
+  getVenueDetails: protectedProcedure
+    .input(z.object({
+      venueId: z.string().uuid(),
+    }))
+    .query(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can access venue details',
+        });
+      }
+
+      // Verify venue assignment
+      const assignment = await db.volunteerAssignment.findFirst({
+        where: { 
+          volunteerId: ctx.user.id, 
+          venueLevelMapping: {
+            venueId: input.venueId
+          }
+        }
+      });
+
+      if (!assignment) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not assigned to this venue',
+        });
+      }
+
+      // Get venue details
+      const venue = await db.venue.findUnique({
+        where: { id: input.venueId },
+        include: {
+          venueLevelMappings: {
+            include: {
+              sport: {
+                select: {
+                  id: true,
+                  name: true,
+                  category: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (!venue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Venue not found',
+        });
+      }
+
+      return {
+        id: venue.id,
+        name: venue.name,
+        address: venue.address,
+        city: venue.city,
+        state: venue.state,
+        capacity: venue.capacity,
+        coordinator: venue.coordinator,
+        phone: venue.phone,
+        email: venue.email,
+        description: venue.description,
+        updatedAt: venue.updatedAt,
+        sports: venue.venueLevelMappings.map(mapping => mapping.sport).filter(Boolean)
+      };
+    }),
+
+  getVenueStats: protectedProcedure
+    .input(z.object({
+      venueId: z.string().uuid(),
+    }))
+    .query(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can access venue stats',
+        });
+      }
+
+      // Verify venue assignment
+      const assignment = await db.volunteerAssignment.findFirst({
+        where: { 
+          volunteerId: ctx.user.id, 
+          venueLevelMapping: {
+            venueId: input.venueId
+          }
+        }
+      });
+
+      if (!assignment) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not assigned to this venue',
+        });
+      }
+
+      // Get team stats
+      const teamStats = await db.team.groupBy({
+        by: ['status'],
+        where: {
+          teamVenueAssignments: {
+            some: {
+              clusterVenueMapping: {
+                venueId: input.venueId
+              }
+            }
+          }
+        },
+        _count: {
+          id: true
+        }
+      });
+
+      const totalTeams = teamStats.reduce((sum, stat) => sum + stat._count.id, 0);
+      const verifiedTeams = teamStats.find(stat => stat.status === 'verified')?._count.id || 0;
+
+      // Get fixture stats
+      const fixtureStats = await db.fixture.groupBy({
+        by: ['status'],
+        where: {
+          venueLevelMapping: {
+            venueId: input.venueId
+          }
+        },
+        _count: {
+          id: true
+        }
+      });
+
+      const totalFixtures = fixtureStats.reduce((sum, stat) => sum + stat._count.id, 0);
+      const activeFixtures = fixtureStats.find(stat => stat.status === 'in_progress')?._count.id || 0;
+
+      // Get match stats
+      const totalMatches = await db.match.count({
+        where: {
+          fixture: {
+            venueLevelMapping: {
+              venueId: input.venueId
+            }
+          }
+        }
+      });
+
+      return {
+        totalTeams,
+        verifiedTeams,
+        activeFixtures,
+        totalFixtures,
+        totalMatches
+      };
+    }),
+
   getVenueTeams: protectedProcedure
     .input(z.object({
       venueId: z.string().uuid(),
@@ -41,13 +198,12 @@ export const volunteersVenueRouter = createTRPCRouter({
         });
       }
 
-      // Get teams through fixture teams relationship
-      const fixtureTeams = await db.fixtureTeam.findMany({
+      // Get teams assigned to this venue through TeamVenueAssignment
+      // Fixed: Query through teamVenueAssignment instead of fixtureTeam
+      const teamAssignments = await db.teamVenueAssignment.findMany({
         where: {
-          fixture: {
-            venueLevelMapping: {
-              venueId: input.venueId
-            }
+          clusterVenueMapping: {
+            venueId: input.venueId
           }
         },
         include: {
@@ -70,16 +226,13 @@ export const volunteersVenueRouter = createTRPCRouter({
         },
       });
 
-      // Extract unique teams with proper typing
-      const uniqueTeams = new Map<string, TeamWithRelations>();
-      fixtureTeams.forEach(ft => {
-        if (ft.team && !uniqueTeams.has(ft.team.id)) {
-          uniqueTeams.set(ft.team.id, ft.team);
-        }
-      });
+      // Extract teams with proper typing
+      const teams: TeamWithRelations[] = teamAssignments
+        .map(assignment => assignment.team)
+        .filter((team): team is TeamWithRelations => team !== null);
 
       // Get verified players count for each team
-      const teamIds = Array.from(uniqueTeams.keys());
+      const teamIds = teams.map(team => team.id);
       const verifiedPlayersCounts = await db.teamPlayer.groupBy({
         by: ['teamId'],
         where: {
@@ -95,7 +248,7 @@ export const volunteersVenueRouter = createTRPCRouter({
         verifiedPlayersCounts.map(item => [item.teamId, item._count.id])
       );
 
-      return Array.from(uniqueTeams.values()).map(team => ({
+      return teams.map(team => ({
         id: team.id,
         name: team.name,
         status: team.status,
@@ -473,6 +626,39 @@ export const volunteersVenueRouter = createTRPCRouter({
         },
         orderBy: {
           createdAt: 'desc'
+        },
+        take: input.limit,
+        skip: input.offset,
+      });
+
+      return posts;
+    }),
+
+  // Get venue posts
+  getVenuePosts: protectedProcedure
+    .input(z.object({
+      venueId: z.string(),
+      limit: z.number().min(1).max(100).default(20),
+      offset: z.number().min(0).default(0),
+    }))
+    .query(async ({ input }) => {
+      const posts = await db.venuePost.findMany({
+        where: {
+          venueLevelMapping: {
+            venueId: input.venueId,
+          },
+        },
+        include: {
+          createdByUser: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
         },
         take: input.limit,
         skip: input.offset,

@@ -92,6 +92,11 @@ export default function VolunteerSidebar({
       icon: LayoutDashboard,
     },
     {
+      name: t('volunteer.sidebar.venue', 'Venue'),
+      href: `/${lang}/volunteer/venues/${venueId}/venue`,
+      icon: MapPin,
+    },
+    {
       name: t('volunteer.sidebar.teams', 'Teams'),
       href: `/${lang}/volunteer/venues/${venueId}/teams`,
       icon: Users,

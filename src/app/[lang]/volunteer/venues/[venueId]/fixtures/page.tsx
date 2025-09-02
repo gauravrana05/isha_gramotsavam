@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { api } from '@/server/trpc/react';
 import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { useOffline } from '@/context/OfflineContextWrapper';
 import OfflineStatusBanner from '@/components/volunteer/OfflineStatusBanner';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';

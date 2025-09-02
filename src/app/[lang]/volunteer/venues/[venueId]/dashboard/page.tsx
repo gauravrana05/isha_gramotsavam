@@ -5,6 +5,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useOffline } from '@/context/OfflineContextWrapper';
 import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
+import { useTranslation } from '@/lib/utils/i18n';
+import { LanguageCode } from '@/lib/utils/i18n-server';
+import LanguageSelectionModal from '@/components/volunteer/LanguageSelectionModal';
 import { 
   AdvancedTable,
   type Column,
@@ -14,7 +18,6 @@ import {
 } from '@/components/ui';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { 
   Loader2, 
   Users, 
@@ -61,6 +64,26 @@ export default function VolunteerDashboard({ params }: PageProps) {
   // State for modals and interactions
   const [showPostCreator, setShowPostCreator] = useState(false);
   const [selectedAction, setSelectedAction] = useState<QuickActionData | null>(null);
+
+  // Language modal state
+  const searchParams = useSearchParams();
+  const showLanguageModal = searchParams.get('showLanguageModal') === 'true';
+  const [isUpdatingLanguage, setIsUpdatingLanguage] = useState(false);
+
+  // Language preference mutation
+  const utils = api.useUtils();
+  const updateLanguageMutation = api.profile.updateLanguagePreference.useMutation({
+    onSuccess: async () => {
+      addNotification('Language preference updated successfully', 'success');
+      setIsUpdatingLanguage(false);
+      // Invalidate profile queries to refresh user data
+      await utils.profile.checkCompletion.invalidate();
+    },
+    onError: (error) => {
+      addNotification(error.message || 'Failed to update language preference', 'error');
+      setIsUpdatingLanguage(false);
+    }
+  });
 
   // tRPC queries for dashboard data
   const { 
@@ -240,6 +263,49 @@ export default function VolunteerDashboard({ params }: PageProps) {
   const handleQuickActionClick = (action: QuickActionData) => {
     router.push(action.href);
   };
+
+  // Handle language selection
+  const handleLanguageSelect = async (languageCode: LanguageCode) => {
+    if (!languageCode) {
+      addNotification('Please select a language', 'error');
+      return;
+    }
+    
+    setIsUpdatingLanguage(true);
+    try {
+      await updateLanguageMutation.mutateAsync({ language: languageCode });
+      // Don't redirect immediately - let the profile refresh handle modal close
+      // The modal will disappear when userProfile.languagePreference is updated
+    } catch (error) {
+      console.error('Failed to update language:', error);
+      setIsUpdatingLanguage(false);
+    }
+  };
+
+  // Handle language modal cancel
+  const handleLanguageCancel = () => {
+    // Just stay on current page, modal will close
+  };
+
+  // Show language selection modal if user has no language preference
+  if (user && userProfile && !userProfile.languagePreference && !authLoading) {
+    return (
+      <>
+        <div className="min-h-screen bg-[#F3F0E5]">
+          {/* Clean background for language modal */}
+        </div>
+        
+        <LanguageSelectionModal
+          isOpen={true}
+          onLanguageSelect={handleLanguageSelect}
+          onCancel={handleLanguageCancel}
+          onClose={handleLanguageCancel}
+          currentLanguage={lang as LanguageCode}
+          isLoading={isUpdatingLanguage}
+        />
+      </>
+    );
+  }
 
   if (authLoading || loading) {
     return (

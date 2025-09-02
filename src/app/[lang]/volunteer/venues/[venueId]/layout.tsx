@@ -1,5 +1,3 @@
-import { VolunteerNav } from '@/components/volunteer/VolunteerNav';
-
 export default function VolunteerVenueLayout({
   children,
 }: {
@@ -8,7 +6,6 @@ export default function VolunteerVenueLayout({
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6">
-        <VolunteerNav />
         {children}
       </div>
     </div>
