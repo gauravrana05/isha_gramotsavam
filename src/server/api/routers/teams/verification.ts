@@ -212,4 +212,66 @@ export const teamsVerificationRouter = createTRPCRouter({
 
       return { verified: results.length }
     }),
+
+  // Submit team for verification
+  submitForVerification: protectedProcedure
+    .input(z.object({ teamId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const { teamId } = input
+
+      return await db.$transaction(async (tx) => {
+        // Get team with players and sport details
+        const team = await tx.team.findUnique({
+          where: { id: teamId },
+          include: {
+            sport: true,
+            teamPlayers: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        })
+
+        if (!team) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Team not found',
+          })
+        }
+
+        // Verify team ownership
+        if (team.captainId !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only team captain can submit team for verification',
+          })
+        }
+
+        // Check if team is already submitted
+        if (team.status !== 'draft') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Team has already been submitted',
+          })
+        }
+
+        // Validate minimum players
+        const minPlayers = team.sport.mainPlayersCount || 1
+        if (team.teamPlayers.length < minPlayers) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Team must have at least ${minPlayers} players`,
+          })
+        }
+
+        // Update team status
+        const updatedTeam = await tx.team.update({
+          where: { id: teamId },
+          data: { status: 'submitted' },
+        })
+
+        return updatedTeam
+      })
+    }),
 });

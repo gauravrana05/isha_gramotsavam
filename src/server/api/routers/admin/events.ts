@@ -87,25 +87,40 @@ export const adminEventsRouter = createTRPCRouter({
   createSport: protectedProcedure
     .input(z.object({
       name: z.string().min(1),
-      category: z.enum(['individual', 'team']),
       description: z.string().optional(),
-      maxPlayers: z.number().optional(),
-      minPlayers: z.number().optional(),
+      mainPlayersCount: z.number().int().min(1).default(11),
+      maxSubstitutes: z.number().int().min(0).default(5),
       isActive: z.boolean().default(true),
+      genderCategories: z.array(z.enum(['men', 'women', 'mixed'])).min(1).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const sport = await db.sport.create({
-        data: {
-          name: input.name,
-          isActive: input.isActive,
-          description: input.description,
-          mainPlayersCount: input.maxPlayers || 11,
-          maxSubstitutes: input.minPlayers || 5,
-        },
+      const sport = await db.$transaction(async (tx) => {
+        // Create the sport
+        const createdSport = await tx.sport.create({
+          data: {
+            name: input.name,
+            isActive: input.isActive,
+            description: input.description,
+            mainPlayersCount: input.mainPlayersCount,
+            maxSubstitutes: input.maxSubstitutes,
+          },
+        });
+
+        // Create gender categories if provided
+        if (input.genderCategories && input.genderCategories.length > 0) {
+          await tx.sportGenderCategory.createMany({
+            data: input.genderCategories.map(category => ({
+              sportId: createdSport.id,
+              genderCategory: category,
+            })),
+          });
+        }
+
+        return createdSport;
       });
 
       return sport;
@@ -117,19 +132,44 @@ export const adminEventsRouter = createTRPCRouter({
       id: z.string(),
       name: z.string().min(1).optional(),
       description: z.string().optional(),
-      mainPlayersCount: z.number().optional(),
-      maxSubstitutes: z.number().optional(),
+      mainPlayersCount: z.number().int().min(1).optional(),
+      maxSubstitutes: z.number().int().min(0).optional(),
       isActive: z.boolean().optional(),
+      genderCategories: z.array(z.enum(['men', 'women', 'mixed'])).min(1).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
       }
 
-      const { id, ...updateData } = input;
-      const sport = await db.sport.update({
-        where: { id },
-        data: updateData,
+      const { id, genderCategories, ...updateData } = input;
+      
+      const sport = await db.$transaction(async (tx) => {
+        // Update the sport
+        const updatedSport = await tx.sport.update({
+          where: { id },
+          data: updateData,
+        });
+
+        // Update gender categories if provided
+        if (genderCategories !== undefined) {
+          // Delete existing gender categories
+          await tx.sportGenderCategory.deleteMany({
+            where: { sportId: id },
+          });
+
+          // Create new gender categories
+          if (genderCategories.length > 0) {
+            await tx.sportGenderCategory.createMany({
+              data: genderCategories.map(category => ({
+                sportId: id,
+                genderCategory: category,
+              })),
+            });
+          }
+        }
+
+        return updatedSport;
       });
 
       return sport;
@@ -243,6 +283,9 @@ export const adminEventsRouter = createTRPCRouter({
           where.status = { in: ['completed', 'cancelled'] };
         }
 
+        console.log('🔍 Events query - input.status:', input.status);
+        console.log('🔍 Events query - where clause:', JSON.stringify(where, null, 2));
+
         const [events, totalCount] = await Promise.all([
           db.event.findMany({
             where,
@@ -276,6 +319,12 @@ export const adminEventsRouter = createTRPCRouter({
           }),
           db.event.count({ where }),
         ]);
+
+        console.log('🔍 Events query results - found events:', events.length);
+        console.log('🔍 Events query results - totalCount:', totalCount);
+        if (events.length > 0) {
+          console.log('🔍 First event:', events[0]);
+        }
 
 
         // Convert dates to strings to avoid serialization issues without superjson

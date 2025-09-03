@@ -232,7 +232,7 @@ export const adminTeamsRouter = createTRPCRouter({
               district: input.district,
               state: input.state,
               pincode: input.pincode,
-              role: 'public',
+              role: 'captain',
               profileComplete: true,
             }
           });
@@ -260,6 +260,12 @@ export const adminTeamsRouter = createTRPCRouter({
         if (!captain) {
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Captain not found' });
         }
+
+        // Update existing user's role to captain
+        await db.user.update({
+          where: { id: captainId },
+          data: { role: 'captain' }
+        });
       }
 
       const team = await db.team.create({

@@ -5,12 +5,16 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
 import ClientOnly from "@/components/common/ClientOnly";
 import { TRPCReactProvider } from "@/server/trpc/react";
+import PageLoader from "@/components/ui/loaders/PageLoader";
 
 // Import other providers dynamically to avoid hydration issues
 import dynamic from "next/dynamic";
 
 const ThemeProvider = dynamic(() => import("@/context/ThemeContext").then(mod => ({ default: mod.ThemeProvider })), { ssr: false });
-const AuthProvider = dynamic(() => import("@/context/AuthContext").then(mod => ({ default: mod.AuthProvider })), { ssr: false });
+const AuthProvider = dynamic(() => import("@/context/AuthContext").then(mod => ({ default: mod.AuthProvider })), { 
+  ssr: false,
+  loading: () => <PageLoader title="Authenticating..." variant="brand" />
+});
 const NotificationProvider = dynamic(() => import("@/context/NotificationContext").then(mod => ({ default: mod.NotificationProvider })), { ssr: false });
 const LoadingProvider = dynamic(() => import("@/context/LoadingContext").then(mod => ({ default: mod.LoadingProvider })), { ssr: false });
 const DocumentProvider = dynamic(() => import("@/context/DocumentContext").then(mod => ({ default: mod.DocumentProvider })), { ssr: false });

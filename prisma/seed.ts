@@ -6,7 +6,7 @@ import {
   clusterDivisionMappings, 
   locationClusterMappings, 
   volunteerAssignments
-} from './seed-data-updated'
+} from './seed_01'
 
 const prisma = new PrismaClient()
 

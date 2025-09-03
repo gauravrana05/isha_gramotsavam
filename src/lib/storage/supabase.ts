@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://mvvbnuzqngloikfyzjya.supabase.co'
-const supabaseKey = 'f33b997b0564cb5ccc0ce75cb1390967'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://mvvbnuzqngloikfyzjya.supabase.co'
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12dmJudXpxbmdsb2lrZnl6anlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYwOTAxODgsImV4cCI6MjA3MTY2NjE4OH0.gwgPJPIEhc_HVnbHPsRxY_MzOLVVVN88lqRKrRxLfNA'
 const supabaseStorageEndpoint = 'https://mvvbnuzqngloikfyzjya.storage.supabase.co/storage/v1/s3'
 
 export const supabase = createClient(supabaseUrl, supabaseKey)

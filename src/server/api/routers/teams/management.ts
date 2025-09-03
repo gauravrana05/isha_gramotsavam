@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { createTRPCRouter, publicProcedure, protectedProcedure } from '../../trpc'
 import { assignVenueToTeam } from '@/lib/services/venueAssignment'
+import { canModifyTeam } from '@/lib/utils/teamStatus'
 import {
   createTeamSchema,
   publicCreateTeamSchema,
@@ -347,7 +348,7 @@ export const teamsManagementRouter = createTRPCRouter({
             state: team.captainUser.state || input.state,
             pincode: team.captainUser.pincode || input.pincode || '000000',
             addedBy: 'captain',
-            verificationStatus: 'approved', // Captain is auto-approved
+            verificationStatus: 'pending', // Captain needs verification like other players
           },
         })
 
@@ -412,16 +413,24 @@ export const teamsManagementRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { id, ...updateData } = input
 
-      // Check if user is captain of this team
+      // Check if user is captain of this team and get current status
       const team = await db.team.findUnique({
         where: { id },
-        select: { captainId: true },
+        select: { captainId: true, status: true },
       })
 
       if (!team || team.captainId !== ctx.user.id) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'You can only update your own team',
+        })
+      }
+
+      // Check if team can be modified based on current status
+      if (!canModifyTeam(team.status as any)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Team cannot be modified after submission',
         })
       }
 
@@ -656,5 +665,71 @@ export const teamsManagementRouter = createTRPCRouter({
         },
         orderBy: { createdAt: 'desc' },
       });
+    }),
+
+  // Promote player to captain
+  promoteCaptain: protectedProcedure
+    .input(z.object({
+      teamId: z.string(),
+      newCaptainId: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { teamId, newCaptainId } = input
+
+      // Check if current user is captain of this team
+      const team = await db.team.findUnique({
+        where: { id: teamId },
+        select: { captainId: true },
+      })
+
+      if (!team || team.captainId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the current captain can promote a new captain',
+        })
+      }
+
+      // Check if new captain is a player in this team
+      const newCaptain = await db.user.findUnique({
+        where: { id: newCaptainId },
+        include: {
+          teamPlayers: {
+            where: { teamId }
+          }
+        }
+      })
+
+      if (!newCaptain || newCaptain.teamPlayers.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'New captain must be a player in this team',
+        })
+      }
+
+      // Use transaction for atomic operations
+      await db.$transaction(async (tx) => {
+        // Update team captain
+        await tx.team.update({
+          where: { id: teamId },
+          data: { 
+            captainId: newCaptainId,
+            captainName: `${newCaptain.firstName} ${newCaptain.lastName}`
+          }
+        })
+
+        // Update old captain's role to player
+        await tx.user.update({
+          where: { id: ctx.user.id },
+          data: { role: 'player' }
+        })
+
+        // Update new captain's role to captain
+        await tx.user.update({
+          where: { id: newCaptainId },
+          data: { role: 'captain' }
+        })
+      })
+
+      return { success: true }
     }),
 });

@@ -6,7 +6,7 @@ import type { Team, User, Sport } from '@prisma/client'
 
 // Define proper types for the response data
 type TeamWithRelations = Team & {
-  captainUser: Pick<User, 'firstName' | 'lastName' | 'phone'> | null;
+  captainUser: Pick<User, 'firstName' | 'lastName' | 'phone' | 'panchayat' | 'district'> | null;
   sport: Pick<Sport, 'name'> | null;
 }
 
@@ -63,7 +63,13 @@ export const volunteersVenueRouter = createTRPCRouter({
               email: true,
             }
           },
-          players: {
+          teamPhoto: {
+            select: {
+              photoPath: true,
+              uploadedAt: true,
+            }
+          },
+          teamPlayers: {
             include: {
               user: {
                 select: {
@@ -74,6 +80,13 @@ export const volunteersVenueRouter = createTRPCRouter({
                   email: true,
                   dateOfBirth: true,
                   gender: true,
+                  profileImages: {
+                    select: {
+                      profilePhotoPath: true,
+                      aadhaarFrontPath: true,
+                      aadhaarBackPath: true,
+                    }
+                  }
                 }
               }
             },
@@ -333,6 +346,8 @@ export const volunteersVenueRouter = createTRPCRouter({
                   firstName: true,
                   lastName: true,
                   phone: true,
+                  panchayat: true,
+                  district: true,
                 },
               },
               sport: {
@@ -1077,5 +1092,189 @@ export const volunteersVenueRouter = createTRPCRouter({
         fixtureInfo,
         stats
       };
+    }),
+
+  // Remove player mutation for volunteers
+  removePlayer: protectedProcedure
+    .input(z.object({
+      playerId: z.string(),
+      teamId: z.string(),
+      venueId: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can remove players',
+        });
+      }
+
+      // Verify venue assignment
+      const assignment = await db.volunteerAssignment.findFirst({
+        where: { 
+          volunteerId: ctx.user.id,
+          deletedAt: null,
+          venueLevelMapping: {
+            venueId: input.venueId
+          }
+        }
+      });
+
+      if (!assignment) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not assigned to this venue',
+        });
+      }
+
+      const teamPlayer = await db.teamPlayer.findUnique({
+        where: { id: input.playerId },
+        include: { team: true }
+      });
+
+      if (!teamPlayer || teamPlayer.teamId !== input.teamId) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Player not found in this team',
+        });
+      }
+
+      await db.teamPlayer.delete({
+        where: { id: input.playerId },
+      });
+
+      return { success: true };
+    }),
+
+  // Update player mutation for volunteers
+  updatePlayer: protectedProcedure
+    .input(z.object({
+      playerId: z.string(),
+      teamId: z.string(),
+      venueId: z.string(),
+      position: z.enum(['main', 'substitute']),
+      firstName: z.string().min(1).max(100),
+      lastName: z.string().min(1).max(100),
+      phone: z.string(),
+      dateOfBirth: z.date(),
+      gender: z.enum(['M', 'F']),
+      village: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can update players',
+        });
+      }
+
+      // Verify venue assignment
+      const assignment = await db.volunteerAssignment.findFirst({
+        where: { 
+          volunteerId: ctx.user.id,
+          deletedAt: null,
+          venueLevelMapping: {
+            venueId: input.venueId
+          }
+        }
+      });
+
+      if (!assignment) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not assigned to this venue',
+        });
+      }
+
+      const { playerId, teamId, venueId, ...updateData } = input;
+
+      const teamPlayer = await db.teamPlayer.findUnique({
+        where: { id: playerId },
+        include: { team: true, user: true }
+      });
+
+      if (!teamPlayer || teamPlayer.teamId !== teamId) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Player not found in this team',
+        });
+      }
+
+      // Update both TeamPlayer and User records
+      const updatedPlayer = await db.$transaction(async (tx) => {
+        // Update TeamPlayer record
+        await tx.teamPlayer.update({
+          where: { id: playerId },
+          data: {
+            position: updateData.position,
+            village: updateData.village,
+          },
+        });
+
+        // Update User record if user exists
+        if (teamPlayer.user) {
+          await tx.user.update({
+            where: { id: teamPlayer.user.id },
+            data: {
+              firstName: updateData.firstName,
+              lastName: updateData.lastName,
+              phone: updateData.phone,
+              dateOfBirth: updateData.dateOfBirth,
+              gender: updateData.gender,
+            },
+          });
+        }
+
+        return await tx.teamPlayer.findUnique({
+          where: { id: playerId },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+              },
+            },
+          },
+        });
+      });
+
+      return updatedPlayer;
+    }),
+
+  // Upload team image mutation for volunteers
+  uploadTeamImage: protectedProcedure
+    .input(z.object({
+      teamId: z.string(),
+      imageUrl: z.string(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can upload team images',
+        });
+      }
+
+      // Create or update team photo record
+      const teamPhoto = await db.teamPhoto.upsert({
+        where: { teamId: input.teamId },
+        update: { 
+          photoPath: input.imageUrl,
+          uploadedBy: ctx.user.id,
+          uploadedAt: new Date()
+        },
+        create: { 
+          teamId: input.teamId,
+          photoPath: input.imageUrl,
+          uploadedBy: ctx.user.id
+        },
+      });
+
+      return teamPhoto;
     }),
 });

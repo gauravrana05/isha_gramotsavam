@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const userId = formData.get('userId') as string;
-    const documentType = formData.get('documentType') as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack';
+    const documentType = formData.get('documentType') as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack' | 'teamPhoto';
 
     console.log('📄 Upload params:', { 
       fileName: file?.name, 
@@ -58,6 +58,9 @@ export async function POST(request: NextRequest) {
       case 'aadhaarBack':
         downloadURL = await documentUploadService.uploadAadhaarBack(userId, file);
         break;
+      case 'teamPhoto':
+        downloadURL = await documentUploadService.uploadTeamPhoto(userId, file);
+        break;
       default:
         console.error('📄 Invalid document type:', documentType);
         return NextResponse.json(
@@ -86,7 +89,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-    const documentType = searchParams.get('documentType') as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack';
+    const documentType = searchParams.get('documentType') as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack' | 'teamPhoto';
 
     if (!userId || !documentType) {
       return NextResponse.json(
@@ -115,7 +118,7 @@ export async function PUT(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const userId = formData.get('userId') as string;
-    const documentType = formData.get('documentType') as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack';
+    const documentType = formData.get('documentType') as 'profilePhoto' | 'aadhaarFront' | 'aadhaarBack' | 'teamPhoto';
 
     if (!file || !userId || !documentType) {
       return NextResponse.json(

@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { createTRPCRouter, protectedProcedure } from '../../trpc'
+import { canModifyTeam } from '@/lib/utils/teamStatus'
 import {
   addTeamPlayerSchema,
   removeTeamPlayerSchema,
@@ -48,123 +49,280 @@ export const teamsPlayersRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { teamId, position, firstName, lastName, phone, dateOfBirth, age, gender, panchayat, taluk, district, state, pincode, verificationStatus } = input
 
-      // Check if user is captain of this team
-      const team = await db.team.findUnique({
-        where: { id: teamId },
-        select: { captainId: true },
-      })
-
-      if (!team || team.captainId !== ctx.user.id) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'You can only add players to your own team',
+      return await db.$transaction(async (tx) => {
+        // Check if user is captain of this team
+        const team = await tx.team.findUnique({
+          where: { id: teamId },
+          include: {
+            sport: true,
+            captainUser: {
+              select: { panchayat: true, taluk: true, district: true },
+            },
+            teamPlayers: true,
+          },
         })
-      }
 
-      // Check if player is already in the team
-      // Check if player with same phone already exists in team
-      const existingPlayer = await db.teamPlayer.findFirst({
-        where: {
-          teamId,
-          phone,
-        },
-      })
+        if (!team || team.captainId !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You can only add players to your own team',
+          })
+        }
 
-      if (existingPlayer) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'Player is already in this team',
+        // Check if team is still in draft status
+        if (team.status !== 'draft') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot modify players after team submission',
+          })
+        }
+
+        // Check if player with same phone already exists in team
+        const existingPlayer = await tx.teamPlayer.findFirst({
+          where: { teamId, phone },
         })
-      }
 
-      // Create user first
-      const user = await db.user.create({
-        data: {
-          firstName,
-          lastName,
-          phone,
-          dateOfBirth,
-          age,
-          gender,
-          panchayat,
-          taluk,
-          district,
-          state,
-          pincode,
-        },
-      })
+        if (existingPlayer) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Player is already in this team',
+          })
+        }
 
-      const teamPlayer = await db.teamPlayer.create({
-        data: {
-          teamId,
-          userId: user.id,
-          position,
-          firstName,
-          lastName,
-          phone,
-          dateOfBirth,
-          age,
-          gender,
-          panchayat,
-          taluk,
-          district,
-          state,
-          pincode,
-          addedBy: 'captain',
-          verificationStatus: verificationStatus || 'pending',
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              phone: true,
-              age: true,
-              gender: true,
+        // Check if player is already in another team for the same sport
+        const existingTeamPlayer = await tx.teamPlayer.findFirst({
+          where: {
+            phone,
+            team: {
+              sportId: team.sportId,
+              status: { in: ['draft', 'submitted', 'verified', 'checked_in'] },
             },
           },
-        },
+          include: { team: true },
+        })
+
+        if (existingTeamPlayer) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `Player is already registered in team "${existingTeamPlayer.team.name}" for this sport`,
+          })
+        }
+
+        // Validate team composition limits
+        const currentMainPlayers = team.teamPlayers.filter(p => p.position === 'main').length
+        const currentSubPlayers = team.teamPlayers.filter(p => p.position === 'substitute').length
+        
+        if (position === 'main' && currentMainPlayers >= team.sport.mainPlayersCount) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Maximum ${team.sport.mainPlayersCount} main players allowed`,
+          })
+        }
+        
+        if (position === 'substitute' && currentSubPlayers >= team.sport.maxSubstitutes) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Maximum ${team.sport.maxSubstitutes} substitute players allowed`,
+          })
+        }
+
+        // Note: Age validation would need to be implemented at application level
+        // as Sport model doesn't have age restrictions in the schema
+
+        // Validate geographic restrictions (same panchayat requirement)
+        if (team.captainUser.panchayat && panchayat !== team.captainUser.panchayat) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'All players must be from the same panchayat as the captain',
+          })
+        }
+
+        // Check if user already exists
+        let user = await tx.user.findUnique({
+          where: { phone },
+        })
+
+        // If user doesn't exist, create new user
+        if (!user) {
+          user = await tx.user.create({
+            data: {
+              firstName,
+              lastName,
+              phone,
+              dateOfBirth,
+              age,
+              gender,
+              panchayat,
+              taluk,
+              district,
+              state,
+              pincode,
+            },
+          })
+        }
+
+        const teamPlayer = await tx.teamPlayer.create({
+          data: {
+            teamId,
+            userId: user.id,
+            position,
+            firstName,
+            lastName,
+            phone,
+            dateOfBirth,
+            age,
+            gender,
+            panchayat,
+            taluk,
+            district,
+            state,
+            pincode,
+            addedBy: 'captain',
+            verificationStatus: verificationStatus || 'pending',
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                age: true,
+                gender: true,
+              },
+            },
+          },
+        })
+
+        return teamPlayer
+      })
+    }),
+
+  // Update player in team
+  updatePlayer: protectedProcedure
+    .input(z.object({
+      playerId: z.string(),
+      position: z.enum(['main', 'substitute']),
+      firstName: z.string().min(1).max(100),
+      lastName: z.string().min(1).max(100),
+      phone: z.string(),
+      dateOfBirth: z.date(),
+      age: z.number(),
+      gender: z.enum(['M', 'F']),
+      panchayat: z.string(),
+      taluk: z.string(),
+      district: z.string(),
+      state: z.string(),
+      pincode: z.string(),
+      verificationStatus: z.enum(['pending', 'verified', 'rejected']).optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { playerId, ...updateData } = input
+
+      // Check if user is captain of the team this player belongs to
+      const teamPlayer = await db.teamPlayer.findUnique({
+        where: { id: playerId },
+        include: { team: true }
       })
 
-      return teamPlayer
+      if (!teamPlayer || teamPlayer.team.captainId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only update players in your own team',
+        })
+      }
+
+      // Update both TeamPlayer and User records
+      const updatedPlayer = await db.$transaction(async (tx) => {
+        // Update TeamPlayer record
+        const updatedTeamPlayer = await tx.teamPlayer.update({
+          where: { id: playerId },
+          data: updateData,
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                profileImages: true,
+              },
+            },
+          },
+        })
+
+        // Update User record
+        await tx.user.update({
+          where: { id: updatedTeamPlayer.userId },
+          data: {
+            firstName: updateData.firstName,
+            lastName: updateData.lastName,
+            phone: updateData.phone,
+            dateOfBirth: updateData.dateOfBirth,
+            age: updateData.age,
+            gender: updateData.gender,
+            panchayat: updateData.panchayat,
+            taluk: updateData.taluk,
+            district: updateData.district,
+            state: updateData.state,
+            pincode: updateData.pincode,
+          }
+        })
+
+        return updatedTeamPlayer
+      })
+
+      return updatedPlayer
     }),
 
   // Remove player from team
   removePlayer: protectedProcedure
-    .input(removeTeamPlayerSchema)
+    .input(z.object({
+      playerId: z.string(),
+    }))
     .mutation(async ({ input, ctx }) => {
-      const { teamId, userId } = input
+      const { playerId } = input
 
-      // Check if user is captain of this team
-      const team = await db.team.findUnique({
-        where: { id: teamId },
-        select: { captainId: true },
+      // Get player and team info
+      const teamPlayer = await db.teamPlayer.findUnique({
+        where: { id: playerId },
+        include: { team: true }
       })
 
-      if (!team || team.captainId !== ctx.user.id) {
+      if (!teamPlayer) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Player not found',
+        })
+      }
+
+      // Check if user is captain of this team
+      if (teamPlayer.team.captainId !== ctx.user.id) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'You can only remove players from your own team',
         })
       }
 
+      // Check if team can be modified based on current status
+      if (!canModifyTeam(teamPlayer.team.status as any)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Cannot remove players after team submission',
+        })
+      }
+
       // Use transaction for atomic operations
       await db.$transaction(async (tx) => {
         await tx.teamPlayer.delete({
-          where: {
-            teamId_userId: {
-              teamId,
-              userId,
-            },
-          },
+          where: { id: playerId },
         });
 
         // Update user's current team if this was their active team
         await tx.user.updateMany({
           where: { 
-            id: userId,
-            currentTeamId: teamId
+            id: teamPlayer.userId,
+            currentTeamId: teamPlayer.teamId
           },
           data: { currentTeamId: null }
         });

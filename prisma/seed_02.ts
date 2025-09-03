@@ -186,16 +186,18 @@ const clusterDivisionMappings = [
   {
     id: "550e8400-e29b-41d4-a716-446655440401",
     eventId: "550e8400-e29b-41d4-a716-446655440301",
-    clusterId: "cluster-telangana-north",
-    divisionId: "division-south-india",
-    isActive: true
+    state: "Telangana",
+    clusterVenueMappingId: "550e8400-e29b-41d4-a716-446655440201",
+    divisionVenueMappingId: "8d81ed70-e80c-4a79-b9f8-096cea520e96",
+    autoAssigned: false
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440402",
     eventId: "550e8400-e29b-41d4-a716-446655440301",
-    clusterId: "cluster-tamil-nadu-west",
-    divisionId: "division-south-india",
-    isActive: true
+    state: "Tamil Nadu",
+    clusterVenueMappingId: "550e8400-e29b-41d4-a716-446655440203",
+    divisionVenueMappingId: "8d81ed70-e80c-4a79-b9f8-096cea520e96",
+    autoAssigned: false
   }
 ];
 
@@ -205,28 +207,28 @@ const locationClusterMappings = [
     id: "550e8400-e29b-41d4-a716-446655440501",
     eventId: "550e8400-e29b-41d4-a716-446655440301",
     locationType: "district",
-    district: "ADILABAD",
+    locationName: "ADILABAD",
     state: "Telangana",
-    clusterId: "cluster-telangana-north",
-    isActive: true
+    district: "ADILABAD",
+    clusterVenueMappingId: "550e8400-e29b-41d4-a716-446655440201"
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440502",
     eventId: "550e8400-e29b-41d4-a716-446655440301",
     locationType: "district",
-    district: "JOGULAMBA GADWAL",
+    locationName: "JOGULAMBA GADWAL",
     state: "Telangana",
-    clusterId: "cluster-telangana-north",
-    isActive: true
+    district: "JOGULAMBA GADWAL",
+    clusterVenueMappingId: "550e8400-e29b-41d4-a716-446655440202"
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440503",
     eventId: "550e8400-e29b-41d4-a716-446655440301",
     locationType: "district",
-    district: "COIMBATORE",
+    locationName: "COIMBATORE",
     state: "Tamil Nadu",
-    clusterId: "cluster-tamil-nadu-west",
-    isActive: true
+    district: "COIMBATORE",
+    clusterVenueMappingId: "550e8400-e29b-41d4-a716-446655440203"
   }
 ];
 
@@ -245,7 +247,7 @@ const volunteerAssignments = [
     eventId: "550e8400-e29b-41d4-a716-446655440301",
     volunteerId: "550e8400-e29b-41d4-a716-446655440104",
     venueLevelMappingId: "550e8400-e29b-41d4-a716-446655440202",
-    volunteerType: "verification_volunteer",
+    volunteerType: "general_volunteer",
     status: "assigned"
   },
   {

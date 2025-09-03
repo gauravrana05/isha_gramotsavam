@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/server/trpc/react';
+import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
 import DocumentPreview from '@/components/documents/DocumentPreview';
 import PlayerDocumentUpload from '@/components/players/PlayerDocumentUpload';
 import { Button } from '@/components/ui/Button';
@@ -15,8 +16,12 @@ import { useAlert } from '@/hooks/useAlert';
 import { formatPhoneForDisplay, normalizePhoneNumber } from '@/lib/utils/phone';
 import { 
   User, 
+  Camera,
+  Upload,
+  ArrowLeft,
   Edit3,
   X,
+  CheckCircle,
   Loader2
 } from 'lucide-react';
 
@@ -64,17 +69,12 @@ export default function CaptainTeamPage() {
   const [error, setError] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const [showPlayerModal, setShowPlayerModal] = useState(false);
+  const [showImageUpload, setShowImageUpload] = useState(false);
   const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
   const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
   const [searchPhone, setSearchPhone] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<{
-    type: 'remove' | 'promote' | 'submit';
-    message: string;
-    onConfirm: () => void;
-  } | null>(null);
   const [playerFormData, setPlayerFormData] = useState({
     phone: '',
     firstName: '',
@@ -99,12 +99,6 @@ export default function CaptainTeamPage() {
   const { data: teamPlayers, refetch: refetchPlayers } = api.teams.players.getTeamPlayers.useQuery(
     { teamId: teamId },
     { enabled: !!teamId }
-  );
-  
-  // Get sport details for proper validation
-  const { data: sportData } = api.sports.getByIdOrName.useQuery(
-    { identifier: teamData?.sport?.id || '' },
-    { enabled: !!teamData?.sport?.id }
   );
 
   const addPlayerMutation = api.teams.players.addPlayer.useMutation({
@@ -156,6 +150,16 @@ export default function CaptainTeamPage() {
     }
   });
 
+  const uploadTeamImageMutation = api.teams.management.uploadTeamImage.useMutation({
+    onSuccess: () => {
+      refetchTeam();
+      setShowImageUpload(false);
+      showSuccess('Team photo uploaded successfully!');
+    },
+    onError: (error) => {
+      showError(`Error: ${error.message}`);
+    }
+  });
 
   const submitTeamMutation = api.teams.verification.submitForVerification.useMutation({
     onSuccess: () => {
@@ -249,22 +253,10 @@ export default function CaptainTeamPage() {
       };
 
       if (isEditMode && editingPlayerId) {
-        const editData = {
+        editPlayerMutation.mutate({
           playerId: editingPlayerId,
-          position: playerData.position,
-          firstName: playerData.firstName,
-          lastName: playerData.lastName, 
-          phone: normalizedPhone,
-          dateOfBirth: new Date(playerFormData.dob),
-          age: new Date().getFullYear() - new Date(playerFormData.dob).getFullYear(),
-          gender: 'M' as const, // This should be determined from form or user data
-          panchayat: team.panchayat,
-          taluk: team.taluk || 'Unknown',
-          district: team.district,
-          state: team.state || 'Unknown',
-          pincode: team.pincode || '000000'
-        };
-        editPlayerMutation.mutate(editData);
+          ...playerData
+        });
       } else {
         addPlayerMutation.mutate(playerData);
       }
@@ -351,95 +343,46 @@ export default function CaptainTeamPage() {
     setShowPlayerModal(true);
   };
 
-  const handleRemovePlayer = useCallback((playerId: string, playerName?: string) => {
-    if (!playerId) {
-      showError('Invalid player ID');
-      return;
+  const handleRemovePlayer = (playerId: string) => {
+    if (window.confirm('Are you sure you want to remove this player from the team?')) {
+      removePlayerMutation.mutate({ playerId });
     }
-    
-    setConfirmAction({
-      type: 'remove',
-      message: `Are you sure you want to remove ${playerName || 'this player'} from the team?`,
-      onConfirm: () => {
-        removePlayerMutation.mutate({ playerId });
-        setShowConfirmModal(false);
-        setConfirmAction(null);
-      }
-    });
-    setShowConfirmModal(true);
-  }, [removePlayerMutation, showError]);
+  };
 
-  const handlePromoteCaptain = useCallback(() => {
-    if (!selectedPlayer || !team?.id) {
-      showError('Invalid selection');
-      return;
+  const handlePromoteCaptain = () => {
+    if (selectedPlayer && window.confirm(`Are you sure you want to promote ${selectedPlayer.name} as the new captain? You will become a regular player.`)) {
+      promoteCaptainMutation.mutate({ 
+        teamId: team?.id || '',
+        newCaptainId: selectedPlayer.userId || selectedPlayer.id 
+      });
     }
-    
-    const newCaptainId = selectedPlayer.userId || selectedPlayer.id;
-    if (!newCaptainId) {
-      showError('Cannot identify player for promotion');
-      return;
+  };
+    if (selectedPlayer) {
+      setIsEditMode(true);
+      setEditingPlayerId(selectedPlayer.id);
+      
+      // Find the actual teamPlayer data
+      const teamPlayer = teamPlayers?.find(tp => tp.id === selectedPlayer.id);
+      
+      setPlayerFormData({
+        phone: teamPlayer?.phone?.replace('+91', '') || '',
+        firstName: teamPlayer?.firstName || '',
+        lastName: teamPlayer?.lastName || '',
+        dob: teamPlayer?.dateOfBirth ? new Date(teamPlayer.dateOfBirth).toISOString().split('T')[0] : '',
+        whatsappNumber: teamPlayer?.whatsappNumber?.replace('+91', '') || '',
+        position: teamPlayer?.position || 'main'
+      });
+      setShowPlayerModal(false);
+      setShowAddPlayerModal(true);
     }
-    
-    setConfirmAction({
-      type: 'promote',
-      message: `Are you sure you want to promote ${selectedPlayer.name} as the new captain? You will become a regular player.`,
-      onConfirm: () => {
-        promoteCaptainMutation.mutate({ 
-          teamId: team.id,
-          newCaptainId 
-        });
-        setShowConfirmModal(false);
-        setConfirmAction(null);
-      }
-    });
-    setShowConfirmModal(true);
-  }, [selectedPlayer, team?.id, promoteCaptainMutation, showError]);
+  };
 
-  const handleEditPlayer = useCallback(() => {
-    if (!selectedPlayer) {
-      showError('No player selected');
-      return;
-    }
-    
-    setIsEditMode(true);
-    setEditingPlayerId(selectedPlayer.id);
-    
-    // Find the actual teamPlayer data
-    const teamPlayer = teamPlayers?.find(tp => tp.id === selectedPlayer.id);
-    
-    if (!teamPlayer) {
-      showError('Player data not found');
-      return;
-    }
-    
-    setPlayerFormData({
-      phone: teamPlayer.phone?.replace(/^\+91/, '') || '',
-      firstName: teamPlayer.firstName || '',
-      lastName: teamPlayer.lastName || '',
-      dob: teamPlayer.dateOfBirth ? new Date(teamPlayer.dateOfBirth).toISOString().split('T')[0] : '',
-      whatsappNumber: teamPlayer.whatsappNumber?.replace(/^\+91/, '') || teamPlayer.phone?.replace(/^\+91/, '') || '',
-      position: (teamPlayer.position as 'main' | 'substitute') || 'main'
-    });
-    setShowPlayerModal(false);
-    setShowAddPlayerModal(true);
-  }, [selectedPlayer, teamPlayers, showError]);
-
-  const handleSubmitTeam = useCallback(() => {
+  const handleSubmitTeam = () => {
     if (!team || !teamPlayers) return;
     
-    // Validate minimum main players using actual sport data
+    // Validate minimum main players
     const mainPlayersCount = teamPlayers.filter(p => p.position === 'main').length;
-    const requiredMainPlayers = sportData?.mainPlayersCount || teamData?.sport?.mainPlayersCount || 6;
-    
-    // Debug logging
-    console.log('Team submission validation:', {
-      mainPlayersCount,
-      requiredMainPlayers,
-      sportData: sportData?.mainPlayersCount,
-      teamSport: teamData?.sport?.mainPlayersCount,
-      sportName: sportData?.name || teamData?.sport?.name
-    });
+    const requiredMainPlayers = team.sport?.mainPlayersCount || 6;
     
     if (mainPlayersCount < requiredMainPlayers) {
       showError(`You need at least ${requiredMainPlayers} main players to submit the team. Currently you have ${mainPlayersCount}.`);
@@ -457,17 +400,10 @@ export default function CaptainTeamPage() {
       return;
     }
     
-    setConfirmAction({
-      type: 'submit',
-      message: 'Are you sure you want to submit this team? Once submitted, you cannot make changes.',
-      onConfirm: () => {
-        submitTeamMutation.mutate({ teamId: team.id });
-        setShowConfirmModal(false);
-        setConfirmAction(null);
-      }
-    });
-    setShowConfirmModal(true);
-  }, [team, teamPlayers, sportData, submitTeamMutation, showError]);
+    if (window.confirm('Are you sure you want to submit this team? Once submitted, you cannot make changes.')) {
+      submitTeamMutation.mutate({ teamId: team.id });
+    }
+  };
 
   const playerColumns = useMemo<Column[]>(() => [
     {
@@ -579,7 +515,66 @@ export default function CaptainTeamPage() {
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <button 
+            onClick={() => router.push(`/${lang}/captain/teams`)} 
+            className="text-[#F28C38] hover:text-[#E67A26] flex items-center"
+          >
+            <ArrowLeft className="w-5 h-5 mr-1" />
+            Back to Teams
+          </button>
+          
+          {isTeamSubmitted && (
+            <div className="flex items-center text-green-600">
+              <CheckCircle className="w-5 h-5 mr-2" />
+              Team Submitted
+            </div>
+          )}
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Team {team?.name}</h1>
+      </div>
 
+      {/* Team Photo */}
+      <div className="hidden md:flex justify-center mb-6">
+        <div className="w-1/2 flex flex-col items-center">
+          <div className="relative">
+            {team.teamImageUrl ? (
+              <>
+                <DocumentPreview
+                  type="teamPhoto"
+                  url={team.teamImageUrl}
+                  label="Team Photo"
+                  showActions={false}
+                  size="xxl"
+                />
+                {!isTeamSubmitted && (
+                  <button
+                    onClick={() => setShowImageUpload(true)}
+                    className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md border hover:bg-gray-50 transition-colors"
+                  >
+                    <Edit3 className="w-4 h-4 text-gray-600" />
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="w-[300px] h-[300px] bg-gray-100 rounded-lg border flex items-center justify-center">
+                <Camera className="w-16 h-16 text-gray-400" />
+              </div>
+            )}
+          </div>
+          
+          {!team.teamImageUrl && !isTeamSubmitted && (
+            <button
+              onClick={() => setShowImageUpload(true)}
+              className="mt-4 text-sm text-[#F28C38] hover:text-[#E67A26] flex items-center"
+            >
+              <Upload className="w-4 h-4 mr-1" />
+              Add Team Photo
+            </button>
+          )}
+        </div>
+      </div>
 
       <AdvancedTable
         data={players}
@@ -612,7 +607,7 @@ export default function CaptainTeamPage() {
               View Details
             </button>
             <button
-              onClick={() => handleRemovePlayer(selectedPlayer.id, selectedPlayer.name)}
+              onClick={() => handleRemovePlayer(selectedPlayer.id)}
               className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm"
             >
               Remove Player
@@ -816,6 +811,28 @@ export default function CaptainTeamPage() {
         </div>
       )}
 
+      {/* Team Photo Upload Modal */}
+      {showImageUpload && !isTeamSubmitted && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Upload Team Photo</h3>
+              <button onClick={() => setShowImageUpload(false)}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <TeamPhotoUpload
+              teamId={teamId}
+              currentUrl={team?.teamImageUrl}
+              onSuccess={async (url) => {
+                uploadTeamImageMutation.mutate({ teamId, imageUrl: url });
+              }}
+              onError={(error) => showError(`Upload failed: ${error}`)}
+              variant="card"
+            />
+          </div>
+        </div>
+      )}
       
       {/* Player Details Modal */}
       {selectedPlayer && (
@@ -902,35 +919,7 @@ export default function CaptainTeamPage() {
                     documentType="profilePhoto"
                     label="Profile Photo"
                     currentUrl={selectedPlayer.documents.profilePhoto?.url}
-                    onSuccess={async () => {
-                      const { data: updatedPlayers } = await refetchPlayers();
-                      if (updatedPlayers) {
-                        const updatedPlayer = updatedPlayers.find(p => p.id === selectedPlayer.id);
-                        if (updatedPlayer) {
-                          const formattedPlayer = {
-                            id: updatedPlayer.id,
-                            userId: updatedPlayer.user?.id,
-                            name: `${updatedPlayer.user?.firstName || ''} ${updatedPlayer.user?.lastName || ''}`.trim(),
-                            firstName: updatedPlayer.user?.firstName || '',
-                            lastName: updatedPlayer.user?.lastName || '',
-                            phone: updatedPlayer.user?.phone || '',
-                            age: updatedPlayer.user?.dateOfBirth ? new Date().getFullYear() - new Date(updatedPlayer.user.dateOfBirth).getFullYear() : 0,
-                            gender: updatedPlayer.user?.gender || 'M',
-                            position: updatedPlayer.position || 'main',
-                            dob: updatedPlayer.user?.dateOfBirth,
-                            whatsappNumber: updatedPlayer.user?.phone,
-                            village: updatedPlayer.village || '',
-                            documents: {
-                              profilePhoto: { url: updatedPlayer.user?.profileImages?.profilePhotoPath || null, verified: false },
-                              aadhaarFront: { url: updatedPlayer.user?.profileImages?.aadhaarFrontPath || null, verified: false },
-                              aadhaarBack: { url: updatedPlayer.user?.profileImages?.aadhaarBackPath || null, verified: false }
-                            },
-                            verificationStatus: updatedPlayer.verificationStatus || 'pending'
-                          };
-                          setSelectedPlayer(formattedPlayer);
-                        }
-                      }
-                    }}
+                    onSuccess={() => refetchPlayers()}
                     onError={(error) => showError(`Upload failed: ${error}`)}
                     variant="card"
                   />
@@ -961,47 +950,6 @@ export default function CaptainTeamPage() {
             )}
           </div>
         </EnhancedModal>
-      )}
-      
-      {/* Confirmation Modal */}
-      {showConfirmModal && confirmAction && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg max-w-md w-full mx-4 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              {confirmAction.type === 'remove' && 'Remove Player'}
-              {confirmAction.type === 'promote' && 'Promote Captain'}
-              {confirmAction.type === 'submit' && 'Submit Team'}
-            </h3>
-            <p className="text-gray-600 mb-6">
-              {confirmAction.message}
-            </p>
-            <div className="flex space-x-3 justify-end">
-              <button
-                onClick={() => {
-                  setShowConfirmModal(false);
-                  setConfirmAction(null);
-                }}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmAction.onConfirm}
-                className={`px-4 py-2 text-white rounded-lg transition-colors ${
-                  confirmAction.type === 'remove' 
-                    ? 'bg-red-600 hover:bg-red-700' 
-                    : confirmAction.type === 'promote'
-                    ? 'bg-green-600 hover:bg-green-700'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
-                {confirmAction.type === 'remove' && 'Remove'}
-                {confirmAction.type === 'promote' && 'Promote'}
-                {confirmAction.type === 'submit' && 'Submit'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
       
       <AlertModal

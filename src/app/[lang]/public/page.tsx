@@ -13,6 +13,7 @@ import TransformationStories from '@/components/public/TransformationStories'
 import CulturalEvents from '@/components/public/CulturalEvents'
 import AwardsRecognition from '@/components/public/AwardsRecognition'
 import FAQSection from '@/components/public/FAQSection'
+import RefreshTracker from '@/components/debug/RefreshTracker'
 
 interface PublicPageProps {
   params: Promise<{
@@ -25,6 +26,8 @@ export default async function PublicPage({ params }: PublicPageProps) {
 
   return (
     <main className="min-h-screen">
+      <RefreshTracker page="PublicPage" />
+      
       {/* Hero Section with improved background and layout */}
       <HeroSection lang={lang} />
       

@@ -87,6 +87,10 @@ export default function TeamMatchDayVerificationPage() {
   const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
   const [isSearchingPhone, setIsSearchingPhone] = useState(false);
   const [playerExists, setPlayerExists] = useState(false);
+  const [foundUser, setFoundUser] = useState<any>(null);
+  const [searchPhone, setSearchPhone] = useState('');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [playerFormData, setPlayerFormData] = useState({
     phone: '',
     firstName: '',
@@ -128,8 +132,27 @@ export default function TeamMatchDayVerificationPage() {
   });
 
   const uploadTeamImageMutation = api.volunteers.venue.uploadTeamImage.useMutation({
-    onSuccess: () => {
-      refetchTeam();
+    onSuccess: async () => {
+      const { data: updatedData } = await refetchTeam();
+      if (updatedData) {
+        // Update team state with fresh data
+        const mappedTeam = {
+          id: updatedData.id,
+          name: updatedData.name,
+          sportName: updatedData.sport?.name || '',
+          captainProfile: {
+            name: `${updatedData.captainUser?.firstName || ''} ${updatedData.captainUser?.lastName || ''}`.trim(),
+            phone: updatedData.captainUser?.phone || '',
+          },
+          panchayat: updatedData.panchayat || '',
+          district: updatedData.district || '',
+          currentPlayers: updatedData.teamPlayers?.length || 0,
+          maxPlayers: updatedData.maxPlayers || 11,
+          status: updatedData.status || 'active',
+          teamImageUrl: updatedData.teamPhoto?.photoPath,
+        };
+        setTeam(mappedTeam);
+      }
       setShowImageUpload(false);
       showSuccess('Team photo uploaded successfully!');
     },
@@ -138,10 +161,86 @@ export default function TeamMatchDayVerificationPage() {
     }
   });
 
+  const removePlayerMutation = api.volunteers.venue.removePlayer.useMutation({
+    onSuccess: () => {
+      refetchTeam();
+      showSuccess('Player removed successfully!');
+    },
+    onError: (error) => {
+      showError(`Error: ${error.message}`);
+    }
+  });
+
+  const updatePlayerMutation = api.volunteers.venue.updatePlayer.useMutation({
+    onSuccess: () => {
+      refetchTeam();
+      setShowAddPlayerModal(false);
+      setPlayerFormData({ phone: '', firstName: '', lastName: '', dob: '', whatsappNumber: '', village: '', position: 'main' });
+      setIsEditMode(false);
+      setEditingPlayerId(null);
+      showSuccess('Player updated successfully!');
+    },
+    onError: (error) => {
+      showError(`Error: ${error.message}`);
+    }
+  });
+
   useEffect(() => {
     if (teamData) {
-      setTeam(teamData.team);
-      setPlayers(teamData.players || []);
+      // Map the API response to expected structure
+      const mappedTeam = {
+        id: teamData.id,
+        name: teamData.name,
+        sportName: teamData.sport?.name || '',
+        captainProfile: {
+          name: `${teamData.captainUser?.firstName || ''} ${teamData.captainUser?.lastName || ''}`.trim(),
+          phone: teamData.captainUser?.phone || '',
+        },
+        panchayat: teamData.panchayat || '',
+        district: teamData.district || '',
+        currentPlayers: teamData.teamPlayers?.length || 0,
+        maxPlayers: teamData.maxPlayers || 11,
+        status: teamData.status || 'active',
+        teamImageUrl: teamData.teamPhoto?.photoPath,
+      };
+
+      const mappedPlayers = teamData.teamPlayers?.map(player => {
+        // Extract documents from profileImages object (not array)
+        const profileImages = player.user?.profileImages;
+
+        return {
+          id: player.id,
+          userId: player.user?.id,
+          name: `${player.user?.firstName || ''} ${player.user?.lastName || ''}`.trim(),
+          firstName: player.user?.firstName || '',
+          lastName: player.user?.lastName || '',
+          phone: player.user?.phone || '',
+          age: player.user?.dateOfBirth ? new Date().getFullYear() - new Date(player.user.dateOfBirth).getFullYear() : 0,
+          gender: player.user?.gender || 'M',
+          position: player.position || 'main',
+          dob: player.user?.dateOfBirth,
+          whatsappNumber: player.user?.phone,
+          village: player.village || '',
+          documents: {
+            profilePhoto: { 
+              url: profileImages?.profilePhotoPath || null, 
+              verified: false 
+            },
+            aadhaarFront: { 
+              url: profileImages?.aadhaarFrontPath || null, 
+              verified: false 
+            },
+            aadhaarBack: { 
+              url: profileImages?.aadhaarBackPath || null, 
+              verified: false 
+            },
+          },
+          verificationStatus: player.verificationStatus || 'pending',
+        };
+      }) || [];
+
+      setTeam(mappedTeam);
+      setPlayers(mappedPlayers);
       setLoading(false);
     }
   }, [teamData]);
@@ -174,26 +273,133 @@ export default function TeamMatchDayVerificationPage() {
     try {
       const normalizedPhone = playerFormData.phone.startsWith('+91') ? playerFormData.phone : `+91${playerFormData.phone}`;
       
-      addPlayerMutation.mutate({
-        teamId: team.id,
-        playerData: {
-          name: `${playerFormData.firstName} ${playerFormData.lastName}`.trim(),
+      if (isEditMode && editingPlayerId) {
+        updatePlayerMutation.mutate({
+          playerId: editingPlayerId,
+          teamId: team.id,
+          venueId,
+          position: playerFormData.position,
           firstName: playerFormData.firstName,
           lastName: playerFormData.lastName,
           phone: normalizedPhone,
-          dateOfBirth: playerFormData.dob,
+          dateOfBirth: new Date(playerFormData.dob),
           gender: 'M',
-          whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
           village: playerFormData.village,
-          panchayat: team.panchayat,
-          district: team.district,
-          position: playerFormData.position
-        }
-      });
+        });
+      } else {
+        addPlayerMutation.mutate({
+          teamId: team.id,
+          playerData: {
+            name: `${playerFormData.firstName} ${playerFormData.lastName}`.trim(),
+            firstName: playerFormData.firstName,
+            lastName: playerFormData.lastName,
+            phone: normalizedPhone,
+            dateOfBirth: playerFormData.dob,
+            gender: 'M',
+            whatsappNumber: playerFormData.whatsappNumber || playerFormData.phone,
+            village: playerFormData.village,
+            panchayat: team.panchayat,
+            district: team.district,
+            position: playerFormData.position
+          }
+        });
+      }
     } finally {
       setIsSubmittingAdd(false);
     }
   };
+
+  const handleEditPlayer = (player: PlayerData) => {
+    setPlayerFormData({
+      phone: player.phone.replace('+91', ''),
+      firstName: player.firstName || '',
+      lastName: player.lastName || '',
+      dob: player.dob ? new Date(player.dob).toISOString().split('T')[0] : '',
+      whatsappNumber: player.whatsappNumber || '',
+      village: player.village || '',
+      position: player.position as 'main' | 'substitute'
+    });
+    setIsEditMode(true);
+    setEditingPlayerId(player.id);
+    setShowAddPlayerModal(true);
+  };
+
+  const handleRemovePlayer = (player: PlayerData) => {
+    if (confirm(`Are you sure you want to remove ${player.name} from the team?`)) {
+      removePlayerMutation.mutate({
+        playerId: player.id,
+        teamId: teamId,
+        venueId
+      });
+    }
+  };
+
+  const resetPlayerForm = () => {
+    setPlayerFormData({ phone: '', firstName: '', lastName: '', dob: '', whatsappNumber: '', village: '', position: 'main' });
+    setIsEditMode(false);
+    setEditingPlayerId(null);
+    setFoundUser(null);
+    setPlayerExists(false);
+  };
+
+  // Phone search functionality
+  const { data: searchedUser } = api.users.findByPhone.useQuery(
+    { phone: searchPhone },
+    { 
+      enabled: !!searchPhone && searchPhone.length === 13, // +91 + 10 digits
+      onSuccess: (data) => {
+        setFoundUser(data);
+        setIsSearchingPhone(false);
+        if (data) {
+          setPlayerFormData(prev => ({
+            ...prev,
+            firstName: data.firstName || '',
+            lastName: data.lastName || '',
+            dob: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString().split('T')[0] : '',
+            whatsappNumber: data.phone?.replace('+91', '') || ''
+          }));
+        }
+      },
+      onError: () => {
+        setFoundUser(null);
+        setIsSearchingPhone(false);
+      }
+    }
+  );
+
+  const handlePhoneSearch = (phone: string) => {
+    setPlayerFormData(prev => ({ ...prev, phone }));
+    
+    if (phone.length === 10) {
+      setIsSearchingPhone(true);
+      setSearchPhone(`+91${phone}`);
+    } else {
+      setSearchPhone('');
+      setFoundUser(null);
+      if (phone.length === 0) {
+        setPlayerFormData(prev => ({
+          ...prev,
+          firstName: '',
+          lastName: '',
+          dob: '',
+          whatsappNumber: ''
+        }));
+      }
+    }
+  };
+
+  // Auto-populate form when user is found
+  useEffect(() => {
+    if (foundUser && playerFormData.phone.length === 10) {
+      setPlayerFormData(prev => ({
+        ...prev,
+        firstName: foundUser.firstName || prev.firstName,
+        lastName: foundUser.lastName || prev.lastName,
+        dob: foundUser.dateOfBirth ? new Date(foundUser.dateOfBirth).toISOString().split('T')[0] : prev.dob,
+        whatsappNumber: foundUser.phone?.replace('+91', '') || prev.whatsappNumber
+      }));
+    }
+  }, [foundUser, playerFormData.phone]);
 
   const handleStatusChangeBulk = async (playersToUpdate: PlayerData[], status: 'pending' | 'verified' | 'approved' | 'rejected') => {
     if (!user) return;
@@ -264,6 +470,8 @@ export default function TeamMatchDayVerificationPage() {
             <img
               src={player.documents.profilePhoto.url}
               alt="Profile"
+              width={32}
+              height={32}
               className="w-8 h-8 rounded-full object-cover"
             />
           ) : (
@@ -314,19 +522,6 @@ export default function TeamMatchDayVerificationPage() {
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-6">
-        <div className="flex items-center mb-4">
-          <button 
-            onClick={() => router.back()} 
-            className="text-[#F28C38] hover:text-[#E67A26] flex items-center mr-4"
-          >
-            <ArrowLeft className="w-5 h-5 mr-1" />
-            Back to Teams
-          </button>
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900">Team {team?.name}</h1>
-      </div>
-
       {/* Team Photo */}
       <div className="hidden md:flex justify-center mb-6">
         <div className="w-1/2 flex flex-col items-center">
@@ -426,8 +621,13 @@ export default function TeamMatchDayVerificationPage() {
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-[#4A2F1D]">Add New Player</h2>
-                <button onClick={() => setShowAddPlayerModal(false)}>
+                <h2 className="text-xl font-bold text-[#4A2F1D]">
+                  {isEditMode ? 'Edit Player' : 'Add New Player'}
+                </h2>
+                <button onClick={() => {
+                  setShowAddPlayerModal(false);
+                  resetPlayerForm();
+                }}>
                   <X className="w-6 h-6" />
                 </button>
               </div>
@@ -441,10 +641,30 @@ export default function TeamMatchDayVerificationPage() {
                   value={playerFormData.phone}
                   onChange={(e) => {
                     const phone = e.target.value.replace(/\D/g, '').slice(0, 10);
-                    setPlayerFormData(prev => ({ ...prev, phone }));
+                    if (!isEditMode) {
+                      handlePhoneSearch(phone);
+                    } else {
+                      setPlayerFormData(prev => ({ ...prev, phone }));
+                    }
                   }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
+                  disabled={isEditMode}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent disabled:bg-gray-100"
                 />
+                {!isEditMode && isSearchingPhone && (
+                  <p className="mt-1 text-sm text-gray-500 flex items-center">
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                    Searching for player...
+                  </p>
+                )}
+                {!isEditMode && !isSearchingPhone && foundUser && (
+                  <p className="mt-1 text-sm text-[#3A7F3F]">✓ Player found in system</p>
+                )}
+                {!isEditMode && !isSearchingPhone && playerFormData.phone.length === 10 && !foundUser && (
+                  <p className="mt-1 text-sm text-gray-600">New player - fill in details below</p>
+                )}
+                {isEditMode && (
+                  <p className="mt-1 text-sm text-gray-500">Phone number cannot be changed in edit mode</p>
+                )}
               </div>
               {playerFormData.phone.length === 10 && (
                 <div className="space-y-4">
@@ -455,7 +675,8 @@ export default function TeamMatchDayVerificationPage() {
                         type="text" 
                         value={playerFormData.firstName} 
                         onChange={(e) => setPlayerFormData(prev => ({ ...prev, firstName: e.target.value }))} 
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]" 
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] disabled:bg-gray-100" 
+                        disabled={!isEditMode && !!foundUser}
                       />
                     </div>
                     <div>
@@ -464,7 +685,8 @@ export default function TeamMatchDayVerificationPage() {
                         type="text" 
                         value={playerFormData.lastName} 
                         onChange={(e) => setPlayerFormData(prev => ({ ...prev, lastName: e.target.value }))} 
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]" 
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] disabled:bg-gray-100" 
+                        disabled={!isEditMode && !!foundUser}
                       />
                     </div>
                   </div>
@@ -474,14 +696,32 @@ export default function TeamMatchDayVerificationPage() {
                       type="date" 
                       value={playerFormData.dob} 
                       onChange={(e) => setPlayerFormData(prev => ({ ...prev, dob: e.target.value }))} 
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]" 
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] disabled:bg-gray-100" 
+                      disabled={!isEditMode && !!foundUser}
                     />
                   </div>
+
+                  {playerExists && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="flex">
+                        <AlertTriangle className="w-5 h-5 text-yellow-400 mr-2 mt-0.5" />
+                        <div>
+                          <h3 className="text-sm font-medium text-yellow-800">Player Already Exists</h3>
+                          <p className="text-sm text-yellow-700 mt-1">
+                            This player is already registered in the system. Their existing details will be used.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="flex space-x-4 pt-4">
                 <button 
-                  onClick={() => setShowAddPlayerModal(false)} 
+                  onClick={() => {
+                    setShowAddPlayerModal(false);
+                    resetPlayerForm();
+                  }} 
                   className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
                 >
                   Cancel
@@ -491,7 +731,7 @@ export default function TeamMatchDayVerificationPage() {
                   disabled={!playerFormData.firstName || !playerFormData.lastName || !playerFormData.dob || isSubmittingAdd} 
                   className="flex-1 bg-[#F28C38] hover:bg-[#E67A26] disabled:bg-gray-400 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
                 >
-                  {isSubmittingAdd ? 'Adding...' : 'Add Player'}
+                  {isSubmittingAdd ? (isEditMode ? 'Updating...' : 'Adding...') : (isEditMode ? 'Update Player' : 'Add Player')}
                 </button>
               </div>
             </div>
@@ -518,7 +758,119 @@ export default function TeamMatchDayVerificationPage() {
                     documentType="profilePhoto"
                     label="Profile Photo"
                     currentUrl={selectedPlayer.documents.profilePhoto?.url}
-                    onSuccess={() => refetchTeam()}
+                    onSuccess={async () => {
+                      const { data: updatedData } = await refetchTeam();
+                      if (updatedData) {
+                        // Update the players state with fresh data
+                        const mappedPlayers = updatedData.teamPlayers?.map(player => {
+                          const profileImages = player.user?.profileImages;
+                          return {
+                            id: player.id,
+                            userId: player.user?.id,
+                            name: `${player.user?.firstName || ''} ${player.user?.lastName || ''}`.trim(),
+                            firstName: player.user?.firstName || '',
+                            lastName: player.user?.lastName || '',
+                            phone: player.user?.phone || '',
+                            age: player.user?.dateOfBirth ? new Date().getFullYear() - new Date(player.user.dateOfBirth).getFullYear() : 0,
+                            gender: player.user?.gender || 'M',
+                            position: player.position || 'main',
+                            dob: player.user?.dateOfBirth,
+                            whatsappNumber: player.user?.phone,
+                            village: player.village || '',
+                            documents: {
+                              profilePhoto: { url: profileImages?.profilePhotoPath || null, verified: false },
+                              aadhaarFront: { url: profileImages?.aadhaarFrontPath || null, verified: false },
+                              aadhaarBack: { url: profileImages?.aadhaarBackPath || null, verified: false },
+                            },
+                            verificationStatus: player.verificationStatus || 'pending',
+                          };
+                        }) || [];
+                        setPlayers(mappedPlayers);
+                        // Update selected player with fresh data
+                        const updatedPlayer = mappedPlayers.find(p => p.id === selectedPlayer.id);
+                        if (updatedPlayer) setSelectedPlayer(updatedPlayer);
+                      }
+                    }}
+                    onError={(error) => showError(`Upload failed: ${error}`)}
+                    variant="card"
+                  />
+                  <PlayerDocumentUpload
+                    playerId={selectedPlayer.id}
+                    playerUserId={selectedPlayer.userId || selectedPlayer.id}
+                    documentType="aadhaarFront"
+                    label="Aadhaar Front"
+                    currentUrl={selectedPlayer.documents.aadhaarFront?.url}
+                    onSuccess={async () => {
+                      const { data: updatedData } = await refetchTeam();
+                      if (updatedData) {
+                        const mappedPlayers = updatedData.teamPlayers?.map(player => {
+                          const profileImages = player.user?.profileImages;
+                          return {
+                            id: player.id,
+                            userId: player.user?.id,
+                            name: `${player.user?.firstName || ''} ${player.user?.lastName || ''}`.trim(),
+                            firstName: player.user?.firstName || '',
+                            lastName: player.user?.lastName || '',
+                            phone: player.user?.phone || '',
+                            age: player.user?.dateOfBirth ? new Date().getFullYear() - new Date(player.user.dateOfBirth).getFullYear() : 0,
+                            gender: player.user?.gender || 'M',
+                            position: player.position || 'main',
+                            dob: player.user?.dateOfBirth,
+                            whatsappNumber: player.user?.phone,
+                            village: player.village || '',
+                            documents: {
+                              profilePhoto: { url: profileImages?.profilePhotoPath || null, verified: false },
+                              aadhaarFront: { url: profileImages?.aadhaarFrontPath || null, verified: false },
+                              aadhaarBack: { url: profileImages?.aadhaarBackPath || null, verified: false },
+                            },
+                            verificationStatus: player.verificationStatus || 'pending',
+                          };
+                        }) || [];
+                        setPlayers(mappedPlayers);
+                        const updatedPlayer = mappedPlayers.find(p => p.id === selectedPlayer.id);
+                        if (updatedPlayer) setSelectedPlayer(updatedPlayer);
+                      }
+                    }}
+                    onError={(error) => showError(`Upload failed: ${error}`)}
+                    variant="card"
+                  />
+                  <PlayerDocumentUpload
+                    playerId={selectedPlayer.id}
+                    playerUserId={selectedPlayer.userId || selectedPlayer.id}
+                    documentType="aadhaarBack"
+                    label="Aadhaar Back"
+                    currentUrl={selectedPlayer.documents.aadhaarBack?.url}
+                    onSuccess={async () => {
+                      const { data: updatedData } = await refetchTeam();
+                      if (updatedData) {
+                        const mappedPlayers = updatedData.teamPlayers?.map(player => {
+                          const profileImages = player.user?.profileImages;
+                          return {
+                            id: player.id,
+                            userId: player.user?.id,
+                            name: `${player.user?.firstName || ''} ${player.user?.lastName || ''}`.trim(),
+                            firstName: player.user?.firstName || '',
+                            lastName: player.user?.lastName || '',
+                            phone: player.user?.phone || '',
+                            age: player.user?.dateOfBirth ? new Date().getFullYear() - new Date(player.user.dateOfBirth).getFullYear() : 0,
+                            gender: player.user?.gender || 'M',
+                            position: player.position || 'main',
+                            dob: player.user?.dateOfBirth,
+                            whatsappNumber: player.user?.phone,
+                            village: player.village || '',
+                            documents: {
+                              profilePhoto: { url: profileImages?.profilePhotoPath || null, verified: false },
+                              aadhaarFront: { url: profileImages?.aadhaarFrontPath || null, verified: false },
+                              aadhaarBack: { url: profileImages?.aadhaarBackPath || null, verified: false },
+                            },
+                            verificationStatus: player.verificationStatus || 'pending',
+                          };
+                        }) || [];
+                        setPlayers(mappedPlayers);
+                        const updatedPlayer = mappedPlayers.find(p => p.id === selectedPlayer.id);
+                        if (updatedPlayer) setSelectedPlayer(updatedPlayer);
+                      }
+                    }}
                     onError={(error) => showError(`Upload failed: ${error}`)}
                     variant="card"
                   />
@@ -563,6 +915,33 @@ export default function TeamMatchDayVerificationPage() {
           subtitle={`${selectedPlayer.firstName} ${selectedPlayer.lastName} - Complete Information`}
           size="xl"
           mobileFullScreen={true}
+          footer={(
+            <div className="flex justify-between">
+              <button
+                onClick={() => {
+                  setShowPlayerModal(false);
+                  setSelectedPlayer(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Close
+              </button>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => handleEditPlayer(selectedPlayer)}
+                  className="px-4 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors"
+                >
+                  Edit Player
+                </button>
+                <button
+                  onClick={() => handleRemovePlayer(selectedPlayer)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Remove Player
+                </button>
+              </div>
+            </div>
+          )}
         >
           <div className="space-y-6">
             {/* Player Basic Info */}

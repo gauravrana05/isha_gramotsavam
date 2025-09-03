@@ -57,7 +57,7 @@ function VenueAssignmentModal({
   // Get available venues for this level and state
   const { data: venuesData, isLoading: venuesLoading } = api.admin.venues.getVenueLevelMappings.useQuery({
     eventId,
-    level,
+    level: 'cluster',
     state,
   }, {
     enabled: !!eventId && !!state,
@@ -86,7 +86,7 @@ function VenueAssignmentModal({
         teamId,
         eventId,
         venueLevelMappingId: selectedVenue,
-        level,
+        level: 'cluster',
       });
     }
   };
@@ -96,7 +96,7 @@ function VenueAssignmentModal({
       isOpen={isOpen}
       onClose={onClose}
       title="Assign Venues"
-      subtitle={`Select ${level} venue for ${selectedTeams.length} team(s) in ${state}`}
+      subtitle={`Select cluster venue for ${selectedTeams.length} team(s) in ${state}`}
       size="lg"
       mobileFullScreen={true}
     >
@@ -113,7 +113,7 @@ function VenueAssignmentModal({
               {venuesLoading ? (
                 <SelectItem value="loading" disabled>Loading venues...</SelectItem>
               ) : venuesData?.length === 0 ? (
-                <SelectItem value="no-venues" disabled>No venues available</SelectItem>
+                <SelectItem value="no-venues" disabled>No cluster venues available</SelectItem>
               ) : (
                 venuesData?.map((mapping) => (
                   <SelectItem key={mapping.id} value={mapping.id}>
@@ -442,7 +442,7 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
       return {
         teamId,
         level,
-        state: team.state,
+        state: team.captain.state,
         team
       };
     }).filter(Boolean);
@@ -477,14 +477,14 @@ export default function TeamVenueAssignmentPage({ params }: { params: Promise<{ 
       <div className="flex items-center space-x-3">
         <button
           onClick={() => {
-            console.log(`Assign ${level} venues to ${selectedTeams.size} teams in ${state}`);
+            console.log(`Assign cluster venues to ${selectedTeams.size} teams in ${state}`);
             setShowAssignModal(true);
           }}
           className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
           disabled={!selectedEvent || loading}
         >
           <MapPin className="w-4 h-4 mr-2" />
-          Assign {level.charAt(0).toUpperCase() + level.slice(1)} Venue ({selectedTeams.size})
+          Assign Cluster Venue ({selectedTeams.size})
         </button>
       </div>
     );

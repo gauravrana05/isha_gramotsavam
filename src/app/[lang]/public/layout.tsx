@@ -3,6 +3,7 @@ import Header from '@/components/common/Header'
 import Footer from '@/components/common/Footer'
 import { PublicOfflineProvider } from '@/context/PublicOfflineContext'
 import { PublicOfflineIndicator } from '@/components/public/PublicOfflineIndicator'
+import RefreshTracker from '@/components/debug/RefreshTracker'
 
 export default async function PublicLayout({
   children,
@@ -15,6 +16,8 @@ export default async function PublicLayout({
   return (
     <PublicOfflineProvider>
       <div className="min-h-screen bg-isha flex flex-col font-['FiraSans']">
+        <RefreshTracker page="PublicLayout" />
+        
         {/* Offline Status Indicator */}
         <PublicOfflineIndicator />
         

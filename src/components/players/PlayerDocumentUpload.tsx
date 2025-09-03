@@ -56,6 +56,14 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
 
   const utils = api.useUtils();
 
+  // Use tRPC mutation for updating image upload
+  const updateImageMutation = api.profile.updateImageUpload.useMutation({
+    onSuccess: () => {
+      utils.teams.players.getTeamPlayers.invalidate();
+      utils.profile.getProfile.invalidate();
+    }
+  });
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user || !playerUserId) return;
@@ -93,51 +101,28 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
       const uploadResult = await uploadResponse.json();
       const downloadURL = uploadResult.url;
 
-      // Update user document in database via direct fetch to tRPC endpoint (same as DocumentContext)
-      const response = await fetch('/api/trpc/profile.updateImageUpload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: playerUserId,
-          imageType: documentType,
-          imagePath: downloadURL,
-        }),
+      // Update user document in database via tRPC
+      await updateImageMutation.mutateAsync({
+        userId: playerUserId,
+        imageType: documentType,
+        imagePath: downloadURL,
       });
 
-      if (!response.ok) {
-        throw new Error(`Database update failed: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      // Invalidate profile completion cache to trigger refresh only when needed
-      try {
-        await utils.profile.checkCompletion.invalidate({ userId: playerUserId });
-      } catch (error) {
-        console.error('Profile completion invalidation failed:', error)
-      }
-
-      // Call onProfileComplete if provided
-      if (onProfileComplete) {
-        onProfileComplete(result.allImagesUploaded);
-      }
-
-      setUploading(false);
       setProgress(100);
       onSuccess?.(downloadURL);
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Upload failed';
-      setError(errorMessage);
+      console.error('Upload error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Upload failed';
+      setError(errorMsg);
+      onError?.(errorMsg);
+    } finally {
       setUploading(false);
       setProgress(0);
-      onError?.(errorMessage);
-    }
-
-    // Reset input value to allow re-uploading same file
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
     }
   };
 
@@ -223,6 +208,8 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
             <Image
               src={currentUrl}
               alt={label}
+              width={350}
+              height={350}
               className="w-full h-full max-h-[350px] object-cover rounded-lg mx-auto border border-gray-200 cursor-pointer"
               onClick={handleImageClick}
             />
@@ -374,6 +361,8 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
             <Image
               src={currentUrl}
               alt={label}
+              width={800}
+              height={600}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
             />

@@ -172,14 +172,16 @@ export default function TeamRegistrationPage() {
       // Use tRPC mutation - pass team data directly
       const result = await createTeamMutation.mutateAsync(teamData);
       
-      // Refresh user data to get updated role before navigating
-      await refreshUser();
+      // Refresh user data and wait for role update
+      const updatedUser = await refreshUser();
       
-      // Small delay to ensure role update is processed
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Verify role was updated to captain
+      if (updatedUser?.role !== 'captain') {
+        console.warn('Role not updated to captain, but proceeding with redirect');
+      }
       
-      // Navigate to team invite page
-      router.push(`/${lang}/captain/teams/${result.id}/players/invite`);
+      // Navigate to team dashboard
+      router.push(`/${lang}/captain/teams/${result.id}`);
 
     } catch (err: any) {
       // Error handling removed

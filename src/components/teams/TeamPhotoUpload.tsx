@@ -57,15 +57,24 @@ const TeamPhotoUpload: React.FC<TeamPhotoUploadProps> = ({
     setProgress(0);
 
     try {
-      // Upload to Firebase Storage
-      const downloadURL = await documentUploadService.uploadTeamPhoto(
-        teamId,
-        file,
-        (progress) => setProgress(progress.progress)
-      );
+      // Create FormData for server-side upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', teamId); // teamId is used as userId parameter for team photos
+      formData.append('documentType', 'teamPhoto');
 
-      // TODO: Update team document via tRPC once team endpoints are updated
-      // For now, just update UI state - tRPC integration pending
+      // Upload to server-side API endpoint
+      const uploadResponse = await fetch('/api/upload-document', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const { url: downloadURL } = await uploadResponse.json();
 
       setUploading(false);
       setProgress(100);

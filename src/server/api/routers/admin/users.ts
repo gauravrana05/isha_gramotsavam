@@ -166,7 +166,7 @@ export const adminUsersRouter = createTRPCRouter({
   // Search User by Phone
   searchUserByPhone: protectedProcedure
     .input(z.object({
-      phone: z.string().min(10).max(10),
+      phone: z.string().min(10).max(15), // Allow for country codes like +91
     }))
     .query(async ({ input, ctx }) => {
       if (ctx.user.role !== 'admin') {

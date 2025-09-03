@@ -308,14 +308,21 @@ export default function CompleteProfilePage() {
         preferredLanguage: formData.languagePreference || undefined,
       });
 
-      // Refresh user data to reflect changes
-      await refreshUser();
+      // Refresh user data and wait for profile completion status update
+      const updatedUser = await refreshUser();
+      
+      // Verify profile completion status was updated
+      if (!updatedUser?.profileComplete) {
+        console.warn('Profile completion status not updated, but proceeding with redirect');
+      }
 
       // Redirect to return URL if coming from team registration, otherwise to profile page
       if (returnTo) {
         router.push(decodeURIComponent(returnTo));
       } else {
-        router.push(`/${lang}/profile`);
+        // Redirect to appropriate dashboard based on user role
+        const dashboardRoute = getDashboardRoute(updatedUser?.role || 'public', lang as string);
+        router.push(dashboardRoute);
       }
     } catch (err: any) {
       // Error handling removed
