@@ -5,6 +5,12 @@ export type { LoadingSpinnerProps } from './LoadingSpinner';
 export { default as PageLoader } from './PageLoader';
 export type { PageLoaderProps } from './PageLoader';
 
+export { default as VolunteerPageLoader } from './VolunteerPageLoader';
+export type { VolunteerPageLoaderProps } from './VolunteerPageLoader';
+
+export { default as VolunteerContentLoader } from './VolunteerContentLoader';
+export type { VolunteerContentLoaderProps } from './VolunteerContentLoader';
+
 export { default as SectionLoader } from './SectionLoader';
 export type { SectionLoaderProps } from './SectionLoader';
 

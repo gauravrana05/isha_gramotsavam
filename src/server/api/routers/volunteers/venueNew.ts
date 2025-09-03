@@ -208,9 +208,23 @@ export const volunteersVenueRouter = createTRPCRouter({
         where: {
           teamVenueAssignments: {
             some: {
-              clusterVenueMapping: {
-                venueId: input.venueId
-              }
+              OR: [
+                {
+                  clusterVenueMapping: {
+                    venueId: input.venueId
+                  }
+                },
+                {
+                  divisionVenueMapping: {
+                    venueId: input.venueId
+                  }
+                },
+                {
+                  finalVenueMapping: {
+                    venueId: input.venueId
+                  }
+                }
+              ]
             }
           }
         },
@@ -290,12 +304,26 @@ export const volunteersVenueRouter = createTRPCRouter({
       }
 
       // Get teams assigned to this venue through TeamVenueAssignment
-      // Fixed: Query through teamVenueAssignment instead of fixtureTeam
+      // Fixed: Query through teamVenueAssignment for all venue levels
       const teamAssignments = await db.teamVenueAssignment.findMany({
         where: {
-          clusterVenueMapping: {
-            venueId: input.venueId
-          }
+          OR: [
+            {
+              clusterVenueMapping: {
+                venueId: input.venueId
+              }
+            },
+            {
+              divisionVenueMapping: {
+                venueId: input.venueId
+              }
+            },
+            {
+              finalVenueMapping: {
+                venueId: input.venueId
+              }
+            }
+          ]
         },
         include: {
           team: {
@@ -837,15 +865,29 @@ export const volunteersVenueRouter = createTRPCRouter({
         }
       });
 
-      // Get checked-in teams grouped by sport for tournament creation
+      // Get teams ready for tournaments (only checked-in teams)
       const checkedInTeams = await db.team.findMany({
         where: {
-          status: 'checked_in',
+          status: 'checked_in', // Only teams that are checked in and ready for tournaments
           teamVenueAssignments: {
             some: {
-              clusterVenueMapping: {
-                venueId: input.venueId
-              }
+              OR: [
+                {
+                  clusterVenueMapping: {
+                    venueId: input.venueId
+                  }
+                },
+                {
+                  divisionVenueMapping: {
+                    venueId: input.venueId
+                  }
+                },
+                {
+                  finalVenueMapping: {
+                    venueId: input.venueId
+                  }
+                }
+              ]
             }
           }
         },
@@ -876,14 +918,13 @@ export const volunteersVenueRouter = createTRPCRouter({
 
       // Calculate tournament stats
       let stats = {
-        totalTeams: 0,
+        totalTeams: checkedInTeams.length, // Use actual checked-in teams count, not tournament teams
         matchesCompleted: 0,
         matchesTotal: 0,
         progress: 0
       };
 
       if (tournament) {
-        stats.totalTeams = tournament.fixtureTeams.length;
         stats.matchesTotal = tournament.matches.length;
         stats.matchesCompleted = tournament.matches.filter(m => m.status === 'completed').length;
         stats.progress = stats.matchesTotal > 0 ? Math.round((stats.matchesCompleted / stats.matchesTotal) * 100) : 0;
@@ -897,7 +938,7 @@ export const volunteersVenueRouter = createTRPCRouter({
           level: tournament.level,
           status: tournament.status,
           genderCategory: tournament.genderCategory,
-          teams: stats.totalTeams,
+          teams: tournament.fixtureTeams.length, // Tournament teams count
           stats
         } : null,
         teamsBySport: Object.values(teamsBySport),

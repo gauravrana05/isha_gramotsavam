@@ -18,7 +18,7 @@ export default function VolunteerHomePage() {
     data: assignments, 
     isLoading: assignmentsLoading,
     error: assignmentsError 
-  } = api.volunteers.venue.getAssignments.useQuery(
+  } = api.volunteers.assignments.getMyAssignments.useQuery(
     undefined,
     { 
       enabled: !authLoading && !!user,

@@ -33,7 +33,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/player/profile': 'Profile',
   
   // Volunteer routes
-  '/volunteer/venues': 'My Venues', // Base volunteer route removed
+  '/volunteer': 'My Venues', // Base volunteer route removed
   '/volunteer/verification': 'Verification',
   
   // Verification routes

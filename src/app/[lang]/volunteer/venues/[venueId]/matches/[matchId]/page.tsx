@@ -51,10 +51,14 @@ export default function MatchScoringPage() {
   const [progressionInfo, setProgressionInfo] = useState<LevelProgressionInfo | null>(null);
   const [step, setStep] = useState<'scoring' | 'confirmation' | 'progression' | 'success'>('scoring');
 
-  // Get match details
+  // Get match details with real-time updates
   const { data: match, isLoading, error, refetch } = api.volunteers.match.getMatchDetails.useQuery(
     { matchId },
-    { enabled: !!user && !!matchId }
+    { 
+      enabled: !!user && !!matchId,
+      refetchInterval: match?.status === 'in_progress' ? 10000 : 30000, // 10s for active matches, 30s otherwise
+      refetchIntervalInBackground: true
+    }
   );
 
   // Update match status mutation
@@ -152,12 +156,67 @@ export default function MatchScoringPage() {
     confirmResult(confirm);
   };
 
+  // Content loading state (keeps sidebar visible)
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
-          <p className="text-gray-600">Loading match details...</p>
+      <div className="min-h-screen bg-[#F3F0E5] py-4 sm:py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Loading Header Skeleton */}
+          <div className="mb-8">
+            <div className="animate-pulse">
+              <div className="flex items-center mb-4">
+                <div className="w-6 h-6 bg-gray-200 rounded mr-3"></div>
+                <div className="h-6 bg-gray-200 rounded w-32"></div>
+              </div>
+              <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+            </div>
+          </div>
+
+          {/* Loading Match Card */}
+          <div className="bg-white rounded-lg border shadow-sm p-6 mb-8">
+            <div className="animate-pulse">
+              {/* Match Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="h-5 bg-gray-200 rounded w-24"></div>
+                <div className="h-6 bg-gray-200 rounded w-20"></div>
+              </div>
+
+              {/* Teams */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="text-center">
+                  <div className="h-16 bg-gray-200 rounded-full w-16 mx-auto mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-20 mx-auto"></div>
+                </div>
+                <div className="flex items-center justify-center">
+                  <div className="h-8 bg-gray-200 rounded w-12"></div>
+                </div>
+                <div className="text-center">
+                  <div className="h-16 bg-gray-200 rounded-full w-16 mx-auto mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-20 mx-auto"></div>
+                </div>
+              </div>
+
+              {/* Loading Controls */}
+              <div className="space-y-4">
+                <div className="h-12 bg-gray-200 rounded"></div>
+                <div className="h-12 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Loading Main Content */}
+          <div className="bg-white rounded-lg border shadow-sm p-6">
+            <div className="animate-pulse">
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F28C38] mx-auto mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-32 mx-auto mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-24 mx-auto"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

@@ -14,7 +14,7 @@ import {
   type Column,
   type ActionButton,
   SingleStatCard,
-  PageLoader
+  VolunteerPageLoader
 } from '@/components/ui';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import Link from 'next/link';
@@ -292,8 +292,16 @@ export default function VolunteerDashboard({ params }: PageProps) {
   if (user && userProfile && !userProfile.languagePreference && !authLoading && !isUpdatingLanguage) {
     return (
       <>
-        <div className="min-h-screen bg-[#F3F0E5]">
-          {/* Clean background for language modal */}
+        <div className="py-4 sm:py-8 px-4 sm:px-6 lg:px-8">
+          <div className="animate-pulse">
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F28C38] mx-auto mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-40 mx-auto mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-32 mx-auto"></div>
+              </div>
+            </div>
+          </div>
         </div>
         
         <LanguageSelectionModal
@@ -308,10 +316,62 @@ export default function VolunteerDashboard({ params }: PageProps) {
     );
   }
 
+  // Content loading state (keeps sidebar visible)
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38]"></div>
+      <div className="py-4 sm:py-8 px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/3 mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          </div>
+        </div>
+
+        {/* Loading Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg border p-6 shadow-sm">
+              <div className="animate-pulse">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-16 mb-2"></div>
+                    <div className="h-8 bg-gray-200 rounded w-12"></div>
+                  </div>
+                  <div className="w-10 h-10 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Loading Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div className="bg-white rounded-lg border p-6 shadow-sm">
+            <div className="animate-pulse">
+              <div className="h-5 bg-gray-200 rounded w-32 mb-4"></div>
+              <div className="h-64 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg border p-6 shadow-sm">
+            <div className="animate-pulse">
+              <div className="h-5 bg-gray-200 rounded w-32 mb-4"></div>
+              <div className="h-64 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading Main Content */}
+        <div className="bg-white rounded-lg border shadow-sm p-6">
+          <div className="animate-pulse">
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F28C38] mx-auto mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-32 mx-auto mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-48 mx-auto"></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

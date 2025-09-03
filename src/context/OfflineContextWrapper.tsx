@@ -3,13 +3,20 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import PageLoader from '@/components/ui/loaders/PageLoader';
+import VolunteerPageLoader from '@/components/ui/loaders/VolunteerPageLoader';
+
+// Check if current path is volunteer
+const isVolunteerPath = () => {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.includes('/volunteer/');
+};
 
 // Dynamically import OfflineContext to avoid SSR issues
 const OfflineContextProvider = dynamic(
   () => import('./OfflineContext').then(mod => mod.OfflineProvider),
   { 
     ssr: false,
-    loading: () => <PageLoader variant="default" title="" />
+    loading: () => isVolunteerPath() ? <VolunteerPageLoader /> : <PageLoader variant="default" title="" />
   }
 );
 

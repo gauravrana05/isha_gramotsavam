@@ -116,7 +116,7 @@ export { default as TableControls } from './TableControls'
 // LOADERS & FEEDBACK
 // ========================================
 
-export { PageLoader } from './loaders'
+export { PageLoader, VolunteerPageLoader } from './loaders'
 export { default as ProgressBar } from './progress/ProgressBar'
 
 // Toast components

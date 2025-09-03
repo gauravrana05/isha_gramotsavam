@@ -23,7 +23,7 @@ export const getDashboardRoute = (role: string | null | undefined, lang: string,
     case "technical_volunteer":
       // Note: No base /volunteer route exists - volunteers are redirected to their venue
       // This will be handled by the volunteer layout which will redirect to venue dashboard
-      return `/${lang}/volunteer/venues`; // Fallback - should be handled by layout redirect
+      return `/${lang}/volunteer`; // Fallback - should be handled by layout redirect
     case "verification":
     case "verification_volunteer":
       return `/${lang}/verification/dashboard`;

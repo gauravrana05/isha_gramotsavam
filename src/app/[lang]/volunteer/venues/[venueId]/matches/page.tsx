@@ -66,7 +66,7 @@ export default function MatchesPage() {
   // Ensure venueId is a string
   const venueIdString = Array.isArray(venueId) ? venueId[0] : venueId;
 
-  // Single query for all match data
+  // Single query for all match data with real-time updates
   const { 
     data: matchData, 
     isLoading: loading, 
@@ -77,8 +77,24 @@ export default function MatchesPage() {
       venueId: venueIdString || '',
       fixtureId: fixtureId || undefined
     },
-    { enabled: !!user && !!venueIdString }
+    { 
+      enabled: !!user && !!venueIdString,
+      refetchInterval: 30000, // Refetch every 30 seconds
+      refetchIntervalInBackground: true
+    }
   );
+
+  // Add aggressive polling for pages with active matches
+  React.useEffect(() => {
+    const hasActiveMatches = matchData?.matches?.some(m => m.status === 'in_progress') || false;
+    if (!hasActiveMatches) return;
+
+    const interval = setInterval(() => {
+      refetch();
+    }, 10000); // Poll every 10 seconds when matches are in progress
+
+    return () => clearInterval(interval);
+  }, [matchData?.matches, refetch]);
 
   // Filter configuration for AdvancedTable
   const filters: FilterField[] = useMemo(() => [
@@ -275,11 +291,75 @@ export default function MatchesPage() {
     }
   ], [router, lang, venueIdString]);
 
-  // Loading state with volunteer theme
+  // Content loading state (keeps sidebar visible)
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38]"></div>
+      <div className="min-h-screen bg-[#F3F0E5] py-4 sm:py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Loading Header Skeleton */}
+          <div className="mb-8">
+            <div className="animate-pulse">
+              <div className="h-8 bg-gray-200 rounded w-1/3 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          </div>
+
+          {/* Loading Stats Cards Skeleton */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white rounded-lg border p-4 shadow-sm">
+                <div className="animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-16 mb-2"></div>
+                      <div className="h-6 bg-gray-200 rounded w-12"></div>
+                    </div>
+                    <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Loading Matches Table */}
+          <div className="bg-white rounded-lg border shadow-sm mb-8">
+            <div className="p-6">
+              <div className="animate-pulse">
+                {/* Table header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="h-5 bg-gray-200 rounded w-32"></div>
+                  <div className="h-8 bg-gray-200 rounded w-24"></div>
+                </div>
+                
+                {/* Table rows */}
+                <div className="space-y-3">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4 py-3 border-b border-gray-100 last:border-b-0">
+                      <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                      <div className="flex-1 h-4 bg-gray-200 rounded"></div>
+                      <div className="w-16 h-4 bg-gray-200 rounded"></div>
+                      <div className="w-20 h-4 bg-gray-200 rounded"></div>
+                      <div className="w-24 h-8 bg-gray-200 rounded"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Loading Main Content */}
+          <div className="bg-white rounded-lg border shadow-sm p-6">
+            <div className="animate-pulse">
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F28C38] mx-auto mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-32 mx-auto mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-48 mx-auto"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

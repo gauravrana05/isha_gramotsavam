@@ -17,7 +17,9 @@ import {
   Plus,
   BarChart3,
   Camera,
-  RefreshCw
+  RefreshCw,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 interface Tournament {
@@ -60,18 +62,19 @@ export default function VolunteerFixturesPage() {
     { venueId },
     { 
       enabled: !!user && !!venueId,
-      refetchInterval: 30000, // Refetch every 30 seconds for live updates
-      refetchIntervalInBackground: true
+      // Remove automatic polling to prevent conflicts
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true
     }
   );
 
-  // Add real-time polling for active tournaments
+  // Add controlled polling only for active tournaments
   React.useEffect(() => {
     if (!venueData?.tournament || venueData.tournament.status !== 'in_progress') return;
 
     const interval = setInterval(() => {
       refetch();
-    }, 15000); // Poll every 15 seconds during active tournaments
+    }, 30000); // Poll every 30 seconds during active tournaments only
 
     return () => clearInterval(interval);
   }, [venueData?.tournament?.status, refetch]);
@@ -97,11 +100,49 @@ export default function VolunteerFixturesPage() {
     }
   };
 
-  // Loading state with volunteer theme
+  // Content loading state (keeps sidebar visible)
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38]"></div>
+      <div className="min-h-screen bg-[#F3F0E5] py-4 sm:py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Loading Header Skeleton */}
+          <div className="mb-8">
+            <div className="animate-pulse">
+              <div className="h-8 bg-gray-200 rounded w-1/3 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          </div>
+
+          {/* Loading Stats Cards Skeleton */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white rounded-lg border p-4 shadow-sm">
+                <div className="animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-16 mb-2"></div>
+                      <div className="h-6 bg-gray-200 rounded w-12"></div>
+                    </div>
+                    <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Loading Main Content */}
+          <div className="bg-white rounded-lg border shadow-sm p-6">
+            <div className="animate-pulse">
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F28C38] mx-auto mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-32 mx-auto mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-48 mx-auto"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -142,13 +183,23 @@ export default function VolunteerFixturesPage() {
                 {t('volunteer.fixtures.subtitle', 'Manage tournament schedules and progress')}
               </p>
             </div>
-            <button
-              onClick={() => refetch()}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors border"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Live Update Indicator */}
+              {venueData?.tournament?.status === 'in_progress' && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 text-green-700 rounded-lg border border-green-200">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <Wifi className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm font-medium">Live Updates</span>
+                </div>
+              )}
+              <button
+                onClick={() => refetch()}
+                className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors border"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+            </div>
           </div>
         </div>
 

@@ -56,6 +56,9 @@ export default function VolunteerHelpBot() {
         }
         
         setTranslations(translationModule.default || translationModule);
+        console.log('Translations loaded:', Object.keys(translationModule.default || translationModule));
+        console.log('FAQ section exists:', !!(translationModule.default || translationModule).faq);
+        console.log('Fixtures section exists:', !!(translationModule.default || translationModule).faq?.fixtures);
       } catch (error) {
         console.error('Failed to load translations:', error);
         // Fallback to English
@@ -77,6 +80,7 @@ export default function VolunteerHelpBot() {
   // Simple translation function with nested key support
   const t = (key: string, fallback?: string) => {
     if (!translations || Object.keys(translations).length === 0) {
+      console.log('No translations loaded:', key);
       return fallback || key;
     }
 
@@ -87,6 +91,7 @@ export default function VolunteerHelpBot() {
       if (value && typeof value === 'object' && k in value) {
         value = value[k];
       } else {
+        console.log('Translation key not found:', key, 'missing segment:', k);
         return fallback || key;
       }
     }
@@ -96,8 +101,12 @@ export default function VolunteerHelpBot() {
 
   // Extract current page context from pathname
   useEffect(() => {
-    const pathSegments = pathname.split('/');
+    const pathSegments = pathname.split('/').filter(Boolean);
     const lastSegment = pathSegments[pathSegments.length - 1];
+    
+    console.log('Full pathname:', pathname);
+    console.log('Path segments:', pathSegments);
+    console.log('Last segment:', lastSegment);
     
     // Map URL segments to context names
     const pageMap: Record<string, string> = {
@@ -108,17 +117,19 @@ export default function VolunteerHelpBot() {
       'post': 'post',
       'chat': 'chat',
       'notifications': 'notifications',
-      'dashboard': 'dashboard',
-      'volunteer': 'dashboard'  // Volunteer main page = dashboard
+      'dashboard': 'dashboard'
     };
     
     setCurrentPage(pageMap[lastSegment] || 'general');
+    console.log('Current page detected:', pageMap[lastSegment] || 'general', 'from segment:', lastSegment);
   }, [pathname]);
 
   // Get relevant FAQs based on search or context
   const displayFAQs = searchQuery 
     ? searchFAQs(searchQuery, currentPage)
     : getContextualFAQs(currentPage);
+
+  console.log('Display FAQs:', displayFAQs.length, 'for page:', currentPage);
 
   const handleFAQClick = (faq: FAQItem) => {
     setSelectedFAQ(faq);

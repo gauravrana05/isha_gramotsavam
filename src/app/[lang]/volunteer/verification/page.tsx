@@ -148,7 +148,7 @@ export default function VolunteerVerification() {
       <div className="bg-[#4A2F1D] text-white py-6">
         <div className="max-w-7xl mx-auto px-4">
           <button
-            onClick={() => router.push(`/${lang}/volunteer/venues`)}
+            onClick={() => router.push(`/${lang}/volunteer`)}
             className="flex items-center space-x-2 text-cream-200 hover:text-white mb-4 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />

@@ -6,16 +6,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useOffline } from '@/context/OfflineContextWrapper';
 import { api } from '@/server/trpc/react';
 import { useTranslation } from '@/lib/utils/i18n';
-import { Loader2, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { VolunteerPageLoader } from '@/components/ui';
 
 // Full page loader for volunteer redirect
 const VolunteerRedirectLoader = ({ message }: { message: string }) => (
-  <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-    <div className="text-center">
-      <Loader2 className="w-12 h-12 animate-spin text-[#F28C38] mx-auto mb-4" />
-      <p className="text-gray-600">{message}</p>
-    </div>
-  </div>
+  <VolunteerPageLoader title={message} />
 );
 
 // Not authorized component
@@ -73,34 +69,7 @@ export default function VolunteerVenuesRedirect() {
 
   // Loading states
   if (authLoading || assignmentsLoading) {
-    return (
-      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-[#F28C38] mx-auto mb-4" />
-          <p className="text-gray-600 mb-4">{t('volunteer.loading_assignment', 'Loading your assignment...')}</p>
-          
-          {/* Offline Status */}
-          <div className="flex items-center justify-center gap-2 text-sm">
-            {isOnline ? (
-              <>
-                <Wifi className="w-4 h-4 text-green-600" />
-                <span className="text-green-600">Online</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-4 h-4 text-orange-600" />
-                <span className="text-orange-600">Offline Mode</span>
-              </>
-            )}
-            {pendingActions.length > 0 && (
-              <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
-                {pendingActions.length} pending
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    );
+    return <VolunteerPageLoader title={t('volunteer.loading_assignment', 'Loading your assignment...')} />;
   }
 
   // Not a volunteer

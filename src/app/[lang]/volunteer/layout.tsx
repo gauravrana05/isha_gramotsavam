@@ -9,6 +9,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import VolunteerSidebar from '@/components/volunteer/VolunteerSidebar';
 import VolunteerHelpBot from '@/components/volunteer/VolunteerHelpBot';
 import { OfflineContextWrapper } from '@/context/OfflineContextWrapper';
+import { VolunteerPageLoader } from '@/components/ui';
 
 export default function VolunteerLayout({
   children,
@@ -34,14 +35,7 @@ export default function VolunteerLayout({
   }, [user, loading, router, lang]);
 
   if (loading || languageLoading) {
-    return (
-      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38] mx-auto mb-4"></div>
-          <p className="text-gray-600">{languageLoading ? 'Loading language...' : 'Loading...'}</p>
-        </div>
-      </div>
-    );
+    return <VolunteerPageLoader />;
   }
 
   if (!user) {

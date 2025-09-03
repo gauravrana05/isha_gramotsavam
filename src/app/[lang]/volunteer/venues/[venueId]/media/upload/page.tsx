@@ -81,12 +81,60 @@ export default function MediaUploadPage() {
     }
   };
 
+  // Content loading state (keeps sidebar visible)
   if (authLoading || loading) {
     return (
-      <div className="lg:min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
-          <p className="text-gray-600">Loading upload page...</p>
+      <div className="min-h-screen bg-[#F3F0E5] py-4 sm:py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Loading Header Skeleton */}
+          <div className="mb-8">
+            <div className="animate-pulse">
+              <div className="flex items-center mb-4">
+                <div className="w-6 h-6 bg-gray-200 rounded mr-3"></div>
+                <div className="h-6 bg-gray-200 rounded w-32"></div>
+              </div>
+              <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+            </div>
+          </div>
+
+          {/* Loading Upload Card */}
+          <div className="bg-white rounded-lg border shadow-sm p-6 mb-8">
+            <div className="animate-pulse">
+              <div className="h-5 bg-gray-200 rounded w-32 mb-6"></div>
+              
+              {/* Upload Area */}
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 mb-6">
+                <div className="text-center">
+                  <div className="w-12 h-12 bg-gray-200 rounded mx-auto mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-48 mx-auto mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-32 mx-auto"></div>
+                </div>
+              </div>
+
+              {/* Form Fields */}
+              <div className="space-y-4">
+                <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                <div className="h-10 bg-gray-200 rounded mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+                <div className="h-20 bg-gray-200 rounded mb-4"></div>
+                <div className="h-10 bg-gray-200 rounded w-32"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Loading Main Content */}
+          <div className="bg-white rounded-lg border shadow-sm p-6">
+            <div className="animate-pulse">
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F28C38] mx-auto mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-32 mx-auto mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-24 mx-auto"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

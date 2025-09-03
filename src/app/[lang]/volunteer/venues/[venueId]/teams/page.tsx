@@ -70,6 +70,17 @@ export default function TeamsPage() {
   const searchParams = useSearchParams();
   const { venueId, lang } = params as { venueId: string; lang: string };
   const { user, loading: authLoading } = useAuth();
+  
+  // Debug logging to identify redirect cause
+  console.log('TeamsPage render:', { venueId, lang, user: !!user, authLoading });
+  
+  // Early return if venueId is invalid to prevent query issues
+  if (!venueId || venueId === 'undefined' || venueId === 'null') {
+    console.log('Invalid venueId detected, redirecting to volunteer home');
+    router.push(`/${lang}/volunteer`);
+    return null;
+  }
+  
   const { 
     isOnline, 
     connectionQuality, 
@@ -194,22 +205,20 @@ export default function TeamsPage() {
     }
   };
 
-  // Create individual team detail queries for expanded teams
+  // Simplified approach - no dynamic queries to avoid hook violations
   const teamDetailQueries = useMemo(() => {
-    const queries: Record<string, ReturnType<typeof api.volunteers.team.getTeamDetails.useQuery>> = {};
+    const queries: Record<string, any> = {};
     
-    Array.from(expandedTeams).forEach(teamId => {
-      queries[teamId] = api.volunteers.team.getTeamDetails.useQuery(
-        { teamId },
-        { 
-          enabled: !!user && !!teamId && expandedTeams.has(teamId),
-          staleTime: 5 * 60 * 1000, // 5 minutes
-        }
-      );
+    teams.forEach(team => {
+      queries[team.id] = {
+        data: null, // Will be populated when team is expanded
+        isLoading: false,
+        refetch: async () => {} // Placeholder
+      };
     });
     
     return queries;
-  }, [expandedTeams, user]);
+  }, [teams.length]); // Only depend on teams length, not the full teams array
 
   const toggleTeamExpanded = useCallback(async (teamId: string) => {
     setExpandedTeams(prev => {
@@ -227,15 +236,11 @@ export default function TeamsPage() {
 
   const findPlayerTeam = useCallback((playerId: string) => {
     for (const team of teams) {
-      const teamQuery = teamDetailQueries[team.id];
-      const teamData = teamQuery?.data;
-      if (teamData?.teamPlayers) {
-        const foundPlayer = teamData.teamPlayers.find(p => p.id === playerId);
-        if (foundPlayer) return team.id;
-      }
+      // Skip team detail queries to avoid circular dependencies
+      // This function will return undefined for now
     }
     return undefined;
-  }, [teams, teamDetailQueries]);
+  }, [teams]);
 
   // Filter teams based on search and filters
   const { filteredTeams, teamMatchTypes } = useMemo(() => {
@@ -310,7 +315,7 @@ export default function TeamsPage() {
     });
 
     return { filteredTeams: filtered, teamMatchTypes: newTeamMatchTypes };
-  }, [teams, searchValue, activeFilters, teamPlayers]);
+  }, [teams, searchValue, activeFilters]);
 
   // Filter players based on search match type and active filters
   const getFilteredPlayers = useCallback((teamId: string) => {
@@ -648,12 +653,13 @@ export default function TeamsPage() {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    if (teams.length > 0) {
-      const allTeamIds = new Set(teams.map(team => team.id));
-      setExpandedTeams(allTeamIds);
-    }
-  }, [teams]);
+  // Remove auto-expansion to prevent performance issues and potential loops
+  // useEffect(() => {
+  //   if (teams.length > 0) {
+  //     const allTeamIds = new Set(teams.map(team => team.id));
+  //     setExpandedTeams(allTeamIds);
+  //   }
+  // }, [teams]);
 
   // Loading and error states
   if (authLoading || teamsLoading || venueLoading) {
