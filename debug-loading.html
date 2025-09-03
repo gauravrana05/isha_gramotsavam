@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Loading Issue</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; border-left: 4px solid #007acc; }
+        .error { border-left-color: #d63384; }
+        .success { border-left-color: #198754; }
+    </style>
+</head>
+<body>
+    <h1>Debug Loading Issue - Team Verification Page</h1>
+    
+    <div>
+        <h2>Test URLs:</h2>
+        <p><strong>Without Auth:</strong> <a href="http://localhost:3002/en/volunteer/venues/352058cf-e527-4453-a6fd-e4dbe70bc796/teams/7bc2f7f8-50e1-4297-910c-74155a70e4b6" target="_blank">Team Page (No Auth)</a></p>
+        <p><strong>With Mock User:</strong> <a href="http://localhost:3002/en/volunteer/venues/352058cf-e527-4453-a6fd-e4dbe70bc796/teams/7bc2f7f8-50e1-4297-910c-74155a70e4b6?mockUser=550e8400-e29b-41d4-a716-446655440103" target="_blank">Team Page (Technical Volunteer)</a></p>
+    </div>
+    
+    <div>
+        <h2>Instructions:</h2>
+        <ol>
+            <li>Open browser DevTools (F12)</li>
+            <li>Go to Console tab</li>
+            <li>Click one of the test URLs above</li>
+            <li>Watch console logs to see where loading gets stuck</li>
+        </ol>
+    </div>
+    
+    <div>
+        <h2>Expected Console Logs:</h2>
+        <div class="log">🔍 Auth & Role Check: { authLoading: false, user: true, userRole: "technical_volunteer" }</div>
+        <div class="log">🔍 Team Data Effect: { teamData: true, isTeamDataLoading: false }</div>
+        <div class="log success">✅ Should show team verification page</div>
+    </div>
+    
+    <div>
+        <h2>If Still Loading:</h2>
+        <div class="log error">Look for logs that show authLoading: true or isTeamDataLoading: true</div>
+        <div class="log error">Check Network tab for failed requests</div>
+        <div class="log error">Look for JavaScript errors in Console</div>
+    </div>
+</body>
+</html>

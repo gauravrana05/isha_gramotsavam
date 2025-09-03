@@ -20,6 +20,7 @@ import {
   CheckCircle, 
   XCircle, 
   AlertCircle, 
+  AlertTriangle,
   User, 
   Phone, 
   Calendar,
@@ -54,10 +55,15 @@ interface PlayerData {
   id: string;
   userId?: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   phone: string;
   age: number;
   gender: string;
   position: string;
+  dob?: string;
+  whatsappNumber?: string;
+  village?: string;
   documents: {
     profilePhoto: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
     aadhaarFront: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
@@ -69,14 +75,18 @@ interface PlayerData {
 }
 
 export default function TeamMatchDayVerificationPage() {
+  console.log('🚀 Team page component rendered!');
+  
   const params = useParams();
   const { venueId, teamId } = params as { venueId: string; teamId: string; lang: string };
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   
+  console.log('🚀 Team page initial state:', { venueId, teamId, authLoading });
+  
   const [team, setTeam] = useState<TeamData | null>(null);
   const [players, setPlayers] = useState<PlayerData[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Removed loading state - using isTeamDataLoading directly
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
@@ -85,7 +95,6 @@ export default function TeamMatchDayVerificationPage() {
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
   const [isSubmittingAdd, setIsSubmittingAdd] = useState(false);
-  const [isSearchingPhone, setIsSearchingPhone] = useState(false);
   const [playerExists, setPlayerExists] = useState(false);
   const [foundUser, setFoundUser] = useState<any>(null);
   const [searchPhone, setSearchPhone] = useState('');
@@ -104,9 +113,19 @@ export default function TeamMatchDayVerificationPage() {
   const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
 
   // tRPC queries and mutations
-  const { data: teamData, refetch: refetchTeam } = api.volunteers.venue.getTeamForVerification.useQuery(
+  const { 
+    data: teamData, 
+    refetch: refetchTeam, 
+    isLoading: isTeamDataLoading,
+    isError: isTeamDataError,
+    error: teamDataError
+  } = api.volunteers.venue.getTeamForVerification.useQuery(
     { teamId },
-    { enabled: !!user && !!teamId }
+    { 
+      enabled: !authLoading && !!user && !!teamId,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true
+    }
   );
 
   const verifyPlayerMutation = api.volunteers.venue.verifyPlayer.useMutation({
@@ -185,7 +204,46 @@ export default function TeamMatchDayVerificationPage() {
     }
   });
 
+  // Handle authentication and role validation first
   useEffect(() => {
+    console.log('🔍 Auth & Role Check:', {
+      authLoading,
+      user: !!user,
+      userRole: user?.role,
+      teamId,
+    });
+
+    // If auth is complete but user doesn't exist, show error
+    if (!authLoading && !user) {
+      console.log('❌ No authenticated user');
+      setError('Authentication required to view this page');
+      return;
+    }
+
+    // Check if user has volunteer role
+    if (!authLoading && user && !['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(user.role)) {
+      console.log('❌ User does not have volunteer role:', user.role);
+      setError('Access denied. Only volunteers can view team verification pages.');
+      return;
+    }
+
+    // Clear any previous auth errors
+    if (!authLoading && user && ['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(user.role)) {
+      setError('');
+    }
+  }, [authLoading, user]);
+
+  // Handle team data fetching
+  useEffect(() => {
+    console.log('🔍 Team Data Effect:', {
+      teamData: !!teamData,
+      isTeamDataLoading,
+      isTeamDataError,
+      teamDataError: teamDataError?.message,
+      queryEnabled: !!user && !!teamId
+    });
+
+    // Handle successful data fetch
     if (teamData) {
       // Map the API response to expected structure
       const mappedTeam = {
@@ -241,9 +299,14 @@ export default function TeamMatchDayVerificationPage() {
 
       setTeam(mappedTeam);
       setPlayers(mappedPlayers);
-      setLoading(false);
     }
-  }, [teamData]);
+
+    // Handle errors
+    if (isTeamDataError) {
+      console.error('❌ Team data fetch error:', teamDataError);
+      setError(teamDataError?.message || 'Failed to load team data');
+    }
+  }, [teamData, isTeamDataLoading, isTeamDataError, teamDataError]);
 
   const handlePlayerVerification = async (playerId: string, status: 'verified' | 'rejected', comments?: string) => {
     verifyPlayerMutation.mutate({
@@ -343,27 +406,11 @@ export default function TeamMatchDayVerificationPage() {
   };
 
   // Phone search functionality
-  const { data: searchedUser } = api.users.findByPhone.useQuery(
+  const { data: searchedUser, isLoading: isSearchingPhone } = api.users.getByPhone.useQuery(
     { phone: searchPhone },
     { 
-      enabled: !!searchPhone && searchPhone.length === 13, // +91 + 10 digits
-      onSuccess: (data) => {
-        setFoundUser(data);
-        setIsSearchingPhone(false);
-        if (data) {
-          setPlayerFormData(prev => ({
-            ...prev,
-            firstName: data.firstName || '',
-            lastName: data.lastName || '',
-            dob: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString().split('T')[0] : '',
-            whatsappNumber: data.phone?.replace('+91', '') || ''
-          }));
-        }
-      },
-      onError: () => {
-        setFoundUser(null);
-        setIsSearchingPhone(false);
-      }
+      enabled: searchPhone.length > 0,
+      retry: false
     }
   );
 
@@ -371,7 +418,7 @@ export default function TeamMatchDayVerificationPage() {
     setPlayerFormData(prev => ({ ...prev, phone }));
     
     if (phone.length === 10) {
-      setIsSearchingPhone(true);
+      // Trigger search with +91 prefix
       setSearchPhone(`+91${phone}`);
     } else {
       setSearchPhone('');
@@ -390,16 +437,19 @@ export default function TeamMatchDayVerificationPage() {
 
   // Auto-populate form when user is found
   useEffect(() => {
-    if (foundUser && playerFormData.phone.length === 10) {
+    if (searchedUser && playerFormData.phone.length === 10) {
+      setFoundUser(searchedUser);
       setPlayerFormData(prev => ({
         ...prev,
-        firstName: foundUser.firstName || prev.firstName,
-        lastName: foundUser.lastName || prev.lastName,
-        dob: foundUser.dateOfBirth ? new Date(foundUser.dateOfBirth).toISOString().split('T')[0] : prev.dob,
-        whatsappNumber: foundUser.phone?.replace('+91', '') || prev.whatsappNumber
+        firstName: searchedUser.firstName || prev.firstName,
+        lastName: searchedUser.lastName || prev.lastName,
+        dob: searchedUser.dateOfBirth ? new Date(searchedUser.dateOfBirth).toISOString().split('T')[0] : prev.dob,
+        whatsappNumber: searchedUser.phone?.replace('+91', '') || prev.whatsappNumber
       }));
+    } else if (!searchedUser && searchPhone) {
+      setFoundUser(null);
     }
-  }, [foundUser, playerFormData.phone]);
+  }, [searchedUser, playerFormData.phone, searchPhone]);
 
   const handleStatusChangeBulk = async (playersToUpdate: PlayerData[], status: 'pending' | 'verified' | 'approved' | 'rejected') => {
     if (!user) return;
@@ -484,22 +534,47 @@ export default function TeamMatchDayVerificationPage() {
     }
   ], [handlePlayerStatusChange, submitting]);
 
-  if (authLoading || loading) {
+  // Show loading spinner while auth is loading OR team data is loading
+  if (authLoading || isTeamDataLoading) {
+    console.log('🔄 Showing loading spinner:', { 
+      authLoading, 
+      isTeamDataLoading, 
+      user: user ? { id: user.id, role: user.role } : null,
+      teamId,
+      queryEnabled: !!user && !!teamId,
+      timestamp: new Date().toISOString()
+    });
     return (
       <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38]"></div>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38]"></div>
+          <div className="text-sm text-gray-600">
+            Loading... (Check console for details)
+          </div>
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-xs text-gray-500 max-w-md text-center">
+              Debug: authLoading={authLoading ? 'true' : 'false'}, 
+              isTeamDataLoading={isTeamDataLoading ? 'true' : 'false'},
+              user={user ? user.role : 'none'}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error || isTeamDataError) {
+    console.log('❌ Showing error state:', { error, isTeamDataError, teamDataError });
     return (
       <div className="p-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Error</h1>
-          <p className="mt-2 text-gray-600">{error}</p>
+          <p className="mt-2 text-gray-600">{error || teamDataError?.message || 'Failed to load team data'}</p>
           <button 
-            onClick={() => refetchTeam()}
+            onClick={() => {
+              setError('');
+              refetchTeam();
+            }}
             className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
             Retry
@@ -509,12 +584,19 @@ export default function TeamMatchDayVerificationPage() {
     );
   }
 
-  if (!team) {
+  if (!team && !isTeamDataLoading && !authLoading) {
+    console.log('❌ Team not found:', { team, teamData, isTeamDataLoading, authLoading });
     return (
       <div className="p-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Team Not Found</h1>
           <p className="mt-2 text-gray-600">The requested team could not be found.</p>
+          <button 
+            onClick={() => refetchTeam()}
+            className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -564,15 +646,13 @@ export default function TeamMatchDayVerificationPage() {
       <AdvancedTable
         data={players}
         columns={playerColumns}
-        loading={loading}
+        loading={isTeamDataLoading}
         stateKey={undefined}
         selectable={true}
         onRowClick={(player) => {
-          // Open player details modal (same as admin/users)
           setSelectedPlayer(player);
           setShowPlayerModal(true);
         }}
-        onRowClick={(player) => setSelectedPlayer(player)}
         keyExtractor={(player) => player.id}
         headerActionsNone={(
           <button
@@ -648,23 +728,8 @@ export default function TeamMatchDayVerificationPage() {
                     }
                   }}
                   disabled={isEditMode}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent disabled:bg-gray-100"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] focus:border-transparent"
                 />
-                {!isEditMode && isSearchingPhone && (
-                  <p className="mt-1 text-sm text-gray-500 flex items-center">
-                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                    Searching for player...
-                  </p>
-                )}
-                {!isEditMode && !isSearchingPhone && foundUser && (
-                  <p className="mt-1 text-sm text-[#3A7F3F]">✓ Player found in system</p>
-                )}
-                {!isEditMode && !isSearchingPhone && playerFormData.phone.length === 10 && !foundUser && (
-                  <p className="mt-1 text-sm text-gray-600">New player - fill in details below</p>
-                )}
-                {isEditMode && (
-                  <p className="mt-1 text-sm text-gray-500">Phone number cannot be changed in edit mode</p>
-                )}
               </div>
               {playerFormData.phone.length === 10 && (
                 <div className="space-y-4">
@@ -699,6 +764,20 @@ export default function TeamMatchDayVerificationPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38] disabled:bg-gray-100" 
                       disabled={!isEditMode && !!foundUser}
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#4A2F1D] mb-2">
+                      Position <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={playerFormData.position}
+                      onChange={(e) => setPlayerFormData(prev => ({ ...prev, position: e.target.value as 'main' | 'substitute' }))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
+                    >
+                      <option value="main">Main Player</option>
+                      <option value="substitute">Substitute</option>
+                    </select>
                   </div>
 
                   {playerExists && (
@@ -739,6 +818,7 @@ export default function TeamMatchDayVerificationPage() {
         </div>
       )}
 
+      {/* OLD MODAL - COMMENTED OUT - ONLY SHOWS DOCUMENTS
       {selectedPlayer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -880,6 +960,7 @@ export default function TeamMatchDayVerificationPage() {
           </div>
         </div>
       )}
+      {/* END OLD MODAL COMMENT */}
 
       {showImageUpload && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -958,6 +1039,10 @@ export default function TeamMatchDayVerificationPage() {
                     <p className="mt-1 text-sm text-gray-900">{selectedPlayer.phone}</p>
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-gray-700">Age</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedPlayer.age} years</p>
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700">WhatsApp</label>
                     <p className="mt-1 text-sm text-gray-900">{selectedPlayer.whatsappNumber || 'Not provided'}</p>
                   </div>
@@ -976,6 +1061,10 @@ export default function TeamMatchDayVerificationPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Position</label>
                     <p className="mt-1 text-sm text-gray-900 capitalize">{selectedPlayer.position}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Gender</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedPlayer.gender === 'M' ? 'Male' : 'Female'}</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Verification Status</label>

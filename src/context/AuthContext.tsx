@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { User } from "@prisma/client";
 import { api } from "@/server/trpc/react";
 import PageLoader from "@/components/ui/loaders/PageLoader";
@@ -19,12 +19,12 @@ interface AuthContextType {
   hasLanguagePreference: boolean;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
+  const initializationRef = useRef(false);
 
   // Fetch profile image data using tRPC
   const profileImageQuery = api.profile.checkCompletion.useQuery(
@@ -41,10 +41,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   );
 
+  // Stable callback functions
   const login = useCallback(async () => {
     setLoading(true);
     try {
-      // Initiate OIDC login flow
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -52,14 +52,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        const { authUrl } = await response.json();
+        if (authUrl) {
+          window.location.href = authUrl;
+        }
+      } else {
         throw new Error('Failed to initiate login');
       }
-
-      const { authUrl } = await response.json();
-      
-      // Redirect to Isha SSO
-      window.location.href = authUrl;
     } catch (error) {
       console.error('Login failed:', error);
       setLoading(false);
@@ -76,26 +76,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       });
       
-      // Clear user state
       setUser(null);
-      // Redirect to public home page
       window.location.href = '/';
     } catch (error) {
       console.error('Logout failed:', error);
-      // Clear local state even if API call fails
       setUser(null);
       window.location.href = '/';
       throw error;
     }
   }, []);
-
-  const isAuthenticated = !!user;
-
-  const hasRole = useCallback((roles: string | string[]) => {
-    if (!user) return false;
-    const roleArray = Array.isArray(roles) ? roles : [roles];
-    return roleArray.includes(user.role);
-  }, [user]);
 
   const refreshUser = useCallback(async (): Promise<User | null> => {
     try {
@@ -118,11 +107,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Initialize auth state from URL params or session storage
+  // Initialize auth state once
   useEffect(() => {
+    if (initializationRef.current) return;
+    
     const initializeAuth = async () => {
-      // Prevent multiple initializations
-      if (initialized) return;
+      initializationRef.current = true;
       
       try {
         // Check URL params first
@@ -153,7 +143,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   newUrl.searchParams.delete('mockUser');
                   window.history.replaceState({}, '', newUrl.toString());
                   setLoading(false);
-                  setInitialized(true);
                   return;
                 }
               }
@@ -179,7 +168,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 newUrl.searchParams.delete('phone');
                 window.history.replaceState({}, '', newUrl.toString());
                 setLoading(false);
-                setInitialized(true);
                 return;
               }
             }
@@ -205,13 +193,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 window.history.replaceState({}, '', newUrl.href);
               }
               setLoading(false);
-              setInitialized(true);
               return;
             }
           }
         }
 
-        // Check session storage
         // Check if user is logged in via cookie
         const response = await fetch('/api/auth/me', {
           method: 'GET',
@@ -222,39 +208,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const { user } = await response.json();
           if (user) {
             setUser(user);
-            setLoading(false);
-            setInitialized(true);
-            return;
           }
         }
-
-        // No valid session
-        setUser(null);
+        
         setLoading(false);
-        setInitialized(true);
       } catch (error) {
         console.error('Auth initialization failed:', error);
         setUser(null);
         setLoading(false);
-        setInitialized(true);
       }
     };
 
     initializeAuth();
-  }, [initialized]);
+  }, []); // Empty dependency array - only run once
+
+  // Stable derived values
+  const isAuthenticated = useMemo(() => !!user, [user]);
+  
+  const hasRole = useCallback((roles: string | string[]) => {
+    if (!user) return false;
+    const roleArray = Array.isArray(roles) ? roles : [roles];
+    return roleArray.includes(user.role);
+  }, [user?.role]); // Only depend on user.role, not entire user object
 
   const updateLanguagePreference = useCallback(async (lang: string) => {
-    // This will be handled by the component using the tRPC mutation
-    // We just need to refresh the user data after update
     await refreshUser();
   }, [refreshUser]);
 
-  const hasLanguagePreference = Boolean(user?.languagePreference && user.languagePreference !== 'en');
+  const hasLanguagePreference = useMemo(() => 
+    Boolean(user?.languagePreference && user.languagePreference !== 'en'), 
+    [user?.languagePreference]
+  );
 
-  const value: AuthContextType = {
+  const profileImage = useMemo(() => 
+    profileImageQuery.data?.userProfileImages?.profilePhotoPath || null,
+    [profileImageQuery.data?.userProfileImages?.profilePhotoPath]
+  );
+
+  // Stable context value - only recreate when actual values change
+  const contextValue = useMemo<AuthContextType>(() => ({
     user,
-    userProfile: user, // Backward compatibility - same as user
-    profileImage: profileImageQuery.data?.userProfileImages?.profilePhotoPath || null,
+    userProfile: user, // Backward compatibility
+    profileImage,
     loading,
     login,
     logout,
@@ -263,10 +258,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasRole,
     updateLanguagePreference,
     hasLanguagePreference,
-  };
+  }), [
+    user,
+    profileImage,
+    loading,
+    login,
+    logout,
+    refreshUser,
+    isAuthenticated,
+    hasRole,
+    updateLanguagePreference,
+    hasLanguagePreference,
+  ]);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={contextValue}>
       {loading ? (
         <PageLoader title="Authenticating..." variant="brand" />
       ) : (
@@ -302,23 +308,4 @@ export const useAuth = () => {
     };
   }
   return context;
-};
-
-// Role-based hook
-export const useRequireAuth = (requiredRoles?: string | string[]) => {
-  const { user, loading, hasRole } = useAuth();
-  
-  const hasRequiredRole = requiredRoles ? hasRole(requiredRoles) : true;
-  
-  return {
-    user,
-    loading,
-    isAuthorized: !!user && hasRequiredRole,
-    hasRole,
-  };
-};
-
-// Admin check hook
-export const useRequireAdmin = () => {
-  return useRequireAuth('admin');
 };
