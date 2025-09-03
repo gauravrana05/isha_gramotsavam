@@ -110,37 +110,46 @@ export default function CaptainTeamPlayersPage() {
     {
       key: 'name',
       header: 'Name',
-      render: (player) => (
-        <div>
-          <div className="font-medium text-gray-900">
-            {player.user?.firstName || player.firstName} {player.user?.lastName || player.lastName}
+      render: (player) => {
+        if (!player) return null;
+        return (
+          <div>
+            <div className="font-medium text-gray-900">
+              {player.user?.firstName || player.firstName} {player.user?.lastName || player.lastName}
+            </div>
+            <div className="flex items-center gap-1 text-sm text-gray-500">
+              <Phone className="w-3 h-3" />
+              {player.user?.phone || player.phone}
+            </div>
           </div>
-          <div className="flex items-center gap-1 text-sm text-gray-500">
-            <Phone className="w-3 h-3" />
-            {player.user?.phone || player.phone}
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'details',
       header: 'Details',
-      render: (player) => (
-        <div className="text-sm">
-          <div>Age: {player.user?.age || player.age} • {(player.user?.gender || player.gender) === 'M' ? 'Male' : (player.user?.gender || player.gender) === 'F' ? 'Female' : 'Other'}</div>
-          <div className="text-gray-500 capitalize">{player.position}</div>
-        </div>
-      ),
+      render: (player) => {
+        if (!player) return null;
+        return (
+          <div className="text-sm">
+            <div>Age: {player.user?.age || player.age} • {(player.user?.gender || player.gender) === 'M' ? 'Male' : (player.user?.gender || player.gender) === 'F' ? 'Female' : 'Other'}</div>
+            <div className="text-gray-500 capitalize">{player.position}</div>
+          </div>
+        );
+      },
     },
     {
       key: 'location',
       header: 'Location',
-      render: (player) => (
-        <div className="flex items-center gap-1 text-sm">
-          <MapPin className="w-3 h-3 text-gray-400" />
-          <span>{player.district}, {player.state}</span>
-        </div>
-      ),
+      render: (player) => {
+        if (!player) return null;
+        return (
+          <div className="flex items-center gap-1 text-sm">
+            <MapPin className="w-3 h-3 text-gray-400" />
+            <span>{player.district}, {player.state}</span>
+          </div>
+        );
+      },
     },
     {
       key: 'status',
@@ -165,12 +174,15 @@ export default function CaptainTeamPlayersPage() {
     {
       key: 'addedAt',
       header: 'Added',
-      render: (player) => (
-        <div className="flex items-center gap-1 text-sm text-gray-500">
-          <Calendar className="w-3 h-3" />
-          {new Date(player.createdAt).toLocaleDateString()}
-        </div>
-      ),
+      render: (player) => {
+        if (!player) return null;
+        return (
+          <div className="flex items-center gap-1 text-sm text-gray-500">
+            <Calendar className="w-3 h-3" />
+            {new Date(player.createdAt).toLocaleDateString()}
+          </div>
+        );
+      },
     },
   ];
 

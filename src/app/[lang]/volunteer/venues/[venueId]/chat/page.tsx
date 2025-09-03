@@ -17,12 +17,22 @@ export default function VenueChatPage() {
 
   const { data: messages = [], isLoading } = api.chat.getVenueMessages.useQuery(
     { venueId: venueId as string },
-    { enabled: !!user && !!venueId }
+    { 
+      enabled: !!user && !!venueId,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false
+    }
   );
 
   const { data: participants = [] } = api.chat.getVenueParticipants.useQuery(
     { venueId: venueId as string },
-    { enabled: !!user && !!venueId }
+    { 
+      enabled: !!user && !!venueId,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false
+    }
   );
 
   const sendMessageMutation = api.chat.sendMessage.useMutation();
@@ -36,10 +46,11 @@ export default function VenueChatPage() {
         document.body.style.overflow = 'unset';
       };
     }
-  }, []);
+  }, []); // Empty dependency array to run only once
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!message.trim()) return;
 
     try {
@@ -52,6 +63,12 @@ export default function VenueChatPage() {
     } catch (error) {
       console.error('Failed to send message:', error);
     }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMessage(e.target.value);
   };
 
   if (isLoading) {
@@ -138,26 +155,34 @@ export default function VenueChatPage() {
         </div>
 
         {/* Mobile Message Input */}
-        <form onSubmit={handleSendMessage} className="p-4 bg-white border-t">
+        <div className="p-4 bg-white border-t">
           <div className="flex gap-2 items-end">
             <div className="flex-1 bg-gray-100 rounded-full px-4 py-2">
               <input
                 type="text"
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSendMessage(e as any);
+                  }
+                }}
                 placeholder={t('volunteer.chat.placeholder', 'Type a message...')}
                 className="w-full bg-transparent text-sm focus:outline-none"
+                autoComplete="off"
               />
             </div>
             <button
-              type="submit"
+              type="button"
+              onClick={(e) => handleSendMessage(e as any)}
               disabled={!message.trim() || sendMessageMutation.isLoading}
               className="w-10 h-10 bg-[#F28C38] text-white rounded-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-4 h-4" />
             </button>
           </div>
-        </form>
+        </div>
 
         {/* Mobile Participants Modal */}
         {showParticipants && (
@@ -235,24 +260,32 @@ export default function VenueChatPage() {
           </div>
 
           {/* Message Input */}
-          <form onSubmit={handleSendMessage} className="p-6 border-t">
+          <div className="p-6 border-t">
             <div className="flex gap-3">
               <input
                 type="text"
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSendMessage(e as any);
+                  }
+                }}
                 placeholder={t('volunteer.chat.placeholder', 'Type a message...')}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                autoComplete="off"
               />
               <button
-                type="submit"
+                type="button"
+                onClick={(e) => handleSendMessage(e as any)}
                 disabled={!message.trim() || sendMessageMutation.isLoading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" />
               </button>
             </div>
-          </form>
+          </div>
         </div>
 
         {/* Participants Sidebar */}

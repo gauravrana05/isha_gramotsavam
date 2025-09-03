@@ -67,7 +67,7 @@ export default function TeamRegistrationPage() {
   // Get ongoing events for venue assignment
   const { data: eventsData } = api.tournaments.events.getAll.useQuery({
     limit: 1,
-    status: 'ongoing',
+    status: 'registration_open',
   }, {
     enabled: !!user
   });

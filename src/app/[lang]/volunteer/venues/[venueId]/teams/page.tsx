@@ -28,40 +28,41 @@ import {
   Wifi,
   WifiOff,
   Upload,
-  CloudOff
+  CloudOff,
+  RefreshCw,
+  Plus,
+  Trophy,
+  Eye
 } from 'lucide-react';
+import { StatusBadge } from '@/components/ui';
+import { ActionButton } from '@/components/ui/ActionButton';
+
+// Types
+interface PlayerData {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  verificationStatus: 'pending' | 'verified' | 'approved' | 'rejected';
+  profilePhoto?: string;
+  aadhaarFront?: string;
+  aadhaarBack?: string;
+  createdAt: string;
+}
 
 interface TeamData {
   id: string;
   name: string;
-  status: string;
-  captainUser?: {
+  status: 'draft' | 'submitted' | 'verified' | 'approved' | 'rejected';
+  sport: { id: string; name: string; };
+  captainUser: {
     firstName: string;
     lastName: string;
     phone: string;
   };
   currentPlayers: number;
   verifiedPlayersCount: number;
-  sport?: {
-    name: string;
-  };
-}
-
-interface PlayerData {
-  id: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  age: number;
-  gender: string;
-  position: string;
-  verificationStatus: string;
-  user?: {
-    profileImages?: {
-      profilePhotoPath?: string;
-    };
-  };
-  userId?: string;
+  verificationStatus?: string;
 }
 
 export default function TeamsPage() {
@@ -70,119 +71,26 @@ export default function TeamsPage() {
   const searchParams = useSearchParams();
   const { venueId, lang } = params as { venueId: string; lang: string };
   const { user, loading: authLoading } = useAuth();
-  
-  // Debug logging to identify redirect cause
-  console.log('TeamsPage render:', { venueId, lang, user: !!user, authLoading });
-  
-  // Early return if venueId is invalid to prevent query issues
-  if (!venueId || venueId === 'undefined' || venueId === 'null') {
-    console.log('Invalid venueId detected, redirecting to volunteer home');
-    router.push(`/${lang}/volunteer`);
-    return null;
-  }
-  
   const { 
     isOnline, 
     connectionQuality, 
-    syncStatus, 
     pendingActions, 
-    queueSyncAction,
-    getSyncStats 
+    syncStatus 
   } = useOffline();
-  const { addNotification } = useNotification();
   const { t } = useTranslation();
+  const { addNotification } = useNotification();
   
   // State management
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const [searchValue, setSearchValue] = useState('');
   const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>([]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [previewImage, setPreviewImage] = useState<{url: string; label: string} | null>(null);
-  const [createTeamModal, setCreateTeamModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isUpdatingPlayer, setIsUpdatingPlayer] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-  
-  // Data fetching with tRPC
-  const { 
-    data: teamsData, 
-    isLoading: teamsLoading, 
-    error: teamsError,
-    refetch: refetchTeams
-  } = api.volunteers.venue.getVenueTeams.useQuery(
-    { venueId: venueId || '' },
-    { enabled: !!user && !!venueId && venueId.length > 0 }
-  );
 
-  // Fetch venue details for location information needed in CreateTeamModal
-  const { 
-    data: venueData, 
-    isLoading: venueLoading 
-  } = api.volunteers.venue.getVenueDetails.useQuery(
-    { venueId: venueId || '' },
-    { enabled: !!user && !!venueId && venueId.length > 0 }
-  );
-
-  const teams = teamsData || [];
-
-  // Filter configuration
-  const filterFields: FilterField[] = useMemo(() => [
-    {
-      key: 'teamStatus',
-      label: 'Team Status',
-      type: 'select',
-      category: 'Team',
-      options: [
-        { label: 'Submitted', value: 'submitted' },
-        { label: 'Verified', value: 'verified' },
-        { label: 'Checked-In', value: 'checked_in' },
-        { label: 'Rejected', value: 'rejected' }
-      ]
-    },
-    {
-      key: 'playerStatus',
-      label: 'Player Status',
-      type: 'select',
-      category: 'Player',
-      options: [
-        { label: 'Pending', value: 'pending' },
-        { label: 'Verified', value: 'verified' },
-        { label: 'Approved', value: 'approved' },
-        { label: 'Rejected', value: 'rejected' }
-      ]
-    }
-  ], []);
-
-  // Helper functions
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'checked_in':
-        return 'bg-green-100 text-green-800';
-      case 'verified':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'pending':
-      case 'submitted':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'checked_in':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'verified':
-        return <UserCheck className="w-4 h-4" />;
-      case 'pending':
-      case 'submitted':
-        return <Clock className="w-4 h-4" />;
-      default:
-        return <AlertCircle className="w-4 h-4" />;
-    }
-  };
-
-  // Long press handlers
+  // Long press handlers for mobile selection
   const handleLongPressStart = (teamId: string) => {
     const timer = setTimeout(() => {
       setSelectedRows(prev => {
@@ -205,7 +113,65 @@ export default function TeamsPage() {
     }
   };
 
-  // Simplified approach - no dynamic queries to avoid hook violations
+  // Data fetching with tRPC
+  const { 
+    data: teamsData, 
+    isLoading: teamsLoading, 
+    error: teamsError,
+    refetch: refetchTeams
+  } = api.volunteers.venue.getVenueTeams.useQuery(
+    { venueId: venueId || '' },
+    { 
+      enabled: !!user && !!venueId && venueId.length > 0,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true
+    }
+  );
+
+  // Fetch venue details for location information needed in CreateTeamModal
+  const { 
+    data: venueData, 
+    isLoading: venueLoading 
+  } = api.volunteers.venue.getVenueDetails.useQuery(
+    { venueId: venueId || '' },
+    { 
+      enabled: !!user && !!venueId && venueId.length > 0,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true
+    }
+  );
+
+  const teams = teamsData || [];
+
+  // Filter configuration
+  const filterFields: FilterField[] = useMemo(() => [
+    {
+      key: 'teamStatus',
+      label: 'Team Status',
+      type: 'select',
+      options: [
+        { value: 'draft', label: 'Draft' },
+        { value: 'submitted', label: 'Submitted' },
+        { value: 'verified', label: 'Verified' },
+        { value: 'approved', label: 'Approved' },
+        { value: 'rejected', label: 'Rejected' }
+      ]
+    }
+  ], []);
+
+  // Mutations
+  const updatePlayerStatusMutation = api.volunteers.team.updatePlayerVerificationStatus.useMutation({
+    onSuccess: () => {
+      addNotification('Player status updated successfully', 'success');
+      setIsUpdatingPlayer(false);
+    },
+    onError: (error) => {
+      addNotification(`Failed to update player status: ${error.message}`, 'error');
+      setIsUpdatingPlayer(false);
+    }
+  });
+
+  // Team detail queries - simplified to avoid circular dependencies
   const teamDetailQueries = useMemo(() => {
     const queries: Record<string, any> = {};
     
@@ -218,13 +184,13 @@ export default function TeamsPage() {
     });
     
     return queries;
-  }, [teams.length]); // Only depend on teams length, not the full teams array
+  }, [teams.length]);
 
   const toggleTeamExpanded = useCallback(async (teamId: string) => {
     setExpandedTeams(prev => {
       const newExpanded = new Set(prev);
       
-      if (prev.has(teamId)) {
+      if (newExpanded.has(teamId)) {
         newExpanded.delete(teamId);
       } else {
         newExpanded.add(teamId);
@@ -235,44 +201,31 @@ export default function TeamsPage() {
   }, []);
 
   const findPlayerTeam = useCallback((playerId: string) => {
-    for (const team of teams) {
-      // Skip team detail queries to avoid circular dependencies
-      // This function will return undefined for now
-    }
+    // Simplified to avoid circular dependencies
     return undefined;
   }, [teams]);
 
-  // Filter teams based on search and filters
+  // Filter teams based on search and filters - FIXED to avoid circular dependency
   const { filteredTeams, teamMatchTypes } = useMemo(() => {
     let filtered = teams;
     const newTeamMatchTypes: Record<string, 'team' | 'player'> = {};
 
-    // Apply search filter
+    // Apply search filter - ONLY team data, no player search to avoid circular dependency
     if (searchValue.trim()) {
       const search = searchValue.toLowerCase().trim();
       filtered = filtered.filter(team => {
-        // Search in team data
+        // Search in team data only
         const teamMatches = team.name?.toLowerCase().includes(search) ||
           team.captainUser?.firstName?.toLowerCase().includes(search) ||
           team.captainUser?.lastName?.toLowerCase().includes(search) ||
           team.captainUser?.phone?.includes(search);
         
-        // Search in player data if team has loaded players
-        const teamQuery = teamDetailQueries[team.id];
-        const teamData = teamQuery?.data;
-        const players = teamData?.teamPlayers || [];
-        const playerMatches = players.some(player => {
-          const fullName = `${player.firstName || ''} ${player.lastName || ''}`.trim();
-          return fullName.toLowerCase().includes(search) ||
-                 player.phone?.includes(search);
-        });
-        
-        const shouldInclude = teamMatches || playerMatches;
-        if (shouldInclude) {
-          newTeamMatchTypes[team.id] = teamMatches ? 'team' : 'player';
+        if (teamMatches) {
+          newTeamMatchTypes[team.id] = 'team';
+          return true;
         }
         
-        return shouldInclude;
+        return false;
       });
     } else {
       filtered.forEach(team => {
@@ -280,39 +233,17 @@ export default function TeamsPage() {
       });
     }
 
-    // Apply active filters
-    activeFilters.forEach(filter => {
-      if (filter.value && filter.value !== '') {
-        if (filter.key === 'teamStatus') {
-          filtered = filtered.filter(team => {
-            const teamStatus = team.status || 'draft';
-            if (Array.isArray(filter.value)) {
-              return filter.value.includes(teamStatus);
-            }
-            return teamStatus === filter.value;
-          });
-        } else if (filter.key === 'playerStatus') {
-          filtered = filtered.filter(team => {
-            const teamQuery = teamDetailQueries[team.id];
-            const teamData = teamQuery?.data;
-            const players = teamData?.teamPlayers || [];
-            const hasMatchingPlayer = players.some(player => {
-              const playerStatus = player.verificationStatus || 'pending';
-              if (Array.isArray(filter.value)) {
-                return filter.value.includes(playerStatus);
-              }
-              return playerStatus === filter.value;
-            });
-            
-            if (hasMatchingPlayer) {
-              newTeamMatchTypes[team.id] = 'player';
-            }
-            
-            return hasMatchingPlayer;
-          });
-        }
-      }
-    });
+    // Apply status filters - only team-level filters to avoid circular dependency
+    if (activeFilters.length > 0) {
+      filtered = filtered.filter(team => {
+        return activeFilters.every(filter => {
+          if (filter.key === 'teamStatus') {
+            return team.verificationStatus === filter.value || team.status === filter.value;
+          }
+          return true;
+        });
+      });
+    }
 
     return { filteredTeams: filtered, teamMatchTypes: newTeamMatchTypes };
   }, [teams, searchValue, activeFilters]);
@@ -328,97 +259,108 @@ export default function TeamsPage() {
       id: player.id,
       firstName: player.firstName,
       lastName: player.lastName,
-      phone: player.phone || '',
-      age: player.age || 0,
-      gender: player.gender || '',
-      position: player.position || '',
+      phone: player.phone,
       verificationStatus: player.verificationStatus || 'pending',
-      user: player.user,
-      userId: player.userId
+      profilePhoto: player.profilePhoto,
+      aadhaarFront: player.aadhaarFront,
+      aadhaarBack: player.aadhaarBack,
+      createdAt: player.createdAt
     }));
+
+    return players;
+  }, [teamDetailQueries, searchValue, activeFilters]); // REMOVED teamMatchTypes to break circular dependency
+
+  // Handle team creation success
+  const handleTeamCreated = useCallback(async (teamId: string) => {
+    setShowCreateModal(false);
+    addNotification('Team created successfully!', 'success');
     
-    const matchType = teamMatchTypes[teamId];
-    let filteredPlayers = players;
+    // Refetch teams data
+    await refetchTeams();
     
-    // Apply search filtering
-    if (searchValue.trim() && matchType === 'player') {
-      const search = searchValue.toLowerCase().trim();
-      filteredPlayers = filteredPlayers.filter(player => {
-        const fullName = `${player.firstName || ''} ${player.lastName || ''}`.trim();
-        return fullName.toLowerCase().includes(search) ||
-               player.phone?.includes(search);
-      });
+    // Navigate to the new team's detail page
+    if (teamId && teamDetailQueries[teamId]) {
+      await teamDetailQueries[teamId].refetch();
     }
-    
-    // Apply player status filters
-    const playerStatusFilters = activeFilters.filter(f => f.key === 'playerStatus');
-    playerStatusFilters.forEach(filter => {
-      if (filter.value && filter.value !== '') {
-        filteredPlayers = filteredPlayers.filter(player => {
-          const playerStatus = player.verificationStatus || 'pending';
-          if (Array.isArray(filter.value)) {
-            return filter.value.includes(playerStatus);
-          }
-          return playerStatus === filter.value;
-        });
-      }
-    });
-    
-    return filteredPlayers;
-  }, [teamDetailQueries, teamMatchTypes, searchValue, activeFilters]);
+  }, [refetchTeams, teamDetailQueries, addNotification]);
 
   // Handle player status change
   const handlePlayerStatusChange = useCallback(async (player: PlayerData, newStatus: 'pending' | 'verified' | 'approved' | 'rejected') => {
     if (!user) return;
 
     try {
-      // Queue offline action for player verification
-      await queueSyncAction({
-        type: 'player_verification',
-        priority: 'high',
-        payload: {
-          playerId: player.id,
-          status: newStatus,
-          teamId: findPlayerTeam(player.id),
-          venueId: venueId,
-          verifiedBy: user.id,
-          verifiedAt: Date.now()
-        },
-        userId: user.id,
-        maxRetries: 3
+      setIsUpdatingPlayer(true);
+      
+      await updatePlayerStatusMutation.mutateAsync({
+        playerId: player.id,
+        status: newStatus,
+        verifiedBy: user.id
       });
 
-      // Refetch the team data to reflect the status change
+      // Find which team this player belongs to and refetch that team's data
       const teamId = findPlayerTeam(player.id);
       if (teamId && teamDetailQueries[teamId]) {
         await teamDetailQueries[teamId].refetch();
       }
-
-      const statusMessage = isOnline 
-        ? `Player status updated to ${newStatus}` 
-        : `Player status queued for sync (${newStatus})`;
       
-      addNotification(statusMessage, 'success');
+      // Close the modal
+      setSelectedPlayer(null);
+      
     } catch (error) {
       console.error('Error updating player status:', error);
-      addNotification('Failed to update player status', 'error');
     }
-  }, [user, venueId, findPlayerTeam, addNotification, queueSyncAction, isOnline]);
+  }, [user, updatePlayerStatusMutation, findPlayerTeam, teamDetailQueries]);
 
   // Team columns only - players will have their own sub-table
   const teamColumns: Column<any>[] = useMemo(() => [
     {
       key: 'name',
       header: 'Team',
-      sortable: true,
-      className: 'min-w-0 w-24 sm:w-auto',
-      render: (_value, item, _index) => {
-        if (!item) return null;
-        
+      render: (team) => {
+        if (!team) return null;
         return (
-          <div className="flex items-center">
-            <div className="min-w-0">
-              <div className="font-semibold text-gray-900 text-sm truncate">{item.name || 'N/A'}</div>
+          <div className="flex items-center space-x-3">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Trophy className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div>
+              <div className="font-medium text-gray-900">{team.name}</div>
+              <div className="text-sm text-gray-500">{team.sport?.name}</div>
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'captain',
+      header: 'Captain',
+      render: (team) => {
+        if (!team) return null;
+        return (
+          <div>
+            <div className="font-medium text-gray-900">
+              {team.captainUser?.firstName} {team.captainUser?.lastName}
+            </div>
+            <div className="text-sm text-gray-500 flex items-center">
+              <Phone className="w-3 h-3 mr-1" />
+              {team.captainUser?.phone}
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'players',
+      header: 'Players',
+      render: (team) => {
+        if (!team) return null;
+        return (
+          <div className="text-center">
+            <div className="font-medium text-gray-900">{team.currentPlayers}</div>
+            <div className="text-xs text-gray-500">
+              {team.verifiedPlayersCount} verified
             </div>
           </div>
         );
@@ -427,218 +369,29 @@ export default function TeamsPage() {
     {
       key: 'status',
       header: 'Status',
-      sortable: true,
-      className: 'min-w-0 w-24 sm:w-auto',
-      render: (_value, item, _index) => {
-        if (!item) return null;
-        
-        return (
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
-            {getStatusIcon(item.status)}
-            <span className="ml-1 capitalize hidden sm:inline">{item.status || 'pending'}</span>
-          </span>
-        );
-      }
+      render: (team) => (
+        <StatusBadge
+          status={team.verificationStatus || team.status || 'draft'} 
+          variant="team"
+        />
+      )
     },
     {
-      key: 'captain',
-      header: 'Captain',
-      className: 'min-w-0 w-28 sm:w-auto',
-      render: (_value, item, _index) => {
-        if (!item) return null;
-        const captainName = item.captainUser ? `${item.captainUser.firstName} ${item.captainUser.lastName}` : 'N/A';
-        return <div className="text-xs sm:text-sm text-gray-900 truncate">{captainName}</div>;
-      }
-    },
-    {
-      key: 'captainPhone',
-      header: 'Captain Phone',
-      className: 'hidden sm:table-cell',
-      headerClassName: 'hidden sm:table-cell',
-      render: (_value, item, _index) => {
-        if (!item) return null;
-        return <div className="text-sm text-gray-600">{item.captainUser?.phone || 'N/A'}</div>;
-      }
-    },
-    {
-      key: 'players',
-      header: 'Players',
-      className: 'min-w-0 w-20 sm:w-auto',
-      render: (_value, item, _index) => {
-        if (!item) return null;
-        return (
-          <div className="flex items-center gap-1 sm:gap-2">
-            <span className="text-xs sm:text-sm text-gray-900 font-medium">
-              {item.verifiedPlayersCount || 0}/{item.currentPlayers || 0}
-            </span>
-          </div>
-        );
-      }
+      key: 'actions',
+      header: 'Actions',
+      render: (team) => (
+        <div className="flex items-center space-x-2">
+          <ActionButton
+            icon={Eye}
+            onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/teams/${team.id}`)}
+            tooltip="View Details"
+            variant="ghost"
+            size="sm"
+          />
+        </div>
+      )
     }
-  ], []);
-
-  // Helper component for player sub-table
-  const PlayerSubTable = ({ players }: { players: PlayerData[] }) => (
-    <tr>
-      <td colSpan={6} className="p-0">
-        <div className="bg-gray-50 border-t">
-          <table className="w-full">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
-                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mobile</th>
-                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age</th>
-                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-1 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12">Profile</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {players.map((player) => (
-                <tr
-                  key={player.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => setSelectedPlayer(player)}
-                >
-                  <td className="px-2 py-2">
-                    <div className="text-sm text-gray-900">
-                      {`${player.firstName || ''} ${player.lastName || ''}`.trim() || 'N/A'}
-                    </div>
-                  </td>
-                  <td className="px-2 py-2 text-sm text-gray-600">{player.phone || 'N/A'}</td>
-                  <td className="px-2 py-2 text-sm text-gray-600">{player.age || 'N/A'}</td>
-                  <td className="px-2 py-2">
-                    <VerificationStatusSelector
-                      value={player.verificationStatus || 'pending'}
-                      onChange={(newStatus) => {
-                        handlePlayerStatusChange(player, newStatus as 'pending' | 'verified' | 'approved' | 'rejected');
-                      }}
-                    />
-                  </td>
-                  <td className="px-1 py-1 w-12">
-                    <div className="flex justify-center">
-                      {player.user?.profileImages?.profilePhotoPath ? (
-                        <div 
-                          className="relative overflow-hidden cursor-pointer hover:opacity-80 transition-opacity rounded-full"
-                          style={{ width: '24px', height: '24px', minWidth: '24px', minHeight: '24px' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPreviewImage({
-                              url: player.user.profileImages.profilePhotoPath!,
-                              label: `${player.firstName} ${player.lastName} - Profile Photo`
-                            });
-                          }}
-                        >
-                          <Image
-                            src={player.user.profileImages.profilePhotoPath}
-                            alt="Profile"
-                            width={24}
-                            height={24}
-                            className="w-full h-full object-cover rounded-full"
-                          />
-                        </div>
-                      ) : (
-                        <div 
-                          className="bg-gray-200 rounded-full flex items-center justify-center"
-                          style={{ width: '24px', height: '24px', minWidth: '24px', minHeight: '24px' }}
-                        >
-                          <User className="w-3 h-3 text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </td>
-    </tr>
-  );
-
-  // Player Modal Component
-  const PlayerModal = ({ player, onClose }: { player: PlayerData | null; onClose: () => void }) => (
-    <>
-      {player && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Player Details</h3>
-              <button 
-                onClick={onClose}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-6">
-              {/* Player Basic Info */}
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3">Basic Information</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">Name:</span>
-                    <div className="font-medium">{`${player.firstName || ''} ${player.lastName || ''}`.trim()}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Phone:</span>
-                    <div className="font-medium">{player.phone}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Age:</span>
-                    <div className="font-medium">{player.age} years</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Gender:</span>
-                    <div className="font-medium">{player.gender === 'M' ? 'Male' : 'Female'}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Position:</span>
-                    <div className="font-medium capitalize">{player.position}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Verification Status:</span>
-                    <div className={`font-medium capitalize ${
-                      player.verificationStatus === 'approved' ? 'text-green-600' :
-                      player.verificationStatus === 'rejected' ? 'text-red-600' : 'text-yellow-600'
-                    }`}>
-                      {player.verificationStatus || 'pending'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              {player.verificationStatus !== 'approved' && (
-                <div className="flex space-x-3">
-                  <button
-                    onClick={async () => {
-                      await handlePlayerStatusChange(player, 'approved');
-                      onClose();
-                    }}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Approve Player
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await handlePlayerStatusChange(player, 'rejected');
-                      onClose();
-                    }}
-                    className="flex-1 text-red-600 border border-red-300 hover:bg-red-50 px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center"
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Reject Player
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
+  ], [lang, venueId, router]);
 
   // Effects
   useEffect(() => {
@@ -653,14 +406,6 @@ export default function TeamsPage() {
     }
   }, [searchParams]);
 
-  // Remove auto-expansion to prevent performance issues and potential loops
-  // useEffect(() => {
-  //   if (teams.length > 0) {
-  //     const allTeamIds = new Set(teams.map(team => team.id));
-  //     setExpandedTeams(allTeamIds);
-  //   }
-  // }, [teams]);
-
   // Loading and error states
   if (authLoading || teamsLoading || venueLoading) {
     return (
@@ -672,15 +417,17 @@ export default function TeamsPage() {
 
   if (teamsError) {
     return (
-      <div className="p-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600">Error</h1>
-          <p className="mt-2 text-gray-600">{teamsError.message}</p>
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-8">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-6" />
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Error Loading Teams</h1>
+          <p className="text-lg text-gray-600 mb-6">{teamsError.message}</p>
           <button 
             onClick={() => refetchTeams()}
-            className="mt-4 bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
+            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors flex items-center gap-2 mx-auto"
           >
-            Retry
+            <RefreshCw className="w-4 h-4" />
+            Try Again
           </button>
         </div>
       </div>
@@ -688,340 +435,318 @@ export default function TeamsPage() {
   }
 
   return (
-    <div className="w-full py-4 sm:py-8 px-0 sm:px-4 lg:px-6">
-      {/* Offline Status Banner */}
-      {!isOnline && (
-        <div className="mb-4 bg-yellow-100 border border-yellow-200 rounded-lg px-4 py-3">
-          <div className="flex items-center gap-2 text-yellow-800">
-            <WifiOff className="w-5 h-5" />
-            <div className="flex-1">
-              <p className="font-medium">Working Offline</p>
-              <p className="text-sm">Changes will sync when connection returns</p>
+    <div className="min-h-screen bg-[#F3F0E5]">
+      <div className="p-4 sm:p-6 lg:p-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Team Management</h1>
+              <p className="text-gray-600">Manage team registrations and player verification</p>
             </div>
-            {pendingActions.length > 0 && (
-              <div className="bg-yellow-200 px-3 py-1 rounded-full">
-                <span className="text-sm font-medium">{pendingActions.length} pending</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Sync Status Banner */}
-      {isOnline && syncStatus === 'syncing' && (
-        <div className="mb-4 bg-blue-100 border border-blue-200 rounded-lg px-4 py-3">
-          <div className="flex items-center gap-2 text-blue-800">
-            <Upload className="w-5 h-5 animate-pulse" />
-            <div className="flex-1">
-              <p className="font-medium">Syncing Changes</p>
-              <p className="text-sm">Uploading offline actions...</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Search and Filters */}
-      <div className="mb-[-20px] sm:mb-2">
-        <TableControls
-          searchable={true}
-          searchValue={searchValue}
-          searchPlaceholder={t('volunteer.teams.search_placeholder', 'Search teams, players...')}
-          onSearchChange={setSearchValue}
-          filterable={true}
-          showFilterButton={true}
-          onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
-          isFilterOpen={isFilterOpen}
-          activeFilters={activeFilters}
-          onFilterRemove={(key) => {
-            setActiveFilters(activeFilters.filter(f => f.key !== key));
-          }}
-          onFiltersClear={() => setActiveFilters([])}
-          showResultsInfo={false}
-          
-          // Header actions - Create Team button and bulk actions
-          headerActions={(
-            <div className="flex items-center gap-2">
-              {selectedRows.size > 0 && (
-                <>
-                  <span className="text-sm text-gray-600">
-                    {selectedRows.size} selected
+            
+            <div className="flex items-center gap-3">
+              {/* Connection Status */}
+              <div className="flex items-center gap-2 text-sm">
+                {isOnline ? (
+                  <>
+                    <Wifi className="w-4 h-4 text-green-600" />
+                    <span className="text-green-600">Online</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="w-4 h-4 text-orange-600" />
+                    <span className="text-orange-600">Offline</span>
+                  </>
+                )}
+                {pendingActions.length > 0 && (
+                  <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+                    {pendingActions.length} pending
                   </span>
-                  <button
-                    onClick={async () => {
-                      // Bulk check-in selected teams
-                      const selectedTeamIds = Array.from(selectedRows);
-                      
-                      try {
-                        await queueSyncAction({
-                          type: 'team_bulk_checkin',
-                          priority: 'critical',
-                          payload: {
-                            teamIds: selectedTeamIds,
-                            venueId: venueId,
-                            checkedInBy: user?.id,
-                            checkedInAt: Date.now()
-                          },
-                          userId: user?.id || '',
-                          maxRetries: 5
-                        });
+                )}
+              </div>
 
-                        const message = isOnline 
-                          ? `${selectedTeamIds.length} teams checked in successfully`
-                          : `${selectedTeamIds.length} teams queued for check-in`;
-                        
-                        addNotification(message, 'success');
-                        setSelectedRows(new Set());
-                      } catch (error) {
-                        console.error('Bulk check-in failed:', error);
-                        addNotification('Failed to check in teams', 'error');
-                      }
-                    }}
-                    className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1 text-sm"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Check In All
-                  </button>
-                  <button
-                    onClick={() => setSelectedRows(new Set())}
-                    className="text-gray-600 hover:text-gray-800 px-2 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </>
-              )}
               <button
-                onClick={() => setCreateTeamModal(true)}
-                className="bg-[#F28C38] text-white px-2 sm:px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors flex items-center gap-1 sm:gap-2 text-sm whitespace-nowrap"
+                onClick={() => refetchTeams()}
+                className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors border"
               >
-                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Create Team</span>
-                <span className="sm:hidden">Create</span>
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </button>
+              
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Team
               </button>
             </div>
-          )}
-          
-          compact={true}
-        />
-      </div>
+          </div>
+        </div>
 
-      {/* Teams Table with Nested Player Sub-Tables */}
-      <AdvancedTable
-        data={filteredTeams}
-        columns={teamColumns}
-        loading={teamsLoading}
-        
-        // Expandable functionality
-        expandable={true}
-        expandedRows={expandedTeams}
-        onRowExpand={(team, expanded) => {
-          const newExpanded = new Set(expandedTeams);
-          if (expanded) {
-            newExpanded.add(team.id);
-          } else {
-            newExpanded.delete(team.id);
-          }
-          setExpandedTeams(newExpanded);
-        }}
-        renderExpandedContent={(team) => {
-          const teamQuery = teamDetailQueries[team.id];
-          const isLoading = teamQuery?.isLoading || false;
-          const hasData = teamQuery?.data?.teamPlayers;
+        {/* Teams Table with Complete AdvancedTable */}
+        <AdvancedTable
+          data={filteredTeams}
+          columns={teamColumns}
+          loading={teamsLoading}
+          keyExtractor={(team) => team.id}
           
-          if (isLoading || !hasData) {
-            return (
-              <tr>
-                <td colSpan={teamColumns.length + 1} className="p-0">
-                  <div className="flex items-center justify-center py-8 bg-gray-50">
+          // Search functionality
+          searchable={true}
+          searchPlaceholder="Search teams by name, captain..."
+          
+          // Filter functionality
+          filterable={true}
+          filters={filterFields}
+          
+          // Expandable functionality for players
+          expandable={true}
+          expandedRows={expandedTeams}
+          onRowExpand={(team, expanded) => {
+            const newExpanded = new Set(expandedTeams);
+            if (expanded) {
+              newExpanded.add(team.id);
+            } else {
+              newExpanded.delete(team.id);
+            }
+            setExpandedTeams(newExpanded);
+          }}
+          renderExpandedContent={(team) => {
+            const teamQuery = teamDetailQueries[team.id];
+            const isLoading = teamQuery?.isLoading || false;
+            const hasData = teamQuery?.data?.teamPlayers;
+            
+            if (isLoading || !hasData) {
+              return (
+                <div className="p-6 bg-gray-50">
+                  <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-5 h-5 animate-spin text-gray-400 mr-2" />
                     <span className="text-gray-500">Loading players...</span>
                   </div>
-                </td>
-              </tr>
-            );
-          }
-          
-          return <PlayerSubTable players={getFilteredPlayers(team.id)} />;
-        }}
-        
-        // Row interaction with long press selection
-        onRowClick={(team) => {
-          if (selectedRows.size === 0) {
-            router.push(`/${lang}/volunteer/venues/${venueId}/teams/${team.id}`);
-          }
-        }}
-        onRowMouseDown={(team) => handleLongPressStart(team.id)}
-        onRowMouseUp={handleLongPressEnd}
-        onRowMouseLeave={handleLongPressEnd}
-        onRowTouchStart={(team) => handleLongPressStart(team.id)}
-        onRowTouchEnd={handleLongPressEnd}
-        
-        // Row selection
-        selectedRows={selectedRows}
-        onRowSelect={(teamId, selected) => {
-          setSelectedRows(prev => {
-            const newSelected = new Set(prev);
-            if (selected) {
-              newSelected.add(teamId);
-            } else {
-              newSelected.delete(teamId);
+                </div>
+              );
             }
-            return newSelected;
-          });
-        }}
-        
-        keyExtractor={(team) => team.id}
-        
-        // Table configuration
-        stickyHeader={true}
-        compact={false}
-        
-        // Disable built-in search/filter since we handle it above
-        searchable={false}
-        filterable={false}
-        
-        // Pagination
-        pagination={{
-          enabled: true,
-          pageSize: 10,
-          pageSizeOptions: [5, 10, 20, 50]
-        }}
-      />
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mt-4 px-3 sm:px-0">
-        <button
-          onClick={() => {
-            setActiveFilters([]);
-            setSearchValue('');
+            const players = getFilteredPlayers(team.id);
+            
+            return (
+              <div className="p-6 bg-gray-50 border-t">
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+                  <Users className="w-4 h-4 mr-2" />
+                  Team Players ({players.length})
+                </h4>
+                
+                {players.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p>No players found for this team</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {players.map((player) => (
+                      <div 
+                        key={player.id}
+                        className="flex items-center justify-between p-4 bg-white rounded-lg border hover:shadow-sm transition-shadow cursor-pointer"
+                        onClick={() => setSelectedPlayer(player)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center">
+                            <User className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {player.firstName} {player.lastName}
+                            </div>
+                            <div className="text-sm text-gray-500 flex items-center">
+                              <Phone className="w-3 h-3 mr-1" />
+                              {player.phone}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3">
+                          <VerificationStatusSelector
+                            value={player.verificationStatus}
+                            onChange={(newStatus) => {
+                              handlePlayerStatusChange(player, newStatus as 'pending' | 'verified' | 'approved' | 'rejected');
+                            }}
+                          />
+                          <Eye className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
           }}
-          className="rounded-md p-2 sm:p-4 shadow-sm border hover:bg-gray-50 text-left transition-colors"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-[11px] sm:text-sm">{t('volunteer.teams.total_teams', 'Total Teams')}</p>
-              <p className="text-lg sm:text-2xl font-bold text-gray-900">{teams.length}</p>
-            </div>
-            <Users className="w-5 h-5 sm:w-8 sm:h-8 text-gray-400" />
-          </div>
-        </button>
-        
-        <button
-          onClick={() => {
-            setActiveFilters([{ key: 'teamStatus', value: 'checked_in', label: 'Team Status', displayValue: 'Checked In' }]);
-            setSearchValue('');
+          
+          // Row interactions
+          onRowClick={(team) => {
+            if (selectedRows.size === 0) {
+              router.push(`/${lang}/volunteer/venues/${venueId}/teams/${team.id}`);
+            }
           }}
-          className="rounded-md p-2 sm:p-4 shadow-sm border hover:bg-gray-50 text-left transition-colors"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-[11px] sm:text-sm">{t('volunteer.teams.checked_in', 'Checked In')}</p>
-              <p className="text-lg sm:text-2xl font-bold text-green-600">
-                {teams.filter(t => t.status === 'checked_in').length}
-              </p>
-            </div>
-            <CheckCircle className="w-5 h-5 sm:w-8 sm:h-8 text-green-400" />
-          </div>
-        </button>
-        
-        <button
-          onClick={() => {
-            setActiveFilters([{ key: 'teamStatus', value: 'verified', label: 'Team Status', displayValue: 'Verified' }]);
-            setSearchValue('');
+          onRowMouseDown={(team) => handleLongPressStart(team.id)}
+          onRowMouseUp={handleLongPressEnd}
+          onRowMouseLeave={handleLongPressEnd}
+          onRowTouchStart={(team) => handleLongPressStart(team.id)}
+          onRowTouchEnd={handleLongPressEnd}
+          
+          // Selection
+          selectable={true}
+          selectedRows={selectedRows}
+          onRowSelect={(teamId, selected) => {
+            setSelectedRows(prev => {
+              const newSelected = new Set(prev);
+              if (selected) {
+                newSelected.add(teamId);
+              } else {
+                newSelected.delete(teamId);
+              }
+              return newSelected;
+            });
           }}
-          className="rounded-md p-2 sm:p-4 shadow-sm border hover:bg-gray-50 text-left transition-colors"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-[11px] sm:text-sm">Confirmed</p>
-              <p className="text-lg sm:text-2xl font-bold text-blue-600">
-                {teams.filter(t => t.status === 'verified').length}
-              </p>
-            </div>
-            <UserCheck className="w-5 h-5 sm:w-8 sm:h-8 text-blue-400" />
-          </div>
-        </button>
-        
-        <button
-          onClick={() => {
-            setActiveFilters([{ key: 'teamStatus', value: 'submitted', label: 'Team Status', displayValue: 'Submitted' }]);
-            setSearchValue('');
-          }}
-          className="rounded-md p-2 sm:p-4 shadow-sm border hover:bg-gray-50 text-left transition-colors"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-600 text-[11px] sm:text-sm">Unconfirmed</p>
-              <p className="text-lg sm:text-2xl font-bold text-yellow-600">
-                {teams.filter(t => t.status === 'submitted').length}
-              </p>
-            </div>
-            <Clock className="w-5 h-5 sm:w-8 sm:h-8 text-yellow-400" />
-          </div>
-        </button>
-      </div>
+          
+          // Bulk actions
+          bulkActions={[
+            {
+              label: 'Check In Selected',
+              icon: CheckCircle,
+              onClick: async (selectedItems) => {
+                const selectedTeamIds = selectedItems.map(team => team.id);
+                
+                try {
+                  await queueSyncAction({
+                    type: 'team_bulk_checkin',
+                    priority: 'critical',
+                    payload: {
+                      teamIds: selectedTeamIds,
+                      venueId: venueId,
+                      checkedInBy: user?.id,
+                      checkedInAt: Date.now()
+                    },
+                    userId: user?.id || '',
+                    maxRetries: 5
+                  });
 
-      {/* Player Modal */}
-      <PlayerModal 
-        player={selectedPlayer} 
-        onClose={() => setSelectedPlayer(null)} 
-      />
+                  const message = isOnline 
+                    ? `${selectedTeamIds.length} teams checked in successfully`
+                    : `${selectedTeamIds.length} teams queued for check-in`;
+                  
+                  addNotification(message, 'success');
+                  setSelectedRows(new Set());
+                } catch (error) {
+                  console.error('Bulk check-in failed:', error);
+                  addNotification('Failed to check in teams', 'error');
+                }
+              }
+            }
+          ]}
+          
+          // Header actions
+          headerActions={(
+            <button
+              onClick={() => setCreateTeamModal(true)}
+              className="bg-[#F28C38] text-white px-4 py-2 rounded-lg hover:bg-[#E67A26] transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Create Team
+            </button>
+          )}
+          
+          // Styling
+          stickyHeader={true}
+          compact={false}
+          emptyMessage="No teams found"
+          
+          // Pagination
+          pagination={{
+            enabled: true,
+            pageSize: 10,
+            pageSizeOptions: [5, 10, 20, 50]
+          }}
+        />
 
-      {/* Create Team Modal */}
-      <CreateTeamModal
-        isOpen={createTeamModal}
-        onClose={() => setCreateTeamModal(false)}
-        venueLocation={venueData ? {
-          panchayat: venueData.city || '',
-          district: venueData.city || '',
-          state: venueData.state || '',
-          taluk: ''
-        } : undefined}
-        venueId={venueId}
-        onTeamCreated={() => {
-          refetchTeams();
-          setCreateTeamModal(false);
-        }}
-      />
-
-      {/* Image Preview Modal */}
-      {previewImage && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] flex flex-col">
-            <div className="border-b px-6 py-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{previewImage?.label || 'Image Preview'}</h3>
-              <button 
-                onClick={() => setPreviewImage(null)}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close preview"
-              >
-                <X className="w-5 h-5" />
-              </button>
+        {/* Summary Stats */}
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Users className="w-8 h-8 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">{teams.length}</div>
+                <div className="text-sm text-gray-500">Total Teams</div>
+              </div>
             </div>
-            <div className="p-4 overflow-auto flex-1 flex items-center justify-center">
-              {previewImage?.url && (
-                <img 
-                  src={previewImage?.url} 
-                  alt={previewImage?.label || 'Preview'} 
-                  className="max-h-[70vh] max-w-full object-contain"
-                />
-              )}
+          </div>
+          
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {teams.filter(t => t.verificationStatus === 'verified' || t.status === 'verified').length}
+                </div>
+                <div className="text-sm text-gray-500">Verified Teams</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Clock className="w-8 h-8 text-yellow-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {teams.filter(t => t.verificationStatus === 'pending' || t.status === 'submitted').length}
+                </div>
+                <div className="text-sm text-gray-500">Pending Review</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <User className="w-8 h-8 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {teams.reduce((sum, team) => sum + (team.currentPlayers || 0), 0)}
+                </div>
+                <div className="text-sm text-gray-500">Total Players</div>
+              </div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Modals */}
+      {showCreateModal && (
+        <CreateTeamModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={handleTeamCreated}
+          venueId={venueId}
+          venueData={venueData}
+        />
       )}
 
-      {/* Filter Sidebar */}
-      <FilterSidebar
-        isOpen={isFilterOpen}
-        onClose={() => setIsFilterOpen(false)}
-        filters={filterFields}
-        activeFilters={activeFilters}
-        onFiltersChange={setActiveFilters}
-        onClearAll={() => setActiveFilters([])}
-        title="Filter Teams"
-        showApplyButton={false}
-        showClearButton={true}
-      />
+      {selectedPlayer && (
+        <PlayerDetailsModal
+          isOpen={!!selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+          player={selectedPlayer}
+          onStatusChange={handlePlayerStatusChange}
+          isUpdating={isUpdatingPlayer}
+        />
+      )}
     </div>
   );
 }

@@ -45,12 +45,17 @@ interface SportGroup {
   teams: any[];
 }
 
-export default function VolunteerFixturesPage() {
+function VolunteerFixturesPage() {
   const params = useParams();
   const router = useRouter();
   const { venueId, lang } = params as { venueId: string; lang: string };
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const { t } = useTranslation();
+
+  // Stabilize the enabled condition to prevent unnecessary re-triggers
+  const isQueryEnabled = React.useCallback(() => {
+    return !!user?.id && !!venueId;
+  }, [user?.id, venueId]);
 
   // Single query for all tournament data with real-time updates
   const { 
@@ -61,12 +66,15 @@ export default function VolunteerFixturesPage() {
   } = api.volunteers.venue.getVenueTournament.useQuery(
     { venueId },
     { 
-      enabled: !!user && !!venueId,
+      enabled: isQueryEnabled(),
       // Remove automatic polling to prevent conflicts
       refetchOnWindowFocus: false,
-      refetchOnReconnect: true
+      refetchOnReconnect: true,
+      // Add stale time to prevent unnecessary refetches
+      staleTime: 10000 // 10 seconds
     }
   );
+
 
   // Add controlled polling only for active tournaments
   React.useEffect(() => {
@@ -78,6 +86,27 @@ export default function VolunteerFixturesPage() {
 
     return () => clearInterval(interval);
   }, [venueData?.tournament?.status, refetch]);
+
+  // Debug logging to track when and why tRPC loading triggers
+  React.useEffect(() => {
+    console.log('🔄 tRPC Query State:', {
+      loading,
+      enabled: isQueryEnabled(),
+      hasUser: !!user?.id,
+      hasVenueId: !!venueId,
+      userId: user?.id,
+      venueId,
+      timestamp: new Date().toISOString()
+    });
+  }, [loading, user?.id, venueId, isQueryEnabled]);
+
+  // Memoize data before any early returns
+  const tournament = React.useMemo(() => venueData?.tournament, [venueData?.tournament]);
+  const teamsBySport = React.useMemo(() => venueData?.teamsBySport || [], [venueData?.teamsBySport]);
+  const stats = React.useMemo(() => 
+    venueData?.stats || { totalTeams: 0, matchesCompleted: 0, matchesTotal: 0, progress: 0 }, 
+    [venueData?.stats]
+  );
 
   // Helper functions
   const getStatusColor = (status: string) => {
@@ -100,8 +129,8 @@ export default function VolunteerFixturesPage() {
     }
   };
 
-  // Content loading state (keeps sidebar visible)
-  if (authLoading || loading) {
+  // Content loading state (keeps sidebar visible) - only check data loading, not auth
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#F3F0E5] py-4 sm:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -164,10 +193,6 @@ export default function VolunteerFixturesPage() {
       </div>
     );
   }
-
-  const tournament = venueData?.tournament;
-  const teamsBySport = venueData?.teamsBySport || [];
-  const stats = venueData?.stats || { totalTeams: 0, matchesCompleted: 0, matchesTotal: 0, progress: 0 };
 
   return (
     <div className="min-h-screen bg-[#F3F0E5] py-4 sm:py-8">
@@ -407,3 +432,5 @@ export default function VolunteerFixturesPage() {
     </div>
   );
 }
+
+export default VolunteerFixturesPage;

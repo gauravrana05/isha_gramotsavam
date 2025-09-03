@@ -24,12 +24,21 @@ async function main() {
     console.log(`✅ User: ${user.fullName} (${user.role})`)
   }
 
-  // 2. Seed Event (now that admin user exists)
-  console.log('📅 Seeding event...')
-  const event = await prisma.event.upsert({
-    where: { id: '550e8400-e29b-41d4-a716-446655440301' },
-    update: {},
-    create: {
+  // 2. Seed Events
+  console.log('📅 Seeding events...')
+  const events = [
+    {
+      id: '20f2f8d1-0ecb-4e9e-b047-d21e999e5111',
+      name: 'Isha Gramotsavam 2025',
+      description: 'Annual sports tournament 2025',
+      startDate: new Date('2025-12-01'),
+      endDate: new Date('2025-12-15'),
+      registrationStartDate: new Date('2025-11-01'),
+      registrationEndDate: new Date('2025-11-25'),
+      status: 'active',
+      createdBy: '550e8400-e29b-41d4-a716-446655440101'
+    },
+    {
       id: '550e8400-e29b-41d4-a716-446655440301',
       name: 'Isha Gramotsavam 2024',
       description: 'Annual sports tournament',
@@ -38,10 +47,18 @@ async function main() {
       registrationStartDate: new Date('2024-11-01'),
       registrationEndDate: new Date('2024-11-25'),
       status: 'active',
-      createdBy: '550e8400-e29b-41d4-a716-446655440101' // Admin user ID
+      createdBy: '550e8400-e29b-41d4-a716-446655440101'
     }
-  })
-  console.log(`✅ Event: ${event.name}`)
+  ]
+
+  for (const event of events) {
+    await prisma.event.upsert({
+      where: { id: event.id },
+      update: event,
+      create: event
+    })
+    console.log(`✅ Event: ${event.name}`)
+  }
 
   // 3. Seed Venues
   console.log('🏟️ Seeding venues...')

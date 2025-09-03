@@ -216,13 +216,13 @@ export default function CaptainSidebar({
         md:left-0 md:right-auto md:translate-x-0 md:fixed md:top-0 md:bottom-0 md:flex-shrink-0 md:transition-[width] md:duration-300 md:ease-in-out
         ${isMobileOpen ? 'right-0 translate-x-0' : 'right-0 translate-x-full'}
         ${isDesktopCollapsed ? 'md:w-16' : 'md:w-[280px]'} 
-        w-full md:w-auto
+        w-full
         ${className}
       `}>
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className={`flex items-center border-b border-gray-200 h-16 ${
-            isDesktopCollapsed ? 'justify-center px-3' : 'justify-between px-3'
+            isDesktopCollapsed ? 'justify-center px-3' : 'justify-between px-4'
           }`}>
             {showContent && (
               <div className="flex items-center animate-fade-in">

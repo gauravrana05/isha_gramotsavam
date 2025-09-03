@@ -183,7 +183,7 @@ export const teamsManagementRouter = createTRPCRouter({
         },
         _count: {
           select: {
-            players: true,
+            teamPlayers: true,
           },
         },
       },
@@ -360,41 +360,33 @@ export const teamsManagementRouter = createTRPCRouter({
         return team
       })
 
-      // Automatic venue assignment using 3-tier system (after transaction)
+      // Fire-and-forget venue assignment (don't await)
       if (input.eventId) {
-        try {
-          const venueAssignmentResult = await assignVenueToTeam(
-            result.id,
-            {
-              panchayat: input.panchayat || '',
-              district: input.district,
-              state: input.state,
-              taluk: input.taluk || '',
-            },
-            input.eventId,
-            ctx.user.id
-          )
-          
-          // Log assignment result for admin monitoring
-          console.log(`Team ${result.name} venue assignment:`, venueAssignmentResult.message)
-        } catch (error) {
-          // Don't fail team creation if venue assignment fails
-          console.error('Venue assignment failed during team creation:', error)
-        }
+        assignVenueToTeam(
+          result.id,
+          {
+            panchayat: input.panchayat || '',
+            district: input.district,
+            state: input.state,
+            taluk: input.taluk || '',
+          },
+          input.eventId,
+          ctx.user.id
+        ).catch(error => {
+          console.error('Background venue assignment failed:', error)
+        })
       } else {
-        // Try to get the current active event for venue assignment
-        try {
-          const activeEvent = await db.event.findFirst({
-            where: {
-              status: {
-                in: ['active', 'registration_open', 'registration_closed']
-              }
-            },
-            select: { id: true }
-          })
-
+        // Try to get active event and assign venue in background
+        db.event.findFirst({
+          where: {
+            status: {
+              in: ['active', 'registration_open', 'registration_closed']
+            }
+          },
+          select: { id: true }
+        }).then(activeEvent => {
           if (activeEvent) {
-            const venueAssignmentResult = await assignVenueToTeam(
+            return assignVenueToTeam(
               result.id,
               {
                 panchayat: input.panchayat || '',
@@ -405,12 +397,10 @@ export const teamsManagementRouter = createTRPCRouter({
               activeEvent.id,
               ctx.user.id
             )
-            
-            console.log(`Team ${result.name} venue assignment (auto-event):`, venueAssignmentResult.message)
           }
-        } catch (error) {
-          console.error('Auto venue assignment failed during team creation:', error)
-        }
+        }).catch(error => {
+          console.error('Background venue assignment failed:', error)
+        })
       }
 
       return result

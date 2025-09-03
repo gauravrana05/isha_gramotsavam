@@ -53,14 +53,19 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
     if (sport.supports_women) categories.push(t('sports.categories.women', 'Women'))
     if (sport.supports_mixed) categories.push(t('sports.categories.mixed', 'Mixed'))
     
-    return categories.length > 0 ? 
-      t('sports.for_categories', 'For {{categories}}').replace('{{categories}}', categories.join(' & ')) : 
-      t('sports.category_tbd', 'Category TBD')
+    if (categories.length > 0) {
+      const template = t('sports.for_categories', 'For {{categories}}');
+      const templateStr = typeof template === 'string' ? template : 'For {{categories}}';
+      return String(templateStr).replace('{{categories}}', categories.join(' & '));
+    }
+    return t('sports.category_tbd', 'Category TBD') || 'Category TBD';
   }
 
   // Helper function to format player count
   const formatPlayerCount = (mainPlayers: number, substitutes: number): string => {
-    return t('sports.players_per_team', '{{main}} + {{subs}} Players Per Team')
+    const template = t('sports.players_per_team', '{{main}} + {{subs}} Players Per Team');
+    const templateStr = typeof template === 'string' ? template : '{{main}} + {{subs}} Players Per Team';
+    return templateStr
       .replace('{{main}}', mainPlayers.toString())
       .replace('{{subs}}', substitutes.toString())
   }
@@ -85,7 +90,7 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
         if (sport.supports_women) supportedCategories.push(t('sports.categories.women', 'women'))
         if (sport.supports_mixed) supportedCategories.push(t('sports.categories.mixed_teams', 'mixed teams'))
         
-        registration_message = t('sports.registration_restricted', 'This sport is only available for {{categories}}')
+        registration_message = String(t('sports.registration_restricted', 'This sport is only available for {{categories}}'))
           .replace('{{categories}}', supportedCategories.join(' and '))
       }
     }
@@ -100,7 +105,21 @@ export default function SportsPreview({ lang }: SportsPreviewProps) {
   }
 
   if (sportsQuery.isLoading) {
-    return <PageLoader title={t('sports.loading', 'Loading sports...')} variant="minimal" />;
+    return (
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              {t('sports.title', 'Sports Categories')}
+            </h2>
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner size="md" />
+              <span className="ml-3 text-gray-600">{t('sports.loading', 'Loading sports...')}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   if (sportsQuery.error) {

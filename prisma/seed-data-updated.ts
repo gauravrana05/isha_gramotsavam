@@ -51,6 +51,15 @@ const venues = [
 // USERS (sample based on roles we saw)
 const users = [
   {
+    id: "9f73280e-5e79-4d4e-adf7-bcf88ace3431",
+    firstName: "Current",
+    lastName: "Volunteer",
+    fullName: "Current Volunteer",
+    email: "volunteer@isha.foundation",
+    phone: "+919876543220",
+    role: "technical_volunteer"
+  },
+  {
     id: "550e8400-e29b-41d4-a716-446655440101",
     firstName: "Admin",
     lastName: "User",
@@ -133,8 +142,15 @@ const users = [
   }
 ];
 
-// VENUE LEVEL MAPPINGS
+// VENUE LEVEL MAPPINGS (Updated with actual IDs)
 const venueLevelMappings = [
+  {
+    id: "8d81ed70-e80c-4a79-b9f8-096cea520e96",
+    eventId: "20f2f8d1-0ecb-4e9e-b047-d21e999e5111",
+    venueId: "550e8400-e29b-41d4-a716-446655440003",
+    level: "division",
+    isActive: true
+  },
   {
     id: "550e8400-e29b-41d4-a716-446655440201",
     eventId: "550e8400-e29b-41d4-a716-446655440301",
@@ -214,47 +230,31 @@ const locationClusterMappings = [
   }
 ];
 
-// VOLUNTEER ASSIGNMENTS
+// VOLUNTEER ASSIGNMENTS (Fixed to match schema)
 const volunteerAssignments = [
   {
-    id: "550e8400-e29b-41d4-a716-446655440601",
-    eventId: "550e8400-e29b-41d4-a716-446655440301",
-    userId: "550e8400-e29b-41d4-a716-446655440103",
-    venueId: "550e8400-e29b-41d4-a716-446655440001",
-    role: "verification_volunteer",
-    isActive: true
+    id: "dd87a82a-f0d9-4eb9-9326-1bd27c04e909",
+    eventId: "20f2f8d1-0ecb-4e9e-b047-d21e999e5111",
+    volunteerId: "9f73280e-5e79-4d4e-adf7-bcf88ace3431",
+    venueLevelMappingId: "8d81ed70-e80c-4a79-b9f8-096cea520e96",
+    volunteerType: "technical_volunteer",
+    status: "assigned"
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440602",
     eventId: "550e8400-e29b-41d4-a716-446655440301",
-    userId: "550e8400-e29b-41d4-a716-446655440104",
-    venueId: "550e8400-e29b-41d4-a716-446655440004",
-    role: "verification_volunteer",
-    isActive: true
+    volunteerId: "550e8400-e29b-41d4-a716-446655440104",
+    venueLevelMappingId: "550e8400-e29b-41d4-a716-446655440202",
+    volunteerType: "verification_volunteer",
+    status: "assigned"
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440603",
     eventId: "550e8400-e29b-41d4-a716-446655440301",
-    userId: "550e8400-e29b-41d4-a716-446655440105",
-    venueId: "550e8400-e29b-41d4-a716-446655440001",
-    role: "technical_volunteer",
-    isActive: true
-  },
-  {
-    id: "550e8400-e29b-41d4-a716-446655440604",
-    eventId: "550e8400-e29b-41d4-a716-446655440301",
-    userId: "550e8400-e29b-41d4-a716-446655440106",
-    venueId: "550e8400-e29b-41d4-a716-446655440004",
-    role: "technical_volunteer",
-    isActive: true
-  },
-  {
-    id: "550e8400-e29b-41d4-a716-446655440605",
-    eventId: "550e8400-e29b-41d4-a716-446655440301",
-    userId: "550e8400-e29b-41d4-a716-446655440107",
-    venueId: "550e8400-e29b-41d4-a716-446655440003",
-    role: "technical_volunteer",
-    isActive: true
+    volunteerId: "550e8400-e29b-41d4-a716-446655440105",
+    venueLevelMappingId: "550e8400-e29b-41d4-a716-446655440201",
+    volunteerType: "technical_volunteer",
+    status: "assigned"
   }
 ];
 

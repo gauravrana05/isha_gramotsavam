@@ -91,12 +91,13 @@ export default function VolunteerHomePage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {assignment.venueName || `Venue ${assignment.venueId}`}
+                      {assignment.venueLevelMapping?.venue?.name || 'Unknown Venue'}
                     </h3>
-                    <p className="text-gray-600">Role: {assignment.role}</p>
+                    <p className="text-gray-600">Event: {assignment.event?.name || 'Unknown Event'}</p>
+                    <p className="text-gray-600">Status: {assignment.status}</p>
                   </div>
                   <button
-                    onClick={() => router.push(`/${lang}/volunteer/venues/${assignment.venueId}/dashboard`)}
+                    onClick={() => router.push(`/${lang}/volunteer/venues/${assignment.venueLevelMapping?.venue?.id}/dashboard`)}
                     className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
                   >
                     Go to Dashboard
