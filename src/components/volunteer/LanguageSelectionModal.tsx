@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from 'react';
-import { useTranslation } from '@/lib/utils/i18n';
 import { SUPPORTED_LANGUAGES, LanguageCode } from '@/lib/utils/i18n-server';
 import { Check, Globe } from 'lucide-react';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
@@ -25,7 +24,6 @@ export default function LanguageSelectionModal({
 }: LanguageSelectionModalProps) {
   
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode | null>(currentLanguage || null);
-  const { t } = useTranslation();
 
   const handleLanguageClick = (languageCode: LanguageCode) => {
     setSelectedLanguage(languageCode);
@@ -66,7 +64,7 @@ export default function LanguageSelectionModal({
     <EnhancedModal
       isOpen={isOpen}
       onClose={onClose}
-      title={t('language_selection.title', 'Choose Your Language')}
+      title="Choose Your Language"
       size="lg"
       mobileFullScreen={true}
       showCloseButton={false}
@@ -77,7 +75,7 @@ export default function LanguageSelectionModal({
             disabled={isLoading}
             className="flex-1 sm:w-32 sm:flex-none px-6 py-3 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
-            {t('common.cancel', 'Cancel')}
+            Cancel
           </button>
           <button
             onClick={handleSave}
@@ -87,10 +85,10 @@ export default function LanguageSelectionModal({
             {isLoading ? (
               <div className="flex items-center justify-center gap-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                {t('common.saving', 'Saving...')}
+                Saving...
               </div>
             ) : (
-              t('common.save', 'Save')
+              'Save'
             )}
           </button>
         </div>
@@ -99,7 +97,7 @@ export default function LanguageSelectionModal({
       <div className="space-y-6 bg-gray-50">
         {/* Subtitle */}
         <p className="text-gray-600 text-center text-sm md:text-base">
-          {t('language_selection.subtitle', 'Select your preferred language for the best experience')}
+          Select your preferred language for the best experience
         </p>
 
         {/* Language Selection */}
@@ -111,7 +109,7 @@ export default function LanguageSelectionModal({
               disabled={isLoading}
               className={`
                 w-full sm:w-[calc(50%-0.5rem)] flex items-center justify-start sm:justify-center p-4 rounded-lg border-2 
-                transition-all duration-300 min-h-[70px] sm:min-h-[80px] box-border
+                transition-all duration-300 min-h-[70px] sm:min-h-[80px] box-border relative
                 appearance-none bg-white hover:shadow-lg hover:shadow-orange-200 active:opacity-90
                 ${selectedLanguage === language.code
                   ? 'border-[#F28C38] bg-orange-50 text-[#F28C38]'
@@ -180,7 +178,7 @@ export default function LanguageSelectionModal({
         {/* Loading state */}
         {isLoading && (
           <div className="text-center text-sm text-gray-600">
-            {t('language_selection.updating', 'Updating preference...')}
+            Updating preference...
           </div>
         )}
       </div>

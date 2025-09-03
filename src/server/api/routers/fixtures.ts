@@ -7,7 +7,7 @@ export const fixturesRouter = createTRPCRouter({
   getTeamFixtures: protectedProcedure
     .input(z.object({
       teamIds: z.array(z.string())
-    }).optional().default({}))
+    }))
     .query(async ({ ctx, input }) => {
       if (input.teamIds.length === 0) {
         return [];
@@ -54,7 +54,7 @@ export const fixturesRouter = createTRPCRouter({
   getFixtureById: protectedProcedure
     .input(z.object({
       fixtureId: z.string()
-    }).optional().default({}))
+    }))
     .query(async ({ ctx, input }) => {
       const fixture = await ctx.db.fixture.findUnique({
         where: { id: input.fixtureId },

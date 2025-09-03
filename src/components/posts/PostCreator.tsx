@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/AdvancedSelect';
 import { Label } from '@/components/ui/Label';
 import { EnhancedModal } from '../ui/EnhancedModal';
-import { MediaUpload } from '@/components/media/MediaUpload';
+import { Upload } from 'lucide-react'; // Upload icon for media
 import { api } from '@/server/trpc/react';
 import { useNotification } from '@/context/NotificationContext';
 import { useParams } from 'next/navigation';
@@ -36,6 +36,7 @@ const PostCreator: React.FC<PostCreatorProps> = ({
   const [entityId, setEntityId] = useState<string | undefined>(undefined);
   const [visibility, setVisibility] = useState('public');
   const [mediaIds, setMediaIds] = useState<string[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDetectingContext, setIsDetectingContext] = useState(false);
 
   const { addNotification } = useNotification();
@@ -69,19 +70,19 @@ const PostCreator: React.FC<PostCreatorProps> = ({
   });
 
   const handleCreatePost = () => {
-    if (!entityId) {
-      addNotification(t('posts.entity_required', 'Please select a fixture or match to associate this post with.'), 'error');
-      return;
-    }
-
-    createPostMutation.mutate({
+    const postData = {
       title,
       content,
       entityType,
       entityId,
+      venueId, // Add venueId for general venue posts
       visibility: visibility as 'public' | 'private',
       mediaIds,
-    });
+    };
+    
+    console.log('Creating post with data:', postData);
+    
+    createPostMutation.mutate(postData);
   };
 
 
@@ -94,31 +95,27 @@ const PostCreator: React.FC<PostCreatorProps> = ({
       mobileFullScreen={true}
       scrollableBody={true}
       footer={
-        <div className="flex justify-end items-center space-x-2">
-          <div className="relative">
-            <Button 
-              variant="outline"
-              className="px-4 md:px-8 py-3 md:py-2 bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-200 hover:to-gray-300 text-sm md:text-base rounded-lg bg-gradient-to-r from-blue-700 to-purple-700 hover:from-blue-900 hover:to-purple-900 bg-clip-text text-transparent border-0 relative z-10 transition-all duration-200"
-            >
-              {t('posts.save_draft', 'Save Draft')}
-            </Button>
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-[2px]">
-              <div className="bg-gradient-to-r from-gray-100 to-gray-200 rounded-lg w-full h-full"></div>
-            </div>
-          </div>
+        <div className="flex justify-end items-center space-x-3">
+          <Button 
+            variant="outline"
+            onClick={onClose}
+            className="px-6 py-2 text-gray-700 border-gray-300 hover:bg-gray-50"
+          >
+            Cancel
+          </Button>
           <Button 
             onClick={handleCreatePost} 
-            disabled={createPostMutation.isPending}
-            className="px-4 md:px-8 py-3 md:py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-sm md:text-base"
+            disabled={createPostMutation.isPending || !title.trim()}
+            className="px-6 py-2 bg-[#F28C38] hover:bg-[#E67A26] text-white disabled:opacity-50"
           >
-            {createPostMutation.isPending ? t('posts.creating', 'Creating...') : t('posts.create_post', 'Create Post')}
+            {createPostMutation.isPending ? 'Posting...' : 'Post'}
           </Button>
         </div>
       }
     >
       <div className="space-y-4">
         <div className="space-y-1">
-          <Label htmlFor="post-title">{t('posts.title', 'Title')}</Label>
+          <Label htmlFor="post-title">{t('posts.title', 'Title')} *</Label>
           <Input 
             id="post-title"
             value={title} 
@@ -128,7 +125,7 @@ const PostCreator: React.FC<PostCreatorProps> = ({
         </div>
 
         <div className="space-y-1">
-          <Label htmlFor="post-content">{t('posts.content', 'Content')}</Label>
+          <Label htmlFor="post-content">{t('posts.content', 'Content')} *</Label>
           <Textarea 
             id="post-content"
             value={content} 
@@ -138,6 +135,76 @@ const PostCreator: React.FC<PostCreatorProps> = ({
             maxLength={500}
           />
           <p className="text-xs text-gray-500 text-right">{content.length} / 500</p>
+        </div>
+
+        <div className="space-y-1">
+          <Label>{t('posts.media', 'Media')}</Label>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-[#F28C38] transition-colors">
+            <div className="flex flex-col items-center py-4">
+              <Upload className="w-8 h-8 text-gray-400 mb-2" />
+              <p className="text-sm text-gray-600 mb-2">Click to upload photos or videos</p>
+              <p className="text-xs text-gray-500 mb-3">JPG, PNG, MP4 up to 10MB</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.multiple = true;
+                  input.accept = 'image/*,video/*';
+                  input.onchange = (e) => {
+                    const files = Array.from((e.target as HTMLInputElement).files || []);
+                    console.log('Selected files:', files);
+                    setSelectedFiles(prev => [...prev, ...files]);
+                  };
+                  input.click();
+                }}
+                className="px-4 py-2 text-sm"
+              >
+                Choose Files
+              </Button>
+            </div>
+          </div>
+          
+          {/* Display selected files */}
+          {selectedFiles.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm font-medium text-gray-700">Selected files:</p>
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">
+                      {file.type.startsWith('image/') ? '🖼️' : '🎥'}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
+                      <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== index))}
+                    className="text-red-500 hover:text-red-700 text-sm"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="visibility">{t('posts.visibility', 'Visibility')}</Label>
+          <Select value={visibility} onValueChange={setVisibility}>
+            <SelectTrigger id="visibility">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="public">{t('posts.public', 'Public')}</SelectItem>
+              <SelectItem value="private">{t('posts.private', 'Private')}</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -170,31 +237,6 @@ const PostCreator: React.FC<PostCreatorProps> = ({
               </SelectContent>
             </Select>
           </div>
-        </div>
-
-        <div className="space-y-1">
-          <Label>{t('posts.media', 'Media')}</Label>
-          <MediaUpload 
-            venueId={venueId}
-            simple={true}
-            onUploadComplete={(results) => {
-              const newMediaIds = results.filter(r => r.success).map(r => r.media.id);
-              setMediaIds(prev => [...prev, ...newMediaIds]);
-            }}
-          />
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="visibility">{t('posts.visibility', 'Visibility')}</Label>
-          <Select value={visibility} onValueChange={setVisibility}>
-            <SelectTrigger id="visibility">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="public">{t('posts.public', 'Public')}</SelectItem>
-              <SelectItem value="private">{t('posts.private', 'Private')}</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
       </div>

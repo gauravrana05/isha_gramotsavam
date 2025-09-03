@@ -24,7 +24,10 @@ import {
   ChevronRight as ChevronRightIcon,
   User,
   Settings,
-  Newspaper
+  Newspaper,
+  MessageCircle,
+  Bell,
+  BookOpen
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/lib/utils/i18n';
@@ -39,6 +42,7 @@ interface VolunteerSidebarProps {
 }
 
 interface NavItem {
+  key: string;
   name: string;
   href?: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -87,53 +91,92 @@ export default function VolunteerSidebar({
   const baseVenueNavigation = [
     // When in venue context, show venue-specific navigation
     {
+      key: 'dashboard',
       name: t('volunteer.sidebar.dashboard', 'Dashboard'),
       href: `/${lang}/volunteer/venues/${venueId}/dashboard`,
       icon: LayoutDashboard,
     },
     {
+      key: 'venue',
       name: t('volunteer.sidebar.venue', 'Venue'),
-      href: `/${lang}/volunteer/venues/${venueId}/venue`,
+      href: `/${lang}/volunteer/venues/${venueId}`,
       icon: MapPin,
     },
     {
+      key: 'teams',
       name: t('volunteer.sidebar.teams', 'Teams'),
       href: `/${lang}/volunteer/venues/${venueId}/teams`,
       icon: Users,
     },
     {
+      key: 'fixtures',
       name: t('volunteer.sidebar.fixtures', 'Fixtures'),
       href: `/${lang}/volunteer/venues/${venueId}/fixtures`,
       icon: Trophy,
     },
     {
+      key: 'matches',
       name: t('volunteer.sidebar.matches', 'Matches'),
       href: `/${lang}/volunteer/venues/${venueId}/matches`,
       icon: Calendar,
     },
     {
+      key: 'guide',
+      name: t('volunteer.sidebar.guide', 'Guide'),
+      href: `/${lang}/volunteer/venues/${venueId}/guide`,
+      icon: BookOpen,
+    },
+    {
+      key: 'media',
       name: t('volunteer.sidebar.media', 'Media'),
       href: `/${lang}/volunteer/venues/${venueId}/media`,
       icon: Camera,
     },
     {
+      key: 'posts',
       name: t('volunteer.sidebar.posts', 'Posts'),
       href: `/${lang}/volunteer/venues/${venueId}/post`,
       icon: Newspaper,
+    },
+    {
+      key: 'chat',
+      name: t('volunteer.sidebar.chat', 'Chat'),
+      href: `/${lang}/volunteer/venues/${venueId}/chat`,
+      icon: MessageCircle,
+    },
+    {
+      key: 'notifications',
+      name: t('volunteer.sidebar.notifications', 'Notifications'),
+      href: `/${lang}/volunteer/venues/${venueId}/notifications`,
+      icon: Bell,
     },
   ];
 
   const baseGeneralNavigation = [
     // When not in venue context, show general overview pages
     {
+      key: 'my_venues',
       name: t('volunteer.sidebar.my_venues', 'My Venues'),
       href: `/${lang}/volunteer`,
       icon: MapPin,
     },
     {
+      key: 'all_fixtures',
       name: t('volunteer.sidebar.all_fixtures', 'All Fixtures'),
       href: `/${lang}/volunteer/fixtures`,
       icon: Trophy,
+    },
+    {
+      key: 'general_chat',
+      name: t('volunteer.sidebar.chat', 'Chat'),
+      href: `/${lang}/volunteer/chat`,
+      icon: MessageCircle,
+    },
+    {
+      key: 'general_notifications',
+      name: t('volunteer.sidebar.notifications', 'Notifications'),
+      href: `/${lang}/volunteer/notifications`,
+      icon: Bell,
     },
   ];
 
@@ -174,7 +217,7 @@ export default function VolunteerSidebar({
     const itemIsActive = item.href ? isActive(item.href) : false;
 
     return (
-      <div key={item.name}>
+      <div key={item.key}>
         {item.href ? (
           <Link
             href={item.href}

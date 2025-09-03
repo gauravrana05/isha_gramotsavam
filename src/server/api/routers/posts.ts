@@ -11,6 +11,7 @@ export const postsRouter = createTRPCRouter({
       content: z.string().optional(),
       entityType: z.enum(['fixture', 'match']).default('fixture'),
       entityId: z.string().uuid().optional(),
+      venueId: z.string().uuid().optional(), // For general venue posts
       visibility: z.enum(['public', 'private']).default('public'),
       mediaIds: z.array(z.string().uuid()).optional(),
     }))
@@ -23,18 +24,19 @@ export const postsRouter = createTRPCRouter({
         });
       }
 
-      if (!input.entityId) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Entity ID is required.',
-        });
-      }
+      // entityId is optional - posts can be general venue posts
+      // if (!input.entityId) {
+      //   throw new TRPCError({
+      //     code: 'BAD_REQUEST',
+      //     message: 'Entity ID is required.',
+      //   });
+      // }
 
       // For technical volunteers, verify they're assigned to the venue
       if (ctx.user.role === 'technical_volunteer') {
         let venueId: string | null = null;
 
-        if (input.entityType === 'fixture') {
+        if (input.entityId && input.entityType === 'fixture') {
           const fixture = await db.fixture.findUnique({
             where: { id: input.entityId },
             include: {
@@ -44,7 +46,7 @@ export const postsRouter = createTRPCRouter({
             }
           });
           venueId = fixture?.venueLevelMapping.venueId || null;
-        } else if (input.entityType === 'match') {
+        } else if (input.entityId && input.entityType === 'match') {
           const match = await db.match.findUnique({
             where: { id: input.entityId },
             include: {
@@ -58,6 +60,9 @@ export const postsRouter = createTRPCRouter({
             }
           });
           venueId = match?.fixture.venueLevelMapping.venueId || null;
+        } else if (input.venueId) {
+          // For general venue posts, use the provided venueId
+          venueId = input.venueId;
         }
 
         if (!venueId) {
@@ -71,6 +76,7 @@ export const postsRouter = createTRPCRouter({
         const assignment = await db.volunteerAssignment.findFirst({
           where: {
             volunteerId: ctx.user.id,
+            deletedAt: null,
             venueLevelMapping: {
               venueId: venueId
             }
@@ -85,15 +91,15 @@ export const postsRouter = createTRPCRouter({
         }
       }
 
-      // Get event ID from entity
+      // Get event ID from entity or use default for general venue posts
       let eventId: string;
-      if (input.entityType === 'fixture') {
+      if (input.entityId && input.entityType === 'fixture') {
         const fixture = await db.fixture.findUnique({
           where: { id: input.entityId },
           select: { eventId: true }
         });
         eventId = fixture?.eventId || "00000000-0000-0000-0000-000000000000";
-      } else {
+      } else if (input.entityId && input.entityType === 'match') {
         const match = await db.match.findUnique({
           where: { id: input.entityId },
           include: {
@@ -103,6 +109,9 @@ export const postsRouter = createTRPCRouter({
           }
         });
         eventId = match?.fixture.eventId || "00000000-0000-0000-0000-000000000000";
+      } else {
+        // For general venue posts without entity association, use default event ID
+        eventId = "isha_gramotsavam_2025"; // or get from venue/context
       }
 
       const post = await db.post.create({

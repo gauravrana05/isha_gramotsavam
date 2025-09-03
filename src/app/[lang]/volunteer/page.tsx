@@ -1,107 +1,128 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useParams } from 'next/navigation';
 import { useTranslation } from '@/lib/utils/i18n';
-import { Loader2, AlertCircle } from 'lucide-react';
 import { api } from '@/server/trpc/react';
-import { useRouter } from 'next/navigation';
+import { MapPin, AlertCircle } from 'lucide-react';
 
-export default function VolunteerMainPage() {
-  const { user, loading: authLoading } = useAuth();
-  const { lang } = useParams();
-  const { t } = useTranslation();
+export default function VolunteerHomePage() {
   const router = useRouter();
-  
+  const { lang } = useParams();
+  const { user, userProfile, loading: authLoading } = useAuth();
+  const { t } = useTranslation();
+
   // Get volunteer assignments
-  const queryEnabled = !authLoading && !!user && ['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user?.role || '');
-  
   const { 
-    data: assignmentsData, 
-    isLoading: assignmentsLoading, 
+    data: assignments, 
+    isLoading: assignmentsLoading,
     error: assignmentsError 
-  } = api.volunteers.assignments.getMyAssignments.useQuery(
+  } = api.volunteers.venue.getAssignments.useQuery(
     undefined,
-    { enabled: queryEnabled }
+    { 
+      enabled: !authLoading && !!user,
+      retry: 1
+    }
   );
 
-  // Catch-all: Show full page loader for ANY loading state or missing data
-  if (authLoading || !user || !lang || assignmentsLoading || (queryEnabled && assignmentsData === undefined)) {
-    return (
-      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-[#F28C38] mx-auto mb-4" />
-          <p className="text-gray-600">{t('volunteer.loading_assignment', 'Loading your assignment...')}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Handle immediate redirect to venue dashboard
   useEffect(() => {
-    if (authLoading || !user || !lang) {
-      return;
+    if (!authLoading && !user) {
+      router.push(`/${lang}/auth/login`);
     }
+  }, [user, authLoading, router, lang]);
 
-    // Check if user is a volunteer
-    if (!['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user?.role || '')) {
-      return;
-    }
+  // Remove auto-redirect - let user stay on homepage
+  // useEffect(() => {
+  //   if (assignments && assignments.length > 0) {
+  //     const primaryVenue = assignments[0];
+  //     router.push(`/${lang}/volunteer/venues/${primaryVenue.venueId}/dashboard`);
+  //   }
+  // }, [assignments, router, lang]);
 
-    // Start loading assignments and redirect as soon as we have data
-    if (!assignmentsLoading && assignmentsData && assignmentsData.length > 0) {
-      const firstAssignment = assignmentsData[0];
-      const venueId = firstAssignment?.venueLevelMapping?.venue?.id;
-      
-      if (venueId) {
-        router.replace(`/${lang}/volunteer/venues/${venueId}/dashboard`);
-        return;
-      }
-    }
-  }, [authLoading, assignmentsLoading, assignmentsData, user, lang, router]);
-
-  // Show loader if user is not a volunteer (will redirect elsewhere via layout)
-  if (!['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user?.role || '')) {
+  // Show loading while checking auth or assignments
+  if (authLoading || assignmentsLoading) {
     return (
       <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-[#F28C38] mx-auto mb-4" />
-          <p className="text-gray-600">Redirecting...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38] mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading assignments...</p>
         </div>
       </div>
     );
   }
 
-  // Show not authorized if assignments loaded but empty or error
-  if (assignmentsError || !assignmentsData || assignmentsData.length === 0) {
+  if (!user) {
+    return null;
+  }
+
+  // Show error if failed to load assignments
+  if (assignmentsError) {
     return (
-      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-8">
-          <AlertCircle className="w-16 h-16 text-[#F28C38] mx-auto mb-6" />
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            Not Authorized
-          </h1>
-          <p className="text-lg text-gray-600 mb-6">
-            You are not assigned to any venue. Please contact your administrator for venue assignment.
-          </p>
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Assignments</h1>
+          <p className="text-gray-600 mb-4">Unable to load your venue assignments. Please try again.</p>
           <button
             onClick={() => window.location.reload()}
-            className="bg-[#F28C38] text-white px-6 py-3 rounded-lg hover:bg-[#E67A26] transition-colors font-medium"
+            className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
           >
-            Refresh
+            Retry
           </button>
         </div>
       </div>
     );
   }
 
-  // Default loading state (should redirect via useEffect)
+  // Show assignments if available
+  if (assignments && assignments.length > 0) {
+    return (
+      <div className="min-h-screen bg-[#F3F0E5] p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome, Volunteer!</h1>
+            <p className="text-gray-600">Your venue assignments</p>
+          </div>
+          
+          <div className="grid gap-4">
+            {assignments.map((assignment, index) => (
+              <div key={index} className="bg-white rounded-lg p-6 shadow-sm border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {assignment.venueName || `Venue ${assignment.venueId}`}
+                    </h3>
+                    <p className="text-gray-600">Role: {assignment.role}</p>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/${lang}/volunteer/venues/${assignment.venueId}/dashboard`)}
+                    className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors"
+                  >
+                    Go to Dashboard
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show no assignments message if no assignments
   return (
-    <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-      <div className="text-center">
-        <Loader2 className="w-12 h-12 animate-spin text-[#F28C38] mx-auto mb-4" />
-        <p className="text-gray-600">Redirecting...</p>
+    <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center p-4">
+      <div className="text-center max-w-md">
+        <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">No Venue Assignment</h1>
+        <p className="text-gray-600 mb-4">
+          You are not assigned to any venue. Please contact the admin to get assigned to a venue.
+        </p>
+        <div className="space-y-2 text-sm text-gray-500">
+          <p>Contact: admin@ishagramotsavam.org</p>
+          <p>Or reach out to your coordinator</p>
+        </div>
       </div>
     </div>
   );

@@ -68,16 +68,16 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
   const [playerExists, setPlayerExists] = useState(false);
 
   // Get sports data
-  const { data: sports = [], isLoading: sportsLoading } = api.admin.sports.getAllSports.useQuery();
+  const { data: sports = [], isLoading: sportsLoading } = api.volunteers.venue.getAllSports.useQuery();
 
   // Search for existing user by phone
-  const { data: existingUser, refetch: searchUser } = api.volunteers.team.searchUserByPhone.useQuery(
+  const { data: existingUser, refetch: searchUser } = api.volunteers.venue.searchUserByPhone.useQuery(
     { phone: formData.captainPhone },
     { enabled: false }
   );
 
   // Create team mutation
-  const createTeamMutation = api.volunteers.team.createTeam.useMutation({
+  const createTeamMutation = api.volunteers.venue.createTeam.useMutation({
     onSuccess: (result) => {
       addNotification('Team created successfully!', 'success');
       onTeamCreated();
@@ -127,7 +127,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
             ...prev,
             captainFirstName: result.data.firstName || '',
             captainLastName: result.data.lastName || '',
-            captainDob: result.data.dob || '',
+            captainDob: result.data.dateOfBirth ? new Date(result.data.dateOfBirth).toISOString().split('T')[0] : '',
             captainGender: result.data.gender || ''
           }));
         } else {
@@ -219,7 +219,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
       captainDetails: {
         firstName: formData.captainFirstName.trim(),
         lastName: formData.captainLastName.trim(),
-        dob: formData.captainDob,
+        dateOfBirth: formData.captainDob,
         gender: formData.captainGender as 'M' | 'F'
       },
       location: {

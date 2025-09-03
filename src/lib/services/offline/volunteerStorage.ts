@@ -834,13 +834,25 @@ let volunteerStorageInstance: VolunteerStorageManager | null = null;
  * Get the singleton volunteer storage instance
  */
 export const getVolunteerStorage = async (): Promise<VolunteerStorageManager> => {
-  if (typeof window === 'undefined' || !window.indexedDB) {
+  if (typeof window === 'undefined') {
+    throw new Error('Volunteer storage is only available in browser environment');
+  }
+  
+  if (!window.indexedDB) {
+    console.warn('IndexedDB not available, offline functionality will be limited');
     throw new Error('IndexedDB is not available in this environment');
   }
   
   if (!volunteerStorageInstance) {
-    volunteerStorageInstance = new VolunteerStorageManager();
-    await volunteerStorageInstance.initialize();
+    try {
+      volunteerStorageInstance = new VolunteerStorageManager();
+      await volunteerStorageInstance.initialize();
+      console.log('✅ Volunteer storage initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize volunteer storage:', error);
+      volunteerStorageInstance = null;
+      throw error;
+    }
   }
   
   return volunteerStorageInstance;

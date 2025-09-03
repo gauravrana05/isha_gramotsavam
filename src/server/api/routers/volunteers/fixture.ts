@@ -61,7 +61,7 @@ export const volunteersFixtureRouter = createTRPCRouter({
   getVenueFixtures: protectedProcedure
     .input(z.object({
       venueId: z.string()
-    }).optional().default({}))
+    }))
     .query(async ({ ctx, input }) => {
       // Check volunteer permissions
       if (!['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {

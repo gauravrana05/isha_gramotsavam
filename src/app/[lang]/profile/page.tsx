@@ -64,7 +64,33 @@ export default function ProfilePage() {
   const { t } = useTranslation();
 
   // tRPC mutations
-  const updateProfileMutation = api.profile.updateComplete.useMutation();
+  const updateProfileMutation = api.profile.updateComplete.useMutation({
+    onSuccess: (data) => {
+      // Check if language preference was changed
+      const newLanguage = formData.languagePreference;
+      const currentLanguage = lang as string;
+      
+      if (newLanguage && newLanguage !== currentLanguage) {
+        // Redirect to new language URL
+        const currentPath = window.location.pathname;
+        const pathSegments = currentPath.split('/');
+        if (pathSegments[1]) {
+          pathSegments[1] = newLanguage;
+          const newPath = pathSegments.join('/');
+          window.location.href = newPath;
+          return;
+        }
+      }
+      
+      // Normal success handling
+      setIsEditing(false);
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
+    },
+    onError: (error) => {
+      console.error('Profile update error:', error);
+    }
+  });
   const profileDataQuery = api.profile.checkCompletion.useQuery(
     { userId: user?.id || '' },
     { 

@@ -240,5 +240,38 @@
       "file_types": "ସମର୍ଥିତ: ଚିତ୍ର ଏବଂ ଭିଡିଓ",
       "max_size": "ସର୍ବାଧିକ ଆକାର: ପ୍ରତି ଫାଇଲ୍ ପାଇଁ 10MB"
     }
-  }
+  },
+  
+  "faq.volunteer_help": "ସ୍ୱେଚ୍ଛାସେବୀ ସହାୟତା",
+  "faq.help_details": "ସହାୟତା ବିବରଣୀ",
+  "faq.search_placeholder": "ସହାୟତା ପାଇଁ ଖୋଜନ୍ତୁ...",
+  "faq.no_results": "ସହାୟତା ବିଷୟ ମିଳିଲା ନାହିଁ",
+  "faq.still_need_help": "ଆହୁରି ସହାୟତା ଦରକାର?",
+  "faq.contact_support": "ସହାୟତା ସହିତ ଯୋଗାଯୋଗ କରନ୍ତୁ",
+  "faq.steps": "ପଦକ୍ଷେପଗୁଡ଼ିକ:",
+  
+  "faq.teams.checkin.question": "ଟିମ୍‌କୁ କିପରି ଚେକ୍ ଇନ୍ କରିବି?",
+  "faq.teams.checkin.answer": "ଟିମ୍‌କୁ ଚେକ୍ ଇନ୍ କରିବା ପାଇଁ, ଟିମ୍ ପୃଷ୍ଠାକୁ ଯାଆନ୍ତୁ, ଟିମ୍ ଖୋଜନ୍ତୁ, ଏବଂ 'ଚେକ୍ ଇନ୍' ବଟନ୍ କ୍ଲିକ୍ କରନ୍ତୁ।",
+  "faq.teams.search.question": "ଟିମ୍‌କୁ କିପରି ଖୋଜିବି?",
+  "faq.teams.search.answer": "ଟିମ୍ ପୃଷ୍ଠାର ଉପରେ ଥିବା ସର୍ଚ୍ ବାର୍ ବ୍ୟବହାର କରନ୍ତୁ।",
+  "faq.players.verify.question": "ଖେଳାଳିଙ୍କୁ କିପରି ଯାଞ୍ଚ କରିବି?",
+  "faq.players.verify.answer": "ଟିମ୍‌ରେ କ୍ଲିକ୍ କରନ୍ତୁ, ଖେଳାଳି ଚୟନ କରନ୍ତୁ, ଦଲିଲଗୁଡ଼ିକ ସମୀକ୍ଷା କରନ୍ତୁ।",
+  "faq.players.photo.question": "ଖେଳାଳିଙ୍କ ଫଟୋ କିପରି ବଦଳାଇବି?",
+  "faq.players.photo.answer": "ଖେଳାଳିଙ୍କ ବିବରଣୀରେ, ଫଟୋ ପାଖରେ ଥିବା କ୍ୟାମେରା ଆଇକନ୍ କ୍ଲିକ୍ କରନ୍ତୁ।",
+  "faq.fixtures.create.question": "ଟୁର୍ଣ୍ଣାମେଣ୍ଟ କିପରି ସୃଷ୍ଟି କରିବି?",
+  "faq.fixtures.create.answer": "ଫିକ୍ସଚର୍ସ ପୃଷ୍ଠାକୁ ଯାଆନ୍ତୁ, 'ଟୁର୍ଣ୍ଣାମେଣ୍ଟ ସୃଷ୍ଟି କରନ୍ତୁ' କ୍ଲିକ୍ କରନ୍ତୁ।",
+  "faq.matches.start.question": "ମ୍ୟାଚ୍ କିପରି ଆରମ୍ଭ କରିବି?",
+  "faq.matches.start.answer": "ମ୍ୟାଚ୍ ପୃଷ୍ଠାରେ, 'ମ୍ୟାଚ୍ ଆରମ୍ଭ କରନ୍ତୁ' କ୍ଲିକ୍ କରନ୍ତୁ।",
+  "faq.matches.score.question": "ସ୍କୋର କିପରି ଏଣ୍ଟ୍ରି କରିବି?",
+  "faq.matches.score.answer": "ଲାଇଭ୍ ମ୍ୟାଚ୍‌ରେ, ସ୍କୋର ବଟନ୍‌ଗୁଡ଼ିକ ବ୍ୟବହାର କରନ୍ତୁ।",
+  "faq.media.upload.question": "ଫଟୋ କିପରି ଅପଲୋଡ୍ କରିବି?",
+  "faq.media.upload.answer": "ମିଡିଆ ପୃଷ୍ଠାକୁ ଯାଆନ୍ତୁ, 'ଅପଲୋଡ୍' ବଟନ୍ କ୍ଲିକ୍ କରନ୍ତୁ।",
+  "faq.posts.create.question": "ପୋଷ୍ଟ କିପରି ସୃଷ୍ଟି କରିବି?",
+  "faq.posts.create.answer": "ପୋଷ୍ଟ ପୃଷ୍ଠାକୁ ଯାଆନ୍ତୁ, 'ପୋଷ୍ଟ ସୃଷ୍ଟି କରନ୍ତୁ' କ୍ଲିକ୍ କରନ୍ତୁ।",
+  "faq.chat.message.question": "ବାର୍ତ୍ତା କିପରି ପଠାଇବି?",
+  "faq.chat.message.answer": "ଚାଟ୍ ପୃଷ୍ଠାକୁ ଯାଆନ୍ତୁ, ଆପଣଙ୍କ ବାର୍ତ୍ତା ଟାଇପ୍ କରନ୍ତୁ।",
+  "faq.general.offline.question": "ଅଫଲାଇନ୍‌ରେ କିପରି କାମ କରିବି?",
+  "faq.general.offline.answer": "ଆପ୍ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ଅଫଲାଇନ୍‌ରେ କାମ କରେ।",
+  "faq.general.sync.question": "ଡାଟା କାହିଁକି ସିଙ୍କ ହେଉନାହିଁ?",
+  "faq.general.sync.answer": "ଆପଣଙ୍କ ଇଣ୍ଟରନେଟ୍ ସଂଯୋଗ ଯାଞ୍ଚ କରନ୍ତୁ।"
 }

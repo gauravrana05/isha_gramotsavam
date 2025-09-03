@@ -130,54 +130,75 @@ async function getUsersByVenueAssignment(db: any, userId: string, targetRoles: U
 }
 
 export const notificationsRouter = createTRPCRouter({
-  // Get notifications for the current user
-  getMyNotifications: protectedProcedure
-    .input(z.object({
-      limit: z.number().min(1).max(100).default(20),
-      offset: z.number().min(0).default(0),
-      unreadOnly: z.boolean().default(false),
-    }).optional().default({}))
-    .query(async ({ ctx, input }) => {
-      const notifications = await ctx.db.notification.findMany({
+  // Get all notifications for the current user
+  getAll: protectedProcedure
+    .query(async ({ ctx }) => {
+      return await ctx.db.notification.findMany({
         where: {
           userId: ctx.user.id,
           deletedAt: null,
-          ...(input.unreadOnly ? { read: false } : {}),
         },
         orderBy: {
           createdAt: 'desc',
         },
-        take: input.limit,
-        skip: input.offset,
-        include: {
-          createdByUser: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-          template: {
-            select: {
-              name: true,
-              category: true,
-            },
-          },
-        },
+        take: 50,
       });
+    }),
 
-      const total = await ctx.db.notification.count({
+  // Get notifications by venue for volunteers
+  getByVenue: protectedProcedure
+    .input(z.object({
+      venueId: z.string().uuid(),
+    }))
+    .query(async ({ ctx, input }) => {
+      return await ctx.db.notification.findMany({
         where: {
           userId: ctx.user.id,
           deletedAt: null,
-          ...(input.unreadOnly ? { read: false } : {}),
         },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 50,
+      });
+    }),
+
+  // Mark notification as read
+  markAsRead: protectedProcedure
+    .input(z.object({
+      notificationId: z.string().uuid(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return await ctx.db.notification.updateMany({
+        where: {
+          id: input.notificationId,
+          userId: ctx.user.id,
+        },
+        data: {
+          read: true,
+          readAt: new Date(),
+        },
+      });
+    }),
+
+  // Get notifications for the current user (legacy)
+  getMyNotifications: protectedProcedure
+    .query(async ({ ctx }) => {
+      const notifications = await ctx.db.notification.findMany({
+        where: {
+          userId: ctx.user.id,
+          deletedAt: null,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 20,
       });
 
       return {
         notifications,
-        total,
-        hasMore: input.offset + input.limit < total,
+        total: notifications.length,
+        hasMore: false,
       };
     }),
 
@@ -188,7 +209,6 @@ export const notificationsRouter = createTRPCRouter({
         where: {
           userId: ctx.user.id,
           read: false,
-          deletedAt: null,
         },
       });
     }),

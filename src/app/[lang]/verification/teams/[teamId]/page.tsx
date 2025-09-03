@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/server/trpc/react";
@@ -8,6 +8,10 @@ import Image from "next/image";
 import { ArrowLeft, Users, Phone, Calendar, MapPin, Loader2, AlertCircle, CheckCircle, X, Eye, Check, UserCheck } from "lucide-react";
 import { AlertModal } from '@/components/ui/Modal';
 import { useAlert } from '@/hooks/useAlert';
+import { AdvancedTable } from '@/components/ui/AdvancedTable';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/Button';
+import type { Column, ActionButton } from '@/components/ui';
 
 interface TeamPlayer {
   playerId: string;
@@ -182,6 +186,10 @@ export default function TeamVerificationPage() {
     setSelectedPlayers(newSelection);
   };
 
+  const handleTableSelectionChange = (selectedIds: string[]) => {
+    setSelectedPlayers(new Set(selectedIds));
+  };
+
   const getDocumentIcon = (doc: DocumentStatus) => {
     if (doc.url && doc.verified) {
       return <CheckCircle className="w-4 h-4 text-green-600" />;
@@ -244,6 +252,109 @@ export default function TeamVerificationPage() {
     rejected: players.filter(p => p.verificationStatus === 'rejected').length,
     pending: players.filter(p => p.verificationStatus === 'pending').length
   };
+
+  // Table columns configuration
+  const columns: Column<TeamPlayer>[] = useMemo(() => [
+    {
+      key: 'name',
+      title: 'Player',
+      render: (player) => (
+        <div>
+          <div className="font-medium text-gray-900">{player.name}</div>
+          <div className="text-sm text-gray-500">
+            {player.age} years • {player.gender} • {player.position}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'contact',
+      title: 'Contact',
+      render: (player) => (
+        <div>
+          <div className="text-sm text-gray-900">{player.phone}</div>
+          <div className="text-sm text-gray-500">{player.profileData.whatsappNumber}</div>
+          <div className="text-sm text-gray-500">
+            {player.profileData.village}, {player.profileData.panchayat}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'documents',
+      title: 'Documents',
+      render: (player) => (
+        <div className="flex space-x-1">
+          <button
+            onClick={() => handleViewImage(player.documents.aadhar.url || '', 'Aadhar Card')}
+            className="flex items-center p-1 rounded"
+            disabled={!player.documents.aadhar.url}
+            title="Aadhar Card"
+          >
+            {getDocumentIcon(player.documents.aadhar)}
+          </button>
+          <button
+            onClick={() => handleViewImage(player.documents.dobCertificate.url || '', 'DOB Certificate')}
+            className="flex items-center p-1 rounded"
+            disabled={!player.documents.dobCertificate.url}
+            title="DOB Certificate"
+          >
+            {getDocumentIcon(player.documents.dobCertificate)}
+          </button>
+          <button
+            onClick={() => handleViewImage(player.documents.photo.url || '', 'Photo')}
+            className="flex items-center p-1 rounded"
+            disabled={!player.documents.photo.url}
+            title="Photo"
+          >
+            {getDocumentIcon(player.documents.photo)}
+          </button>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      title: 'Status',
+      render: (player) => (
+        <Badge className={getStatusColor(player.verificationStatus)}>
+          {player.verificationStatus.charAt(0).toUpperCase() + player.verificationStatus.slice(1)}
+        </Badge>
+      ),
+    },
+  ], []);
+
+  // Table action buttons
+  const actionButtons: ActionButton<TeamPlayer>[] = useMemo(() => [
+    {
+      label: 'Verify',
+      icon: Check,
+      variant: 'success',
+      show: (player) => player.verificationStatus === 'pending',
+      onClick: (player) => handlePlayerStatusChange(player.playerId, 'verified'),
+    },
+    {
+      label: 'Reject',
+      icon: X,
+      variant: 'danger',
+      show: (player) => player.verificationStatus === 'pending',
+      onClick: (player) => {
+        const reason = prompt('Reason for rejection:') || '';
+        if (reason) {
+          handlePlayerStatusChange(player.playerId, 'rejected', reason);
+        }
+      },
+    },
+    {
+      label: 'Details',
+      icon: Users,
+      variant: 'secondary',
+      show: () => true,
+      onClick: (player) => {
+        setSelectedPlayer(player);
+        setShowPlayerModal(true);
+      },
+    },
+  ], []);
 
   const pendingPlayers = players.filter(p => p.verificationStatus === 'pending');
 
@@ -372,123 +483,18 @@ export default function TeamVerificationPage() {
         )}
 
         {/* Players Table - Desktop */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden hidden md:block">
-          <div className="overflow-x-auto">
-            <table className="w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <input
-                      type="checkbox"
-                      checked={selectedPlayers.size === pendingPlayers.length && pendingPlayers.length > 0}
-                      onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Player</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {players.map((player) => (
-                  <tr key={player.playerId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {player.verificationStatus === 'pending' && (
-                        <input
-                          type="checkbox"
-                          checked={selectedPlayers.has(player.playerId)}
-                          onChange={() => handlePlayerSelection(player.playerId)}
-                          className="rounded border-gray-300 text-[#F28C38] focus:ring-[#F28C38]"
-                        />
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{player.name}</div>
-                      <div className="text-sm text-gray-500">
-                        Age: {player.age} • {player.gender === 'M' ? 'Male' : 'Female'} • {player.position}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{player.phone}</div>
-                      <div className="text-sm text-gray-500">{player.profileData.village}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => player.documents.profilePhoto.url && handleViewImage(player.documents.profilePhoto.url, 'Profile Photo')}
-                          disabled={!player.documents.profilePhoto.url}
-                          className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
-                          title="Profile Photo"
-                        >
-                          {getDocumentIcon(player.documents.profilePhoto)}
-                        </button>
-                        <button
-                          onClick={() => player.documents.aadhaarFront.url && handleViewImage(player.documents.aadhaarFront.url, 'Aadhaar Front')}
-                          disabled={!player.documents.aadhaarFront.url}
-                          className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
-                          title="Aadhaar Front"
-                        >
-                          {getDocumentIcon(player.documents.aadhaarFront)}
-                        </button>
-                        <button
-                          onClick={() => player.documents.aadhaarBack.url && handleViewImage(player.documents.aadhaarBack.url, 'Aadhaar Back')}
-                          disabled={!player.documents.aadhaarBack.url}
-                          className="flex items-center justify-center w-8 h-8 rounded border disabled:opacity-50"
-                          title="Aadhaar Back"
-                        >
-                          {getDocumentIcon(player.documents.aadhaarBack)}
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(player.verificationStatus)}`}>
-                        {player.verificationStatus}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex space-x-2">
-                        {player.verificationStatus === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => handlePlayerStatusChange(player.playerId, 'verified', 'Verified by verification volunteer')}
-                              disabled={verifyPlayerMutation.isPending}
-                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
-                            >
-                              Verify
-                            </button>
-                            <button
-                              onClick={() => {
-                                const reason = prompt('Reason for rejection:');
-                                if (reason) {
-                                  handlePlayerStatusChange(player.playerId, 'rejected', reason);
-                                }
-                              }}
-                              disabled={verifyPlayerMutation.isPending}
-                              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={() => {
-                            setSelectedPlayer(player);
-                            setShowPlayerModal(true);
-                          }}
-                          className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
-                        >
-                          Details
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="hidden md:block">
+          <AdvancedTable<TeamPlayer>
+            data={players}
+            columns={columns}
+            enableSelection={true}
+            onSelectionChange={handleTableSelectionChange}
+            selectedItems={Array.from(selectedPlayers)}
+            getItemId={(player) => player.playerId}
+            selectableFilter={(player) => player.verificationStatus === 'pending'}
+            actionButtons={actionButtons}
+            className="bg-white rounded-lg shadow-sm overflow-hidden"
+          />
         </div>
 
         {/* Players Cards - Mobile */}

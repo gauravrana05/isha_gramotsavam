@@ -1,8 +1,0 @@
-{
-  "projectId": "team-task-manager",
-  "requirements": "Build a comprehensive Team Task Manager application with user management, project management, task management, real-time collaboration, and modern tech stack (Next.js 15, tRPC, PostgreSQL).",
-  "createdAt": "2025-09-01T23:46:18.859Z",
-  "status": "initialized",
-  "currentStage": "architecture",
-  "agents": {}
-}

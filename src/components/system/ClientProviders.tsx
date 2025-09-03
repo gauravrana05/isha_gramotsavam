@@ -29,21 +29,23 @@ const ClientProviders: React.FC<ClientProvidersProps> = ({ children, cookies }) 
     <ErrorBoundary>
       <TRPCReactProvider cookies={cookies}>
         <ClientOnly>
-          <LoadingProvider>
-            <ThemeProvider>
-                <AuthProvider>
-                  <DocumentProvider>
-                    <NotificationProvider>
-                      <ProgressBar />
-                      <OfflineIndicator />
-                      <OfflineBanner />
-                      <ToastViewport />
-                      {children}
-                    </NotificationProvider>
-                  </DocumentProvider>
-                </AuthProvider>
-            </ThemeProvider>
-          </LoadingProvider>
+          <LanguageProvider>
+            <LoadingProvider>
+              <ThemeProvider>
+                  <AuthProvider>
+                    <DocumentProvider>
+                      <NotificationProvider>
+                        <ProgressBar />
+                        <OfflineIndicator />
+                        <OfflineBanner />
+                        <ToastViewport />
+                        {children}
+                      </NotificationProvider>
+                    </DocumentProvider>
+                  </AuthProvider>
+              </ThemeProvider>
+            </LoadingProvider>
+          </LanguageProvider>
         </ClientOnly>
       </TRPCReactProvider>
     </ErrorBoundary>

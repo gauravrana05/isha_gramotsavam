@@ -29,6 +29,8 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const initializeLanguage = async () => {
       let targetLang: LanguageCode = DEFAULT_LANGUAGE;
 
+      console.log('LanguageContext: Initializing with params.lang =', params?.lang);
+
       // 1. Try to get language from URL params (highest priority)
       if (params?.lang && isValidLanguageCode(params.lang as string)) {
         targetLang = params.lang as LanguageCode;
@@ -37,6 +39,8 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       else if (user?.languagePreference && isValidLanguageCode(user.languagePreference)) {
         targetLang = user.languagePreference as LanguageCode;
       }
+
+      console.log('LanguageContext: Setting language to', targetLang);
 
       // Load and cache the translation
       try {

@@ -70,10 +70,10 @@ export default function VolunteerProfilePage() {
             />
           </div>
           <h1 className="text-3xl font-bold text-[#4A2F1D] mb-2">
-            Volunteer Profile
+            {t('volunteer.profile.title', 'Volunteer Profile')}
           </h1>
           <p className="text-gray-600">
-            Your personal information
+            {t('volunteer.profile.subtitle', 'Your personal information')}
           </p>
         </div>
 
@@ -124,7 +124,7 @@ export default function VolunteerProfilePage() {
               className="flex items-center text-[#F28C38] hover:text-[#E67A26] text-sm font-medium transition-colors"
             >
               <Edit3 width={64} height={64} className="w-4 h-4 mr-1" />
-              Edit Profile
+              {t('volunteer.profile.edit', 'Edit Profile')}
             </button>
           </div>
           <hr className="mb-6" />

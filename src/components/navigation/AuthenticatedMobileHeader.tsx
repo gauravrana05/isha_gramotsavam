@@ -3,6 +3,8 @@
 import { ArrowLeft, Menu } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/component-patterns';
+import { useAuth } from '@/context/AuthContext';
+import { api } from '@/server/trpc/react';
 
 interface AuthenticatedMobileHeaderProps {
   title: string;
@@ -38,7 +40,8 @@ export const AuthenticatedMobileHeader: React.FC<AuthenticatedMobileHeaderProps>
       } else if (currentPath.includes('/player/')) {
         router.push(`/${currentLang}/player/dashboard`);
       } else if (currentPath.includes('/volunteer/')) {
-        router.push(`/${currentLang}/volunteer/dashboard`);
+        // For volunteers, redirect to volunteer homepage
+        router.push(`/${currentLang}/volunteer`);
       } else if (currentPath.includes('/verification/')) {
         router.push(`/${currentLang}/verification/dashboard`);
       } else {

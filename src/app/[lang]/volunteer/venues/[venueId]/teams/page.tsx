@@ -13,6 +13,8 @@ import CreateTeamModal from '@/components/volunteer/CreateTeamModal';
 import PlayerDocumentUpload from '@/components/players/PlayerDocumentUpload';
 import { api } from '@/server/trpc/react';
 import { useNotification } from '@/context/NotificationContext';
+import { useTranslation } from '@/lib/utils/i18n';
+import Image from 'next/image';
 import { 
   Loader2, 
   Users, 
@@ -47,16 +49,17 @@ interface TeamData {
 
 interface PlayerData {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   phone: string;
   age: number;
   gender: string;
   position: string;
   verificationStatus: string;
-  documents?: {
-    profilePhoto?: { url: string };
-    aadhaarFront?: { url: string };
-    aadhaarBack?: { url: string };
+  user?: {
+    profileImages?: {
+      profilePhotoPath?: string;
+    };
   };
   userId?: string;
 }
@@ -76,10 +79,10 @@ export default function TeamsPage() {
     getSyncStats 
   } = useOffline();
   const { addNotification } = useNotification();
+  const { t } = useTranslation();
   
   // State management
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
-  const [teamPlayers, setTeamPlayers] = useState<Record<string, PlayerData[]>>({});
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const [searchValue, setSearchValue] = useState('');
   const [activeFilters, setActiveFilters] = useState<ActiveFilter[]>([]);
@@ -96,6 +99,15 @@ export default function TeamsPage() {
     error: teamsError,
     refetch: refetchTeams
   } = api.volunteers.venue.getVenueTeams.useQuery(
+    { venueId: venueId || '' },
+    { enabled: !!user && !!venueId && venueId.length > 0 }
+  );
+
+  // Fetch venue details for location information needed in CreateTeamModal
+  const { 
+    data: venueData, 
+    isLoading: venueLoading 
+  } = api.volunteers.venue.getVenueDetails.useQuery(
     { venueId: venueId || '' },
     { enabled: !!user && !!venueId && venueId.length > 0 }
   );
@@ -182,47 +194,22 @@ export default function TeamsPage() {
     }
   };
 
-  // Load team players (mock implementation - replace with actual tRPC call)
-  const loadTeamPlayers = useCallback(async (teamId: string, force = false) => {
-    if (teamPlayers[teamId] && !force) return;
+  // Create individual team detail queries for expanded teams
+  const teamDetailQueries = useMemo(() => {
+    const queries: Record<string, ReturnType<typeof api.volunteers.team.getTeamDetails.useQuery>> = {};
     
-    try {
-      // TODO: Replace with actual tRPC call to get team players
-      // const playersData = await api.volunteers.team.getTeamPlayers.query({ teamId });
-      
-      // Mock data for now - replace with actual implementation
-      const mockPlayers: PlayerData[] = [
-        {
-          id: `player-${teamId}-1`,
-          name: 'Player 1',
-          phone: '9876543210',
-          age: 25,
-          gender: 'M',
-          position: 'forward',
-          verificationStatus: 'pending',
-          documents: {
-            profilePhoto: { url: '/placeholder-avatar.jpg' }
-          }
-        },
-        {
-          id: `player-${teamId}-2`,
-          name: 'Player 2',
-          phone: '9876543211',
-          age: 23,
-          gender: 'M',
-          position: 'defender',
-          verificationStatus: 'verified'
+    Array.from(expandedTeams).forEach(teamId => {
+      queries[teamId] = api.volunteers.team.getTeamDetails.useQuery(
+        { teamId },
+        { 
+          enabled: !!user && !!teamId && expandedTeams.has(teamId),
+          staleTime: 5 * 60 * 1000, // 5 minutes
         }
-      ];
-      
-      setTeamPlayers(prev => ({
-        ...prev,
-        [teamId]: mockPlayers
-      }));
-    } catch (error) {
-      console.error('Failed to load players for team:', teamId, error);
-    }
-  }, []);
+      );
+    });
+    
+    return queries;
+  }, [expandedTeams, user]);
 
   const toggleTeamExpanded = useCallback(async (teamId: string) => {
     setExpandedTeams(prev => {
@@ -232,22 +219,23 @@ export default function TeamsPage() {
         newExpanded.delete(teamId);
       } else {
         newExpanded.add(teamId);
-        loadTeamPlayers(teamId);
       }
       
       return newExpanded;
     });
-  }, [loadTeamPlayers]);
+  }, []);
 
   const findPlayerTeam = useCallback((playerId: string) => {
     for (const team of teams) {
-      if (teamPlayers[team.id]) {
-        const foundPlayer = teamPlayers[team.id].find((p: PlayerData) => p.id === playerId);
+      const teamQuery = teamDetailQueries[team.id];
+      const teamData = teamQuery?.data;
+      if (teamData?.teamPlayers) {
+        const foundPlayer = teamData.teamPlayers.find(p => p.id === playerId);
         if (foundPlayer) return team.id;
       }
     }
     return undefined;
-  }, [teams, teamPlayers]);
+  }, [teams, teamDetailQueries]);
 
   // Filter teams based on search and filters
   const { filteredTeams, teamMatchTypes } = useMemo(() => {
@@ -265,11 +253,14 @@ export default function TeamsPage() {
           team.captainUser?.phone?.includes(search);
         
         // Search in player data if team has loaded players
-        const players = teamPlayers[team.id] || [];
-        const playerMatches = players.some(player => 
-          player.name?.toLowerCase().includes(search) ||
-          player.phone?.includes(search)
-        );
+        const teamQuery = teamDetailQueries[team.id];
+        const teamData = teamQuery?.data;
+        const players = teamData?.teamPlayers || [];
+        const playerMatches = players.some(player => {
+          const fullName = `${player.firstName || ''} ${player.lastName || ''}`.trim();
+          return fullName.toLowerCase().includes(search) ||
+                 player.phone?.includes(search);
+        });
         
         const shouldInclude = teamMatches || playerMatches;
         if (shouldInclude) {
@@ -297,7 +288,9 @@ export default function TeamsPage() {
           });
         } else if (filter.key === 'playerStatus') {
           filtered = filtered.filter(team => {
-            const players = teamPlayers[team.id] || [];
+            const teamQuery = teamDetailQueries[team.id];
+            const teamData = teamQuery?.data;
+            const players = teamData?.teamPlayers || [];
             const hasMatchingPlayer = players.some(player => {
               const playerStatus = player.verificationStatus || 'pending';
               if (Array.isArray(filter.value)) {
@@ -321,18 +314,35 @@ export default function TeamsPage() {
 
   // Filter players based on search match type and active filters
   const getFilteredPlayers = useCallback((teamId: string) => {
-    const players = teamPlayers[teamId] || [];
-    const matchType = teamMatchTypes[teamId];
+    const teamQuery = teamDetailQueries[teamId];
+    const teamData = teamQuery?.data;
     
+    if (!teamData?.teamPlayers) return [];
+    
+    const players: PlayerData[] = teamData.teamPlayers.map(player => ({
+      id: player.id,
+      firstName: player.firstName,
+      lastName: player.lastName,
+      phone: player.phone || '',
+      age: player.age || 0,
+      gender: player.gender || '',
+      position: player.position || '',
+      verificationStatus: player.verificationStatus || 'pending',
+      user: player.user,
+      userId: player.userId
+    }));
+    
+    const matchType = teamMatchTypes[teamId];
     let filteredPlayers = players;
     
     // Apply search filtering
     if (searchValue.trim() && matchType === 'player') {
       const search = searchValue.toLowerCase().trim();
-      filteredPlayers = filteredPlayers.filter(player => 
-        player.name?.toLowerCase().includes(search) ||
-        player.phone?.includes(search)
-      );
+      filteredPlayers = filteredPlayers.filter(player => {
+        const fullName = `${player.firstName || ''} ${player.lastName || ''}`.trim();
+        return fullName.toLowerCase().includes(search) ||
+               player.phone?.includes(search);
+      });
     }
     
     // Apply player status filters
@@ -350,7 +360,7 @@ export default function TeamsPage() {
     });
     
     return filteredPlayers;
-  }, [teamPlayers, teamMatchTypes, searchValue, activeFilters]);
+  }, [teamDetailQueries, teamMatchTypes, searchValue, activeFilters]);
 
   // Handle player status change
   const handlePlayerStatusChange = useCallback(async (player: PlayerData, newStatus: 'pending' | 'verified' | 'approved' | 'rejected') => {
@@ -373,19 +383,11 @@ export default function TeamsPage() {
         maxRetries: 3
       });
 
-      // Update local state for immediate feedback
-      setTeamPlayers(prev => {
-        const updated = { ...prev };
-        const teamId = findPlayerTeam(player.id);
-        if (teamId && updated[teamId]) {
-          updated[teamId] = updated[teamId].map(p => 
-            p.id === player.id 
-              ? { ...p, verificationStatus: newStatus }
-              : p
-          );
-        }
-        return updated;
-      });
+      // Refetch the team data to reflect the status change
+      const teamId = findPlayerTeam(player.id);
+      if (teamId && teamDetailQueries[teamId]) {
+        await teamDetailQueries[teamId].refetch();
+      }
 
       const statusMessage = isOnline 
         ? `Player status updated to ${newStatus}` 
@@ -493,7 +495,9 @@ export default function TeamsPage() {
                   onClick={() => setSelectedPlayer(player)}
                 >
                   <td className="px-2 py-2">
-                    <div className="text-sm text-gray-900">{player.name || 'N/A'}</div>
+                    <div className="text-sm text-gray-900">
+                      {`${player.firstName || ''} ${player.lastName || ''}`.trim() || 'N/A'}
+                    </div>
                   </td>
                   <td className="px-2 py-2 text-sm text-gray-600">{player.phone || 'N/A'}</td>
                   <td className="px-2 py-2 text-sm text-gray-600">{player.age || 'N/A'}</td>
@@ -507,28 +511,29 @@ export default function TeamsPage() {
                   </td>
                   <td className="px-1 py-1 w-12">
                     <div className="flex justify-center">
-                      {player.documents?.profilePhoto?.url ? (
+                      {player.user?.profileImages?.profilePhotoPath ? (
                         <div 
-                          className="overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                          className="relative overflow-hidden cursor-pointer hover:opacity-80 transition-opacity rounded-full"
                           style={{ width: '24px', height: '24px', minWidth: '24px', minHeight: '24px' }}
                           onClick={(e) => {
                             e.stopPropagation();
                             setPreviewImage({
-                              url: player.documents.profilePhoto!.url,
-                              label: `${player.name} - Profile Photo`
+                              url: player.user.profileImages.profilePhotoPath!,
+                              label: `${player.firstName} ${player.lastName} - Profile Photo`
                             });
                           }}
                         >
-                          <img
-                            src={player.documents.profilePhoto.url}
+                          <Image
+                            src={player.user.profileImages.profilePhotoPath}
                             alt="Profile"
-                            className="w-full h-full object-cover"
-                            style={{ width: '24px', height: '24px' }}
+                            width={24}
+                            height={24}
+                            className="w-full h-full object-cover rounded-full"
                           />
                         </div>
                       ) : (
                         <div 
-                          className="bg-gray-200 flex items-center justify-center"
+                          className="bg-gray-200 rounded-full flex items-center justify-center"
                           style={{ width: '24px', height: '24px', minWidth: '24px', minHeight: '24px' }}
                         >
                           <User className="w-3 h-3 text-gray-400" />
@@ -568,7 +573,7 @@ export default function TeamsPage() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-500">Name:</span>
-                    <div className="font-medium">{player.name}</div>
+                    <div className="font-medium">{`${player.firstName || ''} ${player.lastName || ''}`.trim()}</div>
                   </div>
                   <div>
                     <span className="text-gray-500">Phone:</span>
@@ -647,21 +652,14 @@ export default function TeamsPage() {
     if (teams.length > 0) {
       const allTeamIds = new Set(teams.map(team => team.id));
       setExpandedTeams(allTeamIds);
-      
-      teams.forEach(team => {
-        loadTeamPlayers(team.id, true);
-      });
     }
-  }, [teams]); // Removed loadTeamPlayers from dependencies
+  }, [teams]);
 
   // Loading and error states
-  if (authLoading || teamsLoading) {
+  if (authLoading || teamsLoading || venueLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
-          <p className="text-gray-600">Loading teams...</p>
-        </div>
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38]"></div>
       </div>
     );
   }
@@ -721,7 +719,7 @@ export default function TeamsPage() {
         <TableControls
           searchable={true}
           searchValue={searchValue}
-          searchPlaceholder="Search teams, players..."
+          searchPlaceholder={t('volunteer.teams.search_placeholder', 'Search teams, players...')}
           onSearchChange={setSearchValue}
           filterable={true}
           showFilterButton={true}
@@ -813,28 +811,31 @@ export default function TeamsPage() {
           const newExpanded = new Set(expandedTeams);
           if (expanded) {
             newExpanded.add(team.id);
-            if (!teamPlayers[team.id]) {
-              loadTeamPlayers(team.id);
-            }
           } else {
             newExpanded.delete(team.id);
           }
           setExpandedTeams(newExpanded);
         }}
-        renderExpandedContent={(team) => (
-          teamPlayers[team.id] ? (
-            <PlayerSubTable players={getFilteredPlayers(team.id)} />
-          ) : (
-            <tr>
-              <td colSpan={teamColumns.length + 1} className="p-0">
-                <div className="flex items-center justify-center py-8 bg-gray-50">
-                  <Loader2 className="w-5 h-5 animate-spin text-gray-400 mr-2" />
-                  <span className="text-gray-500">Loading players...</span>
-                </div>
-              </td>
-            </tr>
-          )
-        )}
+        renderExpandedContent={(team) => {
+          const teamQuery = teamDetailQueries[team.id];
+          const isLoading = teamQuery?.isLoading || false;
+          const hasData = teamQuery?.data?.teamPlayers;
+          
+          if (isLoading || !hasData) {
+            return (
+              <tr>
+                <td colSpan={teamColumns.length + 1} className="p-0">
+                  <div className="flex items-center justify-center py-8 bg-gray-50">
+                    <Loader2 className="w-5 h-5 animate-spin text-gray-400 mr-2" />
+                    <span className="text-gray-500">Loading players...</span>
+                  </div>
+                </td>
+              </tr>
+            );
+          }
+          
+          return <PlayerSubTable players={getFilteredPlayers(team.id)} />;
+        }}
         
         // Row interaction with long press selection
         onRowClick={(team) => {
@@ -891,7 +892,7 @@ export default function TeamsPage() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-[11px] sm:text-sm">Total Teams</p>
+              <p className="text-gray-600 text-[11px] sm:text-sm">{t('volunteer.teams.total_teams', 'Total Teams')}</p>
               <p className="text-lg sm:text-2xl font-bold text-gray-900">{teams.length}</p>
             </div>
             <Users className="w-5 h-5 sm:w-8 sm:h-8 text-gray-400" />
@@ -907,7 +908,7 @@ export default function TeamsPage() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-[11px] sm:text-sm">Checked In</p>
+              <p className="text-gray-600 text-[11px] sm:text-sm">{t('volunteer.teams.checked_in', 'Checked In')}</p>
               <p className="text-lg sm:text-2xl font-bold text-green-600">
                 {teams.filter(t => t.status === 'checked_in').length}
               </p>
@@ -963,11 +964,11 @@ export default function TeamsPage() {
       <CreateTeamModal
         isOpen={createTeamModal}
         onClose={() => setCreateTeamModal(false)}
-        venueLocation={teams.length > 0 ? {
-          panchayat: teams[0].panchayat || '',
-          district: teams[0].district || '',
-          state: teams[0].state || '',
-          taluk: teams[0].taluk || ''
+        venueLocation={venueData ? {
+          panchayat: venueData.city || '',
+          district: venueData.city || '',
+          state: venueData.state || '',
+          taluk: ''
         } : undefined}
         venueId={venueId}
         onTeamCreated={() => {

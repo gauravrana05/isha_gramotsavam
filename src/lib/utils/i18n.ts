@@ -3,7 +3,8 @@
 import { useLanguage } from "@/context/LanguageContext";
 import en from "@/lib/locales/en.json";
 import ta from "@/lib/locales/ta.json";
-import hi from "@/lib/locales/hi.json";
+// Import hi dynamically to pick up latest changes
+// import hi from "@/lib/locales/hi.json";
 
 // Supported language codes
 export type LanguageCode = "en" | "ta" | "hi" | "ml" | "te" | "kn" | "or";
@@ -31,7 +32,7 @@ const loadTranslation = async (lang: LanguageCode) => {
       case "ta":
         return ta;
       case "hi":
-        return hi;
+        return (await import("@/lib/locales/hi.json")).default;
       case "ml":
         return (await import("@/lib/locales/ml.json")).default;
       case "te":
@@ -49,23 +50,37 @@ const loadTranslation = async (lang: LanguageCode) => {
   }
 };
 
-// Cached translations
+// Cached translations - start with empty cache to force fresh loads
 const translationCache: Record<string, any> = {
   en,
   ta,
-  hi,
 };
 
 export const useTranslation = () => {
   const { language } = useLanguage();
 
-  const t = (key: string, fallback?: string): string => {
+  const t = async (key: string, fallback?: string): Promise<string> => {
     const currentLang = language as LanguageCode;
+    
+    // Ensure the current language is loaded in cache
+    if (!translationCache[currentLang]) {
+      await loadAndCacheTranslation(currentLang);
+    }
+    
+    // Debug log for volunteer sidebar keys
+    if (key.startsWith('volunteer.sidebar')) {
+      console.log(`Translation Debug: key=${key}, lang=${currentLang}, cached=${!!translationCache[currentLang]}`);
+    }
     
     // Check cache first
     if (translationCache[currentLang]) {
       const translation = translationCache[currentLang][key];
-      if (translation) return translation;
+      if (translation) {
+        if (key.startsWith('volunteer.sidebar')) {
+          console.log(`Found translation: ${translation}`);
+        }
+        return translation;
+      }
     }
 
     // Fallback to English
@@ -107,5 +122,11 @@ export const loadAndCacheTranslation = async (lang: LanguageCode) => {
   if (!translationCache[lang]) {
     translationCache[lang] = await loadTranslation(lang);
   }
+  return translationCache[lang];
+};
+
+// Force refresh translation cache (useful for development)
+export const refreshTranslationCache = async (lang: LanguageCode) => {
+  translationCache[lang] = await loadTranslation(lang);
   return translationCache[lang];
 };

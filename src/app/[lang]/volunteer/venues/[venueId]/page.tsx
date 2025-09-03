@@ -1,324 +1,286 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
+import { use } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { api } from '@/server/trpc/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/Progress';
+import { useRouter } from 'next/navigation';
+import { useTranslation } from '@/lib/utils/i18n';
 import { 
+  MapPin, 
+  Clock, 
   Users, 
   Trophy, 
-  Clock, 
-  CheckCircle, 
   Calendar,
-  Hash,
-  Camera,
-  BarChart3,
-  Settings,
-  FileText
+  Phone,
+  Mail,
+  Globe,
+  Star,
+  Info,
+  Loader2
 } from 'lucide-react';
 
-export default function VolunteerVenueDashboard() {
-  const params = useParams();
-  const venueId = params.venueId as string;
+interface PageProps {
+  params: Promise<{
+    venueId: string;
+    lang: string;
+  }>;
+}
 
-  const { data: venueStats } = api.volunteers.dashboard.getVenueStats.useQuery({
-    venueId
-  });
+export default function VenueDetailsPage({ params }: PageProps) {
+  const { venueId, lang } = use(params);
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const { t } = useTranslation();
 
-  const { data: todayMatches } = api.volunteers.match.getVenueMatchesByStatus.useQuery({
-    venueId,
-    status: undefined
-  });
+  // Check if user is a volunteer
+  const isVolunteer = user && ['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user.role);
 
-  const { data: pendingTeams } = api.volunteers.team.getTeamsPendingVerification.useQuery({
-    venueId
-  });
+  // Auth check - redirect if not loading and not authorized
+  if (!authLoading && (!user || !isVolunteer)) {
+    router.replace(`/${lang}/login`);
+    return null;
+  }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-500';
-      case 'in_progress': return 'bg-yellow-500';
-      case 'ready': return 'bg-blue-500';
-      default: return 'bg-gray-500';
-    }
-  };
+  // Fetch venue data - only when authenticated as volunteer
+  const { 
+    data: venueData, 
+    isLoading: venueLoading,
+    error: venueError 
+  } = api.volunteers.venue.getVenueDetails.useQuery(
+    { venueId },
+    { enabled: !authLoading && !!venueId && !!isVolunteer }
+  );
 
-  const todayMatchesByStatus = todayMatches?.reduce((acc, match) => {
-    acc[match.status] = (acc[match.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>) || {};
+  // Fetch venue stats - only when authenticated as volunteer
+  const { 
+    data: venueStats,
+    isLoading: statsLoading 
+  } = api.volunteers.venue.getVenueStats.useQuery(
+    { venueId },
+    { enabled: !authLoading && !!venueId && !!isVolunteer }
+  );
+
+  // Show loading for auth or data loading
+  if (authLoading || venueLoading || statsLoading) {
+    return (
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-[#F28C38]" />
+        </div>
+      </div>
+    );
+  }
+
+  if (venueError) {
+    return (
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600">Error Loading Venue</h1>
+          <p className="mt-2 text-gray-600">{venueError.message}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Venue Dashboard</h1>
-          <p className="text-muted-foreground">
-            {venueStats?.venueName || 'Loading...'}
-          </p>
+    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center mb-2">
+          <MapPin className="w-6 h-6 text-[#F28C38] mr-2" />
+          <h1 className="text-3xl font-bold text-gray-900">
+            {venueData?.name || 'Venue Details'}
+          </h1>
         </div>
-        <div className="flex space-x-2">
-          <Link href={`/volunteer/venues/${venueId}/settings`}>
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
-          </Link>
+        <p className="text-lg text-gray-600">
+          Venue information and management overview
+        </p>
+      </div>
+
+      {/* Venue Information Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Basic Information */}
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <Info className="w-5 h-5 mr-2 text-[#F28C38]" />
+            Basic Information
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-500">Venue Name</label>
+              <p className="text-lg font-medium text-gray-900">
+                {venueData?.name || 'N/A'}
+              </p>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium text-gray-500">Address</label>
+              <p className="text-gray-700">
+                {venueData?.address || 'Address not available'}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-500">City</label>
+              <p className="text-gray-700">
+                {venueData?.city || 'N/A'}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-500">State</label>
+              <p className="text-gray-700">
+                {venueData?.state || 'N/A'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Contact Information */}
+        <div className="bg-white rounded-xl shadow-sm border p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <Phone className="w-5 h-5 mr-2 text-[#F28C38]" />
+            Contact Information
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-500">Coordinator</label>
+              <p className="text-lg font-medium text-gray-900">
+                {venueData?.coordinator || 'Not assigned'}
+              </p>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium text-gray-500">Phone</label>
+              <p className="text-gray-700">
+                {venueData?.phone || 'Not available'}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-500">Email</label>
+              <p className="text-gray-700">
+                {venueData?.email || 'Not available'}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-500">Capacity</label>
+              <p className="text-gray-700">
+                {venueData?.capacity ? `${venueData.capacity} people` : 'Not specified'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Teams</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{venueStats?.totalTeams || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {venueStats?.checkedInTeams || 0} checked in
-            </p>
-          </CardContent>
-        </Card>
+      {/* Stats Overview */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white rounded-xl shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Teams</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {venueStats?.totalTeams || 0}
+              </p>
+            </div>
+            <Users className="w-8 h-8 text-blue-500" />
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Fixtures</CardTitle>
-            <Trophy className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{venueStats?.activeFixtures || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {venueStats?.completedFixtures || 0} completed
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-xl shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Verified Teams</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {venueStats?.verifiedTeams || 0}
+              </p>
+            </div>
+            <Star className="w-8 h-8 text-green-500" />
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Today&apos;s Matches</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{todayMatches?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {todayMatchesByStatus.completed || 0} completed
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-xl shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Active Fixtures</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {venueStats?.activeFixtures || 0}
+              </p>
+            </div>
+            <Trophy className="w-8 h-8 text-yellow-500" />
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Verification</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingTeams?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">teams waiting</p>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-xl shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Matches</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {venueStats?.totalMatches || 0}
+              </p>
+            </div>
+            <Calendar className="w-8 h-8 text-purple-500" />
+          </div>
+        </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <span>Team Check-In</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Check in verified teams for match day participation
-            </p>
-            <Link href={`/volunteer/venues/${venueId}/checkin`}>
-              <Button className="w-full">
-                Manage Check-In
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+      {/* Sports Available */}
+      {venueData?.sports && venueData.sports.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <Trophy className="w-5 h-5 mr-2 text-[#F28C38]" />
+            Sports Available
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {venueData.sports.map((sport: any) => (
+              <div 
+                key={sport.id}
+                className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-3 border border-blue-200"
+              >
+                <p className="font-medium text-blue-900">{sport.name}</p>
+                {sport.category && (
+                  <p className="text-xs text-blue-600">{sport.category}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Hash className="h-5 w-5 text-blue-600" />
-              <span>Tournament Numbers</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Assign tournament numbers to checked-in teams
+      {/* Additional Information */}
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <h2 className="text-xl font-semibold mb-4 flex items-center">
+          <Globe className="w-5 h-5 mr-2 text-[#F28C38]" />
+          Additional Information
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="text-sm font-medium text-gray-500">Status</label>
+            <p className="text-lg font-medium text-green-600">
+              Active
             </p>
-            <Link href={`/volunteer/venues/${venueId}/numbers`}>
-              <Button className="w-full">
-                Assign Numbers
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Trophy className="h-5 w-5 text-yellow-600" />
-              <span>Fixture Management</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Create and manage tournament fixtures
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium text-gray-500">Last Updated</label>
+            <p className="text-gray-700">
+              {venueData?.updatedAt 
+                ? new Date(venueData.updatedAt).toLocaleDateString()
+                : 'N/A'
+              }
             </p>
-            <Link href={`/volunteer/venues/${venueId}/fixtures`}>
-              <Button className="w-full">
-                Manage Fixtures
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5 text-purple-600" />
-              <span>Match Management</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Schedule matches and record results
-            </p>
-            <Link href={`/volunteer/venues/${venueId}/matches`}>
-              <Button className="w-full">
-                Manage Matches
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Users className="h-5 w-5 text-indigo-600" />
-              <span>Team Verification</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Verify team documents and player eligibility
-            </p>
-            <Link href={`/volunteer/verification`}>
-              <Button className="w-full">
-                Verify Teams
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <BarChart3 className="h-5 w-5 text-orange-600" />
-              <span>Reports</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Generate tournament reports and statistics
-            </p>
-            <Link href={`/volunteer/venues/${venueId}/reports`}>
-              <Button className="w-full">
-                View Reports
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Today&apos;s Matches */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Today&apos;s Matches</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {todayMatches?.slice(0, 5).map((match) => (
-                <div key={match.id} className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-sm">
-                      {match.team1?.name || 'TBD'} vs {match.team2?.name || 'TBD'}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {match.fixture.name} • {match.roundName}
-                    </div>
-                  </div>
-                  <Badge className={getStatusColor(match.status)}>
-                    {match.status.replace('_', ' ').toUpperCase()}
-                  </Badge>
-                </div>
-              ))}
-              
-              {todayMatches?.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No matches scheduled for today
-                </p>
-              )}
-              
-              {(todayMatches?.length || 0) > 5 && (
-                <Link href={`/volunteer/venues/${venueId}/matches`}>
-                  <Button variant="outline" size="sm" className="w-full">
-                    View All Matches
-                  </Button>
-                </Link>
-              )}
+          {venueData?.description && (
+            <div className="md:col-span-2">
+              <label className="text-sm font-medium text-gray-500">Description</label>
+              <p className="text-gray-700 mt-1">
+                {venueData.description}
+              </p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Pending Verifications */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending Verifications</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {pendingTeams?.slice(0, 5).map((team) => (
-                <div key={team.id} className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-sm">{team.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {team.sport.name} • {team.captainName}
-                    </div>
-                  </div>
-                  <Badge variant="outline">
-                    {team.teamPlayers.length} players pending
-                  </Badge>
-                </div>
-              ))}
-              
-              {pendingTeams?.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No teams pending verification
-                </p>
-              )}
-              
-              {(pendingTeams?.length || 0) > 5 && (
-                <Link href={`/volunteer/verification`}>
-                  <Button variant="outline" size="sm" className="w-full">
-                    View All Pending
-                  </Button>
-                </Link>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       </div>
     </div>
   );

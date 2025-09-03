@@ -66,7 +66,7 @@ export default function OnboardingFlow() {
     switch (role) {
       case 'captain': return '/captain/guide';
       case 'player': return '/player/guide';
-      case 'volunteer': return '/volunteer/guide';
+      case 'volunteer': return '/volunteer/venues/guide'; // Volunteer guides are venue-specific
       default: return '/public/sports';
     }
   }
@@ -97,7 +97,7 @@ export default function OnboardingFlow() {
     switch (role) {
       case 'admin': return '/admin';
       case 'captain': return '/captain/dashboard';
-      case 'volunteer': return '/volunteer';
+      case 'volunteer': return '/volunteer/venues'; // Will redirect to assigned venue
       default: return '/player/dashboard';
     }
   }

@@ -29,7 +29,7 @@ export const useSmartBack = (options: UseSmartBackOptions = {}) => {
         admin: '/admin/dashboard',
         captain: '/captain/dashboard', 
         player: '/player/dashboard',
-        volunteer: '/volunteer/dashboard',
+        volunteer: '/volunteer/venues', // Will redirect to assigned venue
         verification: '/verification/dashboard'
       };
       
@@ -50,7 +50,7 @@ export const useSmartBack = (options: UseSmartBackOptions = {}) => {
       } else if (currentPath.includes('/player/')) {
         router.push(`/${currentLang}/player/dashboard`);
       } else if (currentPath.includes('/volunteer/')) {
-        router.push(`/${currentLang}/volunteer/dashboard`);
+        router.push(`/${currentLang}/volunteer/venues`); // Will redirect to assigned venue
       } else if (currentPath.includes('/verification/')) {
         router.push(`/${currentLang}/verification/dashboard`);
       } else {

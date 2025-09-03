@@ -21,11 +21,9 @@ export const getDashboardRoute = (role: string | null | undefined, lang: string,
     case "volunteer":
     case "general_volunteer":
     case "technical_volunteer":
-      // If no language preference, show language modal
-      if (!hasLanguagePreference) {
-        return `/${lang}/volunteer?showLanguageModal=true`;
-      }
-      return `/${lang}/volunteer`; // This will be handled by useRedirect for venue assignment
+      // Note: No base /volunteer route exists - volunteers are redirected to their venue
+      // This will be handled by the volunteer layout which will redirect to venue dashboard
+      return `/${lang}/volunteer/venues`; // Fallback - should be handled by layout redirect
     case "verification":
     case "verification_volunteer":
       return `/${lang}/verification/dashboard`;

@@ -58,6 +58,7 @@ interface QuickActionData {
 export default function VolunteerDashboard({ params }: PageProps) {
   const { venueId, lang } = use(params);
   const { user, userProfile, loading: authLoading } = useAuth();
+  const { isOnline, pendingActions, syncStatus } = useOffline();
   const { addNotification } = useNotification();
   const router = useRouter();
 
@@ -75,7 +76,6 @@ export default function VolunteerDashboard({ params }: PageProps) {
   const updateLanguageMutation = api.profile.updateLanguagePreference.useMutation({
     onSuccess: async () => {
       addNotification('Language preference updated successfully', 'success');
-      setIsUpdatingLanguage(false);
       // Invalidate profile queries to refresh user data
       await utils.profile.checkCompletion.invalidate();
     },
@@ -274,8 +274,9 @@ export default function VolunteerDashboard({ params }: PageProps) {
     setIsUpdatingLanguage(true);
     try {
       await updateLanguageMutation.mutateAsync({ language: languageCode });
-      // Don't redirect immediately - let the profile refresh handle modal close
-      // The modal will disappear when userProfile.languagePreference is updated
+      
+      // Redirect to volunteer home page with new language
+      window.location.href = `/${languageCode}/volunteer`;
     } catch (error) {
       console.error('Failed to update language:', error);
       setIsUpdatingLanguage(false);
@@ -288,7 +289,7 @@ export default function VolunteerDashboard({ params }: PageProps) {
   };
 
   // Show language selection modal if user has no language preference
-  if (user && userProfile && !userProfile.languagePreference && !authLoading) {
+  if (user && userProfile && !userProfile.languagePreference && !authLoading && !isUpdatingLanguage) {
     return (
       <>
         <div className="min-h-screen bg-[#F3F0E5]">
@@ -338,6 +339,33 @@ export default function VolunteerDashboard({ params }: PageProps) {
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {/* Offline Status Banner */}
+      {!isOnline && (
+        <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+              <span className="text-orange-800 font-medium">Working Offline</span>
+            </div>
+            {pendingActions.length > 0 && (
+              <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
+                {pendingActions.length} actions pending sync
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sync Status */}
+      {isOnline && syncStatus === 'syncing' && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+            <span className="text-blue-800 font-medium">Syncing offline actions...</span>
+          </div>
+        </div>
+      )}
+
       {/* Modern Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
         {/* Total Teams */}

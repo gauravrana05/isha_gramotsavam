@@ -2,18 +2,19 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
+import PageLoader from '@/components/ui/loaders/PageLoader';
 
 // Dynamically import OfflineContext to avoid SSR issues
-const OfflineContext = dynamic(
-  () => import('./OfflineContext').then(mod => ({ default: mod.OfflineContext })),
+const OfflineContextProvider = dynamic(
+  () => import('./OfflineContext').then(mod => mod.OfflineProvider),
   { 
     ssr: false,
-    loading: () => <div>Loading offline services...</div>
+    loading: () => <PageLoader variant="default" title="" />
   }
 );
 
 export const OfflineContextWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return <OfflineContext>{children}</OfflineContext>;
+  return <OfflineContextProvider>{children}</OfflineContextProvider>;
 };
 
 // Browser-only hook

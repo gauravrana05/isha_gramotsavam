@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { useTranslation } from '@/lib/utils/i18n';
 import { SUPPORTED_LANGUAGES, LanguageCode } from '@/lib/utils/i18n-server';
 import { Globe } from 'lucide-react';
@@ -24,7 +25,8 @@ export default function VolunteerLanguageSwitcher({
   const router = useRouter();
   const { lang } = useParams();
   const { user } = useAuth();
-  const { t, language } = useTranslation();
+  const { language, switchLanguage } = useLanguage();
+  const { t } = useTranslation();
   const { addNotification } = useNotification();
 
   // Get current language
@@ -50,24 +52,25 @@ export default function VolunteerLanguageSwitcher({
     setIsUpdating(true);
 
     try {
-      // Update user preference in database
+      // Update user preference in database first
       if (user) {
         await updateProfileMutation.mutateAsync({
           preferredLanguage: newLanguage,
         });
       }
-
-      // Navigate to new language route
+      
+      // Navigate to new language route and force reload
       const currentPath = window.location.pathname;
       const pathSegments = currentPath.split('/');
       
-      // Replace the language segment in the URL
       if (pathSegments[1]) {
         pathSegments[1] = newLanguage;
         const newPath = pathSegments.join('/');
-        router.push(newPath);
+        // Force a hard navigation to ensure the language context updates
+        window.location.href = newPath;
       }
     } catch (error) {
+      setIsUpdating(false);
       // Error handling is done in the mutation callbacks
     }
   };

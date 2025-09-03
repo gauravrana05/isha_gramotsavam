@@ -695,6 +695,15 @@ export const OfflineProvider: React.FC<{
     // Initialize background sync services
     const initializeServices = async () => {
       try {
+        // Initialize volunteer service first with proper error handling
+        console.log('🔄 Initializing volunteer service...');
+        await volunteerService.initialize('volunteer-user');
+        console.log('✅ Volunteer service initialized');
+        
+        // Add small delay to ensure database is fully ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        console.log('🔄 Initializing background services...');
         await backgroundSyncManager.initialize();
         await mediaUploadQueue.initialize();
         await conflictResolver.initialize();
@@ -703,6 +712,8 @@ export const OfflineProvider: React.FC<{
         console.log('✅ All offline services initialized');
       } catch (error) {
         console.error('❌ Failed to initialize offline services:', error);
+        // Continue without offline services rather than breaking the app
+        console.warn('⚠️ App will continue with limited offline functionality');
       }
     };
     

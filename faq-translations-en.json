@@ -1,0 +1,187 @@
+{
+  "faq": {
+    "volunteer_help": "Volunteer Help",
+    "help_details": "Help Details",
+    "search_placeholder": "Search for help...",
+    "showing_for_page": "Showing help for this page",
+    "no_results": "No help topics found. Try different keywords.",
+    "still_need_help": "Still need help?",
+    "contact_support": "Contact Support",
+    "steps": "Steps:",
+    "steps_coming_soon": "Detailed steps coming soon...",
+    
+    "teams": {
+      "checkin": {
+        "question": "How do I check in a team?",
+        "answer": "To check in a team, go to the Teams page, find the team, and click the 'Check In' button. This marks the team as present for their matches.",
+        "steps": [
+          "Go to Teams page",
+          "Search for the team name", 
+          "Click 'Check In' button",
+          "Confirm team arrival"
+        ]
+      },
+      "search": {
+        "question": "How do I search for a team?",
+        "answer": "Use the search bar at the top of the Teams page. You can search by team name or filter by sport and status."
+      },
+      "create": {
+        "question": "How do I create a new team?",
+        "answer": "Click the 'Create Team' button on the Teams page, fill in the team details, and add players.",
+        "steps": [
+          "Click 'Create Team' button",
+          "Enter team name and sport",
+          "Add team captain details",
+          "Add player information",
+          "Submit the form"
+        ]
+      }
+    },
+    
+    "players": {
+      "verify": {
+        "question": "How do I verify a player?",
+        "answer": "Click on a team, select the player, review their documents, then mark as Verified or Rejected.",
+        "steps": [
+          "Open team details",
+          "Click on player name", 
+          "Review uploaded documents",
+          "Select Verified or Rejected",
+          "Add notes if needed"
+        ]
+      },
+      "photo": {
+        "question": "How do I change a player photo?",
+        "answer": "In player details, click the camera icon next to their photo to upload a new one.",
+        "steps": [
+          "Open player details",
+          "Click camera icon on photo",
+          "Take new photo or select from gallery", 
+          "Confirm upload"
+        ]
+      },
+      "reject": {
+        "question": "How do I reject a player verification?",
+        "answer": "In the player verification screen, select 'Rejected' and provide a reason in the notes field."
+      }
+    },
+    
+    "fixtures": {
+      "create": {
+        "question": "How do I create a tournament?",
+        "answer": "Go to Fixtures page, click 'Create Tournament', select sport and gender, then seed the teams.",
+        "steps": [
+          "Go to Fixtures page",
+          "Click 'Create Tournament'",
+          "Select sport and gender category",
+          "Arrange team seeding",
+          "Generate tournament bracket"
+        ]
+      },
+      "seeding": {
+        "question": "How do I seed teams for a tournament?",
+        "answer": "In the tournament creation flow, drag and drop teams to arrange them by ranking from 1st to last position."
+      },
+      "levels": {
+        "question": "What are cluster, division, and final levels?",
+        "answer": "Cluster is the first round, Division is for top teams from clusters, and Final is for the best teams to determine the champion."
+      }
+    },
+    
+    "matches": {
+      "start": {
+        "question": "How do I start a match?",
+        "answer": "On the Matches page, find the scheduled match and click 'Start Match' to begin scoring.",
+        "steps": [
+          "Go to Matches page",
+          "Find the scheduled match",
+          "Click 'Start Match' button",
+          "Begin entering scores"
+        ]
+      },
+      "score": {
+        "question": "How do I enter match scores?",
+        "answer": "During a live match, use the score buttons to update points for each team in real-time.",
+        "steps": [
+          "Open the live match",
+          "Use + and - buttons for each team",
+          "Scores update automatically",
+          "End match when complete"
+        ]
+      },
+      "winner": {
+        "question": "How do I declare a match winner?",
+        "answer": "After entering final scores, click 'End Match' and confirm the winner to complete the match."
+      }
+    },
+    
+    "media": {
+      "upload": {
+        "question": "How do I upload photos or videos?",
+        "answer": "Go to Media page, click 'Upload' button, select files from your device or take new photos/videos.",
+        "steps": [
+          "Go to Media page",
+          "Click 'Upload' button",
+          "Select files or take new media",
+          "Add description if needed",
+          "Upload to venue gallery"
+        ]
+      },
+      "offline": {
+        "question": "Can I upload media when offline?",
+        "answer": "Yes! Media uploads are queued when offline and will automatically sync when you're back online."
+      }
+    },
+    
+    "posts": {
+      "create": {
+        "question": "How do I create a post?",
+        "answer": "Go to Posts page, click 'Create Post', write your message, add images if needed, and publish.",
+        "steps": [
+          "Go to Posts page",
+          "Click 'Create Post' button",
+          "Write your message",
+          "Add images (optional)",
+          "Click 'Publish'"
+        ]
+      },
+      "visibility": {
+        "question": "Who can see my posts?",
+        "answer": "Posts are visible to all volunteers assigned to the same venue. Technical volunteers can create venue-wide announcements."
+      }
+    },
+    
+    "chat": {
+      "message": {
+        "question": "How do I send messages to other volunteers?",
+        "answer": "Go to Chat page, type your message in the text box, and press send to communicate with venue volunteers."
+      },
+      "urgent": {
+        "question": "How do I report urgent issues?",
+        "answer": "Use the chat to send urgent messages, or contact support directly for emergencies requiring immediate attention."
+      }
+    },
+    
+    "notifications": {
+      "create": {
+        "question": "How do I create notifications?",
+        "answer": "Go to Notifications page, click 'Create Notification', write your message, select recipients, and send."
+      }
+    },
+    
+    "general": {
+      "offline": {
+        "question": "How do I work offline?",
+        "answer": "The app works offline automatically. Your actions are saved locally and will sync when you're back online."
+      },
+      "sync": {
+        "question": "Why is my data not syncing?",
+        "answer": "Check your internet connection. Pending actions will show in the status bar and sync automatically when online."
+      },
+      "mistake": {
+        "question": "What if I make a mistake?",
+        "answer": "Most actions can be corrected. Contact support if you need help fixing critical errors like wrong match results."
+      }
+    }
+  }
+}

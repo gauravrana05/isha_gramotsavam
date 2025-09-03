@@ -613,6 +613,10 @@ export default function AdminTeamsPage() {
           actions={actions}
           loading={teamsLoading}
           onDataLoad={handleDataLoad}
+          onRowClick={(team) => {
+            // Navigate to team detail page
+            router.push(`/${lang}/admin/teams/${team.id}`);
+          }}
           searchable={true}
           searchPlaceholder="Search teams..."
           searchFields={['name', 'captainProfile.name', 'sportName', 'panchayat']}

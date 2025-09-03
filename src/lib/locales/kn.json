@@ -30,5 +30,38 @@
       "mixed": "ಮಿಶ್ರ",
       "mixed_teams": "ಮಿಶ್ರ ತಂಡಗಳು"
     }
-  }
+  },
+  
+  "faq.volunteer_help": "ಸ್ವಯಂಸೇವಕ ಸಹಾಯ",
+  "faq.help_details": "ಸಹಾಯ ವಿವರಗಳು",
+  "faq.search_placeholder": "ಸಹಾಯಕ್ಕಾಗಿ ಹುಡುಕಿ...",
+  "faq.no_results": "ಸಹಾಯ ವಿಷಯಗಳು ಕಂಡುಬಂದಿಲ್ಲ",
+  "faq.still_need_help": "ಇನ್ನೂ ಸಹಾಯ ಬೇಕೇ?",
+  "faq.contact_support": "ಬೆಂಬಲವನ್ನು ಸಂಪರ್ಕಿಸಿ",
+  "faq.steps": "ಹಂತಗಳು:",
+  
+  "faq.teams.checkin.question": "ತಂಡವನ್ನು ಹೇಗೆ ಚೆಕ್ ಇನ್ ಮಾಡಬೇಕು?",
+  "faq.teams.checkin.answer": "ತಂಡವನ್ನು ಚೆಕ್ ಇನ್ ಮಾಡಲು, ತಂಡಗಳ ಪುಟಕ್ಕೆ ಹೋಗಿ, ತಂಡವನ್ನು ಹುಡುಕಿ, 'ಚೆಕ್ ಇನ್' ಬಟನ್ ಕ್ಲಿಕ್ ಮಾಡಿ.",
+  "faq.teams.search.question": "ತಂಡವನ್ನು ಹೇಗೆ ಹುಡುಕಬೇಕು?",
+  "faq.teams.search.answer": "ತಂಡಗಳ ಪುಟದ ಮೇಲ್ಭಾಗದಲ್ಲಿರುವ ಸರ್ಚ್ ಬಾರ್ ಬಳಸಿ.",
+  "faq.players.verify.question": "ಆಟಗಾರನನ್ನು ಹೇಗೆ ಪರಿಶೀಲಿಸಬೇಕು?",
+  "faq.players.verify.answer": "ತಂಡದ ಮೇಲೆ ಕ್ಲಿಕ್ ಮಾಡಿ, ಆಟಗಾರನನ್ನು ಆಯ್ಕೆ ಮಾಡಿ, ದಾಖಲೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+  "faq.players.photo.question": "ಆಟಗಾರನ ಫೋಟೋವನ್ನು ಹೇಗೆ ಬದಲಾಯಿಸಬೇಕು?",
+  "faq.players.photo.answer": "ಆಟಗಾರನ ವಿವರಗಳಲ್ಲಿ, ಫೋಟೋದ ಪಕ್ಕದಲ್ಲಿರುವ ಕ್ಯಾಮೆರಾ ಐಕಾನ್ ಕ್ಲಿಕ್ ಮಾಡಿ.",
+  "faq.fixtures.create.question": "ಪಂದ್ಯಾವಳಿಯನ್ನು ಹೇಗೆ ರಚಿಸಬೇಕು?",
+  "faq.fixtures.create.answer": "ಫಿಕ್ಸ್ಚರ್ಸ್ ಪುಟಕ್ಕೆ ಹೋಗಿ, 'ಪಂದ್ಯಾವಳಿ ರಚಿಸಿ' ಕ್ಲಿಕ್ ಮಾಡಿ.",
+  "faq.matches.start.question": "ಪಂದ್ಯವನ್ನು ಹೇಗೆ ಪ್ರಾರಂಭಿಸಬೇಕು?",
+  "faq.matches.start.answer": "ಪಂದ್ಯಗಳ ಪುಟದಲ್ಲಿ, 'ಪಂದ್ಯ ಪ್ರಾರಂಭಿಸಿ' ಕ್ಲಿಕ್ ಮಾಡಿ.",
+  "faq.matches.score.question": "ಸ್ಕೋರ್ ಅನ್ನು ಹೇಗೆ ನಮೂದಿಸಬೇಕು?",
+  "faq.matches.score.answer": "ಲೈವ್ ಪಂದ್ಯದಲ್ಲಿ, ಸ್ಕೋರ್ ಬಟನ್‌ಗಳನ್ನು ಬಳಸಿ.",
+  "faq.media.upload.question": "ಫೋಟೋಗಳನ್ನು ಹೇಗೆ ಅಪ್‌ಲೋಡ್ ಮಾಡಬೇಕು?",
+  "faq.media.upload.answer": "ಮೀಡಿಯಾ ಪುಟಕ್ಕೆ ಹೋಗಿ, 'ಅಪ್‌ಲೋಡ್' ಬಟನ್ ಕ್ಲಿಕ್ ಮಾಡಿ.",
+  "faq.posts.create.question": "ಪೋಸ್ಟ್ ಅನ್ನು ಹೇಗೆ ರಚಿಸಬೇಕು?",
+  "faq.posts.create.answer": "ಪೋಸ್ಟ್‌ಗಳ ಪುಟಕ್ಕೆ ಹೋಗಿ, 'ಪೋಸ್ಟ್ ರಚಿಸಿ' ಕ್ಲಿಕ್ ಮಾಡಿ.",
+  "faq.chat.message.question": "ಸಂದೇಶಗಳನ್ನು ಹೇಗೆ ಕಳುಹಿಸಬೇಕು?",
+  "faq.chat.message.answer": "ಚಾಟ್ ಪುಟಕ್ಕೆ ಹೋಗಿ, ನಿಮ್ಮ ಸಂದೇಶವನ್ನು ಟೈಪ್ ಮಾಡಿ.",
+  "faq.general.offline.question": "ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿ ಹೇಗೆ ಕೆಲಸ ಮಾಡಬೇಕು?",
+  "faq.general.offline.answer": "ಅಪ್ಲಿಕೇಶನ್ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿ ಕೆಲಸ ಮಾಡುತ್ತದೆ.",
+  "faq.general.sync.question": "ಡೇಟಾ ಏಕೆ ಸಿಂಕ್ ಆಗುತ್ತಿಲ್ಲ?",
+  "faq.general.sync.answer": "ನಿಮ್ಮ ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ."
 }

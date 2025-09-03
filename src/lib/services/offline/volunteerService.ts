@@ -55,17 +55,29 @@ export interface MediaUploadData {
 export class VolunteerService {
   private storage: Awaited<ReturnType<typeof getVolunteerStorage>> | null = null;
   private initialized = false;
+  private initializing = false;
 
   /**
    * Initialize the service
    */
   async initialize(userId: string): Promise<void> {
     if (this.initialized) return;
+    if (this.initializing) {
+      // Wait for existing initialization to complete
+      while (this.initializing) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      return;
+    }
 
-    this.storage = await getVolunteerStorage();
-    this.initialized = true;
-    
-    console.log('✅ Volunteer service initialized');
+    this.initializing = true;
+    try {
+      this.storage = await getVolunteerStorage();
+      this.initialized = true;
+      console.log('✅ Volunteer service initialized');
+    } finally {
+      this.initializing = false;
+    }
   }
 
   /**

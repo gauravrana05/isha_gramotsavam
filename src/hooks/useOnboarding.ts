@@ -40,7 +40,7 @@ export function useOnboardingRedirect() {
     switch (user?.role) {
       case 'admin': return '/admin';
       case 'captain': return '/captain/dashboard';
-      case 'volunteer': return '/volunteer';
+      case 'volunteer': return '/volunteer/venues'; // Will redirect to assigned venue
       default: return '/player/dashboard';
     }
   }

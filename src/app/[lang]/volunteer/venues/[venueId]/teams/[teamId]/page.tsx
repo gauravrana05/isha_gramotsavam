@@ -10,6 +10,7 @@ import PlayerDocumentUpload from '@/components/players/PlayerDocumentUpload';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { AlertModal } from '@/components/ui/Modal';
+import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import type { Column } from '@/components/ui/Table';
 import { VerificationStatusSelector } from '@/components/ui/StatusSelector';
@@ -79,6 +80,7 @@ export default function TeamMatchDayVerificationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
+  const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(new Set());
   const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
@@ -276,11 +278,8 @@ export default function TeamMatchDayVerificationPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#F28C38] mx-auto mb-4" />
-          <p className="text-gray-600">Loading team verification data...</p>
-        </div>
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38]"></div>
       </div>
     );
   }
@@ -373,6 +372,11 @@ export default function TeamMatchDayVerificationPage() {
         loading={loading}
         stateKey={undefined}
         selectable={true}
+        onRowClick={(player) => {
+          // Open player details modal (same as admin/users)
+          setSelectedPlayer(player);
+          setShowPlayerModal(true);
+        }}
         onRowClick={(player) => setSelectedPlayer(player)}
         keyExtractor={(player) => player.id}
         headerActionsNone={(
@@ -545,6 +549,76 @@ export default function TeamMatchDayVerificationPage() {
             />
           </div>
         </div>
+      )}
+      
+      {/* Player Details Modal */}
+      {selectedPlayer && (
+        <EnhancedModal
+          isOpen={showPlayerModal}
+          onClose={() => {
+            setShowPlayerModal(false);
+            setSelectedPlayer(null);
+          }}
+          title="Player Details"
+          subtitle={`${selectedPlayer.firstName} ${selectedPlayer.lastName} - Complete Information`}
+          size="xl"
+          mobileFullScreen={true}
+        >
+          <div className="space-y-6">
+            {/* Player Basic Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedPlayer.firstName} {selectedPlayer.lastName}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Phone</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedPlayer.phone}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">WhatsApp</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedPlayer.whatsappNumber || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
+                    <p className="mt-1 text-sm text-gray-900">
+                      {selectedPlayer.dob ? new Date(selectedPlayer.dob).toLocaleDateString('en-IN') : 'Not provided'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Team Information</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Position</label>
+                    <p className="mt-1 text-sm text-gray-900 capitalize">{selectedPlayer.position}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Verification Status</label>
+                    <p className="mt-1">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        selectedPlayer.verificationStatus === 'verified' ? 'bg-green-100 text-green-800' :
+                        selectedPlayer.verificationStatus === 'rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {selectedPlayer.verificationStatus}
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Village</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedPlayer.village || 'Not provided'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </EnhancedModal>
       )}
       
       <AlertModal

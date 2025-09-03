@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "@/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 
 export const chatRouter = createTRPCRouter({
@@ -17,22 +17,45 @@ export const chatRouter = createTRPCRouter({
       // Verify user has access to this venue (volunteers, admins, players, captains)
       const userAccess = await ctx.db.user.findFirst({
         where: { 
-          id: ctx.session.user.id,
+          id: ctx.user.id,
           OR: [
             // Admins can message anywhere
             { role: 'admin' },
             // Volunteers assigned to venue
             { 
-              volunteerAssignments: {
-                some: { venueId }
+              volunteerAssignmentsAsVolunteer: {
+                some: { 
+                  venueLevelMapping: {
+                    venueId: venueId
+                  }
+                }
               }
             },
             // Players/Captains with teams at this venue
             {
-              teams: {
+              teamPlayers: {
                 some: {
-                  matches: {
-                    some: { venueId }
+                  team: {
+                    OR: [
+                      {
+                        matchesAsTeam1: {
+                          some: { 
+                            venueLevelMapping: {
+                              venueId: venueId
+                            }
+                          }
+                        }
+                      },
+                      {
+                        matchesAsTeam2: {
+                          some: { 
+                            venueLevelMapping: {
+                              venueId: venueId
+                            }
+                          }
+                        }
+                      }
+                    ]
                   }
                 }
               }
@@ -71,7 +94,7 @@ export const chatRouter = createTRPCRouter({
               OR: [
                 { targetType: 'all' },
                 { targetType: userAccess.role === 'captain' ? 'captains' : 'players' },
-                { targetId: ctx.session.user.id }
+                { targetId: ctx.user.id }
               ]
             }
           });
@@ -90,14 +113,14 @@ export const chatRouter = createTRPCRouter({
         data: {
           content,
           venueId,
-          senderId: ctx.session.user.id,
+          senderId: ctx.user.id,
           senderRole: userAccess.role,
           targetType,
           targetId,
         },
         include: {
           sender: {
-            select: { name: true, role: true }
+            select: { firstName: true, lastName: true, role: true }
           }
         }
       });
@@ -110,26 +133,49 @@ export const chatRouter = createTRPCRouter({
     .input(z.object({
       venueId: z.string(),
       limit: z.number().min(1).max(50).default(20),
-    }).optional().default({}))
+    }))
     .query(async ({ ctx, input }) => {
       const { venueId, limit } = input;
 
       // Check if user has access to venue
       const hasAccess = await ctx.db.user.findFirst({
         where: {
-          id: ctx.session.user.id,
+          id: ctx.user.id,
           OR: [
             { role: 'admin' },
             { 
-              volunteerAssignments: {
-                some: { venueId }
+              volunteerAssignmentsAsVolunteer: {
+                some: { 
+                  venueLevelMapping: {
+                    venueId: venueId
+                  }
+                }
               }
             },
             {
-              teams: {
+              teamPlayers: {
                 some: {
-                  matches: {
-                    some: { venueId }
+                  team: {
+                    OR: [
+                      {
+                        matchesAsTeam1: {
+                          some: { 
+                            venueLevelMapping: {
+                              venueId: venueId
+                            }
+                          }
+                        }
+                      },
+                      {
+                        matchesAsTeam2: {
+                          some: { 
+                            venueLevelMapping: {
+                              venueId: venueId
+                            }
+                          }
+                        }
+                      }
+                    ]
                   }
                 }
               }
@@ -152,25 +198,25 @@ export const chatRouter = createTRPCRouter({
             { targetType: 'all' },
             { 
               targetType: 'captains',
-              ...(ctx.session.user.role === 'captain' ? {} : { senderRole: { in: ['volunteer', 'admin'] } })
+              ...(ctx.user.role === 'captain' ? {} : { senderRole: { in: ['volunteer', 'admin'] } })
             },
             { 
               targetType: 'players',
-              ...(ctx.session.user.role === 'player' ? {} : { senderRole: { in: ['volunteer', 'admin'] } })
+              ...(ctx.user.role === 'player' ? {} : { senderRole: { in: ['volunteer', 'admin'] } })
             },
             { 
               targetType: 'volunteers',
-              ...(ctx.session.user.role === 'volunteer' ? {} : { senderRole: { in: ['player', 'captain'] } })
+              ...(ctx.user.role === 'volunteer' ? {} : { senderRole: { in: ['player', 'captain'] } })
             },
             { 
               targetType: 'individual',
-              targetId: ctx.session.user.id
+              targetId: ctx.user.id
             }
           ]
         },
         include: {
           sender: {
-            select: { name: true, role: true }
+            select: { firstName: true, lastName: true, role: true }
           }
         },
         orderBy: { createdAt: 'desc' },
@@ -184,19 +230,23 @@ export const chatRouter = createTRPCRouter({
   getVenueParticipants: protectedProcedure
     .input(z.object({
       venueId: z.string(),
-    }).optional().default({}))
+    }))
     .query(async ({ ctx, input }) => {
       const { venueId } = input;
 
       // Only volunteers/admins can see participants
       const isAuthorized = await ctx.db.user.findFirst({
         where: {
-          id: ctx.session.user.id,
+          id: ctx.user.id,
           OR: [
             { role: 'admin' },
             { 
-              volunteerAssignments: {
-                some: { venueId }
+              volunteerAssignmentsAsVolunteer: {
+                some: { 
+                  venueLevelMapping: {
+                    venueId: venueId
+                  }
+                }
               }
             }
           ]
@@ -213,21 +263,45 @@ export const chatRouter = createTRPCRouter({
       // Get players and captains with teams at this venue
       const participants = await ctx.db.user.findMany({
         where: {
-          teams: {
+          teamPlayers: {
             some: {
-              matches: {
-                some: { venueId }
+              team: {
+                OR: [
+                  {
+                    matchesAsTeam1: {
+                      some: { 
+                        venueLevelMapping: {
+                          venueId: venueId
+                        }
+                      }
+                    }
+                  },
+                  {
+                    matchesAsTeam2: {
+                      some: { 
+                        venueLevelMapping: {
+                          venueId: venueId
+                        }
+                      }
+                    }
+                  }
+                ]
               }
             }
           }
         },
         select: {
           id: true,
-          name: true,
+          firstName: true,
+          lastName: true,
           role: true,
-          teams: {
+          teamPlayers: {
             select: {
-              name: true
+              team: {
+                select: {
+                  name: true
+                }
+              }
             }
           }
         }
@@ -247,8 +321,8 @@ export const chatRouter = createTRPCRouter({
           venueId: input.venueId,
           OR: [
             { targetType: 'all' },
-            { targetType: ctx.session.user.role === 'captain' ? 'captains' : 'players' },
-            { targetId: ctx.session.user.id }
+            { targetType: ctx.user.role === 'captain' ? 'captains' : 'players' },
+            { targetId: ctx.user.id }
           ]
         },
         data: {
@@ -268,7 +342,7 @@ export const chatRouter = createTRPCRouter({
       const { venueId } = input;
 
       // Only players/captains need this info
-      if (!['player', 'captain'].includes(ctx.session.user.role)) {
+      if (!['player', 'captain'].includes(ctx.user.role)) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Only players and captains can access this"
@@ -278,11 +352,30 @@ export const chatRouter = createTRPCRouter({
       // Check if user has access to venue
       const hasAccess = await ctx.db.user.findFirst({
         where: {
-          id: ctx.session.user.id,
-          teams: {
+          id: ctx.user.id,
+          teamPlayers: {
             some: {
-              matches: {
-                some: { venueId }
+              team: {
+                OR: [
+                  {
+                    matchesAsTeam1: {
+                      some: { 
+                        venueLevelMapping: {
+                          venueId: venueId
+                        }
+                      }
+                    }
+                  },
+                  {
+                    matchesAsTeam2: {
+                      some: { 
+                        venueLevelMapping: {
+                          venueId: venueId
+                        }
+                      }
+                    }
+                  }
+                ]
               }
             }
           }
@@ -299,13 +392,18 @@ export const chatRouter = createTRPCRouter({
       // Get volunteers assigned to this venue
       const volunteers = await ctx.db.user.findMany({
         where: {
-          volunteerAssignments: {
-            some: { venueId }
+          volunteerAssignmentsAsVolunteer: {
+            some: { 
+              venueLevelMapping: {
+                venueId: venueId
+              }
+            }
           }
         },
         select: {
           id: true,
-          name: true,
+          firstName: true,
+          lastName: true,
           role: true,
         }
       });

@@ -18,12 +18,22 @@ export default function VenuePostsPage() {
   
   const [showPostCreator, setShowPostCreator] = useState(false);
 
-  const { data: posts, isLoading, error } = api.volunteers.venue.getVenuePosts.useQuery({ venueId });
+  const { data: posts, isLoading, error } = api.volunteers.venue.getVenuePosts.useQuery({ 
+    venueId,
+    limit: 20,
+    offset: 0
+  }, {
+    enabled: !!venueId
+  });
 
   const canCreatePost = userProfile?.role === 'technical_volunteer' || userProfile?.role === 'admin';
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38]"></div>
+      </div>
+    );
   }
 
   if (error) {
@@ -44,35 +54,29 @@ export default function VenuePostsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">Venue Posts</h1>
-            <p className="text-sm md:text-base text-gray-600">
-              Updates and announcements from this venue
-            </p>
-          </div>
-          
-          {canCreatePost && (
-            <Button onClick={() => setShowPostCreator(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Post
-            </Button>
-          )}
+    <div className="p-4 sm:p-6">
+      {/* Quick create post section */}
+      {canCreatePost && (
+        <div className="mb-6 bg-white rounded-lg border shadow-sm p-4">
+          <button
+            onClick={() => setShowPostCreator(true)}
+            className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-[#F28C38] hover:bg-orange-50 transition-colors"
+          >
+            <div className="flex items-center text-gray-500">
+              <Plus className="h-5 w-5 mr-3 text-[#F28C38]" />
+              <span>Share an update with the venue...</span>
+            </div>
+          </button>
         </div>
-      </div>
+      )}
 
       <PostFeed entityType="fixture" entityId={venueId} />
 
-      <EnhancedModal
+      <PostCreator 
         isOpen={showPostCreator}
         onClose={() => setShowPostCreator(false)}
-        title="Create a New Post"
-        size="2xl"
-      >
-        <PostCreator onPostCreated={() => setShowPostCreator(false)} />
-      </EnhancedModal>
+        onPostCreated={() => setShowPostCreator(false)} 
+      />
     </div>
   );
 }

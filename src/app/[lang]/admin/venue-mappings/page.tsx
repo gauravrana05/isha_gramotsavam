@@ -13,6 +13,7 @@ import {
   type ActionButton,
   type FilterField,
 } from '@/components/ui';
+import { ConfirmationModal, AlertModal } from '@/components/ui/Modal';
 import { 
   Plus, 
   MapPin,
@@ -59,6 +60,28 @@ export default function VenueMappingsPage() {
 
   const [selectedLevel, setSelectedLevel] = useState<'all' | 'cluster' | 'division' | 'final'>('all');
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
+  
+  // Modal states
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {}
+  });
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    message: string;
+    type: 'error' | 'success' | 'info';
+  }>({
+    isOpen: false,
+    message: '',
+    type: 'info'
+  });
 
   // tRPC queries
   const {
@@ -89,9 +112,18 @@ export default function VenueMappingsPage() {
   const deleteMappingMutation = api.admin.venues.deleteVenueLevelMapping.useMutation({
     onSuccess: () => {
       refetchMappings();
+      setAlertModal({
+        isOpen: true,
+        message: 'Venue mapping deleted successfully.',
+        type: 'success'
+      });
     },
     onError: (error) => {
-      alert(error.message || 'Failed to delete venue mapping');
+      setAlertModal({
+        isOpen: true,
+        message: error.message || 'Failed to delete venue mapping',
+        type: 'error'
+      });
     }
   });
 
@@ -115,11 +147,15 @@ export default function VenueMappingsPage() {
   const events = eventsData?.events || [];
 
   const handleDeleteMapping = async (mappingId: string) => {
-    if (!confirm('Are you sure you want to delete this venue mapping? This will affect team assignments.')) {
-      return;
-    }
-    
-    deleteMappingMutation.mutate({ id: mappingId });
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Venue Mapping',
+      description: 'Are you sure you want to delete this venue mapping? This will affect team assignments.',
+      onConfirm: () => {
+        deleteMappingMutation.mutate({ id: mappingId });
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   // Define table columns
@@ -446,6 +482,25 @@ export default function VenueMappingsPage() {
           title: 'No venue mappings found',
           description: 'Create your first venue location mapping to get started'
         }}
+      />
+
+      {/* Enhanced Modals */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        confirmLabel="Delete"
+        confirmVariant="danger"
+        loading={deleteMappingMutation.isPending}
+      />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+        message={alertModal.message}
+        type={alertModal.type}
       />
     </div>
   );
