@@ -1,5 +1,8 @@
 /* src/styles/globals.css - Tailwind v4 with Design Tokens */
 
+/* Import mobile design system */
+@import './mobile.css';
+
 /* Fira Sans Font Family - Local Font Files */
 @font-face {
   font-family: 'Fira Sans';

@@ -1,0 +1,64 @@
+/* Mobile Design System */
+:root {
+  /* Mobile Color Palette */
+  --mobile-deep-ocean: #2C5282;
+  --mobile-fresh-green: #38A169;
+  --mobile-energy-orange: #ED8936;
+  --mobile-pure-white: #FFFFFF;
+  
+  /* Mobile Neutrals */
+  --mobile-charcoal: #2D3748;
+  --mobile-steel: #4A5568;
+  --mobile-silver: #A0AEC0;
+  --mobile-light: #F7FAFC;
+  
+  /* Mobile Accents */
+  --mobile-warning: #F6AD55;
+  --mobile-error: #E53E3E;
+  --mobile-info: #4299E1;
+  
+  /* Mobile Spacing */
+  --mobile-safe-area-top: env(safe-area-inset-top, 0px);
+  --mobile-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-header-height: 64px;
+  --mobile-bottom-nav-height: 80px;
+  
+  /* Mobile Touch Targets */
+  --mobile-touch-target: 44px;
+  --mobile-touch-padding: 12px;
+}
+
+/* Mobile Typography */
+.mobile-header-title {
+  @apply text-xl font-bold text-[#2D3748];
+}
+
+.mobile-tab-label {
+  @apply text-xs font-medium;
+}
+
+.mobile-card-title {
+  @apply text-lg font-semibold;
+}
+
+.mobile-body-text {
+  @apply text-base font-normal;
+}
+
+/* Mobile Layout Classes */
+.mobile-safe-area {
+  padding-top: var(--mobile-safe-area-top);
+  padding-bottom: var(--mobile-safe-area-bottom);
+}
+
+.mobile-content-area {
+  padding-top: var(--mobile-header-height);
+  padding-bottom: var(--mobile-bottom-nav-height);
+  min-height: 100vh;
+}
+
+.mobile-touch-target {
+  min-height: var(--mobile-touch-target);
+  min-width: var(--mobile-touch-target);
+  padding: var(--mobile-touch-padding);
+}
