@@ -1,217 +1,183 @@
-'use client'
-import { useState, useEffect, useCallback } from 'react';
-import { pushNotificationService, type PushSubscriptionData, type NotificationSettings } from '@/lib/services/pushNotifications';
-import { api } from '@/lib/api';
+'use client';
 
-export interface UsePushNotificationsReturn {
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { PushNotificationService, PushNotificationData } from '@/lib/services/pushNotifications';
+
+interface PushNotificationState {
   isSupported: boolean;
   permission: NotificationPermission;
   isSubscribed: boolean;
-  subscription: PushSubscriptionData | null;
+  subscription: PushSubscription | null;
   isLoading: boolean;
   error: string | null;
-  
-  // Actions
-  requestPermission: () => Promise<boolean>;
-  subscribe: () => Promise<boolean>;
-  unsubscribe: () => Promise<boolean>;
-  testNotification: () => Promise<void>;
-  updateSettings: (settings: Partial<NotificationSettings>) => Promise<void>;
 }
 
-export function usePushNotifications(): UsePushNotificationsReturn {
-  const [isSupported, setIsSupported] = useState(false);
-  const [permission, setPermission] = useState<NotificationPermission>('default');
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [subscription, setSubscription] = useState<PushSubscriptionData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function usePushNotifications() {
+  const { user } = useAuth();
+  const [state, setState] = useState<PushNotificationState>({
+    isSupported: false,
+    permission: 'default',
+    isSubscribed: false,
+    subscription: null,
+    isLoading: true,
+    error: null
+  });
 
-  // API mutations
-  const updateSettingsMutation = api.notifications.updateSettings.useMutation();
+  const [service] = useState(() => new PushNotificationService());
 
-  // Check initial state
+  // Initialize push notification state
   useEffect(() => {
     const initializePushNotifications = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
+        setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-        // Check support
-        const supported = pushNotificationService.isPushSupported();
-        setIsSupported(supported);
+        const isSupported = service.isSupported();
+        const permission = Notification.permission;
+        
+        let subscription = null;
+        let isSubscribed = false;
 
-        if (!supported) {
-          setIsLoading(false);
-          return;
+        if (isSupported && permission === 'granted') {
+          subscription = await service.getSubscription();
+          isSubscribed = !!subscription;
         }
 
-        // Get current permission
-        const currentPermission = pushNotificationService.getPermissionStatus();
-        setPermission(currentPermission);
-
-        // Initialize service worker
-        await pushNotificationService.initializeServiceWorker();
-
-        // Check existing subscription
-        const currentSubscription = await pushNotificationService.getCurrentSubscription();
-        setSubscription(currentSubscription);
-        setIsSubscribed(!!currentSubscription);
-
-        // Setup message listener for service worker communication
-        pushNotificationService.setupMessageListener();
-
-      } catch (err) {
-        console.error('Failed to initialize push notifications:', err);
-        setError(err instanceof Error ? err.message : 'Failed to initialize push notifications');
-      } finally {
-        setIsLoading(false);
+        setState(prev => ({
+          ...prev,
+          isSupported,
+          permission,
+          isSubscribed,
+          subscription,
+          isLoading: false
+        }));
+      } catch (error) {
+        console.error('Failed to initialize push notifications:', error);
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: 'Failed to initialize push notifications'
+        }));
       }
     };
 
     initializePushNotifications();
-  }, []);
-
-  // Request notification permission
-  const requestPermission = useCallback(async (): Promise<boolean> => {
-    try {
-      setError(null);
-      setIsLoading(true);
-
-      if (!isSupported) {
-        throw new Error('Push notifications are not supported in this browser');
-      }
-
-      const granted = await pushNotificationService.requestPermission();
-      setPermission(granted);
-
-      return granted === 'granted';
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to request permission';
-      setError(errorMessage);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isSupported]);
+  }, [service]);
 
   // Subscribe to push notifications
-  const subscribe = useCallback(async (): Promise<boolean> => {
-    try {
-      setError(null);
-      setIsLoading(true);
-
-      if (!isSupported) {
-        throw new Error('Push notifications are not supported');
-      }
-
-      // For demo purposes, using a placeholder VAPID key
-      // In production, this should come from your environment variables
-      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'demo-key';
-      
-      if (vapidPublicKey === 'demo-key') {
-        console.warn('Using demo VAPID key. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY in production.');
-      }
-
-      const pushSubscription = await pushNotificationService.subscribeToPush(vapidPublicKey);
-      setSubscription(pushSubscription);
-      setIsSubscribed(true);
-
-      // Update settings in the backend
-      await updateSettingsMutation.mutateAsync({
-        pushEnabled: true,
-        pushSubscription: pushSubscription as any,
-      });
-
-      // Register for background sync
-      await pushNotificationService.registerBackgroundSync();
-
-      return true;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to subscribe to push notifications';
-      setError(errorMessage);
-      return false;
-    } finally {
-      setIsLoading(false);
+  const subscribe = useCallback(async () => {
+    if (!user?.id) {
+      throw new Error('User not authenticated');
     }
-  }, [isSupported, updateSettingsMutation]);
+
+    try {
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+      const subscription = await service.subscribeToPush(user.id);
+      const permission = Notification.permission;
+
+      setState(prev => ({
+        ...prev,
+        permission,
+        isSubscribed: !!subscription,
+        subscription,
+        isLoading: false
+      }));
+
+      return subscription;
+    } catch (error) {
+      console.error('Failed to subscribe to push notifications:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to subscribe'
+      }));
+      throw error;
+    }
+  }, [user?.id, service]);
 
   // Unsubscribe from push notifications
-  const unsubscribe = useCallback(async (): Promise<boolean> => {
+  const unsubscribe = useCallback(async () => {
     try {
-      setError(null);
-      setIsLoading(true);
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-      const success = await pushNotificationService.unsubscribeFromPush();
-      
+      const success = await service.unsubscribe();
+
       if (success) {
-        setSubscription(null);
-        setIsSubscribed(false);
-
-        // Update settings in the backend
-        await updateSettingsMutation.mutateAsync({
-          pushEnabled: false,
-          pushSubscription: null,
-        });
+        setState(prev => ({
+          ...prev,
+          isSubscribed: false,
+          subscription: null,
+          isLoading: false
+        }));
+      } else {
+        throw new Error('Failed to unsubscribe');
       }
 
       return success;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to unsubscribe from push notifications';
-      setError(errorMessage);
-      return false;
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error('Failed to unsubscribe from push notifications:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to unsubscribe'
+      }));
+      throw error;
     }
-  }, [updateSettingsMutation]);
+  }, [service]);
 
-  // Test push notification
-  const testNotification = useCallback(async (): Promise<void> => {
+  // Request permission
+  const requestPermission = useCallback(async () => {
     try {
-      setError(null);
-      await pushNotificationService.testNotification(
-        'Isha Gramotsavam Test',
-        'This is a test notification to verify everything is working correctly!'
-      );
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to send test notification';
-      setError(errorMessage);
-      throw err;
-    }
-  }, []);
+      setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-  // Update notification settings
-  const updateSettings = useCallback(async (settings: Partial<NotificationSettings>): Promise<void> => {
-    try {
-      setError(null);
-      
-      // Update local service worker settings
-      await pushNotificationService.updateNotificationSettings(settings);
-      
-      // Update backend settings
-      await updateSettingsMutation.mutateAsync(settings);
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update notification settings';
-      setError(errorMessage);
-      throw err;
+      const permission = await service.requestPermission();
+
+      setState(prev => ({
+        ...prev,
+        permission,
+        isLoading: false
+      }));
+
+      return permission;
+    } catch (error) {
+      console.error('Failed to request notification permission:', error);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to request permission'
+      }));
+      throw error;
     }
-  }, [updateSettingsMutation]);
+  }, [service]);
+
+  // Show local notification
+  const showLocalNotification = useCallback(async (data: PushNotificationData) => {
+    try {
+      await service.showLocalNotification(data);
+    } catch (error) {
+      console.error('Failed to show local notification:', error);
+      throw error;
+    }
+  }, [service]);
+
+  // Check if notifications should be prompted
+  const shouldPromptForNotifications = useCallback(() => {
+    return (
+      state.isSupported &&
+      state.permission === 'default' &&
+      !state.isSubscribed &&
+      user?.role &&
+      ['captain', 'player'].includes(user.role)
+    );
+  }, [state.isSupported, state.permission, state.isSubscribed, user?.role]);
 
   return {
-    isSupported,
-    permission,
-    isSubscribed,
-    subscription,
-    isLoading,
-    error,
-    
-    requestPermission,
+    ...state,
     subscribe,
     unsubscribe,
-    testNotification,
-    updateSettings,
+    requestPermission,
+    showLocalNotification,
+    shouldPromptForNotifications
   };
 }
-
-export default usePushNotifications;
