@@ -14,13 +14,20 @@ export default function FixtureBracketPage() {
   const fixtureId = params.fixtureId as string;
   const venueId = params.venueId as string;
 
-  const { data: bracketData } = // TODO: Migrate to offline - api.volunteers.match.getFixtureBracket.useQuery({
-    fixtureId
-  });
+  // TODO: Migrate to offline - api.volunteers.match.getFixtureBracket.useQuery
+  const bracketData = { rounds: {} }; // Placeholder for offline implementation
 
-  const { data: fixture } = // TODO: Migrate to offline - api.volunteers.fixture.getFixtureDetails.useQuery({
-    fixtureId
-  });
+  // TODO: Migrate to offline - api.volunteers.fixture.getFixtureDetails.useQuery
+  const fixture = {
+    fixture: {
+      name: 'Loading...',
+      sport: { name: '' },
+      genderCategory: '',
+      level: '',
+      status: 'loading',
+      championTeamName: null
+    }
+  }; // Placeholder for offline implementation
 
   if (!bracketData || !fixture) {
     return <div>Loading...</div>;

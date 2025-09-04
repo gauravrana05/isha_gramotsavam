@@ -47,7 +47,7 @@ interface SportGroup {
 }
 
 function VolunteerFixturesPage() {
-  console.log('🎭 [FixturesPage] Component render started', { timestamp: new Date().toISOString() });
+  // console.log('🎭 [FixturesPage] Component render started', { timestamp: new Date().toISOString() });
   
   const params = useParams();
   const router = useRouter();
@@ -55,7 +55,9 @@ function VolunteerFixturesPage() {
   const { user } = useAuth();
   const { t } = useTranslation();
   
-  console.log('📍 [FixturesPage] Params and user:', { venueId, lang, userId: user?.id });
+  // console.log('📍 [FixturesPage] Params and user:', { venueId, lang, userId: user?.id });
+
+  // Removed render tracking debug code to prevent interference
 
   // Get venue tournament data from offline storage
   const { 
@@ -72,97 +74,50 @@ function VolunteerFixturesPage() {
     error: teamsError 
   } = useOfflineTeams(venueId);
   
-  console.log('🎯 [FixturesPage] Hook results:', { 
-    hasVenueData: !!venueData, 
-    loading, 
-    teamsLoading,
-    hasError: !!error,
-    teamsCount: teamsData?.length || 0,
-    timestamp: new Date().toISOString()
-  });
+  // console.log('🎯 [FixturesPage] Hook results:', { 
+  //   hasVenueData: !!venueData, 
+  //   loading, 
+  //   teamsLoading,
+  //   hasError: !!error,
+  //   hasTeamsError: !!teamsError,
+  //   teamsCount: teamsData?.length || 0,
+  //   timestamp: new Date().toISOString()
+  // });
 
-  // Stabilize refetch functions to prevent dependency loops
-  const stableRefetch = React.useCallback(() => {
+  // Simplified refetch - no polling to avoid cascade issues
+  // Tournament data is mostly static, so manual refresh is sufficient
+  const handleRefresh = React.useCallback(() => {
     refetch();
-  }, [refetch]);
-  
-  const stableTeamsRefetch = React.useCallback(() => {
-    // Only refetch teams if they exist in useOfflineTeams hook
-    // This prevents calling non-existent refetch functions
   }, []);
-
-  // Add controlled polling only for active tournaments with stable reference
-  React.useEffect(() => {
-    if (!venueData?.tournament || venueData.tournament.status !== 'in_progress') return;
-
-    const interval = setInterval(() => {
-      stableRefetch();
-    }, 30000); // Poll every 30 seconds during active tournaments only
-
-    return () => clearInterval(interval);
-  }, [venueData?.tournament?.status, stableRefetch]);
 
   // FIXED: Remove all problematic memoizations - use direct data access
   const tournament = venueData?.tournament || venueData?.fixtures?.[0] || null;
   
   // Stabilize teams data to prevent unnecessary recalculations  
-  const stableTeamsData = React.useMemo(() => teamsData || [], [teamsData]);
+  const stableTeamsData = teamsData || [];
   
-  // FIXED: Use stable data and proper dependencies
-  const teamsBySport = React.useMemo(() => {
-    // If we have pre-grouped data, use it (prioritize offline storage data)
-    if (venueData?.teamsBySport) {
-      return venueData.teamsBySport;
-    }
-    
-    // Otherwise, group teams by sport from stable teams data  
-    if (stableTeamsData.length > 0) {
-      const grouped = stableTeamsData.reduce((acc: SportGroup[], team: any) => {
-        const sportName = team.sport?.name || 'Unknown Sport';
-        const genderCategory = team.genderCategory || 'mixed';
-        
-        let sportGroup = acc.find(g => g.sportName === sportName && g.genderCategory === genderCategory);
-        
-        if (!sportGroup) {
-          sportGroup = {
-            sportId: team.sport?.id || 'unknown',
-            sportName,
-            genderCategory,
-            teams: []
-          };
-          acc.push(sportGroup);
-        }
-        
-        sportGroup.teams.push(team);
-        return acc;
-      }, []);
-      
-      return grouped;
-    }
-    
-    return [];
-  }, [venueData?.teamsBySport, stableTeamsData]);
+  // FIXED: Simplify teamsBySport - remove useMemo to prevent dependency issues
+  const teamsBySport = venueData?.teamsBySport || [];
   
-  const stats = React.useMemo(() => {
-    // Calculate stats from actual teams data (same pattern as dashboard)
-    const totalTeams = teamsData?.length || 0;
-    const checkedInTeams = teamsData?.filter(team => team.status === 'checked_in').length || 0;
-    
-    // Calculate matches stats from fixtures if available
-    const fixtures = venueData?.fixtures || [];
-    const totalMatches = fixtures.reduce((sum: number, fixture: any) => sum + (fixture.matches?.length || 0), 0);
-    const completedMatches = fixtures.reduce((sum: number, fixture: any) => 
-      sum + (fixture.matches?.filter((m: any) => m.status === 'completed').length || 0), 0);
-    
-    const progress = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0;
-    
-    return {
-      totalTeams,
-      matchesCompleted: completedMatches,
-      matchesTotal: totalMatches,
-      progress
-    };
-  }, [teamsData?.length, venueData?.fixtures?.length]); // FIXED: Only depend on lengths
+  // FIXED: Simplify stats calculation - remove useMemo to prevent dependency issues
+  const totalTeams = stableTeamsData.length;
+  const checkedInTeams = stableTeamsData.filter(team => team.status === 'checked_in').length;
+  
+  // Calculate matches stats from fixtures if available
+  const fixtures = venueData?.fixtures || [];
+  const totalMatches = fixtures.reduce((sum: number, fixture: any) => sum + (fixture.matches?.length || 0), 0);
+  const completedMatches = fixtures.reduce((sum: number, fixture: any) => 
+    sum + (fixture.matches?.filter((m: any) => m.status === 'completed').length || 0), 0);
+  
+  const progress = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0;
+  
+  const stats = {
+    totalTeams,
+    checkedInTeams, // Added this back since we're calculating it
+    matchesCompleted: completedMatches,
+    matchesTotal: totalMatches,
+    progress
+  };
 
   // Helper functions
   const getStatusColor = (status: string) => {
@@ -185,26 +140,33 @@ function VolunteerFixturesPage() {
     }
   };
 
-  // Content loading state (keeps sidebar visible) - only check data loading, not auth
-  // Add timeout to prevent infinite loading
+  // Simplified loading logic - prioritize teams data since that's most critical
   const [loadingTimeout, setLoadingTimeout] = React.useState(false);
   
   React.useEffect(() => {
-    // Reset timeout when loading states change
-    if (!loading && !teamsLoading) {
+    // Reset timeout when teams finish loading
+    if (!teamsLoading) {
       setLoadingTimeout(false);
       return;
     }
     
     const timer = setTimeout(() => {
       setLoadingTimeout(true);
-    }, 5000); // 5 second timeout
+    }, 3000); // 3 second timeout for teams only
     
     return () => clearTimeout(timer);
-  }, [loading, teamsLoading]);
+  }, [teamsLoading]);
   
-  // Show loading only if both hooks are loading and timeout hasn't occurred
-  const isActuallyLoading = (loading || teamsLoading) && !loadingTimeout;
+  // Show loading only if teams are loading (venue data is secondary)
+  const isActuallyLoading = teamsLoading && !loadingTimeout;
+  
+  // console.log('🎯 [FixturesPage] Detailed loading state:', {
+  //   'useOfflineVenueData.loading': loading,
+  //   'useOfflineTeams.loading': teamsLoading,
+  //   'loadingTimeout': loadingTimeout,
+  //   'isActuallyLoading': isActuallyLoading,
+  //   'willShowLoadingScreen': isActuallyLoading
+  // });
   
   if (isActuallyLoading) {
     return (
@@ -259,7 +221,7 @@ function VolunteerFixturesPage() {
           <h1 className="text-2xl font-bold text-red-600 mb-4">Error Loading Tournament</h1>
           <p className="text-gray-600 mb-6">{error.message}</p>
           <button 
-            onClick={() => refetch()}
+            onClick={handleRefresh}
             className="bg-[#F28C38] text-white px-6 py-2 rounded-lg hover:bg-[#E67A26] transition-colors flex items-center gap-2 mx-auto"
           >
             <RefreshCw className="w-4 h-4" />
@@ -294,7 +256,7 @@ function VolunteerFixturesPage() {
                 </div>
               )}
               <button
-                onClick={() => refetch()}
+                onClick={handleRefresh}
                 className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-50 transition-colors border"
               >
                 <RefreshCw className="w-4 h-4" />

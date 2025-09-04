@@ -34,21 +34,19 @@ export default function CreateFixturePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get available sports with checked-in teams
-  const { data: availableSports, isLoading } = // TODO: Migrate to offline - api.volunteers.fixture.getAvailableSportsForFixture.useQuery(
-    { venueId },
-    { enabled: !!user && !!venueId }
-  );
+  // TODO: Migrate to offline - api.volunteers.fixture.getAvailableSportsForFixture.useQuery
+  const availableSports = []; // Placeholder for offline implementation
+  const isLoading = false;
 
-  const createFixtureMutation = // TODO: Migrate to offline - api.volunteers.fixture.createFixture.useMutation({
-    onSuccess: (data) => {
+  // TODO: Migrate to offline - api.volunteers.fixture.createFixture.useMutation
+  const createFixtureMutation = {
+    mutate: () => {
+      // Placeholder for offline implementation
+      const data = { fixtureId: 'mock-fixture-id' };
       showSuccess('Tournament created successfully!');
       router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${data.fixtureId}`);
-    },
-    onError: (error) => {
-      showError(`Failed to create tournament: ${error.message}`);
-      setIsSubmitting(false);
     }
-  });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

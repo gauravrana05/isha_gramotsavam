@@ -10,7 +10,7 @@ export function useNotifications() {
 
   // Fetch user notifications
   const { 
-    data: notifications = [], 
+    data: notificationData, 
     isLoading,
     refetch 
   } = api.notifications.getUserNotifications.useQuery(
@@ -20,6 +20,14 @@ export function useNotifications() {
       refetchInterval: 30000 // Refetch every 30 seconds
     }
   );
+
+  // Extract notifications array from API response (handle both old and new format)
+  const notifications = Array.isArray(notificationData) 
+    ? notificationData 
+    : (notificationData?.notifications || []);
+
+  // Calculate unread count (use API count if available, otherwise calculate)
+  const unreadCount = notificationData?.unreadCount ?? notifications.filter(n => !n.read).length;
 
   // Mark notification as read mutation
   const markAsReadMutation = api.notifications.markAsRead.useMutation({
@@ -35,8 +43,10 @@ export function useNotifications() {
     }
   });
 
-  // Calculate unread count
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // Close notification panel
+  const closePanel = () => {
+    setShowPanel(false);
+  };
 
   // Handle notification click
   const handleNotificationClick = (notification: any) => {
@@ -69,11 +79,6 @@ export function useNotifications() {
     setShowPanel(!showPanel);
   };
 
-  // Close notification panel
-  const closePanel = () => {
-    setShowPanel(false);
-  };
-
   return {
     notifications,
     unreadCount,
@@ -84,7 +89,7 @@ export function useNotifications() {
     handleNotificationClick,
     handleMarkAsRead,
     handleMarkAllAsRead,
-    isMarkingAsRead: markAsReadMutation.isLoading,
-    isMarkingAllAsRead: markAllAsReadMutation.isLoading
+    isMarkingAsRead: markAsReadMutation.isPending,
+    isMarkingAllAsRead: markAllAsReadMutation.isPending
   };
 }

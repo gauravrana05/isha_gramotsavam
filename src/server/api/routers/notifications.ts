@@ -145,6 +145,97 @@ export const notificationsRouter = createTRPCRouter({
       });
     }),
 
+  // Get user notifications (alias for getAll for compatibility)
+  getUserNotifications: protectedProcedure
+    .input(z.object({
+      userId: z.string().uuid().optional(),
+      limit: z.number().min(1).max(100).default(20),
+      offset: z.number().min(0).default(0),
+      unreadOnly: z.boolean().default(false)
+    }).optional().default({}))
+    .query(async ({ ctx, input }) => {
+      // Use current user's ID if not provided or if not admin
+      const targetUserId = (ctx.user.role === 'admin' && input.userId) ? input.userId : ctx.user.id;
+
+      const notifications = await ctx.db.notification.findMany({
+        where: {
+          userId: targetUserId,
+          deletedAt: null,
+          ...(input.unreadOnly ? { read: false } : {})
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: input.limit,
+        skip: input.offset,
+      });
+
+      const unreadCount = await ctx.db.notification.count({
+        where: {
+          userId: targetUserId,
+          read: false,
+          deletedAt: null,
+        },
+      });
+
+      return {
+        notifications,
+        unreadCount,
+        hasMore: notifications.length === input.limit
+      };
+    }),
+
+  // Mark notification as read
+  markAsRead: protectedProcedure
+    .input(z.object({
+      notificationId: z.string().uuid()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const notification = await ctx.db.notification.findFirst({
+        where: {
+          id: input.notificationId,
+          userId: ctx.user.id,
+          deletedAt: null,
+        },
+      });
+
+      if (!notification) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Notification not found',
+        });
+      }
+
+      return await ctx.db.notification.update({
+        where: { id: input.notificationId },
+        data: { 
+          read: true,
+          readAt: new Date()
+        },
+      });
+    }),
+
+  // Mark all notifications as read
+  markAllAsRead: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const result = await ctx.db.notification.updateMany({
+        where: {
+          userId: ctx.user.id,
+          read: false,
+          deletedAt: null,
+        },
+        data: { 
+          read: true,
+          readAt: new Date()
+        },
+      });
+
+      return {
+        success: true,
+        updatedCount: result.count
+      };
+    }),
+
   // Get notifications by venue for volunteers
   getByVenue: protectedProcedure
     .input(z.object({

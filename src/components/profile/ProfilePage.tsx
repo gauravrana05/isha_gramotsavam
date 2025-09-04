@@ -1,30 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { User, Edit, Camera, Phone, Mail, MapPin, Calendar, Shield, Crown, Users, Save, X } from 'lucide-react';
+import { User, Camera, Phone, Mail, MapPin, Calendar, Shield, Crown, Users, Globe, CreditCard } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useMobileDetection } from '@/hooks/useMobileDetection';
+import { api } from '@/server/trpc/react';
+import { DocumentUpload } from '@/components/documents';
 
 export function ProfilePage() {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { isMobile } = useMobileDetection();
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    phone: user?.phone || '',
-    whatsappNumber: user?.whatsappNumber || '',
-    email: user?.email || '',
-    dateOfBirth: user?.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
-    gender: user?.gender || '',
-    panchayat: user?.panchayat || '',
-    taluk: user?.taluk || '',
-    district: user?.district || '',
-    state: user?.state || '',
-    pincode: user?.pincode || ''
-  });
+  const [error, setError] = useState('');
 
-  if (!user) {
+  // Fetch profile data with documents
+  const { data: profileData, refetch } = api.profile.checkCompletion.useQuery(
+    { userId: user?.id || '' },
+    { 
+      enabled: !!user?.id,
+      staleTime: 2 * 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+    }
+  );
+
+  if (!user || !userProfile) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-gray-500">Please log in to view your profile</p>
@@ -58,23 +56,6 @@ export function ProfilePage() {
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleSave = async () => {
-    try {
-      console.log('Saving profile data:', formData);
-      // TODO: Implement profile update API call
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error saving profile:', error);
-    }
-  };
-
   const CardComponent = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => {
     if (isMobile) {
       return (
@@ -90,96 +71,34 @@ export function ProfilePage() {
     );
   };
 
-  const ButtonComponent = ({ 
-    children, 
-    onClick, 
-    variant = 'primary', 
-    className = '' 
-  }: { 
-    children: React.ReactNode; 
-    onClick: () => void; 
-    variant?: 'primary' | 'secondary';
-    className?: string;
-  }) => {
-    const baseClasses = isMobile 
-      ? 'w-full py-3 px-4 rounded-lg font-medium text-sm transition-colors'
-      : 'px-6 py-2 rounded-lg font-medium text-sm transition-colors';
-    
-    const variantClasses = variant === 'primary'
-      ? 'bg-[#2C5282] text-white hover:bg-[#2D3748]'
-      : 'bg-gray-100 text-gray-700 hover:bg-gray-200';
-
-    return (
-      <button
-        onClick={onClick}
-        className={`${baseClasses} ${variantClasses} ${className}`}
-      >
-        {children}
-      </button>
-    );
-  };
-
-  const InputComponent = ({ 
-    label, 
-    value, 
-    onChange, 
-    type = 'text',
-    className = ''
-  }: { 
-    label: string; 
-    value: string; 
-    onChange: (value: string) => void; 
-    type?: string;
-    className?: string;
-  }) => (
-    <div className={className}>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-      </label>
-      {type === 'select' ? (
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Select Gender</option>
-          <option value="M">Male</option>
-          <option value="F">Female</option>
-          <option value="O">Other</option>
-        </select>
-      ) : (
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      )}
-    </div>
-  );
+  const phoneNumber = user?.phone?.replace(/^\+91/, '') || '';
+  const whatsappNumber = userProfile?.whatsappNumber?.replace(/^\+91/, '') || '';
 
   return (
     <div className={`${isMobile ? 'space-y-4' : 'max-w-4xl mx-auto space-y-6'}`}>
-      {/* Profile Header */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Profile Header with Photo */}
       <CardComponent>
         <div className={`${isMobile ? 'text-center' : 'flex items-center space-x-6'}`}>
           {/* Profile Image */}
-          <div className={`relative ${isMobile ? 'inline-block mb-4' : 'flex-shrink-0'}`}>
-            {user.profileImages?.profilePhotoPath ? (
-              <img
-                src={user.profileImages.profilePhotoPath}
-                alt="Profile"
-                className={`${isMobile ? 'w-24 h-24' : 'w-32 h-32'} rounded-full object-cover ${isMobile ? 'mx-auto border-4 border-white shadow-lg' : 'border-4 border-gray-200'}`}
-              />
-            ) : (
-              <div className={`${isMobile ? 'w-24 h-24' : 'w-32 h-32'} rounded-full bg-gray-200 flex items-center justify-center ${isMobile ? 'mx-auto border-4 border-white shadow-lg' : 'border-4 border-gray-200'}`}>
-                <User size={isMobile ? 32 : 48} className="text-gray-600" />
-              </div>
-            )}
-            
-            <button className={`absolute bottom-0 right-0 ${isMobile ? 'w-8 h-8' : 'w-10 h-10'} bg-[#2C5282] rounded-full flex items-center justify-center shadow-lg`}>
-              <Camera size={isMobile ? 16 : 20} className="text-white" />
-            </button>
+          <div className={`${isMobile ? 'inline-block mb-4' : 'flex-shrink-0'}`}>
+            <DocumentUpload
+              type="profilePhoto"
+              label="Profile Photo"
+              currentUrl={profileData?.userProfileImages?.profilePhotoPath}
+              variant="profile"
+              className="flex flex-col justify-center items-center"
+              onSuccess={async () => {
+                setError("");
+                await refetch();
+              }}
+              onError={(error) => setError(error)}
+            />
           </div>
 
           {/* Name and Role */}
@@ -192,181 +111,227 @@ export function ProfilePage() {
               {getRoleIcon()}
               <span className="ml-2 capitalize">{user.role}</span>
             </div>
-
-            {!isMobile && (
-              <div className="mt-4">
-                <ButtonComponent
-                  onClick={() => setIsEditing(!isEditing)}
-                  variant="secondary"
-                >
-                  <Edit size={16} className="mr-2" />
-                  {isEditing ? 'Cancel Edit' : 'Edit Profile'}
-                </ButtonComponent>
-              </div>
-            )}
           </div>
         </div>
       </CardComponent>
 
-      {/* Edit Mode */}
-      {isEditing && (
-        <CardComponent>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold`}>Edit Profile</h3>
-            {!isMobile && (
-              <button
-                onClick={() => setIsEditing(false)}
-                className="p-2 text-gray-500 hover:text-gray-700"
-              >
-                <X size={20} />
-              </button>
-            )}
+      {/* Personal Details */}
+      <CardComponent>
+        <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold mb-4`}>Personal Details</h3>
+        
+        <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-2 gap-6'}`}>
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-1">First Name</p>
+            <p className="text-gray-900">{user.firstName || 'Not Available'}</p>
           </div>
-
-          <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-2 gap-6'}`}>
-            <InputComponent
-              label="First Name"
-              value={formData.firstName}
-              onChange={(value) => handleInputChange('firstName', value)}
-            />
-            
-            <InputComponent
-              label="Last Name"
-              value={formData.lastName}
-              onChange={(value) => handleInputChange('lastName', value)}
-            />
-            
-            <InputComponent
-              label="Phone Number"
-              value={formData.phone}
-              onChange={(value) => handleInputChange('phone', value)}
-              type="tel"
-            />
-            
-            <InputComponent
-              label="WhatsApp Number"
-              value={formData.whatsappNumber}
-              onChange={(value) => handleInputChange('whatsappNumber', value)}
-              type="tel"
-            />
-            
-            <InputComponent
-              label="Email"
-              value={formData.email}
-              onChange={(value) => handleInputChange('email', value)}
-              type="email"
-            />
-            
-            <InputComponent
-              label="Date of Birth"
-              value={formData.dateOfBirth}
-              onChange={(value) => handleInputChange('dateOfBirth', value)}
-              type="date"
-            />
-            
-            <InputComponent
-              label="Gender"
-              value={formData.gender}
-              onChange={(value) => handleInputChange('gender', value)}
-              type="select"
-            />
-            
-            <InputComponent
-              label="Panchayat"
-              value={formData.panchayat}
-              onChange={(value) => handleInputChange('panchayat', value)}
-            />
-            
-            <InputComponent
-              label="Taluk"
-              value={formData.taluk}
-              onChange={(value) => handleInputChange('taluk', value)}
-            />
-            
-            <InputComponent
-              label="District"
-              value={formData.district}
-              onChange={(value) => handleInputChange('district', value)}
-            />
-            
-            <InputComponent
-              label="State"
-              value={formData.state}
-              onChange={(value) => handleInputChange('state', value)}
-            />
-            
-            <InputComponent
-              label="Pincode"
-              value={formData.pincode}
-              onChange={(value) => handleInputChange('pincode', value)}
-            />
+          
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-1">Last Name</p>
+            <p className="text-gray-900">{user.lastName || 'Not Available'}</p>
           </div>
-
-          <div className={`${isMobile ? 'mt-6 space-y-3' : 'mt-6 flex justify-end space-x-3'}`}>
-            <ButtonComponent
-              onClick={() => setIsEditing(false)}
-              variant="secondary"
-            >
-              Cancel
-            </ButtonComponent>
-            
-            <ButtonComponent
-              onClick={handleSave}
-              variant="primary"
-            >
-              <Save size={16} className="mr-2" />
-              Save Changes
-            </ButtonComponent>
+          
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-1">Date of Birth</p>
+            <p className="text-gray-900">
+              {userProfile.dateOfBirth ? new Date(userProfile.dateOfBirth).toLocaleDateString() : 'Not Available'}
+            </p>
           </div>
-        </CardComponent>
-      )}
+          
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-1">Gender</p>
+            <p className="text-gray-900">
+              {userProfile.gender === 'M' ? 'Male' : 
+               userProfile.gender === 'F' ? 'Female' : 
+               userProfile.gender === 'O' ? 'Others' : 'Not Available'}
+            </p>
+          </div>
+          
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-1">Role</p>
+            <p className="text-gray-900 capitalize">{user.role}</p>
+          </div>
+          
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-1">Preferred Language</p>
+            <p className="text-gray-900">
+              {userProfile.languagePreference === 'en' ? 'English' :
+               userProfile.languagePreference === 'ta' ? 'Tamil' :
+               userProfile.languagePreference === 'hi' ? 'Hindi' :
+               userProfile.languagePreference === 'ml' ? 'Malayalam' :
+               userProfile.languagePreference === 'te' ? 'Telugu' :
+               userProfile.languagePreference === 'kn' ? 'Kannada' :
+               userProfile.languagePreference === 'or' ? 'Odia' : 'English'}
+            </p>
+          </div>
+        </div>
+      </CardComponent>
 
       {/* Contact Information */}
-      {!isEditing && (
-        <CardComponent>
-          <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold mb-4`}>Contact Information</h3>
-          
-          <div className={`${isMobile ? 'space-y-3' : 'grid grid-cols-2 gap-6'}`}>
-            <div className="flex items-center">
-              <Phone size={16} className="text-gray-500 mr-3" />
-              <div>
-                <p className="text-sm text-gray-600">Phone</p>
-                <p className="font-medium">{user.phone || 'Not provided'}</p>
-              </div>
+      <CardComponent>
+        <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold mb-4`}>Contact Information</h3>
+        
+        <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-2 gap-6'}`}>
+          <div className="flex items-center">
+            <Phone size={16} className="text-gray-500 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">Phone Number</p>
+              <p className="text-gray-900">+91 {phoneNumber || 'Not Available'}</p>
             </div>
-
-            <div className="flex items-center">
-              <Mail size={16} className="text-gray-500 mr-3" />
-              <div>
-                <p className="text-sm text-gray-600">Email</p>
-                <p className="font-medium">{user.email || 'Not provided'}</p>
-              </div>
-            </div>
-
-            {user.whatsappNumber && (
-              <div className="flex items-center">
-                <Phone size={16} className="text-green-500 mr-3" />
-                <div>
-                  <p className="text-sm text-gray-600">WhatsApp</p>
-                  <p className="font-medium">{user.whatsappNumber}</p>
-                </div>
-              </div>
-            )}
           </div>
-        </CardComponent>
-      )}
 
-      {/* Mobile Edit Button */}
-      {isMobile && !isEditing && (
-        <div className="space-y-3">
-          <ButtonComponent
-            onClick={() => setIsEditing(true)}
-            variant="primary"
-          >
-            Edit Profile
-          </ButtonComponent>
+          <div className="flex items-center">
+            <Phone size={16} className="text-green-500 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">WhatsApp Number</p>
+              <p className="text-gray-900">+91 {whatsappNumber || phoneNumber || 'Not Available'}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <Mail size={16} className="text-gray-500 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">Email</p>
+              <p className="text-gray-900">{user.email || 'Not Available'}</p>
+            </div>
+          </div>
+
+          {userProfile.instagramHandle && (
+            <div className="flex items-center">
+              <Globe size={16} className="text-purple-500 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">Instagram</p>
+                <p className="text-gray-900">{userProfile.instagramHandle}</p>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </CardComponent>
+
+      {/* Address Information */}
+      <CardComponent>
+        <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold mb-4`}>Address Details</h3>
+        
+        {userProfile.pincode ? (
+          <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-2 gap-6'}`}>
+            <div className="flex items-start">
+              <MapPin size={16} className="text-gray-500 mr-3 mt-1" />
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">Pincode</p>
+                <p className="text-gray-900">{userProfile.pincode}</p>
+              </div>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">State</p>
+              <p className="text-gray-900">{userProfile.state || 'Not Available'}</p>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">District</p>
+              <p className="text-gray-900">{userProfile.district || 'Not Available'}</p>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">Taluk</p>
+              <p className="text-gray-900">{userProfile.taluk || 'Not Available'}</p>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">Panchayat</p>
+              <p className="text-gray-900">{userProfile.panchayat || 'Not Available'}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No address information available</p>
+          </div>
+        )}
+      </CardComponent>
+
+      {/* Identity Verification */}
+      <CardComponent>
+        <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold mb-4`}>Identity Verification</h3>
+        
+        <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-2 gap-6'}`}>
+          {/* Aadhaar Front */}
+          <div>
+            <div className="flex items-center mb-2">
+              <CreditCard size={16} className="text-gray-500 mr-2" />
+              <p className="text-sm font-medium text-gray-700">Aadhaar Card Front</p>
+            </div>
+            <DocumentUpload
+              type="aadhaarFront"
+              label="Aadhaar Front"
+              currentUrl={profileData?.userProfileImages?.aadhaarFrontPath}
+              variant="card"
+              className="w-full"
+              onSuccess={async () => {
+                setError("");
+                await refetch();
+              }}
+              onError={(error) => setError(error)}
+            />
+          </div>
+
+          {/* Aadhaar Back */}
+          <div>
+            <div className="flex items-center mb-2">
+              <CreditCard size={16} className="text-gray-500 mr-2" />
+              <p className="text-sm font-medium text-gray-700">Aadhaar Card Back</p>
+            </div>
+            <DocumentUpload
+              type="aadhaarBack"
+              label="Aadhaar Back"
+              currentUrl={profileData?.userProfileImages?.aadhaarBackPath}
+              variant="card"
+              className="w-full"
+              onSuccess={async () => {
+                setError("");
+                await refetch();
+              }}
+              onError={(error) => setError(error)}
+            />
+          </div>
+        </div>
+      </CardComponent>
+
+      {/* Account Information */}
+      <CardComponent>
+        <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold mb-4`}>Account Information</h3>
+        
+        <div className={`${isMobile ? 'space-y-3' : 'grid grid-cols-2 gap-6'}`}>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Member since</span>
+            <span className="text-gray-900">
+              {new Date(user.createdAt).toLocaleDateString()}
+            </span>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Profile status</span>
+            <span className={`px-2 py-1 text-xs rounded-full ${
+              userProfile.profileComplete 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              {userProfile.profileComplete ? 'Complete' : 'Incomplete'}
+            </span>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">User ID</span>
+            <span className="text-gray-900 text-xs font-mono">{user.id.slice(0, 8)}...</span>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Last updated</span>
+            <span className="text-gray-900">
+              {userProfile.updatedAt ? new Date(userProfile.updatedAt).toLocaleDateString() : 'N/A'}
+            </span>
+          </div>
+        </div>
+      </CardComponent>
     </div>
   );
 }

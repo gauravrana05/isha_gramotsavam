@@ -1,27 +1,27 @@
 'use client';
 
-import { MobileLayout } from '@/components/mobile/MobileLayout';
-import { MobilePageWrapper } from '@/components/mobile/MobilePageWrapper';
+import { MobileHeader } from '@/components/mobile/MobileHeader';
 import { ProfilePage } from '@/components/profile/ProfilePage';
 import { useMobileDetection } from '@/hooks/useMobileDetection';
 
 export default function PlayerProfilePage() {
   const { isMobile } = useMobileDetection();
 
-  // Mobile version with mobile layout
+  // Mobile version with just header (no bottom nav)
   if (isMobile) {
     return (
-      <MobileLayout
-        currentTab="dashboard"
-        onTabChange={() => {}}
-        title="My Profile"
-        role="player"
-        showBackButton={true}
-      >
-        <MobilePageWrapper>
-          <ProfilePage />
-        </MobilePageWrapper>
-      </MobileLayout>
+      <div className="min-h-screen bg-[#F7FAFC] mobile-safe-area">
+        <MobileHeader
+          title="My Profile"
+          showBackButton={true}
+        />
+        
+        <main className="mobile-content-area overflow-auto">
+          <div className="px-4 py-6">
+            <ProfilePage />
+          </div>
+        </main>
+      </div>
     );
   }
 

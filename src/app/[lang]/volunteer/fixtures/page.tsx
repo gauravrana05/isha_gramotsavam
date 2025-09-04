@@ -19,17 +19,20 @@ export default function VolunteerFixturesPage() {
   const [selectedVenueId, setSelectedVenueId] = useState<string>('all');
 
   // Get user's venue assignments
-  const { data: userVenues } = // TODO: Migrate to offline - api.volunteers.venue.getVenueTeams.useQuery(undefined, {
-    enabled: !!user
-  });
+  // const { data: userVenues } = api.volunteers.venue.getVenueTeams.useQuery(undefined, {
+  //   enabled: !!user
+  // });
+  const userVenues = undefined; // TODO: Migrate to offline
 
   // Get all fixtures across user's assigned venues
-  const { data: allFixtures, isLoading: fixturesLoading } = // TODO: Migrate to offline - api.volunteers.fixture.getAllUserFixtures.useQuery(
-    undefined,
-    { 
-      enabled: !!user
-    }
-  );
+  // const { data: allFixtures, isLoading: fixturesLoading } = api.volunteers.fixture.getAllUserFixtures.useQuery(
+  //   undefined,
+  //   { 
+  //     enabled: !!user
+  //   }
+  // );
+  const allFixtures = undefined; // TODO: Migrate to offline
+  const fixturesLoading = false;
 
   useEffect(() => {
     if (authLoading) return;

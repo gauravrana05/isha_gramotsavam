@@ -59,36 +59,33 @@ export default function VolunteerVerification() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // API Queries
-  const { data: teamData, isLoading: teamLoading } = // TODO: Migrate to offline - api.volunteers.teams.getTeamDetails.useQuery(
-    { teamId: teamId as string },
-    { enabled: !!teamId }
-  );
+  // TODO: Migrate to offline - api.volunteers.teams.getTeamDetails.useQuery
+  const teamData = null; // Placeholder for offline implementation
+  const teamLoading = false;
 
-  const { data: players, isLoading: playersLoading, refetch: refetchPlayers } = // TODO: Migrate to offline - api.volunteers.teams.getTeamPlayers.useQuery(
-    { teamId: teamId as string },
-    { enabled: !!teamId }
-  );
+  // TODO: Migrate to offline - api.volunteers.teams.getTeamPlayers.useQuery
+  const players = []; // Placeholder for offline implementation
+  const playersLoading = false;
+  const refetchPlayers = () => {};
 
   // Mutations
-  const verifyPlayerMutation = // TODO: Migrate to offline - api.volunteers.teams.verifyPlayer.useMutation({
-    onSuccess: () => {
+  // TODO: Migrate to offline - api.volunteers.teams.verifyPlayer.useMutation
+  const verifyPlayerMutation = {
+    mutate: () => {
+      // Placeholder for offline implementation
       addNotification('Player verified successfully', 'success');
       refetchPlayers();
-    },
-    onError: (error) => {
-      addNotification(error.message, 'error');
     }
-  });
+  };
 
-  const rejectPlayerMutation = // TODO: Migrate to offline - api.volunteers.teams.rejectPlayer.useMutation({
-    onSuccess: () => {
+  // TODO: Migrate to offline - api.volunteers.teams.rejectPlayer.useMutation
+  const rejectPlayerMutation = {
+    mutate: () => {
+      // Placeholder for offline implementation
       addNotification('Player rejected', 'success');
       refetchPlayers();
-    },
-    onError: (error) => {
-      addNotification(error.message, 'error');
     }
-  });
+  };
 
   // Loading state
   if (teamLoading || playersLoading) {

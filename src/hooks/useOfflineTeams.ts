@@ -2,12 +2,26 @@ import { useCallback, useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { getVolunteerService } from '@/lib/services/offline/volunteerService';
 import { api } from '@/server/trpc/react';
-
+import React from 'react';
 export function useOfflineTeams(venueId?: string) {
+  console.log('🏒 [useOfflineTeams] Hook called with venueId:', venueId);
+  
   const { user } = useAuth();
   const [teams, setTeams] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  
+  // Circuit breaker to prevent infinite loops
+  const loadAttempts = React.useRef(0);
+  const lastLoadTime = React.useRef(0);
+  
+  console.log('🏒 [useOfflineTeams] Current state:', {
+    venueId,
+    userId: user?.id,
+    isLoading,
+    teamsCount: teams.length,
+    loadAttempts: loadAttempts.current
+  });
 
   // Fallback to API when offline storage is empty
   const { data: apiTeams, refetch: refetchApiTeams } = api.volunteers.venue.getVenueTeams.useQuery(
@@ -19,12 +33,29 @@ export function useOfflineTeams(venueId?: string) {
   );
 
   const loadTeams = useCallback(async () => {
+    const now = Date.now();
+    
+    // Circuit breaker: prevent excessive loading attempts
+    if (loadAttempts.current > 5 && (now - lastLoadTime.current) < 5000) {
+      console.warn('🚨 [useOfflineTeams] Circuit breaker triggered - too many load attempts');
+      setIsLoading(false);
+      setError(new Error('Too many load attempts, circuit breaker activated'));
+      return;
+    }
+    
+    loadAttempts.current++;
+    lastLoadTime.current = now;
+    
+    console.log('🏒 [useOfflineTeams] loadTeams called:', { venueId, userId: user?.id, loadAttempt: loadAttempts.current });
+    
     if (!venueId || !user?.id) {
+      console.log('🏒 [useOfflineTeams] Missing venueId or userId, stopping');
       setIsLoading(false);
       return;
     }
 
     try {
+      console.log('🏒 [useOfflineTeams] Starting teams load');
       setIsLoading(true);
       setError(null);
       
@@ -33,74 +64,78 @@ export function useOfflineTeams(venueId?: string) {
       let teamsData = [];
       
       try {
+        console.log('🏒 [useOfflineTeams] Trying offline storage');
         const offlineTeams = await service.getTeamsForVenue(venueId, user.id);
         teamsData = offlineTeams.map(t => t.data || t);
+        console.log('🏒 [useOfflineTeams] Offline storage returned:', teamsData.length, 'teams');
         
         if (teamsData.length > 0) {
           setTeams(teamsData);
           console.log('✅ Using offline teams data:', teamsData.length, 'teams');
           // Don't return early - let finally block run
         } else {
-          // Try API fallback
-          if (apiTeams?.length) {
-            setTeams(apiTeams);
-            console.log('✅ Using API teams data with relations');
-            
-            // Cache API response for future offline use
-            try {
-              for (const team of apiTeams) {
-                await service.cacheTeamData(user.id, { ...team, venueId });
-              }
-              console.log('💾 Cached API teams data for offline use');
-            } catch (cacheError) {
-              console.warn('Failed to cache teams data:', cacheError);
-            }
-          } else {
-            // No data available
-            setTeams([]);
-            console.log('ℹ️ No teams data available');
-          }
+          console.log('🏒 [useOfflineTeams] No offline data, trying API fallback');
+          // No offline data - set empty for now, API fallback handled separately
+          console.log('🏒 [useOfflineTeams] No offline data, setting empty (API fallback separate)');
+          setTeams([]);
+          console.log('ℹ️ No offline teams data available');
         }
       } catch (offlineError) {
+        console.log('🏒 [useOfflineTeams] Offline storage error:', offlineError);
         console.log('📱 No offline teams data available');
         
-        // Fallback to API data when offline storage fails
-        if (apiTeams?.length) {
-          setTeams(apiTeams);
-          console.log('✅ Using API teams data (offline failed)');
-          
-          // Cache API response for future offline use
-          try {
-            for (const team of apiTeams) {
-              await service.cacheTeamData(user.id, { ...team, venueId });
-            }
-            console.log('💾 Cached API teams data for offline use');
-          } catch (cacheError) {
-            console.warn('Failed to cache teams data:', cacheError);
-          }
-        } else {
-          // No data available
-          setTeams([]);
-          console.log('ℹ️ No teams data available (offline failed, no API)');
-        }
+        // Offline storage failed - set empty, API fallback handled separately
+        setTeams([]);
+        console.log('ℹ️ No teams data available (offline failed)');
       }
       
     } catch (err) {
+      console.log('🏒 [useOfflineTeams] Load failed with error:', err);
       console.error('Failed to load teams:', err);
-      // Final fallback to API data on error
-      if (apiTeams?.length) {
-        setTeams(apiTeams);
-        console.log('✅ Using API teams data (error fallback)');
-      }
       setError(err as Error);
     } finally {
+      console.log('🏒 [useOfflineTeams] Setting isLoading to false');
       setIsLoading(false);
     }
-  }, [venueId, user?.id, apiTeams]);
+  }, [venueId, user?.id]);
 
+  // Initial load effect - stable dependencies to prevent loops
   useEffect(() => {
-    loadTeams();
-  }, [loadTeams]);
+    console.log('🏒 [useOfflineTeams] useEffect triggered:', { venueId, userId: user?.id, hasApiTeams: !!apiTeams?.length });
+    if (venueId && user?.id) {
+      console.log('🏒 [useOfflineTeams] Calling loadTeams');
+      loadTeams();
+    }
+  }, [venueId, user?.id]); // FIXED: Only stable dependencies, removed loadTeams
+
+  // Separate API fallback effect
+  useEffect(() => {
+    console.log('🏒 [useOfflineTeams] API fallback effect:', { hasApiTeams: !!apiTeams?.length, teamsCount: teams.length });
+    
+    // Only use API fallback if we have API data but no teams yet
+    if (apiTeams?.length && teams.length === 0) {
+      console.log('🏒 [useOfflineTeams] Using API fallback data:', apiTeams.length, 'teams');
+      setTeams(apiTeams);
+      setIsLoading(false);
+      
+      // Cache API response for future offline use
+      const cacheApiData = async () => {
+        try {
+          const service = getVolunteerService();
+          for (const team of apiTeams) {
+            await service.cacheTeamData(user?.id!, { ...team, venueId });
+          }
+          console.log('💾 Cached API teams data for offline use');
+        } catch (cacheError) {
+          console.warn('Failed to cache teams data:', cacheError);
+        }
+      };
+      
+      if (user?.id) {
+        cacheApiData();
+      }
+    }
+  }, [apiTeams]); // FIXED: Only depend on apiTeams array reference, not length
 
   const refetch = useCallback(async () => {
     await refetchApiTeams();

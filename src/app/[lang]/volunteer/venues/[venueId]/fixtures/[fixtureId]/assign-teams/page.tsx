@@ -36,28 +36,23 @@ export default function AssignTeamNumbersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get fixture details
-  const { data: fixture, isLoading } = // TODO: Migrate to offline - api.volunteers.fixture.getFixtureDetails.useQuery(
-    { fixtureId },
-    { enabled: !!user && !!fixtureId }
-  );
+  // TODO: Migrate to offline - api.volunteers.fixture.getFixtureDetails.useQuery
+  const fixture = null; // Placeholder for offline implementation
+  const isLoading = false;
 
   // Get teams for this fixture
-  const { data: teams } = // TODO: Migrate to offline - api.volunteers.venue.getVenueTeams.useQuery(
-    { venueId: venueId || '' },
-    { enabled: !!user && !!venueId && venueId.length > 0 }
-  );
+  // TODO: Migrate to offline - api.volunteers.venue.getVenueTeams.useQuery
+  const teams = []; // Placeholder for offline implementation
 
   // Assign team numbers mutation
-  const assignNumbers = // TODO: Migrate to offline - api.volunteers.fixture.assignTeamNumbers.useMutation({
-    onSuccess: () => {
+  // TODO: Migrate to offline - api.volunteers.fixture.assignTeamNumbers.useMutation
+  const assignNumbers = {
+    mutateAsync: async () => {
+      // Placeholder for offline implementation
       addNotification('Team numbers assigned successfully!', 'success');
       router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${fixtureId}`);
-    },
-    onError: (error) => {
-      addNotification(error.message, 'error');
-      setIsSubmitting(false);
     }
-  });
+  };
 
   useEffect(() => {
     if (teams && fixture) {

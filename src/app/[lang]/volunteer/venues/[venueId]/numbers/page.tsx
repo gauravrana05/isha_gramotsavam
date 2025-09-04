@@ -101,7 +101,7 @@ export default function TournamentNumbersPage() {
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedVenueMapping || !selectedSport || !selectedGender) {
       addNotification('Please select all filters', 'error');
       return;

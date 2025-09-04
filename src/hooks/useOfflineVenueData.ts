@@ -16,24 +16,36 @@ export interface VenueData {
  * Hook for managing venue data with offline-first approach and API fallback
  */
 export function useOfflineVenueData(venueId?: string) {
+  console.log('🔧 [useOfflineVenueData] Hook called with venueId:', venueId);
+  
   const { user } = useAuth();
   const [venueData, setVenueData] = useState<VenueData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
   const hasInitialized = React.useRef(false);
+  
+  // Circuit breaker to prevent infinite loops
+  const loadAttempts = React.useRef(0);
+  const lastLoadAttemptTime = React.useRef(0);
+
+  console.log('🔧 [useOfflineVenueData] Current state:', {
+    venueId,
+    userId: user?.id,
+    isLoading,
+    hasVenueData: !!venueData,
+    hasInitialized: hasInitialized.current,
+    lastFetchTime,
+    loadAttempts: loadAttempts.current
+  });
 
   // Stabilize userId to prevent infinite loops
-  const stableUserId = React.useMemo(() => user?.id, [user?.id]);
+  const stableUserId = React.useMemo(() => {
+    console.log('🔧 [useOfflineVenueData] stableUserId updated:', user?.id);
+    return user?.id;
+  }, [user?.id]);
 
-  // API fallback for teams
-  const { data: apiTeams } = api.volunteers.venue.getVenueTeams.useQuery(
-    { venueId: venueId! },
-    { 
-      enabled: !!venueId && !!user?.id,
-      retry: false 
-    }
-  );
+  // Removed teams API query - teams are now handled by useOfflineTeams hook
 
   // API fallback for fixtures
   const { data: apiFixtures } = api.volunteers.venue.getVenueFixtures.useQuery(
@@ -45,7 +57,23 @@ export function useOfflineVenueData(venueId?: string) {
   );
 
   const loadVenueData = useCallback(async (force = false) => {
+    const now = Date.now();
+    
+    // Circuit breaker: prevent excessive loading attempts
+    if (loadAttempts.current > 5 && (now - lastLoadAttemptTime.current) < 5000) {
+      console.warn('🚨 [useOfflineVenueData] Circuit breaker triggered - too many load attempts');
+      setIsLoading(false);
+      setError(new Error('Too many load attempts, circuit breaker activated'));
+      return;
+    }
+    
+    loadAttempts.current++;
+    lastLoadAttemptTime.current = now;
+    
+    console.log('🔧 [useOfflineVenueData] loadVenueData called:', { venueId, stableUserId, force, hasInitialized: hasInitialized.current, loadAttempt: loadAttempts.current });
+    
     if (!venueId || !stableUserId) {
+      console.log('🔧 [useOfflineVenueData] Missing venueId or userId, stopping');
       setIsLoading(false);
       return;
     }
@@ -55,66 +83,62 @@ export function useOfflineVenueData(venueId?: string) {
       const now = Date.now();
       const isDataFresh = venueData && lastFetchTime && (now - lastFetchTime) < 5 * 60 * 1000;
       
+      console.log('🔧 [useOfflineVenueData] Freshness check:', { hasVenueData: !!venueData, lastFetchTime, isDataFresh });
+      
       if (venueData && isDataFresh) {
+        console.log('🔧 [useOfflineVenueData] Data is fresh, skipping load');
         setIsLoading(false);
         return;
       }
     }
 
     try {
+      console.log('🔧 [useOfflineVenueData] Starting load process');
       setIsLoading(true);
       setError(null);
       
       const service = getVolunteerService();
+      console.log('🔧 [useOfflineVenueData] Got volunteer service');
       
-      // Try offline storage first
-      let venue, teams, fixtures;
+      // Try offline storage first (venue and fixtures only - teams handled separately)
+      let venue, fixtures;
       
       try {
-        [venue, teams, fixtures] = await Promise.all([
+        console.log('🔧 [useOfflineVenueData] Trying offline storage');
+        [venue, fixtures] = await Promise.all([
           service.getVenueDetails(venueId, stableUserId),
-          service.getTeamsForVenue(venueId, stableUserId),
           service.getVenueFixtures(venueId, stableUserId),
         ]);
+        console.log('🔧 [useOfflineVenueData] Offline storage result:', { venue: !!venue, fixtures: fixtures?.length });
       } catch (offlineError) {
+        console.log('🔧 [useOfflineVenueData] Offline storage failed:', offlineError);
         // Offline storage empty, will use API fallback
       }
 
-      // Use offline data if available
-      const teamsData = teams?.map(t => t.data || t) || [];
+      // Use offline data if available (no teams stats since teams handled separately)
       const fixturesData = fixtures?.map(f => f.data || f) || [];
       
-      if (teamsData.length > 0 || fixturesData.length > 0) {
-        const stats = {
-          totalTeams: teamsData.length,
-          checkedInTeams: teamsData.filter(t => t.status === 'checked_in').length,
-          totalFixtures: fixturesData.length,
-          completedFixtures: fixturesData.filter(f => f.status === 'completed').length,
-        };
+      const stats = {
+        totalFixtures: fixturesData.length,
+        completedFixtures: fixturesData.filter(f => f.status === 'completed').length,
+      };
 
-        setVenueData({
-          venue,
-          teams: teamsData,
-          fixtures: fixturesData,
-          matches: [],
-          stats,
-        });
-        setLastFetchTime(Date.now());
-        hasInitialized.current = true;
-      } else {
-        // No offline data - set empty data and let API fallback handle it
-        setVenueData({
-          venue: null,
-          teams: [],
-          fixtures: [],
-          matches: [],
-          stats: { totalTeams: 0, checkedInTeams: 0, totalFixtures: 0, completedFixtures: 0 }
-        });
-        setLastFetchTime(Date.now());
-        hasInitialized.current = true;
-      }
+      console.log('🔧 [useOfflineVenueData] Setting venue data:', { venue: !!venue, fixturesCount: fixturesData.length, stats });
+      
+      setVenueData({
+        venue,
+        teams: [], // Always empty - teams handled by useOfflineTeams
+        fixtures: fixturesData,
+        matches: [],
+        stats,
+      });
+      setLastFetchTime(Date.now());
+      hasInitialized.current = true;
+      
+      console.log('🔧 [useOfflineVenueData] Load completed successfully');
       
     } catch (err) {
+      console.log('🔧 [useOfflineVenueData] Load failed with error:', err);
       setError(err as Error);
       // Set empty data on error to prevent UI hanging
       setVenueData({
@@ -122,42 +146,50 @@ export function useOfflineVenueData(venueId?: string) {
         teams: [],
         fixtures: [],
         matches: [],
-        stats: { totalTeams: 0, checkedInTeams: 0, totalFixtures: 0, completedFixtures: 0 }
+        stats: { totalFixtures: 0, completedFixtures: 0 }
       });
       setLastFetchTime(Date.now());
       hasInitialized.current = true;
     } finally {
+      console.log('🔧 [useOfflineVenueData] Setting isLoading to false');
       setIsLoading(false);
     }
   }, [venueId, stableUserId]);
 
-  // Initial load effect - only runs once when dependencies change
+  // Initial load effect - stable dependencies to prevent loops
   useEffect(() => {
-    if (!hasInitialized.current) {
+    console.log('🔧 [useOfflineVenueData] Initial load effect triggered:', { hasInitialized: hasInitialized.current, venueId, stableUserId });
+    if (!hasInitialized.current && venueId && stableUserId) {
+      console.log('🔧 [useOfflineVenueData] Calling loadVenueData from useEffect');
       loadVenueData();
     }
-  }, [loadVenueData]);
+  }, [venueId, stableUserId]); // FIXED: Only stable dependencies, removed loadVenueData
 
-  // API fallback effect - handles API data when offline data is not available
+  // API fallback effect - handles fixtures API data when offline data is not available
   useEffect(() => {
-    // Only run if we have API data and either no venue data or empty venue data
-    // Also check that we haven't already initialized to prevent multiple runs
-    if ((apiTeams?.length || apiFixtures?.length) && 
-        (!venueData || (venueData.teams.length === 0 && venueData.fixtures.length === 0)) &&
+    console.log('🔧 [useOfflineVenueData] API fallback effect triggered:', {
+      apiFixturesLength: apiFixtures?.length,
+      hasVenueData: !!venueData,
+      venueDataFixturesLength: venueData?.fixtures?.length,
+      hasInitialized: hasInitialized.current
+    });
+    
+    // Only run if we have fixtures API data and haven't already initialized
+    if (apiFixtures?.length && 
+        (!venueData || venueData.fixtures.length === 0) &&
         !hasInitialized.current) {
-      const teamsData = apiTeams?.map(t => ({ ...t })) || [];
+      console.log('🔧 [useOfflineVenueData] Using API fallback data');
+      
       const fixturesData = apiFixtures?.map(f => ({ ...f })) || [];
       
       const stats = {
-        totalTeams: teamsData.length,
-        checkedInTeams: teamsData.filter(t => t.status === 'checked_in').length,
         totalFixtures: fixturesData.length,
         completedFixtures: fixturesData.filter(f => f.status === 'completed').length,
       };
 
       setVenueData({
         venue: null,
-        teams: teamsData,
+        teams: [], // Always empty - teams handled by useOfflineTeams
         fixtures: fixturesData,
         matches: [],
         stats,
@@ -165,8 +197,12 @@ export function useOfflineVenueData(venueId?: string) {
       setLastFetchTime(Date.now());
       hasInitialized.current = true;
       setIsLoading(false);
+      
+      console.log('🔧 [useOfflineVenueData] API fallback completed');
+    } else {
+      console.log('🔧 [useOfflineVenueData] API fallback conditions not met');
     }
-  }, [apiTeams?.length, apiFixtures?.length]); // FIXED: Remove venueData dependencies that cause loops
+  }, [apiFixtures]); // FIXED: Only depend on apiFixtures array reference
 
   // Manual refetch function that forces a refresh
   const refetch = useCallback(() => {
@@ -180,7 +216,7 @@ export function useOfflineVenueData(venueId?: string) {
     teams: [],
     fixtures: [],
     matches: [],
-    stats: { totalTeams: 0, checkedInTeams: 0, totalFixtures: 0, completedFixtures: 0 }
+    stats: { totalFixtures: 0, completedFixtures: 0 }
   };
 
   return {

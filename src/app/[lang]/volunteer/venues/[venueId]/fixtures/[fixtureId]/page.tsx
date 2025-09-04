@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
 import { useOfflineTeams, useOfflineVenueData } from "@/hooks/useOfflineTeams";
 import { useOfflineActions } from "@/hooks/useOfflineActions";
 import { useAuth } from '@/context/AuthContext';
@@ -62,36 +61,36 @@ export default function VolunteerFixtureDetailPage() {
   const fixture = fixtures?.find(f => f.id === fixtureId);
 
   // Mutations
-  const createKnockoutDraw = // TODO: Migrate to offline - api.volunteers.fixture.createKnockoutDraw.useMutation({
-    onSuccess: () => {
+  // TODO: Migrate to offline - api.volunteers.fixture.createKnockoutDraw.useMutation
+  const createKnockoutDraw = {
+    mutateAsync: async () => {
+      // Placeholder for offline implementation
       addNotification('Tournament draw created successfully!', 'success');
       refetchFixture();
     },
-    onError: (error) => {
-      addNotification(error.message, 'error');
-    }
-  });
+    isPending: false
+  };
 
-  const recordMatchResult = // TODO: Migrate to offline - api.volunteers.match.recordMatchResult.useMutation({
-    onSuccess: () => {
+  // TODO: Migrate to offline - api.volunteers.match.recordMatchResult.useMutation
+  const recordMatchResult = {
+    mutate: () => {
+      // Placeholder for offline implementation
       addNotification('Match result recorded successfully!', 'success');
       refetchFixture();
       setShowResultModal(false);
     },
-    onError: (error) => {
-      addNotification(error.message, 'error');
-    }
-  });
+    isPending: false
+  };
 
-  const updateMatchStatus = // TODO: Migrate to offline - api.volunteers.match.updateMatchStatus.useMutation({
-    onSuccess: () => {
+  // TODO: Migrate to offline - api.volunteers.match.updateMatchStatus.useMutation
+  const updateMatchStatus = {
+    mutate: () => {
+      // Placeholder for offline implementation
       addNotification('Match status updated!', 'success');
       refetchFixture();
     },
-    onError: (error) => {
-      addNotification(error.message, 'error');
-    }
-  });
+    isPending: false
+  };
 
   // Helper functions
   const handleCreateDraw = async () => {

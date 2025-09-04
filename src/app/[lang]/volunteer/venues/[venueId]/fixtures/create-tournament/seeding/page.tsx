@@ -54,16 +54,23 @@ export default function TournamentSeedingPage() {
   const dragCounter = useRef(0);
 
   // Get tournament data
-  const { data: venueData, isLoading } = // TODO: Migrate to offline - api.volunteers.venue.getVenueTournament.useQuery(
-    { venueId },
-    { enabled: !!user && !!venueId }
-  );
+  // TODO: Migrate to offline - api.volunteers.venue.getVenueTournament.useQuery
+  const venueData = {
+    teamsBySport: []
+  }; // Placeholder for offline implementation
+  const isLoading = false;
 
   // Create fixture mutation
-  const createFixtureMutation = // TODO: Migrate to offline - api.volunteers.fixture.createFixture.useMutation({
-    onSuccess: async (data) => {
+  // TODO: Migrate to offline - api.volunteers.fixture.createFixture.useMutation
+  const createFixtureMutation = {
+    mutate: async () => {
       setStep(3);
-      // Now assign team numbers and create knockout draw
+      // Placeholder for offline implementation
+      const data = {
+        venueLevelMappingId: 'mock-id',
+        fixtureId: 'mock-fixture-id'
+      };
+      
       try {
         const assignments = teams.map((team, index) => ({
           teamId: team.id,
@@ -90,13 +97,22 @@ export default function TournamentSeedingPage() {
         showError('Failed to set up tournament bracket: ' + (error as Error).message);
       }
     },
-    onError: (error) => {
-      showError(`Failed to create tournament: ${error.message}`);
-    }
-  });
+    isLoading: false
+  };
 
-  const assignTeamNumbers = // TODO: Migrate to offline - api.volunteers.fixture.assignTeamNumbers.useMutation();
-  const createKnockoutDraw = // TODO: Migrate to offline - api.volunteers.fixture.createKnockoutDraw.useMutation();
+  // TODO: Migrate to offline - api.volunteers.fixture.assignTeamNumbers.useMutation
+  const assignTeamNumbers = {
+    mutateAsync: async () => {
+      // Placeholder for offline implementation
+    }
+  };
+  
+  // TODO: Migrate to offline - api.volunteers.fixture.createKnockoutDraw.useMutation
+  const createKnockoutDraw = {
+    mutateAsync: async () => {
+      // Placeholder for offline implementation
+    }
+  };
 
   useEffect(() => {
     if (!venueData || isLoading) return;

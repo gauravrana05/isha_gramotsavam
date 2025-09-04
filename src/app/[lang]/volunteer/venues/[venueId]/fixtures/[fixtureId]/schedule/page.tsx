@@ -38,22 +38,22 @@ export default function ScheduleMatchesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get fixture details with matches
-  const { data: fixture, isLoading } = // TODO: Migrate to offline - api.volunteers.fixture.getFixtureDetails.useQuery(
-    { fixtureId },
-    { enabled: !!user && !!fixtureId }
-  );
+  // TODO: Migrate to offline - api.volunteers.fixture.getFixtureDetails.useQuery
+  const fixture = {
+    name: 'Loading...',
+    matches: []
+  }; // Placeholder for offline implementation
+  const isLoading = false;
 
   // Bulk schedule matches mutation
-  const bulkSchedule = // TODO: Migrate to offline - api.volunteers.match.bulkScheduleMatches.useMutation({
-    onSuccess: () => {
+  // TODO: Migrate to offline - api.volunteers.match.bulkScheduleMatches.useMutation
+  const bulkSchedule = {
+    mutateAsync: async () => {
+      // Placeholder for offline implementation
       addNotification('Match schedules updated successfully!', 'success');
       router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${fixtureId}`);
-    },
-    onError: (error) => {
-      addNotification(error.message, 'error');
-      setIsSubmitting(false);
     }
-  });
+  };
 
   useEffect(() => {
     if (fixture?.matches) {

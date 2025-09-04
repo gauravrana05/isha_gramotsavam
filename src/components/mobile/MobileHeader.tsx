@@ -43,13 +43,12 @@ export function MobileHeader({
   };
 
   const handleProfileClick = () => {
-    // Navigate to mobile profile page
+    // Navigate to mobile-specific profile page
     const currentPath = window.location.pathname;
     const pathParts = currentPath.split('/');
     const lang = pathParts[1] || 'en';
-    const role = pathParts[2] || 'captain';
     
-    router.push(`/${lang}/${role}/profile`);
+    router.push(`/${lang}/mobile-profile`);
   };
 
   const handleMenuAction = (action: string) => {

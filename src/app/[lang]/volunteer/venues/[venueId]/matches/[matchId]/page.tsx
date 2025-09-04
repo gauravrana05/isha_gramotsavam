@@ -73,41 +73,27 @@ export default function MatchScoringPage() {
     }
   };
 
-  const handleRecordResult = async (teamScores: any[]) => {
-    try {
-      setIsRecordingResult(true);
-      await updateMatchScore(matchId, teamScores);
-      showSuccess('Match result recorded successfully');
-    } catch (error: any) {
-      showError(`Failed to record match result: ${error.message}`);
-    } finally {
-      setIsRecordingResult(false);
+  const handleRecordResult = async (teamScores?: any[]) => {
+    if (teamScores) {
+      // Handle with team scores
+      try {
+        setIsRecordingResult(true);
+        await updateMatchScore(matchId, teamScores);
+        showSuccess('Match result recorded successfully');
+      } catch (error: any) {
+        showError(`Failed to record match result: ${error.message}`);
+      } finally {
+        setIsRecordingResult(false);
+      }
+    } else {
+      // Handle winner selection
+      if (!winnerId) {
+        showError('Please select a winner');
+        return;
+      }
+      setStep('confirmation');
     }
   };
-    onSuccess: (result) => {
-      if (result.levelProgression?.requiresConfirmation) {
-        setProgressionInfo(result.levelProgression);
-        setShowProgressionDialog(true);
-      } else if (result.levelProgression?.fixtureId) {
-        // Tournament progression completed
-        setStep('progression');
-        setTimeout(() => {
-          router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${result.levelProgression?.fixtureId}`);
-        }, 3000);
-      } else if (result.tournamentCompleted) {
-        setStep('success');
-        setTimeout(() => {
-          router.push(`/${lang}/volunteer/venues/${venueId}/fixtures`);
-        }, 3000);
-      } else {
-        showSuccess('Match result recorded successfully');
-        refetch();
-      }
-    },
-    onError: (error) => {
-      showError(`Failed to record result: ${error.message}`);
-    }
-  });
 
   // Initialize scores from existing match data
   useEffect(() => {
@@ -138,15 +124,6 @@ export default function MatchScoringPage() {
       matchId,
       status: 'in_progress'
     });
-  };
-
-  const handleRecordResult = () => {
-    if (!winnerId) {
-      showError('Please select a winner');
-      return;
-    }
-
-    setStep('confirmation');
   };
 
   const confirmResult = (confirmProgression = false) => {
