@@ -33,6 +33,8 @@ export class SupabaseStorageProvider implements StorageProvider {
       const bucket = this.getBucketFromPath(path);
       const filePath = this.getFilePathFromPath(path);
 
+      console.log('📄 Supabase upload details:', { bucket, filePath, path });
+
       // Upload with progress tracking
       const { data, error } = await this.client.storage
         .from(bucket)

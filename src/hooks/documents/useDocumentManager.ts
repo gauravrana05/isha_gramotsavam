@@ -99,7 +99,28 @@ export const useDocumentManager = (options: UseDocumentManagerOptions = {}): Use
       onSuccess?.(type, result);
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Operation failed';
+      let errorMessage = 'Upload failed. Please try again.';
+      
+      if (error instanceof Error) {
+        // Convert technical errors to user-friendly messages
+        if (error.message.includes('<!DOCTYPE') || error.message.includes('not valid JSON')) {
+          errorMessage = 'Server configuration error. Please contact support.';
+        } else if (error.message.includes('Network')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('size')) {
+          errorMessage = 'File is too large. Please choose a smaller image.';
+        } else if (error.message.includes('format') || error.message.includes('type') || error.message.includes('allowed')) {
+          errorMessage = 'Invalid file format. Please choose a valid image file.';
+        } else if (error.message.includes('permission') || error.message.includes('unauthorized')) {
+          errorMessage = 'Permission denied. Please contact support.';
+        } else if (error.message.includes('corrupted') || error.message.includes('empty')) {
+          errorMessage = 'File appears to be corrupted. Please choose a different file.';
+        } else {
+          // For other errors, show a generic message but log the actual error
+          console.error('Upload error details:', error.message);
+          errorMessage = 'Upload failed. Please try again or contact support if the problem persists.';
+        }
+      }
       
       // Retry logic
       if (autoRetry && currentRetryCount < 2) {
@@ -128,7 +149,21 @@ export const useDocumentManager = (options: UseDocumentManagerOptions = {}): Use
       await documentContext.deleteDocument(type);
       return true;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Delete failed';
+      let errorMessage = 'Delete failed. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('<!DOCTYPE') || error.message.includes('not valid JSON')) {
+          errorMessage = 'Server configuration error. Please contact support.';
+        } else if (error.message.includes('Network')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('permission') || error.message.includes('unauthorized')) {
+          errorMessage = 'Permission denied. Please contact support.';
+        } else {
+          console.error('Delete error details:', error.message);
+          errorMessage = 'Delete failed. Please try again or contact support if the problem persists.';
+        }
+      }
+      
       onError?.(type, errorMessage);
       return false;
     }

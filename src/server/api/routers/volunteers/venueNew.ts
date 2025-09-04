@@ -10,6 +10,61 @@ type TeamWithRelations = Team & {
   sport: Pick<Sport, 'name'> | null;
 }
 
+// Helper functions for status cascading
+async function cascadeTeamStatusToPlayers(teamId: string, teamStatus: string) {
+  let playerStatus: string | null = null;
+  
+  if (teamStatus === 'checked_in') {
+    playerStatus = 'approved';
+  } else if (teamStatus === 'verified') {
+    playerStatus = 'verified';
+  } else if (teamStatus === 'submitted') {
+    playerStatus = 'pending';
+  }
+  
+  if (playerStatus) {
+    await db.teamPlayer.updateMany({
+      where: { teamId },
+      data: { verificationStatus: playerStatus as any },
+    });
+    console.log(`🔄 Team ${teamId} (${teamStatus}) cascaded to players (${playerStatus})`);
+  }
+}
+
+async function cascadePlayerStatusToTeam(teamId: string) {
+  const team = await db.team.findUnique({
+    where: { id: teamId },
+    include: { teamPlayers: true },
+  });
+  
+  if (!team) return;
+  
+  const playerStatuses = team.teamPlayers.map(p => p.verificationStatus);
+  const currentTeamStatus = team.status;
+  let newTeamStatus = currentTeamStatus;
+  
+  // Priority-based status resolution
+  if (playerStatuses.some(s => s === 'rejected')) {
+    newTeamStatus = 'rejected';
+  } else if (playerStatuses.some(s => s === 'pending') && currentTeamStatus !== 'draft') {
+    newTeamStatus = 'submitted';
+  } else if (playerStatuses.every(s => s === 'approved')) {
+    newTeamStatus = 'checked_in';
+  } else if (playerStatuses.every(s => s === 'verified')) {
+    newTeamStatus = 'verified';
+  } else if (playerStatuses.some(s => s === 'verified') && currentTeamStatus === 'checked_in') {
+    newTeamStatus = 'verified';
+  }
+  
+  if (newTeamStatus !== currentTeamStatus) {
+    await db.team.update({
+      where: { id: teamId },
+      data: { status: newTeamStatus as any },
+    });
+    console.log(`🔄 Team ${teamId} status: ${currentTeamStatus} → ${newTeamStatus}`);
+  }
+}
+
 export const volunteersVenueRouter = createTRPCRouter({
   getAllSports: protectedProcedure.query(async ({ ctx }) => {
     // Verify volunteer role
@@ -52,6 +107,8 @@ export const volunteersVenueRouter = createTRPCRouter({
             select: {
               id: true,
               name: true,
+              mainPlayersCount: true,
+              maxSubstitutes: true,
             }
           },
           captainUser: {
@@ -353,6 +410,14 @@ export const volunteersVenueRouter = createTRPCRouter({
               sport: {
                 select: {
                   name: true,
+                  mainPlayersCount: true,
+                  maxSubstitutes: true,
+                },
+              },
+              teamPlayers: {
+                select: {
+                  id: true,
+                  verificationStatus: true,
                 },
               },
             }
@@ -595,7 +660,7 @@ export const volunteersVenueRouter = createTRPCRouter({
             dateOfBirth: new Date(captainDetails.dateOfBirth),
             gender: captainDetails.gender,
             role: 'captain',
-            profileCompleted: true
+            profileComplete: true
           }
         });
       } else {
@@ -611,25 +676,153 @@ export const volunteersVenueRouter = createTRPCRouter({
         });
       }
 
+      // Get current ongoing event (registration_open, registration_closed, or active)
+      const ongoingEvent = await db.event.findFirst({
+        where: {
+          status: {
+            in: ['registration_open', 'registration_closed', 'active']
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
       // Create team
       const team = await db.team.create({
         data: {
           name: teamData.name,
           description: teamData.description,
           sportId: teamData.sportId,
+          eventId: ongoingEvent?.id,
           captainId: captain.id,
           captainName: `${captainDetails.firstName} ${captainDetails.lastName}`,
           panchayat: location.panchayat,
           district: location.district,
           state: location.state,
           taluk: location.taluk,
-          status: 'submitted',
+          pincode: location.pincode || '600001',
+          status: 'draft',
           currentPlayers: 1,
           genderCategory: captainDetails.gender === 'F' ? 'women' : 'men'
         }
       });
 
+      // Add captain as team player with pending status
+      await db.teamPlayer.create({
+        data: {
+          teamId: team.id,
+          userId: captain.id,
+          position: 'main',
+          verificationStatus: 'pending',
+          firstName: captain.firstName!,
+          lastName: captain.lastName!,
+          dateOfBirth: captain.dateOfBirth!,
+          age: new Date().getFullYear() - captain.dateOfBirth!.getFullYear(),
+          gender: captain.gender!,
+          phone: captain.phone!,
+          panchayat: location.panchayat,
+          district: location.district,
+          state: location.state,
+          taluk: location.taluk,
+          pincode: location.pincode || '600001',
+          addedBy: ctx.user.id,
+        }
+      });
+
+      // Find the venue level mapping for this venue
+      const venueLevelMapping = await db.venueLevelMapping.findFirst({
+        where: {
+          venueId: input.venueId,
+          eventId: ongoingEvent!.id,
+          level: 'cluster'
+        }
+      });
+
+      if (!venueLevelMapping) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Venue level mapping not found for this venue'
+        });
+      }
+
+      // Assign team to the current venue
+      await db.teamVenueAssignment.create({
+        data: {
+          teamId: team.id,
+          eventId: ongoingEvent!.id,
+          assignmentMethod: 'manual_assigned',
+          assignedBy: ctx.user.id,
+          clusterVenueMappingId: venueLevelMapping.id
+        }
+      });
+
       return { success: true, teamId: team.id };
+    }),
+
+  // Get team details
+  getTeamDetails: protectedProcedure
+    .input(z.object({
+      teamId: z.string().uuid(),
+    }))
+    .query(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can access team details',
+        });
+      }
+
+      const team = await db.team.findUnique({
+        where: { id: input.teamId },
+        include: {
+          captainUser: {
+            select: {
+              firstName: true,
+              lastName: true,
+              phone: true,
+              panchayat: true,
+              district: true,
+              state: true,
+              profileImages: true,
+            },
+          },
+          sport: {
+            select: {
+              name: true,
+              mainPlayersCount: true,
+              maxSubstitutes: true,
+            },
+          },
+          teamPhoto: {
+            select: {
+              photoPath: true,
+            },
+          },
+          teamPlayers: {
+            include: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  phone: true,
+                  dateOfBirth: true,
+                  gender: true,
+                  profileImages: true,
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (!team) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Team not found',
+        });
+      }
+
+      return team;
     }),
 
   // Get venue media and posts for technical volunteers
@@ -1157,9 +1350,10 @@ export const volunteersVenueRouter = createTRPCRouter({
       firstName: z.string().min(1).max(100),
       lastName: z.string().min(1).max(100),
       phone: z.string(),
-      dateOfBirth: z.date(),
+      dateOfBirth: z.string(), // Change to string to match form input
       gender: z.enum(['M', 'F']),
-      village: z.string().optional(),
+      panchayat: z.string().optional(),
+      district: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       // Verify volunteer role
@@ -1209,7 +1403,17 @@ export const volunteersVenueRouter = createTRPCRouter({
           where: { id: playerId },
           data: {
             position: updateData.position,
-            village: updateData.village,
+            firstName: updateData.firstName,
+            lastName: updateData.lastName,
+            phone: updateData.phone,
+            dateOfBirth: new Date(updateData.dateOfBirth),
+            age: Math.floor((new Date().getTime() - new Date(updateData.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)),
+            gender: updateData.gender,
+            panchayat: updateData.panchayat || 'Default Panchayat',
+            district: updateData.district || 'Default District',
+            taluk: updateData.district || 'Default District',
+            state: 'Tamil Nadu',
+            pincode: '600001',
           },
         });
 
@@ -1221,7 +1425,7 @@ export const volunteersVenueRouter = createTRPCRouter({
               firstName: updateData.firstName,
               lastName: updateData.lastName,
               phone: updateData.phone,
-              dateOfBirth: updateData.dateOfBirth,
+              dateOfBirth: new Date(updateData.dateOfBirth),
               gender: updateData.gender,
             },
           });
@@ -1276,5 +1480,390 @@ export const volunteersVenueRouter = createTRPCRouter({
       });
 
       return teamPhoto;
+    }),
+
+  // Add Player Mutation
+  addPlayer: protectedProcedure
+    .input(z.object({
+      teamId: z.string(),
+      playerData: z.object({
+        name: z.string(),
+        firstName: z.string(),
+        lastName: z.string(),
+        phone: z.string(),
+        dateOfBirth: z.string(),
+        gender: z.string(),
+        whatsappNumber: z.string().optional(),
+        village: z.string(),
+        panchayat: z.string(),
+        district: z.string(),
+        position: z.enum(['main', 'substitute'])
+      })
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can add players',
+        });
+      }
+
+      const { teamId, playerData } = input;
+      const { firstName, lastName, phone, dateOfBirth, gender, village, panchayat, district, position } = playerData;
+
+      return await db.$transaction(async (tx) => {
+        // Check if team exists
+        const team = await tx.team.findUnique({
+          where: { id: teamId },
+          include: {
+            sport: true,
+            teamPlayers: true,
+          },
+        });
+
+        if (!team) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Team not found',
+          });
+        }
+
+        // Check if player with same phone already exists in team
+        const existingPlayer = await tx.teamPlayer.findFirst({
+          where: { teamId, phone },
+        });
+
+        if (existingPlayer) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Player is already in this team',
+          });
+        }
+
+        // Validate team composition limits
+        const currentMainPlayers = team.teamPlayers.filter(p => p.position === 'main').length;
+        const currentSubPlayers = team.teamPlayers.filter(p => p.position === 'substitute').length;
+        
+        if (position === 'main' && currentMainPlayers >= team.sport.mainPlayersCount) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Maximum ${team.sport.mainPlayersCount} main players allowed`,
+          });
+        }
+        
+        if (position === 'substitute' && currentSubPlayers >= team.sport.maxSubstitutes) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Maximum ${team.sport.maxSubstitutes} substitute players allowed`,
+          });
+        }
+
+        // Check if user already exists
+        let user = await tx.user.findUnique({
+          where: { phone },
+        });
+
+        // If user doesn't exist, create new user
+        if (!user) {
+          user = await tx.user.create({
+            data: {
+              firstName,
+              lastName,
+              phone,
+              dateOfBirth: new Date(dateOfBirth),
+              age: Math.floor((new Date().getTime() - new Date(dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)),
+              gender,
+              panchayat,
+              district,
+            },
+          });
+        }
+
+        const teamPlayer = await tx.teamPlayer.create({
+          data: {
+            teamId,
+            userId: user.id,
+            position,
+            firstName,
+            lastName,
+            phone,
+            dateOfBirth: new Date(dateOfBirth),
+            age: Math.floor((new Date().getTime() - new Date(dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)),
+            gender,
+            panchayat,
+            district,
+            taluk: district, // Use district as taluk for now
+            state: 'Tamil Nadu', // Default state
+            pincode: '600001', // Default pincode
+            addedBy: 'volunteer',
+            verificationStatus: 'pending',
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                gender: true,
+              },
+            },
+          },
+        });
+
+        return teamPlayer;
+      });
+    }),
+
+  // Verify Player Mutation
+  verifyPlayer: protectedProcedure
+    .input(z.object({
+      playerId: z.string(),
+      status: z.enum(['pending', 'verified', 'approved', 'rejected']),
+      comments: z.string(),
+      teamId: z.string(),
+      venueId: z.string()
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can verify players',
+        });
+      }
+
+      // Verify venue assignment
+      const assignment = await db.volunteerAssignment.findFirst({
+        where: { 
+          volunteerId: ctx.user.id,
+          deletedAt: null,
+          venueLevelMapping: {
+            venueId: input.venueId
+          }
+        }
+      });
+
+      if (!assignment) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not assigned to this venue',
+        });
+      }
+
+      const teamPlayer = await db.teamPlayer.findUnique({
+        where: { id: input.playerId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+        },
+      });
+
+      if (!teamPlayer || teamPlayer.teamId !== input.teamId) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Player not found in this team',
+        });
+      }
+
+      const updatedPlayer = await db.teamPlayer.update({
+        where: { id: input.playerId },
+        data: {
+          verificationStatus: input.status,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+            },
+          },
+        },
+      });
+
+      // CASCADE: Players → Team
+      await cascadePlayerStatusToTeam(updatedPlayer.teamId);
+
+      return updatedPlayer;
+    }),
+
+  // Promote Captain Mutation
+  promoteCaptain: protectedProcedure
+    .input(z.object({
+      teamId: z.string(),
+      newCaptainId: z.string()
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can promote captains',
+        });
+      }
+
+      const { teamId, newCaptainId } = input;
+
+      return await db.$transaction(async (tx) => {
+        // Check if team exists
+        const team = await tx.team.findUnique({
+          where: { id: teamId },
+          include: {
+            teamPlayers: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        });
+
+        if (!team) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Team not found',
+          });
+        }
+
+        // Find the new captain in team players
+        const newCaptainPlayer = team.teamPlayers.find(
+          (player) => player.userId === newCaptainId
+        );
+
+        if (!newCaptainPlayer) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'New captain must be a player in this team',
+          });
+        }
+
+        // Update user role to captain
+        await tx.user.update({
+          where: { id: newCaptainId },
+          data: { role: 'captain' },
+        });
+
+        // Update team captain
+        const updatedTeam = await tx.team.update({
+          where: { id: teamId },
+          data: {
+            captainId: newCaptainId,
+            captainName: `${newCaptainPlayer.firstName} ${newCaptainPlayer.lastName}`,
+          },
+        });
+
+        return updatedTeam;
+      });
+    }),
+
+  // Update Team Status Mutation
+  updateTeamStatus: protectedProcedure
+    .input(z.object({
+      teamId: z.string(),
+      status: z.enum(['draft', 'submitted', 'verified', 'rejected', 'checked_in']),
+      venueId: z.string()
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can update team status',
+        });
+      }
+
+      // Verify venue assignment
+      const assignment = await db.volunteerAssignment.findFirst({
+        where: { 
+          volunteerId: ctx.user.id,
+          deletedAt: null,
+          venueLevelMapping: {
+            venueId: input.venueId
+          }
+        }
+      });
+
+      if (!assignment) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not assigned to this venue',
+        });
+      }
+
+      const updatedTeam = await db.team.update({
+        where: { id: input.teamId },
+        data: { status: input.status },
+        include: {
+          sport: true,
+          captainUser: true,
+          teamPlayers: true
+        }
+      });
+
+      // CASCADE: Team → Players
+      await cascadeTeamStatusToPlayers(input.teamId, input.status);
+
+      return updatedTeam;
+    }),
+
+  // Team Check-in with cascading
+  checkInTeam: protectedProcedure
+    .input(z.object({
+      teamId: z.string(),
+      venueId: z.string(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify volunteer role
+      if (!['technical_volunteer', 'general_volunteer', 'verification_volunteer'].includes(ctx.user.role)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only volunteers can check in teams',
+        });
+      }
+
+      // Verify venue assignment
+      const assignment = await db.volunteerAssignment.findFirst({
+        where: { 
+          volunteerId: ctx.user.id,
+          deletedAt: null,
+          venueLevelMapping: {
+            venueId: input.venueId
+          }
+        }
+      });
+
+      if (!assignment) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not assigned to this venue',
+        });
+      }
+
+      // Update team to checked_in
+      const updatedTeam = await db.team.update({
+        where: { id: input.teamId },
+        data: { 
+          status: 'checked_in',
+        },
+        include: {
+          sport: true,
+          captainUser: true,
+          teamPlayers: true
+        }
+      });
+
+      // CASCADE: Team → Players (checked_in → approved)
+      await cascadeTeamStatusToPlayers(input.teamId, 'checked_in');
+
+      return updatedTeam;
     }),
 });

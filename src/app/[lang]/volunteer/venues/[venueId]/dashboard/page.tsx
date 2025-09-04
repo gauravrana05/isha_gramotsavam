@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, use } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useOffline } from '@/context/OfflineContextWrapper';
 import { useNotification } from '@/context/NotificationContext';
+import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
+import { useOfflineTeams } from '@/hooks/useOfflineTeams';
 import { api } from '@/server/trpc/react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/utils/i18n';
@@ -85,31 +87,22 @@ export default function VolunteerDashboard({ params }: PageProps) {
     }
   });
 
-  // tRPC queries for dashboard data
+  // Offline hooks for dashboard data
   const { 
-    data: teamsData, 
+    teams: teamsData, 
     isLoading: teamsLoading, 
     error: teamsError 
-  } = api.volunteers.venue.getVenueTeams.useQuery(
-    { venueId: venueId || '' },
-    { enabled: !authLoading && !!user && !!venueId && venueId.length > 0 && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
-  );
+  } = useOfflineTeams(venueId);
 
+  // Get venue data including fixtures
   const { 
-    data: checkedInTeamsData, 
-    isLoading: checkedInLoading 
-  } = api.volunteers.venue.getVenueCheckedInTeams.useQuery(
-    { venueId },
-    { enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
-  );
-
-  const { 
-    data: fixturesData, 
+    fixtures: fixturesData, 
     isLoading: fixturesLoading 
-  } = api.volunteers.venue.getVenueFixtures.useQuery(
-    { venueId },
-    { enabled: !authLoading && !!user && ['general_volunteer', 'technical_volunteer'].includes(userProfile?.role || '') }
-  );
+  } = useOfflineVenueData(venueId);
+
+  // Calculate checked-in teams from offline data
+  const checkedInTeamsData = teamsData?.filter(team => team.checkedIn) || [];
+  const checkedInLoading = teamsLoading;
 
   // Loading and error states
   const teams = teamsData || [];

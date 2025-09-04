@@ -5,6 +5,12 @@ import { User } from "@prisma/client";
 import { api } from "@/server/trpc/react";
 import PageLoader from "@/components/ui/loaders/PageLoader";
 
+interface CachedUserData {
+  user: User;
+  timestamp: number;
+  expiry: number;
+}
+
 interface AuthContextType {
   user: User | null;
   userProfile: User | null; // Keep backward compatibility 
@@ -17,6 +23,9 @@ interface AuthContextType {
   hasRole: (roles: string | string[]) => boolean;
   updateLanguagePreference: (lang: string) => Promise<void>;
   hasLanguagePreference: boolean;
+  // NEW: Offline support
+  clearOfflineData: () => Promise<void>;
+  isOfflineMode: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +33,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   const initializationRef = useRef(false);
 
   // Fetch profile image data using tRPC
@@ -40,6 +50,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       refetchOnMount: false,
     }
   );
+
+  const clearOfflineData = useCallback(async () => {
+    try {
+      // Clear IndexedDB
+      const databases = await indexedDB.databases();
+      for (const db of databases) {
+        if (db.name?.includes('volunteer') || db.name?.includes('offline')) {
+          indexedDB.deleteDatabase(db.name);
+        }
+      }
+      
+      // Clear localStorage offline data
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.includes('volunteer') || key.includes('offline') || key.includes('cached_user')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      console.log('✅ Offline data cleared');
+    } catch (error) {
+      console.error('Failed to clear offline data:', error);
+    }
+  }, []);
 
   // Stable callback functions
   const login = useCallback(async () => {
@@ -75,16 +109,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Content-Type': 'application/json',
         },
       });
-      
-      setUser(null);
-      window.location.href = '/';
     } catch (error) {
-      console.error('Logout failed:', error);
-      setUser(null);
-      window.location.href = '/';
-      throw error;
+      console.warn('Server logout failed:', error);
     }
-  }, []);
+    
+    // Always clear local data regardless of server response
+    setUser(null);
+    setIsOfflineMode(false);
+    localStorage.removeItem('cached_user_auth');
+    
+    // Clear offline cache
+    await clearOfflineData();
+    
+    window.location.href = '/';
+  }, [clearOfflineData]);
 
   const refreshUser = useCallback(async (): Promise<User | null> => {
     try {
@@ -115,39 +153,90 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       initializationRef.current = true;
       
       try {
-        // Check URL params first
+        // STEP 1: Try cached user first for instant load
+        const cachedData = localStorage.getItem('cached_user_auth');
+        let hasValidCache = false;
+        
+        if (cachedData) {
+          try {
+            const { user: cachedUser, expiry }: CachedUserData = JSON.parse(cachedData);
+            if (Date.now() < expiry) {
+              setUser(cachedUser);
+              setLoading(false);
+              hasValidCache = true;
+              console.log('✅ Using cached user for instant load:', cachedUser.id);
+              
+              // Background validation if online
+              if (navigator.onLine) {
+                setTimeout(() => validateAndUpdateUser(cachedUser.id), 100);
+              }
+            } else {
+              localStorage.removeItem('cached_user_auth');
+            }
+          } catch (error) {
+            console.warn('Invalid cached user data:', error);
+            localStorage.removeItem('cached_user_auth');
+          }
+        }
+        
+        // STEP 2: If no valid cache, try API (but don't block on offline)
+        if (!hasValidCache) {
+          // Always try API validation, even if offline
+          await validateAndUpdateUser();
+        }
+        
+        // Ensure loading is set to false
+        if (loading) {
+          setLoading(false);
+        }
+        
+      } catch (error) {
+        console.error('Auth initialization failed:', error);
+        
+        // FALLBACK: Try to use cached user even if expired (offline mode)
+        const cachedData = localStorage.getItem('cached_user_auth');
+        if (cachedData) {
+          try {
+            const { user: cachedUser }: CachedUserData = JSON.parse(cachedData);
+            setUser(cachedUser);
+            setIsOfflineMode(true);
+            console.log('🔄 Using expired cache due to connection error');
+          } catch (fallbackError) {
+            console.error('Failed to use cached user:', fallbackError);
+          }
+        }
+        
+        setLoading(false);
+      }
+    };
+
+    const validateAndUpdateUser = async (currentUserId?: string) => {
+      try {
+        // Check URL params first for auth flows
         const urlParams = new URLSearchParams(window.location.search);
         const phone = urlParams.get('phone');
         const authSuccess = urlParams.get('auth');
         const userId = urlParams.get('userId');
         const mockUser = urlParams.get('mockUser');
 
-        // Handle auth parameters
+        // Handle special auth parameters
         if (phone || authSuccess || userId || mockUser) {
-          // Handle mockUser parameter (for testing)
           if (mockUser) {
-            try {
-              const response = await fetch('/api/auth/mock-users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: mockUser }),
-                credentials: 'include',
-              });
-              
-              if (response.ok) {
-                const { user } = await response.json();
-                if (user) {
-                  setUser(user);
-                  // Clean URL
-                  const newUrl = new URL(window.location.href);
-                  newUrl.searchParams.delete('mockUser');
-                  window.history.replaceState({}, '', newUrl.toString());
-                  setLoading(false);
-                  return;
-                }
+            const response = await fetch('/api/auth/mock-users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: mockUser }),
+              credentials: 'include',
+            });
+            
+            if (response.ok) {
+              const { user } = await response.json();
+              if (user) {
+                await cacheUserData(user);
+                setUser(user);
+                cleanUrl();
+                return;
               }
-            } catch (error) {
-              console.error('❌ Mock user login error:', error);
             }
           }
           
@@ -162,60 +251,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (phoneResponse.ok) {
               const { user } = await phoneResponse.json();
               if (user) {
+                await cacheUserData(user);
                 setUser(user);
-                // Clean URL
-                const newUrl = new URL(window.location.href);
-                newUrl.searchParams.delete('phone');
-                window.history.replaceState({}, '', newUrl.toString());
-                setLoading(false);
+                cleanUrl();
                 return;
               }
             }
           }
-          
-          // Try to get current user
-          const response = await fetch('/api/auth/me', {
-            method: 'GET',
-            credentials: 'include',
-          });
-          
-          if (response.ok) {
-            const { user } = await response.json();
-            if (user) {
-              setUser(user);
-              // Clean URL
-              const newUrl = new URL(window.location.href);
-              newUrl.searchParams.delete('auth');
-              newUrl.searchParams.delete('userId');
-              newUrl.searchParams.delete('mockUser');
-              newUrl.searchParams.delete('phone');
-              if (newUrl.href !== window.location.href) {
-                window.history.replaceState({}, '', newUrl.href);
-              }
-              setLoading(false);
-              return;
-            }
-          }
         }
 
-        // Check if user is logged in via cookie
+        // Regular user validation
         const response = await fetch('/api/auth/me', {
           method: 'GET',
           credentials: 'include',
         });
         
         if (response.ok) {
-          const { user } = await response.json();
-          if (user) {
-            setUser(user);
+          const { user: freshUser } = await response.json();
+          if (freshUser) {
+            await cacheUserData(freshUser);
+            
+            // Update user if different from current
+            if (!currentUserId || currentUserId !== freshUser.id) {
+              setUser(freshUser);
+              
+              // If user changed, clear old offline data
+              if (currentUserId && currentUserId !== freshUser.id) {
+                await clearOfflineData();
+              }
+            }
+            
+            setIsOfflineMode(false);
+            cleanUrl();
           }
         }
         
-        setLoading(false);
+        // Always set loading to false after API attempt
+        if (loading) {
+          setLoading(false);
+        }
       } catch (error) {
-        console.error('Auth initialization failed:', error);
-        setUser(null);
-        setLoading(false);
+        console.warn('Background user validation failed:', error);
+        // Don't fail - continue with cached user
+        if (loading) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const cacheUserData = async (user: User) => {
+      const cacheData: CachedUserData = {
+        user,
+        timestamp: Date.now(),
+        expiry: Date.now() + (7 * 24 * 60 * 60 * 1000), // 7 days
+      };
+      localStorage.setItem('cached_user_auth', JSON.stringify(cacheData));
+    };
+
+    const cleanUrl = () => {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('auth');
+      newUrl.searchParams.delete('userId');
+      newUrl.searchParams.delete('mockUser');
+      newUrl.searchParams.delete('phone');
+      if (newUrl.href !== window.location.href) {
+        window.history.replaceState({}, '', newUrl.href);
       }
     };
 
@@ -258,6 +358,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasRole,
     updateLanguagePreference,
     hasLanguagePreference,
+    clearOfflineData,
+    isOfflineMode,
   }), [
     user,
     profileImage,
@@ -269,6 +371,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     hasRole,
     updateLanguagePreference,
     hasLanguagePreference,
+    clearOfflineData,
+    isOfflineMode,
   ]);
 
   return (

@@ -80,7 +80,27 @@ const TeamPhotoUpload: React.FC<TeamPhotoUploadProps> = ({
       setProgress(100);
       onSuccess?.(downloadURL);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+      let errorMessage = 'Upload failed. Please try again.';
+      
+      if (error instanceof Error) {
+        // Convert technical errors to user-friendly messages
+        if (error.message.includes('<!DOCTYPE') || error.message.includes('not valid JSON')) {
+          errorMessage = 'Server configuration error. Please contact support.';
+        } else if (error.message.includes('Network')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('size')) {
+          errorMessage = 'File is too large. Please choose a smaller image.';
+        } else if (error.message.includes('format') || error.message.includes('type')) {
+          errorMessage = 'Invalid file format. Please choose a valid image file.';
+        } else if (error.message.includes('permission') || error.message.includes('unauthorized')) {
+          errorMessage = 'Permission denied. Please contact support.';
+        } else {
+          // For other errors, show a generic message but log the actual error
+          console.error('Upload error:', error.message);
+          errorMessage = 'Upload failed. Please try again or contact support if the problem persists.';
+        }
+      }
+      
       setError(errorMessage);
       setUploading(false);
       setProgress(0);

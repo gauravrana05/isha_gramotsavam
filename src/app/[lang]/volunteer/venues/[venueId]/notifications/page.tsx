@@ -21,6 +21,7 @@ export default function VenueNotificationsPage() {
     targetRoles: ['captain', 'player'] as string[],
   });
 
+  // Keep notifications as API calls - not critical for offline functionality
   const { data: notifications = [], isLoading } = api.notifications.getByVenue.useQuery(
     { venueId: venueId as string },
     { enabled: !!user && !!venueId }

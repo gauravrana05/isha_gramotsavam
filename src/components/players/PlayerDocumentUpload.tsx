@@ -117,7 +117,28 @@ const PlayerDocumentUpload: React.FC<PlayerDocumentUploadProps> = ({
       }
     } catch (error) {
       console.error('Upload error:', error);
-      const errorMsg = error instanceof Error ? error.message : 'Upload failed';
+      
+      let errorMsg = 'Upload failed. Please try again.';
+      
+      if (error instanceof Error) {
+        // Convert technical errors to user-friendly messages
+        if (error.message.includes('<!DOCTYPE') || error.message.includes('not valid JSON')) {
+          errorMsg = 'Server configuration error. Please contact support.';
+        } else if (error.message.includes('Network')) {
+          errorMsg = 'Network error. Please check your connection and try again.';
+        } else if (error.message.includes('size')) {
+          errorMsg = 'File is too large. Please choose a smaller image.';
+        } else if (error.message.includes('format') || error.message.includes('type')) {
+          errorMsg = 'Invalid file format. Please choose a valid image file.';
+        } else if (error.message.includes('permission') || error.message.includes('unauthorized')) {
+          errorMsg = 'Permission denied. Please contact support.';
+        } else {
+          // For other errors, show a generic message but log the actual error
+          console.error('Upload error details:', error.message);
+          errorMsg = 'Upload failed. Please try again or contact support if the problem persists.';
+        }
+      }
+      
       setError(errorMsg);
       onError?.(errorMsg);
     } finally {

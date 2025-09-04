@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
 import { api } from '@/server/trpc/react';
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
@@ -48,15 +49,16 @@ export default function VolunteerFixtureDetailPage() {
   const [team2Score, setTeam2Score] = useState(0);
 
   // Get fixture details
+  // Get fixture data from offline storage
   const { 
-    data: fixture, 
+    fixtures, 
     isLoading: fixtureLoading, 
     error: fixtureError,
     refetch: refetchFixture
-  } = api.volunteers.fixture.getFixtureDetails.useQuery(
-    { fixtureId },
-    { enabled: !!user && !!fixtureId }
-  );
+  } = useOfflineVenueData(venueId);
+  
+  // Find specific fixture
+  const fixture = fixtures?.find(f => f.id === fixtureId);
 
   // Mutations
   const createKnockoutDraw = api.volunteers.fixture.createKnockoutDraw.useMutation({

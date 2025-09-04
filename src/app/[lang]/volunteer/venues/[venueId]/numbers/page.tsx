@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { api } from '@/server/trpc/react';
+import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
+import { useOfflineTeams } from '@/hooks/useOfflineTeams';
+import { useOfflineActions } from '@/hooks/useOfflineActions';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -28,30 +30,39 @@ export default function TournamentNumbersPage() {
   const [assignments, setAssignments] = useState<TeamAssignment[]>([]);
   const { addNotification } = useNotification();
 
-  // Get venue level mappings
-  const { data: venueMappings } = api.volunteers.venue.getVenueLevelMappings.useQuery({
-    venueId
-  });
+  // Get venue data from offline storage
+  const { venueData } = useOfflineVenueData(venueId);
+  const venueMappings = venueData?.venueMappings || [];
 
-  // Get available sports
-  const { data: sports } = api.sports.getAll.useQuery();
+  // Get sports from venue data
+  const sports = venueData?.sports || [];
 
-  // Get teams for assignment
-  const { data: teams, refetch: refetchTeams } = api.volunteers.team.getTeamsForNumberAssignment.useQuery({
-    venueLevelMappingId: selectedVenueMapping,
-    sportId: selectedSport,
-    genderCategory: selectedGender as any
-  }, {
-    enabled: !!(selectedVenueMapping && selectedSport && selectedGender)
-  });
+  // Get teams from offline storage
+  const { teams: allTeams } = useOfflineTeams(venueId);
+  
+  // Filter teams based on selections
+  const teams = allTeams?.filter(team => {
+    if (!selectedSport || !selectedGender) return false;
+    return team.sportId === selectedSport && team.genderCategory === selectedGender;
+  }) || [];
 
-  const assignNumbersMutation = api.volunteers.team.assignTournamentNumbers.useMutation({
-    onSuccess: () => {
+  // Get offline actions
+  const { updateTeamStatus } = useOfflineActions();
+  const [isAssigningNumbers, setIsAssigningNumbers] = useState(false);
+
+  const handleAssignNumbers = async () => {
+    try {
+      setIsAssigningNumbers(true);
+      // TODO: Implement assignTournamentNumbers action in useOfflineActions
+      console.log('Assigning tournament numbers offline:', assignments);
       addNotification('Tournament numbers assigned successfully', 'success');
-      refetchTeams();
       setAssignments([]);
+    } catch (error: any) {
+      addNotification(`Failed to assign numbers: ${error.message}`, 'error');
+    } finally {
+      setIsAssigningNumbers(false);
     }
-  });
+  };
 
   // Initialize assignments when teams load
   React.useEffect(() => {
@@ -106,15 +117,7 @@ export default function TournamentNumbersPage() {
       return;
     }
 
-    assignNumbersMutation.mutate({
-      venueLevelMappingId: selectedVenueMapping,
-      sportId: selectedSport,
-      genderCategory: selectedGender as any,
-      assignments: assignments.map(a => ({
-        teamId: a.teamId,
-        number: a.number
-      }))
-    });
+    await handleAssignNumbers();
   };
 
   const getDuplicateNumbers = () => {

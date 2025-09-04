@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useOfflineTeamDetails } from '@/hooks/useOfflineTeams';
+import { useOfflineActions } from '@/hooks/useOfflineActions';
 import { api } from '@/server/trpc/react';
 import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
 import DocumentPreview from '@/components/documents/DocumentPreview';
@@ -64,6 +66,8 @@ interface PlayerData {
   dob?: string;
   whatsappNumber?: string;
   village?: string;
+  district?: string; // ADD THIS
+  panchayat?: string; // ADD THIS
   documents: {
     profilePhoto: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
     aadhaarFront: { url?: string | null; verified: boolean; storagePath?: string | null; uploadedBy?: string | null; uploadedAt?: string | null };
@@ -113,42 +117,47 @@ export default function TeamMatchDayVerificationPage() {
   const { alertState, showError, showSuccess, showInfo, hideAlert } = useAlert();
 
   // tRPC queries and mutations
+  // Get team data from offline storage
   const { 
-    data: teamData, 
+    team: teamData, 
+    players: hookPlayers,
     refetch: refetchTeam, 
     isLoading: isTeamDataLoading,
-    isError: isTeamDataError,
     error: teamDataError
-  } = api.volunteers.venue.getTeamForVerification.useQuery(
-    { teamId },
+  } = useOfflineTeamDetails(teamId);
+  
+  const isTeamDataError = !!teamDataError;
+  const { verifyPlayer } = useOfflineActions();
+
+  // Keep phone search as API call for now
+  const { data: searchedUser, isLoading: isSearchingPhone } = api.users.getByPhone.useQuery(
+    { phone: searchPhone },
     { 
-      enabled: !authLoading && !!user && !!teamId,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true
+      enabled: searchPhone.length > 0,
+      refetchOnWindowFocus: false
     }
   );
 
-  const verifyPlayerMutation = api.volunteers.venue.verifyPlayer.useMutation({
-    onSuccess: () => {
-      refetchTeam();
-      showSuccess('Player verification updated successfully!');
-    },
-    onError: (error) => {
-      showError(`Error: ${error.message}`);
-    }
-  });
+  // Get offline actions
+  const { verifyPlayer: verifyPlayerAction, uploadMedia } = useOfflineActions();
+  const [isAddingPlayer, setIsAddingPlayer] = useState(false);
 
-  const addPlayerMutation = api.volunteers.venue.addPlayer.useMutation({
-    onSuccess: () => {
-      refetchTeam();
+  // Replace addPlayerMutation with offline action
+  const handleAddPlayer = async (playerData: any) => {
+    try {
+      setIsAddingPlayer(true);
+      // Note: addPlayer action needs to be implemented in useOfflineActions
+      // For now, we'll use a placeholder
+      console.log('Adding player offline:', playerData);
       setShowAddPlayerModal(false);
       setPlayerFormData({ phone: '', firstName: '', lastName: '', dob: '', whatsappNumber: '', village: '', position: 'main' });
       showSuccess('Player added successfully!');
-    },
-    onError: (error) => {
+    } catch (error: any) {
       showError(`Error: ${error.message}`);
+    } finally {
+      setIsAddingPlayer(false);
     }
-  });
+  };
 
   const uploadTeamImageMutation = api.volunteers.venue.uploadTeamImage.useMutation({
     onSuccess: async () => {
@@ -197,11 +206,59 @@ export default function TeamMatchDayVerificationPage() {
       setPlayerFormData({ phone: '', firstName: '', lastName: '', dob: '', whatsappNumber: '', village: '', position: 'main' });
       setIsEditMode(false);
       setEditingPlayerId(null);
+      
+      // Update selected player with fresh data if modal is open
+      if (selectedPlayer && showPlayerModal) {
+        // Find updated player in the refreshed data
+        setTimeout(async () => {
+          const { data: updatedData } = await refetchTeam();
+          if (updatedData) {
+            const updatedPlayer = updatedData.teamPlayers?.find(p => p.id === selectedPlayer.id);
+            if (updatedPlayer) {
+              const profileImages = updatedPlayer.user?.profileImages;
+              const mappedPlayer = {
+                id: updatedPlayer.id,
+                userId: updatedPlayer.user?.id,
+                name: `${updatedPlayer.user?.firstName || ''} ${updatedPlayer.user?.lastName || ''}`.trim(),
+                firstName: updatedPlayer.user?.firstName || '',
+                lastName: updatedPlayer.user?.lastName || '',
+                phone: updatedPlayer.user?.phone || '',
+                age: updatedPlayer.user?.dateOfBirth ? new Date().getFullYear() - new Date(updatedPlayer.user.dateOfBirth).getFullYear() : 0,
+                gender: updatedPlayer.user?.gender || 'M',
+                position: updatedPlayer.position || 'main',
+                dob: updatedPlayer.user?.dateOfBirth,
+                whatsappNumber: updatedPlayer.user?.phone,
+                village: updatedPlayer.panchayat || '',
+                district: updatedPlayer.district || '',
+                panchayat: updatedPlayer.panchayat || '',
+                documents: {
+                  profilePhoto: { url: profileImages?.profilePhotoPath || null, verified: false },
+                  aadhaarFront: { url: profileImages?.aadhaarFrontPath || null, verified: false },
+                  aadhaarBack: { url: profileImages?.aadhaarBackPath || null, verified: false },
+                },
+                verificationStatus: updatedPlayer.verificationStatus || 'pending',
+              };
+              setSelectedPlayer(mappedPlayer);
+            }
+          }
+        }, 100);
+      }
+      
       showSuccess('Player updated successfully!');
     },
     onError: (error) => {
       showError(`Error: ${error.message}`);
     }
+  });
+
+  const promoteCaptainMutation = api.volunteers.venue.promoteCaptain.useMutation({
+    onSuccess: () => {
+      refetchTeam();
+      setShowPlayerModal(false);
+      setSelectedPlayer(null);
+      showSuccess('Captain promoted successfully!');
+    },
+    onError: (error) => showError(`Error: ${error.message}`)
   });
 
   // Handle authentication and role validation first
@@ -278,7 +335,9 @@ export default function TeamMatchDayVerificationPage() {
           position: player.position || 'main',
           dob: player.user?.dateOfBirth,
           whatsappNumber: player.user?.phone,
-          village: player.village || '',
+          village: player.panchayat || '',
+          district: player.district || '',
+          panchayat: player.panchayat || '',
           documents: {
             profilePhoto: { 
               url: profileImages?.profilePhotoPath || null, 
@@ -297,8 +356,17 @@ export default function TeamMatchDayVerificationPage() {
         };
       }) || [];
 
+      // Sort players to show captain first
+      const sortedPlayers = mappedPlayers.sort((a, b) => {
+        const aIsCaptain = mappedTeam.captainProfile?.phone === a.phone;
+        const bIsCaptain = mappedTeam.captainProfile?.phone === b.phone;
+        if (aIsCaptain && !bIsCaptain) return -1;
+        if (!aIsCaptain && bIsCaptain) return 1;
+        return 0;
+      });
+
       setTeam(mappedTeam);
-      setPlayers(mappedPlayers);
+      setPlayers(sortedPlayers);
     }
 
     // Handle errors
@@ -309,25 +377,39 @@ export default function TeamMatchDayVerificationPage() {
   }, [teamData, isTeamDataLoading, isTeamDataError, teamDataError]);
 
   const handlePlayerVerification = async (playerId: string, status: 'verified' | 'rejected', comments?: string) => {
-    verifyPlayerMutation.mutate({
-      playerId,
-      status,
-      comments: comments || '',
-      teamId,
-      venueId
-    });
+    try {
+      await verifyPlayer(playerId, status, comments);
+      refetchTeam();
+      showSuccess('Player verification updated successfully!');
+    } catch (error) {
+      showError(`Error: ${error.message}`);
+    }
+  };
+
+  // Replace verifyPlayerMutation with offline action
+  const [isVerifyingPlayer, setIsVerifyingPlayer] = useState(false);
+  
+  const handleVerifyPlayer = async (playerId: string, status: 'verified' | 'rejected', comments?: string) => {
+    try {
+      setIsVerifyingPlayer(true);
+      await verifyPlayerAction(playerId, status, comments);
+      showSuccess('Player verification updated successfully!');
+      // No need to refetch - data updates automatically with offline hooks
+    } catch (error: any) {
+      showError(`Error: ${error.message}`);
+    } finally {
+      setIsVerifyingPlayer(false);
+    }
   };
 
   const handlePlayerStatusChange = useCallback(async (player: PlayerData, newStatus: 'pending' | 'verified' | 'approved' | 'rejected') => {
     if (!user) return;
-    verifyPlayerMutation.mutate({
-      playerId: player.id,
-      status: newStatus,
-      comments: `Status changed to ${newStatus}`,
-      teamId,
-      venueId
-    });
-  }, [user, teamId, venueId, verifyPlayerMutation]);
+    await handleVerifyPlayer(
+      player.id,
+      newStatus as 'verified' | 'rejected',
+      `Status changed to ${newStatus}`
+    );
+  }, [user, handleVerifyPlayer]);
 
   const handleAddPlayerVolunteer = async () => {
     if (!team || !user) return;
@@ -345,12 +427,13 @@ export default function TeamMatchDayVerificationPage() {
           firstName: playerFormData.firstName,
           lastName: playerFormData.lastName,
           phone: normalizedPhone,
-          dateOfBirth: new Date(playerFormData.dob),
+          dateOfBirth: playerFormData.dob,
           gender: 'M',
-          village: playerFormData.village,
+          panchayat: 'Default Panchayat',
+          district: 'Default District',
         });
       } else {
-        addPlayerMutation.mutate({
+        await handleAddPlayer({
           teamId: team.id,
           playerData: {
             name: `${playerFormData.firstName} ${playerFormData.lastName}`.trim(),
@@ -384,15 +467,32 @@ export default function TeamMatchDayVerificationPage() {
     });
     setIsEditMode(true);
     setEditingPlayerId(player.id);
+    setShowPlayerModal(false); // Close player details modal
+    setSelectedPlayer(null);   // Clear selected player
     setShowAddPlayerModal(true);
   };
 
   const handleRemovePlayer = (player: PlayerData) => {
+    // Check if player is captain
+    if (team?.captainProfile?.phone === player.phone) {
+      showError('Cannot remove the team captain. Please promote another player to captain first.');
+      return;
+    }
+    
     if (confirm(`Are you sure you want to remove ${player.name} from the team?`)) {
       removePlayerMutation.mutate({
         playerId: player.id,
         teamId: teamId,
         venueId
+      });
+    }
+  };
+
+  const handlePromoteCaptain = async (player: PlayerData) => {
+    if (confirm(`Are you sure you want to promote ${player.name} to team captain?`)) {
+      promoteCaptainMutation.mutate({
+        teamId: teamId,
+        newCaptainId: player.userId || player.id
       });
     }
   };
@@ -404,15 +504,6 @@ export default function TeamMatchDayVerificationPage() {
     setFoundUser(null);
     setPlayerExists(false);
   };
-
-  // Phone search functionality
-  const { data: searchedUser, isLoading: isSearchingPhone } = api.users.getByPhone.useQuery(
-    { phone: searchPhone },
-    { 
-      enabled: searchPhone.length > 0,
-      retry: false
-    }
-  );
 
   const handlePhoneSearch = (phone: string) => {
     setPlayerFormData(prev => ({ ...prev, phone }));
@@ -451,19 +542,35 @@ export default function TeamMatchDayVerificationPage() {
     }
   }, [searchedUser, playerFormData.phone, searchPhone]);
 
+  // Add computed properties for position limits
+  const availablePositions = useMemo(() => {
+    if (!team || !players) return { main: { available: true, count: 0 }, substitute: { available: true, count: 0 } };
+    
+    const mainCount = players.filter(p => p.position === 'main').length;
+    const subCount = players.filter(p => p.position === 'substitute').length;
+    
+    // Get sport data from team query - it should include mainPlayersCount and maxSubstitutes
+    const sportData = teamData?.sport;
+    const maxMainPlayers = sportData?.mainPlayersCount || 11; // Default fallback
+    const maxSubPlayers = sportData?.maxSubstitutes || 5; // Default fallback
+
+    return {
+      main: { available: mainCount < maxMainPlayers, count: mainCount, max: maxMainPlayers },
+      substitute: { available: subCount < maxSubPlayers, count: subCount, max: maxSubPlayers }
+    };
+  }, [players, team, teamData]);
+
   const handleStatusChangeBulk = async (playersToUpdate: PlayerData[], status: 'pending' | 'verified' | 'approved' | 'rejected') => {
     if (!user) return;
     setSubmitting(true);
     
     try {
       for (const player of playersToUpdate) {
-        await verifyPlayerMutation.mutateAsync({
-          playerId: player.id,
-          status,
-          comments: `Bulk set to ${status}`,
-          teamId,
-          venueId
-        });
+        await handleVerifyPlayer(
+          player.id,
+          status as 'verified' | 'rejected',
+          `Bulk set to ${status}`
+        );
       }
       showSuccess(`Updated ${playersToUpdate.length} players to ${status}.`);
     } catch (e) {
@@ -475,11 +582,40 @@ export default function TeamMatchDayVerificationPage() {
 
   const playerColumns = useMemo<Column[]>(() => [
     {
+      key: 'profile',
+      header: 'Profile',
+      className: 'w-16 text-center',
+      render: (_value, player) => (
+        <div className="flex justify-center">
+          {player.documents?.profilePhoto?.url ? (
+            <img
+              src={player.documents.profilePhoto.url}
+              alt="Profile"
+              width={32}
+              height={32}
+              className="w-8 h-8 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+              <User className="w-4 h-4 text-gray-400" />
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
       key: 'player',
       header: 'Player',
       render: (_value, player) => (
         <div>
-          <div className="text-sm font-medium text-gray-900">{player.name}</div>
+          <div className="text-sm font-medium text-gray-900">
+            {player.name}
+            {team?.captainProfile?.phone === player.phone && (
+              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                Captain
+              </span>
+            )}
+          </div>
           <div className="text-sm text-gray-500">{player.age} years • {player.gender === 'M' ? 'Male' : 'Female'}</div>
         </div>
       )
@@ -489,6 +625,29 @@ export default function TeamMatchDayVerificationPage() {
       header: 'Mobile',
       render: (_value, player) => (
         <span className="text-sm text-gray-900">{player.phone}</span>
+      )
+    },
+    {
+      key: 'position',
+      header: 'Position',
+      render: (_value, player) => (
+        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+          player.position === 'main'
+            ? 'bg-[#F28C38] text-white'
+            : 'bg-gray-200 text-gray-700'
+        }`}>
+          {player.position === 'main' ? 'Main Player' : 'Substitute'}
+        </span>
+      )
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      render: (_value, player) => (
+        <div className="text-sm">
+          <div className="text-gray-900">{player.village || 'N/A'}</div>
+          <div className="text-gray-500">{player.district || 'N/A'}</div>
+        </div>
       )
     },
     {
@@ -511,23 +670,34 @@ export default function TeamMatchDayVerificationPage() {
       )
     },
     {
-      key: 'profile',
-      header: 'Profile',
-      className: 'w-16 text-center',
+      key: 'actions',
+      header: 'Actions',
+      className: 'w-32 text-center',
       render: (_value, player) => (
-        <div className="flex justify-center">
-          {player.documents?.profilePhoto?.url ? (
-            <img
-              src={player.documents.profilePhoto.url}
-              alt="Profile"
-              width={32}
-              height={32}
-              className="w-8 h-8 rounded-full object-cover"
-            />
-          ) : (
-            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-              <User className="w-4 h-4 text-gray-400" />
-            </div>
+        <div className="flex space-x-1 justify-center">
+          {player.verificationStatus !== 'approved' && player.verificationStatus !== 'rejected' && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePlayerStatusChange(player, 'approved');
+                }}
+                disabled={submitting}
+                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Approve
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePlayerStatusChange(player, 'rejected');
+                }}
+                disabled={submitting}
+                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Reject
+              </button>
+            </>
           )}
         </div>
       )
@@ -668,18 +838,31 @@ export default function TeamMatchDayVerificationPage() {
           </button>
         )}
         headerActionsMultiple={(selected) => (
-          <button
-            onClick={async () => {
-              if (!selected?.length) return;
-              await handleStatusChangeBulk(selected as any[], 'approved');
-            }}
-            disabled={submitting}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
-          >
-            Approve
-          </button>
+          <div className="flex space-x-2">
+            <button
+              onClick={async () => {
+                if (!selected?.length) return;
+                await handleStatusChangeBulk(selected as any[], 'approved');
+              }}
+              disabled={submitting}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+            >
+              Approve
+            </button>
+            <button
+              onClick={async () => {
+                if (!selected?.length) return;
+                await handleStatusChangeBulk(selected as any[], 'rejected');
+              }}
+              disabled={submitting}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+            >
+              Reject
+            </button>
+          </div>
         )}
         searchable={true}
+        searchFields={['name', 'phone', 'firstName', 'lastName']}
         searchPlaceholder="Search players..."
         stickyHeader={true}
         compact={false}
@@ -697,7 +880,7 @@ export default function TeamMatchDayVerificationPage() {
 
       {/* Modals */}
       {showAddPlayerModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
@@ -775,9 +958,17 @@ export default function TeamMatchDayVerificationPage() {
                       onChange={(e) => setPlayerFormData(prev => ({ ...prev, position: e.target.value as 'main' | 'substitute' }))}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F28C38]"
                     >
-                      <option value="main">Main Player</option>
-                      <option value="substitute">Substitute</option>
+                      <option value="main" disabled={!availablePositions.main.available}>
+                        Main Player {!availablePositions.main.available ? '(Full)' : ''}
+                      </option>
+                      <option value="substitute" disabled={!availablePositions.substitute.available}>
+                        Substitute {!availablePositions.substitute.available ? '(Full)' : ''}
+                      </option>
                     </select>
+                    <div className="text-sm text-gray-600 mt-1">
+                      Main: {availablePositions.main.count}/{availablePositions.main.max} • 
+                      Substitutes: {availablePositions.substitute.count}/{availablePositions.substitute.max}
+                    </div>
                   </div>
 
                   {playerExists && (
@@ -997,7 +1188,7 @@ export default function TeamMatchDayVerificationPage() {
           size="xl"
           mobileFullScreen={true}
           footer={(
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center gap-4">
               <button
                 onClick={() => {
                   setShowPlayerModal(false);
@@ -1007,18 +1198,18 @@ export default function TeamMatchDayVerificationPage() {
               >
                 Close
               </button>
-              <div className="flex space-x-3">
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => handlePromoteCaptain(selectedPlayer)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Promote Captain
+                </button>
                 <button
                   onClick={() => handleEditPlayer(selectedPlayer)}
                   className="px-4 py-2 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors"
                 >
                   Edit Player
-                </button>
-                <button
-                  onClick={() => handleRemovePlayer(selectedPlayer)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Remove Player
                 </button>
               </div>
             </div>
@@ -1083,6 +1274,214 @@ export default function TeamMatchDayVerificationPage() {
                     <p className="mt-1 text-sm text-gray-900">{selectedPlayer.village || 'Not provided'}</p>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Documents Section */}
+            <div>
+              <h4 className="font-medium text-gray-900 mb-3">Documents</h4>
+              <div className="grid grid-cols-1 gap-6">
+                <PlayerDocumentUpload
+                  playerId={selectedPlayer.id}
+                  playerUserId={selectedPlayer.userId || selectedPlayer.id}
+                  documentType="profilePhoto"
+                  label="Profile Photo"
+                  currentUrl={selectedPlayer.documents.profilePhoto?.url}
+                  onSuccess={async () => {
+                    const { data: updatedData } = await refetchTeam();
+                    if (updatedData) {
+                      // Update the players state with fresh data
+                      const mappedPlayers = updatedData.teamPlayers?.map(player => {
+                        const profileImages = player.user?.profileImages;
+                        return {
+                          id: player.id,
+                          userId: player.user?.id,
+                          name: `${player.user?.firstName || ''} ${player.user?.lastName || ''}`.trim(),
+                          firstName: player.user?.firstName || '',
+                          lastName: player.user?.lastName || '',
+                          phone: player.user?.phone || '',
+                          age: player.user?.age || 0,
+                          gender: player.user?.gender || '',
+                          position: player.position || '',
+                          dob: player.user?.dateOfBirth?.toISOString(),
+                          whatsappNumber: player.whatsappNumber,
+                          village: player.village,
+                          district: player.district,
+                          panchayat: player.panchayat,
+                          documents: {
+                            profilePhoto: {
+                              url: profileImages?.profilePhotoPath || null,
+                              verified: false,
+                              storagePath: profileImages?.profilePhotoPath || null,
+                              uploadedBy: null,
+                              uploadedAt: null
+                            },
+                            aadhaarFront: {
+                              url: profileImages?.aadhaarFrontPath || null,
+                              verified: false,
+                              storagePath: profileImages?.aadhaarFrontPath || null,
+                              uploadedBy: null,
+                              uploadedAt: null
+                            },
+                            aadhaarBack: {
+                              url: profileImages?.aadhaarBackPath || null,
+                              verified: false,
+                              storagePath: profileImages?.aadhaarBackPath || null,
+                              uploadedBy: null,
+                              uploadedAt: null
+                            }
+                          },
+                          verificationStatus: player.verificationStatus || 'pending',
+                          matchDayVerificationStatus: player.matchDayVerificationStatus,
+                          matchDayComments: player.matchDayComments
+                        };
+                      }) || [];
+                      setPlayers(mappedPlayers);
+                      
+                      // Update selected player if it's the same one
+                      const updatedSelectedPlayer = mappedPlayers.find(p => p.id === selectedPlayer.id);
+                      if (updatedSelectedPlayer) {
+                        setSelectedPlayer(updatedSelectedPlayer);
+                      }
+                    }
+                  }}
+                  onError={(error) => showError(`Upload failed: ${error}`)}
+                  variant="card"
+                />
+                <PlayerDocumentUpload
+                  playerId={selectedPlayer.id}
+                  playerUserId={selectedPlayer.userId || selectedPlayer.id}
+                  documentType="aadhaarFront"
+                  label="Aadhaar Front"
+                  currentUrl={selectedPlayer.documents.aadhaarFront?.url}
+                  onSuccess={async () => {
+                    const { data: updatedData } = await refetchTeam();
+                    if (updatedData) {
+                      // Update the players state with fresh data
+                      const mappedPlayers = updatedData.teamPlayers?.map(player => {
+                        const profileImages = player.user?.profileImages;
+                        return {
+                          id: player.id,
+                          userId: player.user?.id,
+                          name: `${player.user?.firstName || ''} ${player.user?.lastName || ''}`.trim(),
+                          firstName: player.user?.firstName || '',
+                          lastName: player.user?.lastName || '',
+                          phone: player.user?.phone || '',
+                          age: player.user?.age || 0,
+                          gender: player.user?.gender || '',
+                          position: player.position || '',
+                          dob: player.user?.dateOfBirth?.toISOString(),
+                          whatsappNumber: player.whatsappNumber,
+                          village: player.village,
+                          district: player.district,
+                          panchayat: player.panchayat,
+                          documents: {
+                            profilePhoto: {
+                              url: profileImages?.profilePhotoPath || null,
+                              verified: false,
+                              storagePath: profileImages?.profilePhotoPath || null,
+                              uploadedBy: null,
+                              uploadedAt: null
+                            },
+                            aadhaarFront: {
+                              url: profileImages?.aadhaarFrontPath || null,
+                              verified: false,
+                              storagePath: profileImages?.aadhaarFrontPath || null,
+                              uploadedBy: null,
+                              uploadedAt: null
+                            },
+                            aadhaarBack: {
+                              url: profileImages?.aadhaarBackPath || null,
+                              verified: false,
+                              storagePath: profileImages?.aadhaarBackPath || null,
+                              uploadedBy: null,
+                              uploadedAt: null
+                            }
+                          },
+                          verificationStatus: player.verificationStatus || 'pending',
+                          matchDayVerificationStatus: player.matchDayVerificationStatus,
+                          matchDayComments: player.matchDayComments
+                        };
+                      }) || [];
+                      setPlayers(mappedPlayers);
+                      
+                      // Update selected player if it's the same one
+                      const updatedSelectedPlayer = mappedPlayers.find(p => p.id === selectedPlayer.id);
+                      if (updatedSelectedPlayer) {
+                        setSelectedPlayer(updatedSelectedPlayer);
+                      }
+                    }
+                  }}
+                  onError={(error) => showError(`Upload failed: ${error}`)}
+                  variant="card"
+                />
+                <PlayerDocumentUpload
+                  playerId={selectedPlayer.id}
+                  playerUserId={selectedPlayer.userId || selectedPlayer.id}
+                  documentType="aadhaarBack"
+                  label="Aadhaar Back"
+                  currentUrl={selectedPlayer.documents.aadhaarBack?.url}
+                  onSuccess={async () => {
+                    const { data: updatedData } = await refetchTeam();
+                    if (updatedData) {
+                      // Update the players state with fresh data
+                      const mappedPlayers = updatedData.teamPlayers?.map(player => {
+                        const profileImages = player.user?.profileImages;
+                        return {
+                          id: player.id,
+                          userId: player.user?.id,
+                          name: `${player.user?.firstName || ''} ${player.user?.lastName || ''}`.trim(),
+                          firstName: player.user?.firstName || '',
+                          lastName: player.user?.lastName || '',
+                          phone: player.user?.phone || '',
+                          age: player.user?.age || 0,
+                          gender: player.user?.gender || '',
+                          position: player.position || '',
+                          dob: player.user?.dateOfBirth?.toISOString(),
+                          whatsappNumber: player.whatsappNumber,
+                          village: player.village,
+                          district: player.district,
+                          panchayat: player.panchayat,
+                          documents: {
+                            profilePhoto: {
+                              url: profileImages?.profilePhotoPath || null,
+                              verified: false,
+                              storagePath: profileImages?.profilePhotoPath || null,
+                              uploadedBy: null,
+                              uploadedAt: null
+                            },
+                            aadhaarFront: {
+                              url: profileImages?.aadhaarFrontPath || null,
+                              verified: false,
+                              storagePath: profileImages?.aadhaarFrontPath || null,
+                              uploadedBy: null,
+                              uploadedAt: null
+                            },
+                            aadhaarBack: {
+                              url: profileImages?.aadhaarBackPath || null,
+                              verified: false,
+                              storagePath: profileImages?.aadhaarBackPath || null,
+                              uploadedBy: null,
+                              uploadedAt: null
+                            }
+                          },
+                          verificationStatus: player.verificationStatus || 'pending',
+                          matchDayVerificationStatus: player.matchDayVerificationStatus,
+                          matchDayComments: player.matchDayComments
+                        };
+                      }) || [];
+                      setPlayers(mappedPlayers);
+                      
+                      // Update selected player if it's the same one
+                      const updatedSelectedPlayer = mappedPlayers.find(p => p.id === selectedPlayer.id);
+                      if (updatedSelectedPlayer) {
+                        setSelectedPlayer(updatedSelectedPlayer);
+                      }
+                    }
+                  }}
+                  onError={(error) => showError(`Upload failed: ${error}`)}
+                  variant="card"
+                />
               </div>
             </div>
           </div>

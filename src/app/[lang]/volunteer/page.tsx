@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/lib/utils/i18n';
-import { api } from '@/server/trpc/react';
+import { useOfflineAssignments } from '@/hooks/useOfflineAssignments';
 import { MapPin, AlertCircle } from 'lucide-react';
 
 export default function VolunteerHomePage() {
@@ -13,18 +13,18 @@ export default function VolunteerHomePage() {
   const { user, userProfile, loading: authLoading } = useAuth();
   const { t } = useTranslation();
 
-  // Get volunteer assignments
+  // Get volunteer assignments with API fallback
   const { 
-    data: assignments, 
+    assignments, 
     isLoading: assignmentsLoading,
-    error: assignmentsError 
-  } = api.volunteers.assignments.getMyAssignments.useQuery(
-    undefined,
-    { 
-      enabled: !authLoading && !!user,
-      retry: 1
-    }
-  );
+    error: assignmentsError,
+    refetch
+  } = useOfflineAssignments();
+
+  // Debug assignments
+  console.log('Volunteer assignments:', assignments);
+  console.log('Assignments loading:', assignmentsLoading);
+  console.log('Assignments error:', assignmentsError);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -83,6 +83,21 @@ export default function VolunteerHomePage() {
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome, Volunteer!</h1>
             <p className="text-gray-600">Your venue assignments</p>
+            
+            {/* Data source indicator and sync button */}
+            <div className="mt-4 flex items-center justify-center gap-4">
+              <span className="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
+                🌐 Live Data
+              </span>
+              
+              <button
+                onClick={refetch}
+                disabled={assignmentsLoading}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+              >
+                {assignmentsLoading ? '🔄 Syncing...' : '🔄 Sync Now'}
+              </button>
+            </div>
           </div>
           
           <div className="grid gap-4">
@@ -120,6 +135,22 @@ export default function VolunteerHomePage() {
         <p className="text-gray-600 mb-4">
           You are not assigned to any venue. Please contact the admin to get assigned to a venue.
         </p>
+        
+        {/* Data source and sync button */}
+        <div className="mb-4 flex items-center justify-center gap-4">
+          <span className="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
+            🌐 Live Data
+          </span>
+          
+          <button
+            onClick={refetch}
+            disabled={assignmentsLoading}
+            className="bg-[#F28C38] hover:bg-[#E67A26] text-white px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+          >
+            {assignmentsLoading ? '🔄 Syncing...' : '🔄 Check Again'}
+          </button>
+        </div>
+        
         <div className="space-y-2 text-sm text-gray-500">
           <p>Contact: admin@ishagramotsavam.org</p>
           <p>Or reach out to your coordinator</p>

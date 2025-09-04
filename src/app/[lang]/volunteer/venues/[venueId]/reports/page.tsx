@@ -1,7 +1,8 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { api } from '@/server/trpc/react';
+import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
+import { useOfflineMatches } from '@/hooks/useOfflineMatches';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/Progress';
@@ -18,17 +19,9 @@ export default function ReportsPage() {
   const params = useParams();
   const venueId = params.venueId as string;
 
-  const { data: stats } = api.volunteers.dashboard.getVenueStats.useQuery({
-    venueId
-  });
-
-  const { data: fixtures } = api.volunteers.fixture.getVenueFixtures.useQuery({
-    venueId
-  });
-
-  const { data: matches } = api.volunteers.match.getVenueMatchesByStatus.useQuery({
-    venueId
-  });
+  // Get data from offline storage
+  const { stats, fixtures } = useOfflineVenueData(venueId);
+  const { matches } = useOfflineMatches(venueId);
 
   const completionRate = stats?.totalTeams ? 
     Math.round((stats.checkedInTeams / stats.totalTeams) * 100) : 0;

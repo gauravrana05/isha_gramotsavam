@@ -4,9 +4,14 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useParams } from 'next/navigation';
+import { useOfflineTeams } from '@/hooks/useOfflineTeams';
+import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
 import { api } from '@/server/trpc/react';
+import CreateTeamModal from '@/components/volunteer/CreateTeamModal';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
+import { TeamStatusSelector } from '@/components/ui/StatusSelector';
 import type { Column } from '@/components/ui/Table';
+import { useAlert } from '@/hooks/useAlert';
 import { 
   Loader2, 
   Users, 
@@ -17,32 +22,80 @@ import {
   MapPin,
   Trophy,
   UserCheck,
-  AlertCircle
+  AlertCircle,
+  Plus
 } from 'lucide-react';
 
 export default function MatchDayTeamsPage() {
   const params = useParams();
   const { venueId } = params as { venueId: string; lang: string };
   const { user, loading: authLoading } = useAuth();
+  const { showError, showSuccess } = useAlert();
   
   const [error, setError] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Data fetching with tRPC
+  // Get teams from offline storage
   const { 
-    data: teamsData, 
+    teams: teamsData, 
     isLoading: loading, 
     error: teamsError,
     refetch: refetchTeams
-  } = api.volunteers.venue.getVenueTeams.useQuery(
-    { venueId: venueId || '' },
-    { 
-      enabled: !!user && !!venueId && venueId.length > 0,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true
-    }
-  );
+  } = useOfflineTeams(venueId);
+
+  // Get venue data for location information
+  const { venueData } = useOfflineVenueData(venueId);
+  
+  // Debug venue data
+  console.log('Venue data for location:', venueData);
 
   const teams = teamsData || [];
+
+  // Debug team data structure
+  console.log('Teams data:', teams[0]);
+  if (teams[0]) {
+    console.log('First team location:', {
+      panchayat: teams[0].panchayat,
+      district: teams[0].district,
+      state: teams[0].state,
+      taluk: teams[0].taluk,
+      captainUser: teams[0].captainUser,
+      captainUserLocation: {
+        panchayat: teams[0].captainUser?.panchayat,
+        district: teams[0].captainUser?.district,
+        state: teams[0].captainUser?.state,
+      }
+    });
+    console.log('First team sport:', teams[0].sport);
+    console.log('First team players:', teams[0].teamPlayers);
+    console.log('Full team object keys:', Object.keys(teams[0]));
+    console.log('Captain user keys:', teams[0].captainUser ? Object.keys(teams[0].captainUser) : 'No captain user');
+  }
+
+  // Team status update mutation
+  const updateTeamStatusMutation = api.volunteers.venue.updateTeamStatus.useMutation({
+    onSuccess: () => {
+      refetchTeams();
+      showSuccess('Team status updated successfully!');
+    },
+    onError: (error) => {
+      console.error('Failed to update team status:', error);
+      showError(`Failed to update team status: ${error.message}`);
+    }
+  });
+
+  // Handle team status change
+  const handleTeamStatusChange = async (team: any, newStatus: string) => {
+    try {
+      updateTeamStatusMutation.mutate({
+        teamId: team.id,
+        status: newStatus as any,
+        venueId: venueId
+      });
+    } catch (error) {
+      console.error('Failed to update team status:', error);
+    }
+  };
 
   // Set error from tRPC
   useEffect(() => {
@@ -119,6 +172,16 @@ export default function MatchDayTeamsPage() {
     }
   };
 
+  const createTeamButton = (
+    <button
+      onClick={() => setShowCreateModal(true)}
+      className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-[#F28C38] border border-transparent rounded-lg hover:bg-[#E67A26] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+    >
+      <Plus className="w-4 h-4 mr-2" />
+      Create Team
+    </button>
+  );
+
   const getTeamColumns = (): Column<any>[] => [
     {
       key: 'name',
@@ -129,21 +192,22 @@ export default function MatchDayTeamsPage() {
         return (
           <div>
             <div className="text-sm font-medium text-gray-900">{item.name || 'N/A'}</div>
-            <div className="text-sm text-gray-500">{item.captainUser?.firstName || item.captainUser?.name || 'N/A'} {item.captainUser?.lastName || ''}</div>
+            <div className="text-sm text-gray-500">{item.sport?.name || 'N/A'}</div>
           </div>
         );
       }
     },
     {
-      key: 'sport',
-      header: 'Sport',
+      key: 'captain',
+      header: 'Captain',
       sortable: true,
       render: (value, item, index) => {
         if (!item) return null;
+        const captainName = `${item.captainUser?.firstName || ''} ${item.captainUser?.lastName || ''}`.trim() || 'N/A';
         return (
-          <div className="flex items-center">
-            <Trophy className="w-4 h-4 text-gray-400 mr-2" />
-            <span className="text-sm text-gray-900">{item.sport?.name || 'N/A'}</span>
+          <div>
+            <div className="text-sm font-medium text-gray-900">{captainName}</div>
+            <div className="text-sm text-gray-500">{item.captainUser?.phone || 'N/A'}</div>
           </div>
         );
       }
@@ -153,9 +217,11 @@ export default function MatchDayTeamsPage() {
       header: 'Players',
       render: (value, item, index) => {
         if (!item) return null;
+        const currentPlayers = item.teamPlayers?.length || item.currentPlayers || 0;
+        const maxPlayers = item.sport?.mainPlayersCount || 11;
         return (
           <span className="text-sm text-gray-900">
-            {item.verifiedPlayersCount || 0}/{item.currentPlayers || 0}
+            {currentPlayers}/{maxPlayers}
           </span>
         );
       }
@@ -165,9 +231,11 @@ export default function MatchDayTeamsPage() {
       header: 'Location',
       render: (value, item, index) => {
         if (!item) return null;
-        // Extract location from captain user or team data
+        
+        // Get location from captain's user data or team data
         const panchayat = item.captainUser?.panchayat || item.panchayat || 'N/A';
         const district = item.captainUser?.district || item.district || 'N/A';
+        
         return (
           <div className="flex items-center">
             <MapPin className="w-4 h-4 text-gray-400 mr-2" />
@@ -185,12 +253,13 @@ export default function MatchDayTeamsPage() {
       sortable: true,
       render: (value, item, index) => {
         if (!item) return null;
-        const status = item.verificationStatus || item.status || 'pending';
         return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
-            {getStatusIcon(status)}
-            <span className="ml-1 capitalize">{status.replace('_', ' ')}</span>
-          </span>
+          <TeamStatusSelector
+            value={item.status || 'draft'}
+            onChange={(newStatus) => handleTeamStatusChange(item, newStatus)}
+            disabled={false}
+            className="min-w-[120px]"
+          />
         );
       }
     }
@@ -297,35 +366,38 @@ export default function MatchDayTeamsPage() {
         data={teams}
         columns={getTeamColumns()}
         searchable
+        searchFields={['name', 'captainUser.firstName', 'captainUser.lastName', 'captainUser.phone', 'captainUser.panchayat', 'captainUser.district', 'sport.name']}
         searchPlaceholder="Search teams..."
         filterable
         filters={getTeamFilters()}
         sortable
         pagination={{ enabled: true, pageSize: 25 }}
         keyExtractor={(team) => team?.id || Math.random().toString()}
+        onRowClick={(team) => window.location.href = `/en/volunteer/venues/${venueId}/teams/${team?.id}`}
         emptyState={{
           icon: Users,
           title: 'No teams found',
           description: 'No teams have been assigned to this venue yet.'
         }}
-        actions={[
-          {
-            label: 'View',
-            icon: Eye,
-            onClick: (team) => window.location.href = `/en/volunteer/venues/${venueId}/teams/${team?.id}`,
-            variant: 'primary'
-          },
-          {
-            label: 'Photo',
-            icon: Camera,
-            onClick: (team) => {/* View photo action */},
-            variant: 'secondary',
-            // @ts-expect-error: 'show' is not a valid property on ActionButton, but used for conditional rendering
-            show: (team : any) => !!team?.teamImageUrl
-          }
-        ]}
-        persistState
-        stateKey="venue-teams"
+        headerActions={createTeamButton}
+      />
+
+      {/* Create Team Modal */}
+      <CreateTeamModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        venueId={venueId}
+        venueLocation={{
+          panchayat: venueData?.panchayat || venueData?.venue?.panchayat || 'Default Panchayat',
+          district: venueData?.district || venueData?.venue?.district || 'Default District', 
+          state: venueData?.state || venueData?.venue?.state || 'Tamil Nadu',
+          taluk: venueData?.taluk || venueData?.venue?.taluk || 'Default Taluk',
+          pincode: venueData?.pincode || venueData?.venue?.pincode || '600001'
+        }}
+        onTeamCreated={() => {
+          refetchTeams();
+          setShowCreateModal(false);
+        }}
       />
     </div>
   );

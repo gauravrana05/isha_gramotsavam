@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useOffline } from '@/context/OfflineContextWrapper';
-import { api } from '@/server/trpc/react';
+import { useOfflineAssignments } from '@/hooks/useOfflineAssignments';
 import { useTranslation } from '@/lib/utils/i18n';
 import { AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { VolunteerPageLoader } from '@/components/ui';
@@ -46,14 +46,12 @@ export default function VolunteerVenuesRedirect() {
   const isVolunteer = user && ['general_volunteer', 'technical_volunteer', 'verification_volunteer'].includes(user.role);
   
   // Fetch volunteer assignments
+  // Get assignments from offline storage
   const { 
     data: assignments, 
     isLoading: assignmentsLoading,
     error: assignmentsError
-  } = api.volunteers.assignments.getMyAssignments.useQuery(
-    undefined,
-    { enabled: !authLoading && !!user && !!isVolunteer }
-  );
+  } = useOfflineAssignments();
 
   // Handle redirect when assignments are loaded
   useEffect(() => {

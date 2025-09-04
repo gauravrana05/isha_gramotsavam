@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { api } from '@/server/trpc/react';
+import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/lib/utils/i18n';
@@ -57,24 +57,13 @@ function VolunteerFixturesPage() {
     return !!user?.id && !!venueId;
   }, [user?.id, venueId]);
 
-  // Single query for all tournament data with real-time updates
+  // Get venue tournament data from offline storage
   const { 
-    data: venueData, 
+    venueData, 
     isLoading: loading, 
     error,
     refetch
-  } = api.volunteers.venue.getVenueTournament.useQuery(
-    { venueId },
-    { 
-      enabled: isQueryEnabled(),
-      // Remove automatic polling to prevent conflicts
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true,
-      // Add stale time to prevent unnecessary refetches
-      staleTime: 10000 // 10 seconds
-    }
-  );
-
+  } = useOfflineVenueData(venueId);
 
   // Add controlled polling only for active tournaments
   React.useEffect(() => {
@@ -101,12 +90,18 @@ function VolunteerFixturesPage() {
   }, [loading, user?.id, venueId, isQueryEnabled]);
 
   // Memoize data before any early returns
-  const tournament = React.useMemo(() => venueData?.tournament, [venueData?.tournament]);
-  const teamsBySport = React.useMemo(() => venueData?.teamsBySport || [], [venueData?.teamsBySport]);
-  const stats = React.useMemo(() => 
-    venueData?.stats || { totalTeams: 0, matchesCompleted: 0, matchesTotal: 0, progress: 0 }, 
-    [venueData?.stats]
-  );
+  const tournament = React.useMemo(() => {
+    return venueData?.tournament || venueData?.fixtures?.[0] || null;
+  }, [venueData?.tournament, venueData?.fixtures]);
+  
+  const teamsBySport = React.useMemo(() => {
+    return venueData?.teamsBySport || venueData?.teams || [];
+  }, [venueData?.teamsBySport, venueData?.teams]);
+  
+  const stats = React.useMemo(() => {
+    const defaultStats = { totalTeams: 0, matchesCompleted: 0, matchesTotal: 0, progress: 0 };
+    return venueData?.stats || defaultStats;
+  }, [venueData?.stats]);
 
   // Helper functions
   const getStatusColor = (status: string) => {
@@ -329,17 +324,18 @@ function VolunteerFixturesPage() {
             {/* Quick Actions */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <button
-                onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${tournament.id}`)}
+                onClick={() => tournament?.id && router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${tournament.id}`)}
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-[#F28C38] text-white rounded-lg hover:bg-[#E67A26] transition-colors"
+                disabled={!tournament?.id}
               >
                 <Eye className="w-4 h-4" />
                 <span className="text-sm font-medium">View Bracket</span>
               </button>
 
               <button
-                onClick={() => router.push(`/${lang}/volunteer/venues/${venueId}/matches?fixture=${tournament.id}`)}
+                onClick={() => tournament?.id && router.push(`/${lang}/volunteer/venues/${venueId}/matches?fixture=${tournament.id}`)}
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                disabled={tournament.status === 'completed'}
+                disabled={tournament?.status === 'completed' || !tournament?.id}
               >
                 <Play className="w-4 h-4" />
                 <span className="text-sm font-medium">Live Matches</span>

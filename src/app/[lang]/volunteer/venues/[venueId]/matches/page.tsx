@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/lib/utils/i18n';
-import { api } from '@/server/trpc/react';
+import { useOfflineMatches } from '@/hooks/useOfflineMatches';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import type { Column } from '@/components/ui/Table';
 import { type FilterField } from '@/components/ui/FilterSidebar';
@@ -67,22 +67,13 @@ export default function MatchesPage() {
   const venueIdString = Array.isArray(venueId) ? venueId[0] : venueId;
 
   // Single query for all match data with real-time updates
+  // Get matches from offline storage
   const { 
-    data: matchData, 
+    matches: matchData, 
     isLoading: loading, 
     error,
     refetch
-  } = api.volunteers.venue.getVenueMatches.useQuery(
-    { 
-      venueId: venueIdString || '',
-      fixtureId: fixtureId || undefined
-    },
-    { 
-      enabled: !!user && !!venueIdString,
-      refetchInterval: 30000, // Refetch every 30 seconds
-      refetchIntervalInBackground: true
-    }
-  );
+  } = useOfflineMatches(venueIdString, { fixtureId });
 
   // Add aggressive polling for pages with active matches
   React.useEffect(() => {

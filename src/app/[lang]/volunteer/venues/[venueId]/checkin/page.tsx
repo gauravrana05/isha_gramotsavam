@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { api } from '@/server/trpc/react';
+import { useOfflineTeams } from '@/hooks/useOfflineTeams';
+import { useOfflineActions } from '@/hooks/useOfflineActions';
 import { Button }  from '@/components/ui'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Badge } from '@/components/ui/badge';
@@ -18,36 +19,31 @@ export default function TeamCheckInPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [photoDialog, setPhotoDialog] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
   const { addNotification } = useNotification();
 
-  // Get teams assigned to this venue
-  const { data: teams, refetch } = api.volunteers.team.getVenueTeams.useQuery({
-    venueId
-  });
-
-  const checkInMutation = api.volunteers.team.checkInTeam.useMutation({
-    onSuccess: () => {
-      addNotification('Team checked in successfully', 'success');
-      refetch();
-    }
-  });
-
-  const uploadPhotoMutation = api.volunteers.team.uploadTeamPhoto.useMutation({
-    onSuccess: () => {
-      addNotification('Team photo uploaded successfully', 'success');
-      setPhotoDialog(false);
-      refetch();
-    }
-  });
+  // Get teams from offline storage
+  const { teams, refetch } = useOfflineTeams(venueId);
+  const { checkInTeam } = useOfflineActions();
 
   const filteredTeams = teams?.filter(team =>
-    team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    team.captainName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    team.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    team.captainName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     team.tournamentNumber?.toString().includes(searchTerm)
   );
 
-  const handleCheckIn = (teamId: string) => {
-    checkInMutation.mutate({ teamId });
+  const handleCheckIn = async (teamId: string) => {
+    try {
+      setIsCheckingIn(true);
+      await checkInTeam(teamId);
+      addNotification('Team checked in successfully', 'success');
+      refetch(); // Refresh offline data
+    } catch (error) {
+      addNotification('Failed to check in team', 'error');
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
   };
 
   const handlePhotoUpload = (e: React.FormEvent<HTMLFormElement>) => {

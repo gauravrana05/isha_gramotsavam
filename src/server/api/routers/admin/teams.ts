@@ -4,6 +4,61 @@ import { TRPCError } from "@trpc/server";
 import { db } from "@/lib/db";
 import { assignVenueToTeam } from "@/lib/services/venueAssignment";
 
+// Helper functions for status cascading
+async function cascadeTeamStatusToPlayers(teamId: string, teamStatus: string) {
+  let playerStatus: string | null = null;
+  
+  if (teamStatus === 'checked_in') {
+    playerStatus = 'approved';
+  } else if (teamStatus === 'verified') {
+    playerStatus = 'verified';
+  } else if (teamStatus === 'submitted') {
+    playerStatus = 'pending';
+  }
+  
+  if (playerStatus) {
+    await db.teamPlayer.updateMany({
+      where: { teamId },
+      data: { verificationStatus: playerStatus as any },
+    });
+    console.log(`🔄 Admin: Team ${teamId} (${teamStatus}) cascaded to players (${playerStatus})`);
+  }
+}
+
+async function cascadePlayerStatusToTeam(teamId: string) {
+  const team = await db.team.findUnique({
+    where: { id: teamId },
+    include: { teamPlayers: true },
+  });
+  
+  if (!team) return;
+  
+  const playerStatuses = team.teamPlayers.map(p => p.verificationStatus);
+  const currentTeamStatus = team.status;
+  let newTeamStatus = currentTeamStatus;
+  
+  // Priority-based status resolution
+  if (playerStatuses.some(s => s === 'rejected')) {
+    newTeamStatus = 'rejected';
+  } else if (playerStatuses.some(s => s === 'pending') && currentTeamStatus !== 'draft') {
+    newTeamStatus = 'submitted';
+  } else if (playerStatuses.every(s => s === 'approved')) {
+    newTeamStatus = 'checked_in';
+  } else if (playerStatuses.every(s => s === 'verified')) {
+    newTeamStatus = 'verified';
+  } else if (playerStatuses.some(s => s === 'verified') && currentTeamStatus === 'checked_in') {
+    newTeamStatus = 'verified';
+  }
+  
+  if (newTeamStatus !== currentTeamStatus) {
+    await db.team.update({
+      where: { id: teamId },
+      data: { status: newTeamStatus as any },
+    });
+    console.log(`🔄 Admin: Team ${teamId} status: ${currentTeamStatus} → ${newTeamStatus}`);
+  }
+}
+
 export const adminTeamsRouter = createTRPCRouter({
   // Get Admin Teams with enhanced filtering
   getAdminTeams: protectedProcedure
@@ -296,7 +351,7 @@ export const adminTeamsRouter = createTRPCRouter({
           teamId: team.id,
           userId: captainId!,
           position: 'main', // Captain is a main player
-          verificationStatus: 'approved', // Captain is auto-approved
+          verificationStatus: 'pending', // Captain starts as pending
           firstName: captain.firstName!,
           lastName: captain.lastName!,
           phone: captain.phone || input.captainPhone!,
@@ -621,39 +676,8 @@ export const adminTeamsRouter = createTRPCRouter({
         }
       });
 
-      // Get all players in the team to determine team status
-      const allPlayers = await db.teamPlayer.findMany({
-        where: { teamId }
-      });
-
-      // Get current team status
-      const currentTeam = await db.team.findUnique({
-        where: { id: teamId },
-        select: { status: true }
-      });
-
-      // Determine new team status based on player statuses
-      const playerStatuses = allPlayers.map(p => p.verificationStatus);
-      let newTeamStatus = currentTeam?.status || 'draft';
-      
-      // Priority order: rejected > pending > verified > approved (checked_in)
-      if (playerStatuses.some(s => s === 'rejected')) {
-        newTeamStatus = 'rejected';
-      } else if (playerStatuses.some(s => s === 'pending') && currentTeam?.status !== 'draft') {
-        newTeamStatus = 'submitted';      // ANY player pending → Team submitted (only if team not draft)
-      } else if (playerStatuses.every(s => s === 'approved')) {
-        newTeamStatus = 'checked_in';
-      } else if (playerStatuses.every(s => s === 'verified')) {
-        newTeamStatus = 'verified';
-      } else if (playerStatuses.some(s => s === 'verified') && currentTeam?.status === 'checked_in') {
-        newTeamStatus = 'verified';       // ANY verified → Team verified (only if team was checked_in)
-      }
-
-      // Update team status
-      await db.team.update({
-        where: { id: teamId },
-        data: { status: newTeamStatus }
-      });
+      // CASCADE: Players → Team
+      await cascadePlayerStatusToTeam(teamId);
 
       return { success: true, message: 'Player status updated successfully' };
     }),
@@ -680,24 +704,8 @@ export const adminTeamsRouter = createTRPCRouter({
         data: { status }
       });
 
-      // Determine player status based on team status and update all players
-      let playerStatus: 'pending' | 'verified' | 'approved' | 'rejected' | null = null;
-      
-      if (status === 'checked_in') {
-        playerStatus = 'approved' as const;
-      } else if (status === 'verified') {
-        playerStatus = 'verified' as const;
-      } else if (status === 'submitted') {
-        playerStatus = 'pending' as const;
-      }
-
-      // Only update players if we have a specific status to set
-      if (playerStatus) {
-        await db.teamPlayer.updateMany({
-          where: { teamId },
-          data: { verificationStatus: playerStatus }
-        });
-      }
+      // CASCADE: Team → Players
+      await cascadeTeamStatusToPlayers(teamId, status);
 
       return { success: true, message: 'Team status updated successfully' };
     }),

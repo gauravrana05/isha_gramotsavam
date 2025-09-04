@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/server/trpc/react';
+import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/lib/utils/i18n';
 import { 
@@ -42,23 +42,15 @@ export default function VenueDetailsPage({ params }: PageProps) {
   }
 
   // Fetch venue data - only when authenticated as volunteer
+  // Get venue data from offline storage
   const { 
-    data: venueData, 
+    venueData, 
+    stats: venueStats,
     isLoading: venueLoading,
     error: venueError 
-  } = api.volunteers.venue.getVenueDetails.useQuery(
-    { venueId },
-    { enabled: !authLoading && !!venueId && !!isVolunteer }
-  );
-
-  // Fetch venue stats - only when authenticated as volunteer
-  const { 
-    data: venueStats,
-    isLoading: statsLoading 
-  } = api.volunteers.venue.getVenueStats.useQuery(
-    { venueId },
-    { enabled: !authLoading && !!venueId && !!isVolunteer }
-  );
+  } = useOfflineVenueData(venueId);
+  
+  const statsLoading = venueLoading;
 
   // Show loading for auth or data loading
   if (authLoading || venueLoading || statsLoading) {

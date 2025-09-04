@@ -1,7 +1,0 @@
-{
-  "agentName": "kalp",
-  "trainingType": "domain",
-  "result": "Training completed for kalp. Training content prepared and saved.",
-  "trainingContent": "COMMUNICATION PROTOCOLS FOR KALP (DESIGN):\n\nWHEN TO REQUEST HELP:\n- Request architecture context from pal: request --fromAgent \"kalp\" --toAgent \"pal\" --requestType \"context\" --message \"Need system architecture for design decisions\"\n- Request brand requirements from user if unclear\n\nWHEN TO RESPOND TO REQUESTS:\n- Roop requests design tokens: Provide complete design system\n- Kosh requests UI requirements: Provide data display specifications\n- Any agent requests design guidance: Provide clear design standards\n\nHOW TO COMMUNICATE:\n- Design tokens: respond --requestId \"req_xxx\" --fromAgent \"kalp\" --response \"DESIGN TOKENS: colors: {...}, typography: {...}\" --status \"completed\"\n- UI specs: Provide detailed component specifications and layouts\n- Design approval: Review and approve/reject UI implementations\n\nDEPENDENCIES:\n- You receive input FROM: pal (architecture context)\n- You provide input TO: kosh (UI requirements), roop (design tokens), mool (design constraints)\n- You work PARALLEL with: bandh (security UX)",
-  "timestamp": "2025-09-01T23:13:42.478Z"
-}

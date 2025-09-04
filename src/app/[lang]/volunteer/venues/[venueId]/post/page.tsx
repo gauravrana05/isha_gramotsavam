@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Plus, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/server/trpc/react';
+import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import PostFeed from '@/components/posts/PostFeed';
 import PostCreator from '@/components/posts/PostCreator';
@@ -18,13 +18,9 @@ export default function VenuePostsPage() {
   
   const [showPostCreator, setShowPostCreator] = useState(false);
 
-  const { data: posts, isLoading, error } = api.volunteers.venue.getVenuePosts.useQuery({ 
-    venueId,
-    limit: 20,
-    offset: 0
-  }, {
-    enabled: !!venueId
-  });
+  // Get venue data including posts from offline storage
+  const { venueData, isLoading, error } = useOfflineVenueData(venueId);
+  const posts = venueData?.posts || [];
 
   const canCreatePost = userProfile?.role === 'technical_volunteer' || userProfile?.role === 'admin';
 

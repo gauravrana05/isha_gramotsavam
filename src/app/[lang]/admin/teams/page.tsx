@@ -39,7 +39,7 @@ import {
 } from '@/components/ui';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { TeamCreationForm, TeamCreationFormValues } from '@/components/admin/TeamCreationForm';
-import StatusSelector from '@/components/ui/StatusSelector';
+import { TeamStatusSelector } from '@/components/ui/StatusSelector';
 // Raw backend data structure
 interface RawTeamData {
   id: string;
@@ -474,15 +474,8 @@ export default function AdminTeamsPage() {
         if (!team) return null;
         
         return (
-          <StatusSelector
+          <TeamStatusSelector
             value={team.status}
-            options={[
-              { value: 'draft', label: 'Draft', color: 'gray' },
-              { value: 'submitted', label: 'Submitted', color: 'yellow' },
-              { value: 'verified', label: 'Verified', color: 'blue' },
-              { value: 'checked_in', label: 'Checked In', color: 'green' },
-              { value: 'rejected', label: 'Rejected', color: 'red' }
-            ]}
             onChange={(newStatus) => {
               updateTeamStatusMutation.mutate({
                 teamId: team.id,

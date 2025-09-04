@@ -6,8 +6,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
 import { api } from '@/server/trpc/react';
 import { AdvancedTable, StatsCard, PageLoader, type Column, type ActionButton } from '@/components/ui';
-import StatusSelector from '@/components/ui/StatusSelector';
+import { VerificationStatusSelector } from '@/components/ui/StatusSelector';
 import { AlertModal } from '@/components/ui/Modal';
+import { useAlert } from '@/hooks/useAlert';
 import { AddPlayerModal } from '@/components/modals/AddPlayerModal';
 import { PlayerDetailModal } from '@/components/modals/PlayerDetailModal';
 import {
@@ -51,6 +52,7 @@ export default function AdminTeamDetailPage() {
   const router = useRouter();
   const { user, userProfile, loading: authLoading } = useAuth();
   const { addNotification } = useNotification();
+  const { showError, showSuccess } = useAlert();
 
   const [selectedPlayer, setSelectedPlayer] = useState<TeamPlayer | null>(null);
   const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
@@ -85,11 +87,11 @@ export default function AdminTeamDetailPage() {
   // Update player status mutation
   const updatePlayerStatusMutation = api.admin.teams.updatePlayerStatus.useMutation({
     onSuccess: () => {
-      addNotification('Player status updated successfully!', 'success');
+      showSuccess('Player status updated successfully!');
       refetchTeam();
     },
     onError: (error) => {
-      addNotification(error.message || 'Failed to update player status', 'error');
+      showError(`Failed to update player status: ${error.message}`);
     },
   });
 
@@ -218,6 +220,28 @@ export default function AdminTeamDetailPage() {
   // Player Columns
   const playerColumns: Column<TeamPlayer>[] = [
     {
+      key: 'profile',
+      header: 'Profile',
+      className: 'w-16 text-center',
+      render: (_, player) => (
+        <div className="flex justify-center">
+          {player.user?.profileImages?.profilePhotoPath ? (
+            <img
+              src={player.user.profileImages.profilePhotoPath}
+              alt="Profile"
+              width={32}
+              height={32}
+              className="w-8 h-8 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+              <User className="w-4 h-4 text-gray-400" />
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
       key: 'name',
       header: 'Player',
       sortable: true,
@@ -233,6 +257,7 @@ export default function AdminTeamDetailPage() {
               </span>
             )}
           </div>
+          <div className="text-sm text-gray-500">{player.age} years • {player.gender === 'M' ? 'Male' : 'Female'}</div>
         </div>
       ),
     },
@@ -259,40 +284,24 @@ export default function AdminTeamDetailPage() {
       ),
     },
     {
-      key: 'age',
-      header: 'Age',
-      sortable: true,
-      render: (_, player) => <span>{player.age || 'N/A'}</span>,
-    },
-    {
-      key: 'documents',
-      header: 'Documents',
+      key: 'location',
+      header: 'Location',
       render: (_, player) => (
-        <div className="flex space-x-1">
-          <div className={`w-4 h-4 rounded-full ${
-            player.user?.profileImages?.profilePhotoPath ? 'bg-green-500' : 'bg-gray-300'
-          }`} title="Profile" />
-          <div className={`w-4 h-4 rounded-full ${
-            player.user?.profileImages?.aadhaarFrontPath ? 'bg-green-500' : 'bg-gray-300'
-          }`} title="Aadhaar Front" />
-          <div className={`w-4 h-4 rounded-full ${
-            player.user?.profileImages?.aadhaarBackPath ? 'bg-green-500' : 'bg-gray-300'
-          }`} title="Aadhaar Back" />
+        <div className="flex items-center">
+          <MapPin className="w-4 h-4 text-gray-400 mr-2" />
+          <div>
+            <div className="text-sm text-gray-900">{player.panchayat}</div>
+            <div className="text-sm text-gray-500">{player.district}</div>
+          </div>
         </div>
-      ),
+      )
     },
     {
       key: 'verificationStatus',
       header: 'Status',
       render: (_, player) => (
-        <StatusSelector
+        <VerificationStatusSelector
           value={player.verificationStatus}
-          options={[
-            { value: 'pending', label: 'Pending', color: 'yellow' },
-            { value: 'verified', label: 'Verified', color: 'blue' },
-            { value: 'approved', label: 'Approved', color: 'green' },
-            { value: 'rejected', label: 'Rejected', color: 'red' }
-          ]}
           onChange={(newStatus) => {
             updatePlayerStatusMutation.mutate({
               teamId: teamId as string,
@@ -303,6 +312,46 @@ export default function AdminTeamDetailPage() {
           disabled={updatePlayerStatusMutation.isPending}
         />
       ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (_, player) => (
+        <div className="flex space-x-1 justify-center">
+          {player.verificationStatus !== 'approved' && player.verificationStatus !== 'rejected' && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updatePlayerStatusMutation.mutate({
+                    teamId: teamId as string,
+                    userId: player.userId,
+                    status: 'approved'
+                  });
+                }}
+                disabled={updatePlayerStatusMutation.isPending}
+                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Approve
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updatePlayerStatusMutation.mutate({
+                    teamId: teamId as string,
+                    userId: player.userId,
+                    status: 'rejected'
+                  });
+                }}
+                disabled={updatePlayerStatusMutation.isPending}
+                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Reject
+              </button>
+            </>
+          )}
+        </div>
+      )
     }
   ];
 
@@ -423,12 +472,17 @@ export default function AdminTeamDetailPage() {
 
         {/* Players Table */}
         <AdvancedTable<TeamPlayer>
-          data={players}
+          data={players.sort((a, b) => {
+            // Captain first, then others
+            if (team?.captainId === a.userId) return -1;
+            if (team?.captainId === b.userId) return 1;
+            return 0;
+          })}
           columns={playerColumns}
           loading={teamLoading}
           searchable={true}
           searchPlaceholder="Search players..."
-          searchFields={['firstName', 'lastName', 'phone']}
+          searchFields={['firstName', 'lastName', 'phone', 'panchayat', 'district']}
           filterable={true}
           filters={playerFilterFields}
           selectable={true}

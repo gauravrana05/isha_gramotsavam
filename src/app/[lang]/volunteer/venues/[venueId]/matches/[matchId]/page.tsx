@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useOfflineMatchDetails } from '@/hooks/useOfflineMatches';
+import { useOfflineActions } from '@/hooks/useOfflineActions';
 import { api } from '@/server/trpc/react';
 import { useAlert } from '@/hooks/useAlert';
 import { AlertModal } from '@/components/ui/Modal';
@@ -51,29 +53,37 @@ export default function MatchScoringPage() {
   const [progressionInfo, setProgressionInfo] = useState<LevelProgressionInfo | null>(null);
   const [step, setStep] = useState<'scoring' | 'confirmation' | 'progression' | 'success'>('scoring');
 
-  // Get match details with real-time updates
-  const { data: match, isLoading, error, refetch } = api.volunteers.match.getMatchDetails.useQuery(
-    { matchId },
-    { 
-      enabled: !!user && !!matchId,
-      refetchInterval: match?.status === 'in_progress' ? 10000 : 30000, // 10s for active matches, 30s otherwise
-      refetchIntervalInBackground: true
-    }
-  );
+  // Get match details from offline storage
+  const { data: match, isLoading, error, refetch } = useOfflineMatchDetails(matchId);
+  const { updateMatchScore, updateTeamStatus } = useOfflineActions();
 
-  // Update match status mutation
-  const updateStatusMutation = api.volunteers.match.updateMatchStatus.useMutation({
-    onSuccess: () => {
-      refetch();
+  // Replace mutations with offline actions
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isRecordingResult, setIsRecordingResult] = useState(false);
+
+  const handleUpdateStatus = async (status: string) => {
+    try {
+      setIsUpdatingStatus(true);
+      await updateTeamStatus(matchId, status);
       showSuccess('Match status updated');
-    },
-    onError: (error) => {
+    } catch (error: any) {
       showError(`Failed to update match status: ${error.message}`);
+    } finally {
+      setIsUpdatingStatus(false);
     }
-  });
+  };
 
-  // Record match result mutation
-  const recordResultMutation = api.volunteers.match.recordMatchResult.useMutation({
+  const handleRecordResult = async (teamScores: any[]) => {
+    try {
+      setIsRecordingResult(true);
+      await updateMatchScore(matchId, teamScores);
+      showSuccess('Match result recorded successfully');
+    } catch (error: any) {
+      showError(`Failed to record match result: ${error.message}`);
+    } finally {
+      setIsRecordingResult(false);
+    }
+  };
     onSuccess: (result) => {
       if (result.levelProgression?.requiresConfirmation) {
         setProgressionInfo(result.levelProgression);

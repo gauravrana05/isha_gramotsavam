@@ -132,8 +132,8 @@ export const TeamStatusSelector: React.FC<{
     { value: 'draft', label: 'Draft' },
     { value: 'submitted', label: 'Submitted' },
     { value: 'verified', label: 'Verified' },
-    { value: 'approved', label: 'Approved' },
-    { value: 'rejected', label: 'Rejected' }
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'checked_in', label: 'Checked In' }
   ];
 
   return (

@@ -17,6 +17,7 @@ interface CreateTeamModalProps {
     district: string;
     state: string;
     taluk?: string;
+    pincode?: string;
   };
   venueId: string;
   onTeamCreated: () => void;
@@ -30,6 +31,7 @@ interface FormData {
   district: string;
   state: string;
   taluk: string;
+  pincode: string;
   captainPhone: string;
   captainFirstName: string;
   captainLastName: string;
@@ -57,6 +59,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
     district: venueLocation?.district || '',
     state: venueLocation?.state || '',
     taluk: venueLocation?.taluk || '',
+    pincode: venueLocation?.pincode || '',
     captainPhone: '',
     captainFirstName: '',
     captainLastName: '',
@@ -78,13 +81,16 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
 
   // Create team mutation
   const createTeamMutation = api.volunteers.venue.createTeam.useMutation({
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       addNotification('Team created successfully!', 'success');
-      onTeamCreated();
+      onTeamCreated(); // This should refresh the teams list
       onClose();
       
+      // Wait a moment for the data to be available, then navigate
       if (result.teamId) {
-        router.push(`/${lang}/volunteer/venues/${venueId}/teams/${result.teamId}`);
+        setTimeout(() => {
+          router.push(`/${lang}/volunteer/venues/${venueId}/teams/${result.teamId}`);
+        }, 1000);
       }
       
       resetForm();
@@ -103,6 +109,7 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
       district: venueLocation?.district || '',
       state: venueLocation?.state || '',
       taluk: venueLocation?.taluk || '',
+      pincode: venueLocation?.pincode || '',
       captainPhone: '',
       captainFirstName: '',
       captainLastName: '',
@@ -158,7 +165,8 @@ const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
         panchayat: venueLocation.panchayat,
         district: venueLocation.district,
         state: venueLocation.state,
-        taluk: venueLocation.taluk || ''
+        taluk: venueLocation.taluk || '',
+        pincode: venueLocation.pincode || ''
       }));
     }
   }, [venueLocation]);

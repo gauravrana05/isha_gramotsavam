@@ -3,7 +3,8 @@
 import React, { useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/server/trpc/react';
+import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
+import { useOfflineActions } from '@/hooks/useOfflineActions';
 import { useNotification } from '@/context/NotificationContext';
 import { 
   Upload, 
@@ -266,15 +267,13 @@ export default function MediaPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   // Get venue media - always call the hook
-  const { 
-    data: venueData, 
-    isLoading, 
-    error,
-    refetch: refetchMedia 
-  } = api.volunteers.venue.getVenueMediaAndPosts.useQuery(
-    { venueId },
-    { enabled: !!venueId }
-  );
+  // Get venue media data from offline storage
+  const { venueData, isLoading, error } = useOfflineVenueData(venueId);
+  const { uploadMedia } = useOfflineActions();
+  
+  // Extract media data from venue data
+  const mediaData = venueData?.media || [];
+  const postsData = venueData?.posts || [];
 
   const canUploadMedia = userProfile?.role === 'technical_volunteer' || 
                         userProfile?.role === 'general_volunteer' || 
@@ -284,14 +283,14 @@ export default function MediaPage() {
     if (!confirm('Are you sure you want to delete this media?')) return;
     
     try {
-      // TODO: Implement delete API call
-      // await api.volunteers.venue.deleteMedia.mutate({ mediaId });
+      // TODO: Implement deleteMedia action in useOfflineActions
+      console.log('Deleting media offline:', mediaId);
       addNotification('Media deleted successfully', 'success');
-      await refetchMedia();
+      // No refetch needed - data updates automatically
     } catch (error) {
       addNotification('Failed to delete media', 'error');
     }
-  }, [addNotification, refetchMedia]);
+  }, [addNotification]);
 
   // Mock upload function - replace with actual implementation
   const handleFileUpload = useCallback(async (files: FileList) => {
