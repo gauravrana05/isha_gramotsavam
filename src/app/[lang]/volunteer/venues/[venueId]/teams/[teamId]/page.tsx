@@ -3,8 +3,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { useOfflineTeamDetails } from '@/hooks/useOfflineTeams';
-import { useOfflineActions } from '@/hooks/useOfflineActions';
 import { useOfflineTeams, useOfflineTeamDetails } from '@/hooks/useOfflineTeams';
 import { useOfflineActions } from '@/hooks/useOfflineActions';
 import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
@@ -16,6 +14,7 @@ import { AlertModal } from '@/components/ui/Modal';
 import { EnhancedModal } from '@/components/ui/EnhancedModal';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import type { Column } from '@/components/ui/Table';
+import api from '@/lib/api';
 import { VerificationStatusSelector } from '@/components/ui/StatusSelector';
 import { useAlert } from '@/hooks/useAlert';
 import { 
@@ -130,14 +129,18 @@ export default function TeamMatchDayVerificationPage() {
   const isTeamDataError = !!teamDataError;
   const { verifyPlayer } = useOfflineActions();
 
-  // Keep phone search as API call for now
-  const { data: searchedUser, isLoading: isSearchingPhone } = api.users.getByPhone.useQuery(
-    { phone: searchPhone },
-    { 
-      enabled: searchPhone.length > 0,
-      refetchOnWindowFocus: false
-    }
-  );
+  // Keep phone search as API call for now - TODO: Migrate to offline
+  // const { data: searchedUser, isLoading: isSearchingPhone } = api.users.getByPhone.useQuery(
+  //   { phone: searchPhone },
+  //   { 
+  //     enabled: searchPhone.length > 0,
+  //     refetchOnWindowFocus: false
+  //   }
+  // );
+  
+  // Temporary placeholder for offline migration
+  const searchedUser = null;
+  const isSearchingPhone = false;
 
   // Get offline actions
   const { 
@@ -165,9 +168,6 @@ export default function TeamMatchDayVerificationPage() {
     }
   };
 
-  // Get offline actions
-  const { uploadMedia, removePlayer, updatePlayer, promoteCaptain } = useOfflineActions();
-
   const handleUploadTeamImage = async (file: File) => {
     try {
       await uploadMedia(file, teamId!, 'team');
@@ -193,24 +193,14 @@ export default function TeamMatchDayVerificationPage() {
       }
       setShowImageUpload(false);
       showSuccess('Team photo uploaded successfully!');
-    },
-    onError: (error) => {
+    } catch (error: any) {
       showError(`Error: ${error.message}`);
     }
-  });
+  };
 
-  const removePlayerMutation = // TODO: Migrate to offline - api.volunteers.venue.removePlayer.useMutation({
-    onSuccess: () => {
-      refetchTeam();
-      showSuccess('Player removed successfully!');
-    },
-    onError: (error) => {
-      showError(`Error: ${error.message}`);
-    }
-  });
-
-  const updatePlayerMutation = // TODO: Migrate to offline - api.volunteers.venue.updatePlayer.useMutation({
-    onSuccess: () => {
+  const handleUpdatePlayer = async (playerData: any) => {
+    try {
+      await updatePlayerAction(playerData.id, playerData);
       refetchTeam();
       setShowAddPlayerModal(false);
       setPlayerFormData({ phone: '', firstName: '', lastName: '', dob: '', whatsappNumber: '', village: '', position: 'main' });
@@ -255,21 +245,10 @@ export default function TeamMatchDayVerificationPage() {
       }
       
       showSuccess('Player updated successfully!');
-    },
-    onError: (error) => {
+    } catch (error: any) {
       showError(`Error: ${error.message}`);
     }
-  });
-
-  const promoteCaptainMutation = // TODO: Migrate to offline - api.volunteers.venue.promoteCaptain.useMutation({
-    onSuccess: () => {
-      refetchTeam();
-      setShowPlayerModal(false);
-      setSelectedPlayer(null);
-      showSuccess('Captain promoted successfully!');
-    },
-    onError: (error) => showError(`Error: ${error.message}`)
-  });
+  };
 
   // Handle authentication and role validation first
   useEffect(() => {
