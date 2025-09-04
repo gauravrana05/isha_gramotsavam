@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { NotificationBell } from './header/NotificationBell';
 import { NotificationPanel } from './header/NotificationPanel';
 import { ProfileIcon } from './header/ProfileIcon';
@@ -21,6 +22,7 @@ export function MobileHeader({
   onBackClick
 }: MobileHeaderProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const { goBack } = useMobileNavigation();
   const {
     notifications,
@@ -41,8 +43,13 @@ export function MobileHeader({
   };
 
   const handleProfileClick = () => {
-    console.log('Navigate to profile');
-    // TODO: Navigate to mobile profile page
+    // Navigate to mobile profile page
+    const currentPath = window.location.pathname;
+    const pathParts = currentPath.split('/');
+    const lang = pathParts[1] || 'en';
+    const role = pathParts[2] || 'captain';
+    
+    router.push(`/${lang}/${role}/profile`);
   };
 
   const handleMenuAction = (action: string) => {

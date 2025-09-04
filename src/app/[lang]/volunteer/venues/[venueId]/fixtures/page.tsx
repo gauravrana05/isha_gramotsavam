@@ -81,37 +81,43 @@ function VolunteerFixturesPage() {
     timestamp: new Date().toISOString()
   });
 
-  // Add controlled polling only for active tournaments
-  const refetchRef = React.useRef(refetch);
-  
-  // FIXED: Only update ref when refetch actually changes, not on every render
-  React.useEffect(() => {
-    refetchRef.current = refetch;
+  // Stabilize refetch functions to prevent dependency loops
+  const stableRefetch = React.useCallback(() => {
+    refetch();
   }, [refetch]);
+  
+  const stableTeamsRefetch = React.useCallback(() => {
+    // Only refetch teams if they exist in useOfflineTeams hook
+    // This prevents calling non-existent refetch functions
+  }, []);
 
+  // Add controlled polling only for active tournaments with stable reference
   React.useEffect(() => {
     if (!venueData?.tournament || venueData.tournament.status !== 'in_progress') return;
 
     const interval = setInterval(() => {
-      refetchRef.current();
+      stableRefetch();
     }, 30000); // Poll every 30 seconds during active tournaments only
 
     return () => clearInterval(interval);
-  }, [venueData?.tournament?.status]);
+  }, [venueData?.tournament?.status, stableRefetch]);
 
   // FIXED: Remove all problematic memoizations - use direct data access
   const tournament = venueData?.tournament || venueData?.fixtures?.[0] || null;
   
-  // FIXED: Use direct data without memoization to prevent loops
+  // Stabilize teams data to prevent unnecessary recalculations  
+  const stableTeamsData = React.useMemo(() => teamsData || [], [teamsData]);
+  
+  // FIXED: Use stable data and proper dependencies
   const teamsBySport = React.useMemo(() => {
-    // If we have pre-grouped data, use it
+    // If we have pre-grouped data, use it (prioritize offline storage data)
     if (venueData?.teamsBySport) {
       return venueData.teamsBySport;
     }
     
-    // Otherwise, group teams by sport from teamsData
-    if (teamsData?.length) {
-      const grouped = teamsData.reduce((acc: SportGroup[], team: any) => {
+    // Otherwise, group teams by sport from stable teams data  
+    if (stableTeamsData.length > 0) {
+      const grouped = stableTeamsData.reduce((acc: SportGroup[], team: any) => {
         const sportName = team.sport?.name || 'Unknown Sport';
         const genderCategory = team.genderCategory || 'mixed';
         
@@ -119,6 +125,7 @@ function VolunteerFixturesPage() {
         
         if (!sportGroup) {
           sportGroup = {
+            sportId: team.sport?.id || 'unknown',
             sportName,
             genderCategory,
             teams: []
@@ -134,7 +141,7 @@ function VolunteerFixturesPage() {
     }
     
     return [];
-  }, [teamsData?.length]); // FIXED: Only depend on length
+  }, [venueData?.teamsBySport, stableTeamsData]);
   
   const stats = React.useMemo(() => {
     // Calculate stats from actual teams data (same pattern as dashboard)
