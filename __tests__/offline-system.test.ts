@@ -37,12 +37,18 @@ Object.defineProperty(global, 'structuredClone', {
   writable: true,
 });
 
-Object.defineProperty(global, 'window', {
-  value: {
-    indexedDB: mockIndexedDB,
-  },
-  writable: true,
-});
+// Only define window if it doesn't exist
+if (typeof global.window === 'undefined') {
+  Object.defineProperty(global, 'window', {
+    value: {
+      indexedDB: mockIndexedDB,
+    },
+    writable: true,
+  });
+} else {
+  // If window exists, just add indexedDB to it
+  (global.window as any).indexedDB = mockIndexedDB;
+}
 
 describe('Phase 4: Offline-First Volunteer System', () => {
   beforeEach(() => {

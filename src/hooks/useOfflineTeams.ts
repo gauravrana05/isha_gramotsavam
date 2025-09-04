@@ -138,9 +138,17 @@ export function useOfflineTeams(venueId?: string) {
   }, [apiTeams]); // FIXED: Only depend on apiTeams array reference, not length
 
   const refetch = useCallback(async () => {
-    await refetchApiTeams();
-    await loadTeams();
-  }, [refetchApiTeams, loadTeams]);
+    // Reset circuit breaker and force reload
+    loadAttempts.current = 0;
+    setIsLoading(true); // Force a reload by triggering loading state
+    
+    // Refetch API data
+    try {
+      await refetchApiTeams();
+    } catch (error) {
+      console.warn('Failed to refetch API teams:', error);
+    }
+  }, []); // FIXED: No dependencies at all to ensure complete stability
 
   return {
     teams,

@@ -204,11 +204,12 @@ export function useOfflineVenueData(venueId?: string) {
     }
   }, [apiFixtures]); // FIXED: Only depend on apiFixtures array reference
 
-  // Manual refetch function that forces a refresh
+  // Manual refetch function that forces a refresh - make it completely stable
   const refetch = useCallback(() => {
     hasInitialized.current = false; // Reset to allow fresh load
-    return loadVenueData(true);
-  }, [loadVenueData]);
+    loadAttempts.current = 0; // Reset circuit breaker
+    setIsLoading(true); // Force a reload by triggering loading state
+  }, []); // FIXED: No dependencies at all to ensure complete stability
 
   // Ensure we always return a valid structure
   const safeVenueData = venueData || {
