@@ -139,10 +139,12 @@ export function useOfflineVenueData(venueId?: string) {
   }, [loadVenueData]);
 
   // API fallback effect - handles API data when offline data is not available
-  // FIXED: Stabilize dependencies and ensure loading is set to false
   useEffect(() => {
-    // Only run if we have API data and no venue data yet
-    if ((apiTeams?.length || apiFixtures?.length) && hasInitialized.current && venueData && venueData.teams.length === 0 && venueData.fixtures.length === 0) {
+    // Only run if we have API data and either no venue data or empty venue data
+    // Also check that we haven't already initialized to prevent multiple runs
+    if ((apiTeams?.length || apiFixtures?.length) && 
+        (!venueData || (venueData.teams.length === 0 && venueData.fixtures.length === 0)) &&
+        !hasInitialized.current) {
       const teamsData = apiTeams?.map(t => ({ ...t })) || [];
       const fixturesData = apiFixtures?.map(f => ({ ...f })) || [];
       
@@ -161,9 +163,10 @@ export function useOfflineVenueData(venueId?: string) {
         stats,
       });
       setLastFetchTime(Date.now());
-      setIsLoading(false); // FIXED: Ensure loading is set to false
+      hasInitialized.current = true;
+      setIsLoading(false);
     }
-  }, [apiTeams?.length, apiFixtures?.length, hasInitialized.current]); // FIXED: Stable dependencies
+  }, [apiTeams?.length, apiFixtures?.length]); // FIXED: Remove venueData dependencies that cause loops
 
   // Manual refetch function that forces a refresh
   const refetch = useCallback(() => {

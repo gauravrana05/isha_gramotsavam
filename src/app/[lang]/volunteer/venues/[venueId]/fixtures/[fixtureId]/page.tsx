@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
-import { api } from '@/server/trpc/react';
+import { useOfflineTeams, useOfflineVenueData } from "@/hooks/useOfflineTeams";
+import { useOfflineActions } from "@/hooks/useOfflineActions";
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
 import { useParams, useRouter } from 'next/navigation';
@@ -61,7 +62,7 @@ export default function VolunteerFixtureDetailPage() {
   const fixture = fixtures?.find(f => f.id === fixtureId);
 
   // Mutations
-  const createKnockoutDraw = api.volunteers.fixture.createKnockoutDraw.useMutation({
+  const createKnockoutDraw = // TODO: Migrate to offline - api.volunteers.fixture.createKnockoutDraw.useMutation({
     onSuccess: () => {
       addNotification('Tournament draw created successfully!', 'success');
       refetchFixture();
@@ -71,7 +72,7 @@ export default function VolunteerFixtureDetailPage() {
     }
   });
 
-  const recordMatchResult = api.volunteers.match.recordMatchResult.useMutation({
+  const recordMatchResult = // TODO: Migrate to offline - api.volunteers.match.recordMatchResult.useMutation({
     onSuccess: () => {
       addNotification('Match result recorded successfully!', 'success');
       refetchFixture();
@@ -82,7 +83,7 @@ export default function VolunteerFixtureDetailPage() {
     }
   });
 
-  const updateMatchStatus = api.volunteers.match.updateMatchStatus.useMutation({
+  const updateMatchStatus = // TODO: Migrate to offline - api.volunteers.match.updateMatchStatus.useMutation({
     onSuccess: () => {
       addNotification('Match status updated!', 'success');
       refetchFixture();

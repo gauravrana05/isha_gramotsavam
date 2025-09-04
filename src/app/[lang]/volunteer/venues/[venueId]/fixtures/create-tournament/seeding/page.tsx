@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/server/trpc/react';
+import { useOfflineTeams } from '@/hooks/useOfflineTeams';
+import { useOfflineActions } from '@/hooks/useOfflineActions';
 import { useAlert } from '@/hooks/useAlert';
 import { AlertModal } from '@/components/ui/Modal';
 import { 
@@ -53,13 +54,13 @@ export default function TournamentSeedingPage() {
   const dragCounter = useRef(0);
 
   // Get tournament data
-  const { data: venueData, isLoading } = api.volunteers.venue.getVenueTournament.useQuery(
+  const { data: venueData, isLoading } = // TODO: Migrate to offline - api.volunteers.venue.getVenueTournament.useQuery(
     { venueId },
     { enabled: !!user && !!venueId }
   );
 
   // Create fixture mutation
-  const createFixtureMutation = api.volunteers.fixture.createFixture.useMutation({
+  const createFixtureMutation = // TODO: Migrate to offline - api.volunteers.fixture.createFixture.useMutation({
     onSuccess: async (data) => {
       setStep(3);
       // Now assign team numbers and create knockout draw
@@ -94,8 +95,8 @@ export default function TournamentSeedingPage() {
     }
   });
 
-  const assignTeamNumbers = api.volunteers.fixture.assignTeamNumbers.useMutation();
-  const createKnockoutDraw = api.volunteers.fixture.createKnockoutDraw.useMutation();
+  const assignTeamNumbers = // TODO: Migrate to offline - api.volunteers.fixture.assignTeamNumbers.useMutation();
+  const createKnockoutDraw = // TODO: Migrate to offline - api.volunteers.fixture.createKnockoutDraw.useMutation();
 
   useEffect(() => {
     if (!venueData || isLoading) return;

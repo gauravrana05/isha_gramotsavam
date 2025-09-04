@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useParams } from 'next/navigation';
 import { useOfflineTeams } from '@/hooks/useOfflineTeams';
 import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
-import { api } from '@/server/trpc/react';
+import { useOfflineActions } from '@/hooks/useOfflineActions';
 import CreateTeamModal from '@/components/volunteer/CreateTeamModal';
 import { AdvancedTable } from '@/components/ui/AdvancedTable';
 import { TeamStatusSelector } from '@/components/ui/StatusSelector';
@@ -72,26 +72,25 @@ export default function MatchDayTeamsPage() {
     console.log('Captain user keys:', teams[0].captainUser ? Object.keys(teams[0].captainUser) : 'No captain user');
   }
 
-  // Team status update mutation
-  const updateTeamStatusMutation = api.volunteers.venue.updateTeamStatus.useMutation({
-    onSuccess: () => {
+  // Get offline actions
+  const { updateTeamStatus } = useOfflineActions();
+
+  // Team status update handler
+  const handleUpdateTeamStatus = async (teamId: string, status: string) => {
+    try {
+      await updateTeamStatus(teamId, status);
       refetchTeams();
       showSuccess('Team status updated successfully!');
-    },
-    onError: (error) => {
+    } catch (error: any) {
       console.error('Failed to update team status:', error);
       showError(`Failed to update team status: ${error.message}`);
     }
-  });
+  };
 
   // Handle team status change
   const handleTeamStatusChange = async (team: any, newStatus: string) => {
     try {
-      updateTeamStatusMutation.mutate({
-        teamId: team.id,
-        status: newStatus as any,
-        venueId: venueId
-      });
+      await handleUpdateTeamStatus(team.id, newStatus);
     } catch (error) {
       console.error('Failed to update team status:', error);
     }

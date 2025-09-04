@@ -1,7 +1,8 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { api } from '@/server/trpc/react';
+import { useOfflineTeams, useOfflineVenueData } from "@/hooks/useOfflineTeams";
+import { useOfflineActions } from "@/hooks/useOfflineActions";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/Button';
@@ -13,11 +14,11 @@ export default function FixtureBracketPage() {
   const fixtureId = params.fixtureId as string;
   const venueId = params.venueId as string;
 
-  const { data: bracketData } = api.volunteers.match.getFixtureBracket.useQuery({
+  const { data: bracketData } = // TODO: Migrate to offline - api.volunteers.match.getFixtureBracket.useQuery({
     fixtureId
   });
 
-  const { data: fixture } = api.volunteers.fixture.getFixtureDetails.useQuery({
+  const { data: fixture } = // TODO: Migrate to offline - api.volunteers.fixture.getFixtureDetails.useQuery({
     fixtureId
   });
 

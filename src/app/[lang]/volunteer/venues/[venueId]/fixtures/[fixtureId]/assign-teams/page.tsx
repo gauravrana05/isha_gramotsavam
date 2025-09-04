@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { api } from '@/server/trpc/react';
+import { useOfflineTeams, useOfflineVenueData } from "@/hooks/useOfflineTeams";
+import { useOfflineActions } from "@/hooks/useOfflineActions";
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
 import { useParams, useRouter } from 'next/navigation';
@@ -35,19 +36,19 @@ export default function AssignTeamNumbersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get fixture details
-  const { data: fixture, isLoading } = api.volunteers.fixture.getFixtureDetails.useQuery(
+  const { data: fixture, isLoading } = // TODO: Migrate to offline - api.volunteers.fixture.getFixtureDetails.useQuery(
     { fixtureId },
     { enabled: !!user && !!fixtureId }
   );
 
   // Get teams for this fixture
-  const { data: teams } = api.volunteers.venue.getVenueTeams.useQuery(
+  const { data: teams } = // TODO: Migrate to offline - api.volunteers.venue.getVenueTeams.useQuery(
     { venueId: venueId || '' },
     { enabled: !!user && !!venueId && venueId.length > 0 }
   );
 
   // Assign team numbers mutation
-  const assignNumbers = api.volunteers.fixture.assignTeamNumbers.useMutation({
+  const assignNumbers = // TODO: Migrate to offline - api.volunteers.fixture.assignTeamNumbers.useMutation({
     onSuccess: () => {
       addNotification('Team numbers assigned successfully!', 'success');
       router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${fixtureId}`);

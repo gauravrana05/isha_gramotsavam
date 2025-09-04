@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/server/trpc/react';
+import { useOfflineTeams, useOfflineVenueData } from "@/hooks/useOfflineTeams";
+import { useOfflineActions } from "@/hooks/useOfflineActions";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/Button';
@@ -18,12 +19,12 @@ export default function VolunteerFixturesPage() {
   const [selectedVenueId, setSelectedVenueId] = useState<string>('all');
 
   // Get user's venue assignments
-  const { data: userVenues } = api.volunteers.venue.getVenueTeams.useQuery(undefined, {
+  const { data: userVenues } = // TODO: Migrate to offline - api.volunteers.venue.getVenueTeams.useQuery(undefined, {
     enabled: !!user
   });
 
   // Get all fixtures across user's assigned venues
-  const { data: allFixtures, isLoading: fixturesLoading } = api.volunteers.fixture.getAllUserFixtures.useQuery(
+  const { data: allFixtures, isLoading: fixturesLoading } = // TODO: Migrate to offline - api.volunteers.fixture.getAllUserFixtures.useQuery(
     undefined,
     { 
       enabled: !!user

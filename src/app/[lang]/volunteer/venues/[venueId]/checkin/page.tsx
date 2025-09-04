@@ -44,7 +44,6 @@ export default function TeamCheckInPage() {
       setIsCheckingIn(false);
     }
   };
-  };
 
   const handlePhotoUpload = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

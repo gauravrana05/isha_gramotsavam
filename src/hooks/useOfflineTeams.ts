@@ -28,27 +28,61 @@ export function useOfflineTeams(venueId?: string) {
       setIsLoading(true);
       setError(null);
       
-      // Prefer API data when available (has complete relations)
-      if (apiTeams?.length) {
-        setTeams(apiTeams);
-        console.log('✅ Using API teams data with relations');
+      // Try offline storage first (offline-first approach)
+      const service = getVolunteerService();
+      let teamsData = [];
+      
+      try {
+        const offlineTeams = await service.getTeamsForVenue(venueId, user.id);
+        teamsData = offlineTeams.map(t => t.data || t);
         
-        // Cache API response for future offline use
-        try {
-          const service = getVolunteerService();
-          for (const team of apiTeams) {
-            await service.cacheTeamData(user.id, { ...team, venueId });
+        if (teamsData.length > 0) {
+          setTeams(teamsData);
+          console.log('✅ Using offline teams data:', teamsData.length, 'teams');
+          // Don't return early - let finally block run
+        } else {
+          // Try API fallback
+          if (apiTeams?.length) {
+            setTeams(apiTeams);
+            console.log('✅ Using API teams data with relations');
+            
+            // Cache API response for future offline use
+            try {
+              for (const team of apiTeams) {
+                await service.cacheTeamData(user.id, { ...team, venueId });
+              }
+              console.log('💾 Cached API teams data for offline use');
+            } catch (cacheError) {
+              console.warn('Failed to cache teams data:', cacheError);
+            }
+          } else {
+            // No data available
+            setTeams([]);
+            console.log('ℹ️ No teams data available');
           }
-          console.log('💾 Cached API teams data for offline use');
-        } catch (cacheError) {
-          console.warn('Failed to cache teams data:', cacheError);
         }
-      } else {
-        // Fallback to offline storage
-        const service = getVolunteerService();
-        const teamsData = await service.getTeamsForVenue(venueId, user.id);
-        setTeams(teamsData);
-        console.log('📱 Using offline teams data');
+      } catch (offlineError) {
+        console.log('📱 No offline teams data available');
+        
+        // Fallback to API data when offline storage fails
+        if (apiTeams?.length) {
+          setTeams(apiTeams);
+          console.log('✅ Using API teams data (offline failed)');
+          
+          // Cache API response for future offline use
+          try {
+            for (const team of apiTeams) {
+              await service.cacheTeamData(user.id, { ...team, venueId });
+            }
+            console.log('💾 Cached API teams data for offline use');
+          } catch (cacheError) {
+            console.warn('Failed to cache teams data:', cacheError);
+          }
+        } else {
+          // No data available
+          setTeams([]);
+          console.log('ℹ️ No teams data available (offline failed, no API)');
+        }
       }
       
     } catch (err) {
@@ -56,6 +90,7 @@ export function useOfflineTeams(venueId?: string) {
       // Final fallback to API data on error
       if (apiTeams?.length) {
         setTeams(apiTeams);
+        console.log('✅ Using API teams data (error fallback)');
       }
       setError(err as Error);
     } finally {

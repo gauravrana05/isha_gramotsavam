@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { api } from '@/server/trpc/react';
+import { useOfflineTeams } from '@/hooks/useOfflineTeams';
+import { useOfflineActions } from '@/hooks/useOfflineActions';
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
 import {
@@ -58,18 +59,18 @@ export default function VolunteerVerification() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // API Queries
-  const { data: teamData, isLoading: teamLoading } = api.volunteers.teams.getTeamDetails.useQuery(
+  const { data: teamData, isLoading: teamLoading } = // TODO: Migrate to offline - api.volunteers.teams.getTeamDetails.useQuery(
     { teamId: teamId as string },
     { enabled: !!teamId }
   );
 
-  const { data: players, isLoading: playersLoading, refetch: refetchPlayers } = api.volunteers.teams.getTeamPlayers.useQuery(
+  const { data: players, isLoading: playersLoading, refetch: refetchPlayers } = // TODO: Migrate to offline - api.volunteers.teams.getTeamPlayers.useQuery(
     { teamId: teamId as string },
     { enabled: !!teamId }
   );
 
   // Mutations
-  const verifyPlayerMutation = api.volunteers.teams.verifyPlayer.useMutation({
+  const verifyPlayerMutation = // TODO: Migrate to offline - api.volunteers.teams.verifyPlayer.useMutation({
     onSuccess: () => {
       addNotification('Player verified successfully', 'success');
       refetchPlayers();
@@ -79,7 +80,7 @@ export default function VolunteerVerification() {
     }
   });
 
-  const rejectPlayerMutation = api.volunteers.teams.rejectPlayer.useMutation({
+  const rejectPlayerMutation = // TODO: Migrate to offline - api.volunteers.teams.rejectPlayer.useMutation({
     onSuccess: () => {
       addNotification('Player rejected', 'success');
       refetchPlayers();

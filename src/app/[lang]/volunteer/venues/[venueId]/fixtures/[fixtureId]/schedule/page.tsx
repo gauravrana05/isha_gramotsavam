@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { api } from '@/server/trpc/react';
+import { useOfflineTeams, useOfflineVenueData } from "@/hooks/useOfflineTeams";
+import { useOfflineActions } from "@/hooks/useOfflineActions";
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
 import { useParams, useRouter } from 'next/navigation';
@@ -37,13 +38,13 @@ export default function ScheduleMatchesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get fixture details with matches
-  const { data: fixture, isLoading } = api.volunteers.fixture.getFixtureDetails.useQuery(
+  const { data: fixture, isLoading } = // TODO: Migrate to offline - api.volunteers.fixture.getFixtureDetails.useQuery(
     { fixtureId },
     { enabled: !!user && !!fixtureId }
   );
 
   // Bulk schedule matches mutation
-  const bulkSchedule = api.volunteers.match.bulkScheduleMatches.useMutation({
+  const bulkSchedule = // TODO: Migrate to offline - api.volunteers.match.bulkScheduleMatches.useMutation({
     onSuccess: () => {
       addNotification('Match schedules updated successfully!', 'success');
       router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${fixtureId}`);

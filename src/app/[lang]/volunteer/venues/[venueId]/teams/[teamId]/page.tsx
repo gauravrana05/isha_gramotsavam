@@ -5,7 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useOfflineTeamDetails } from '@/hooks/useOfflineTeams';
 import { useOfflineActions } from '@/hooks/useOfflineActions';
-import { api } from '@/server/trpc/react';
+import { useOfflineTeams, useOfflineTeamDetails } from '@/hooks/useOfflineTeams';
+import { useOfflineActions } from '@/hooks/useOfflineActions';
 import TeamPhotoUpload from '@/components/teams/TeamPhotoUpload';
 import DocumentPreview from '@/components/documents/DocumentPreview';
 import PlayerDocumentUpload from '@/components/players/PlayerDocumentUpload';
@@ -164,8 +165,12 @@ export default function TeamMatchDayVerificationPage() {
     }
   };
 
-  const uploadTeamImageMutation = api.volunteers.venue.uploadTeamImage.useMutation({
-    onSuccess: async () => {
+  // Get offline actions
+  const { uploadMedia, removePlayer, updatePlayer, promoteCaptain } = useOfflineActions();
+
+  const handleUploadTeamImage = async (file: File) => {
+    try {
+      await uploadMedia(file, teamId!, 'team');
       const { data: updatedData } = await refetchTeam();
       if (updatedData) {
         // Update team state with fresh data
@@ -194,7 +199,7 @@ export default function TeamMatchDayVerificationPage() {
     }
   });
 
-  const removePlayerMutation = api.volunteers.venue.removePlayer.useMutation({
+  const removePlayerMutation = // TODO: Migrate to offline - api.volunteers.venue.removePlayer.useMutation({
     onSuccess: () => {
       refetchTeam();
       showSuccess('Player removed successfully!');
@@ -204,7 +209,7 @@ export default function TeamMatchDayVerificationPage() {
     }
   });
 
-  const updatePlayerMutation = api.volunteers.venue.updatePlayer.useMutation({
+  const updatePlayerMutation = // TODO: Migrate to offline - api.volunteers.venue.updatePlayer.useMutation({
     onSuccess: () => {
       refetchTeam();
       setShowAddPlayerModal(false);
@@ -256,7 +261,7 @@ export default function TeamMatchDayVerificationPage() {
     }
   });
 
-  const promoteCaptainMutation = api.volunteers.venue.promoteCaptain.useMutation({
+  const promoteCaptainMutation = // TODO: Migrate to offline - api.volunteers.venue.promoteCaptain.useMutation({
     onSuccess: () => {
       refetchTeam();
       setShowPlayerModal(false);

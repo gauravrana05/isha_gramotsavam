@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/server/trpc/react';
+import { useOfflineTeams, useOfflineVenueData } from "@/hooks/useOfflineTeams";
+import { useOfflineActions } from "@/hooks/useOfflineActions";
 import { useAlert } from '@/hooks/useAlert';
 import { AlertModal } from '@/components/ui/Modal';
 import { 
@@ -33,12 +34,12 @@ export default function CreateFixturePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get available sports with checked-in teams
-  const { data: availableSports, isLoading } = api.volunteers.fixture.getAvailableSportsForFixture.useQuery(
+  const { data: availableSports, isLoading } = // TODO: Migrate to offline - api.volunteers.fixture.getAvailableSportsForFixture.useQuery(
     { venueId },
     { enabled: !!user && !!venueId }
   );
 
-  const createFixtureMutation = api.volunteers.fixture.createFixture.useMutation({
+  const createFixtureMutation = // TODO: Migrate to offline - api.volunteers.fixture.createFixture.useMutation({
     onSuccess: (data) => {
       showSuccess('Tournament created successfully!');
       router.push(`/${lang}/volunteer/venues/${venueId}/fixtures/${data.fixtureId}`);

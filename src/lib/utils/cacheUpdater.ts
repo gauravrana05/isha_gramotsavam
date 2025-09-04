@@ -61,6 +61,12 @@ export async function batchUpdateCache(
   try {
     if (!dataArray?.length || !userId) return;
     
+    // Skip cache update on server-side
+    if (typeof window === 'undefined') {
+      console.log('⏭️ Skipping cache update on server-side');
+      return;
+    }
+    
     const volunteerService = await VolunteerService.getServiceForBackend();
     await volunteerService.initialize(userId);
     
