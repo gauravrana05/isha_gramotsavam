@@ -86,9 +86,9 @@ function VolunteerFixturesPage() {
 
   // Simplified refetch - no polling to avoid cascade issues
   // Tournament data is mostly static, so manual refresh is sufficient
-  const handleRefresh = React.useCallback(() => {
+  const handleRefresh = () => {
     refetch();
-  }, []);
+  };
 
   // FIXED: Remove all problematic memoizations - use direct data access
   const tournament = venueData?.tournament || venueData?.fixtures?.[0] || null;
@@ -99,28 +99,41 @@ function VolunteerFixturesPage() {
   // FIXED: Simplify teamsBySport - remove useMemo to prevent dependency issues
   const teamsBySport = venueData?.teamsBySport || [];
   
-  // FIXED: Simplify stats calculation - remove useMemo to prevent dependency issues
+  // FIXED: Add proper memoization to prevent infinite render loops
   const totalTeams = stableTeamsData.length;
-  const checkedInTeams = stableTeamsData.filter(team => team.status === 'checked_in').length;
   
-  // Calculate matches stats from fixtures if available
+  // Memoize expensive filter operation
+  const checkedInTeams = React.useMemo(() => 
+    stableTeamsData.filter(team => team.status === 'checked_in').length,
+    [stableTeamsData.length] // Use length as dependency to avoid object instability
+  );
+  
+  // Memoize expensive reduce operations
   const fixtures = venueData?.fixtures || [];
-  const totalMatches = fixtures.reduce((sum: number, fixture: any) => sum + (fixture.matches?.length || 0), 0);
-  const completedMatches = fixtures.reduce((sum: number, fixture: any) => 
-    sum + (fixture.matches?.filter((m: any) => m.status === 'completed').length || 0), 0);
+  const totalMatches = React.useMemo(() => 
+    fixtures.reduce((sum: number, fixture: any) => sum + (fixture.matches?.length || 0), 0),
+    [fixtures.length] // Use length as dependency
+  );
+  
+  const completedMatches = React.useMemo(() => 
+    fixtures.reduce((sum: number, fixture: any) => 
+      sum + (fixture.matches?.filter((m: any) => m.status === 'completed').length || 0), 0),
+    [fixtures.length] // Use length as dependency
+  );
   
   const progress = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0;
   
-  const stats = {
+  // Memoize stats object to prevent recreation
+  const stats = React.useMemo(() => ({
     totalTeams,
-    checkedInTeams, // Added this back since we're calculating it
+    checkedInTeams,
     matchesCompleted: completedMatches,
     matchesTotal: totalMatches,
     progress
-  };
+  }), [totalTeams, checkedInTeams, completedMatches, totalMatches, progress]);
 
-  // Helper functions
-  const getStatusColor = (status: string) => {
+  // Memoize helper functions to prevent recreation on every render
+  const getStatusColor = React.useCallback((status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
       case 'in_progress': return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -128,9 +141,9 @@ function VolunteerFixturesPage() {
       case 'draft': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
-  };
+  }, []);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = React.useCallback((status: string) => {
     switch (status) {
       case 'completed': return <CheckCircle className="w-4 h-4" />;
       case 'in_progress': return <Play className="w-4 h-4" />;
@@ -138,7 +151,7 @@ function VolunteerFixturesPage() {
       case 'draft': return <AlertCircle className="w-4 h-4" />;
       default: return <AlertCircle className="w-4 h-4" />;
     }
-  };
+  }, []);
 
   // Simplified loading logic - prioritize teams data since that's most critical
   const [loadingTimeout, setLoadingTimeout] = React.useState(false);
