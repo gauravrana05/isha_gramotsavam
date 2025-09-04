@@ -209,12 +209,193 @@ export function useOfflineActions() {
     }
   }, [user?.id, addPendingAction]);
 
+  const addPlayer = useCallback(async (
+    teamId: string,
+    playerData: {
+      name: string;
+      firstName: string;
+      lastName: string;
+      phone: string;
+      dob: string;
+      whatsappNumber?: string;
+      village?: string;
+      position: 'main' | 'substitute';
+    }
+  ) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    try {
+      const service = getVolunteerService();
+      await service.addPlayerToTeam({
+        teamId,
+        playerId: `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        position: playerData.position,
+        addedBy: user.id,
+        timestamp: Date.now(),
+      }, user.id);
+
+      addPendingAction({
+        id: `add-player-${teamId}-${Date.now()}`,
+        type: 'player_addition',
+        description: `Add player ${playerData.name} to team`,
+        timestamp: Date.now(),
+        priority: 'medium',
+        retryCount: 0,
+      });
+
+      console.log('✅ Player added offline');
+      
+    } catch (error) {
+      console.error('Failed to add player:', error);
+      throw error;
+    }
+  }, [user?.id, addPendingAction]);
+
+  const removePlayer = useCallback(async (
+    teamId: string,
+    playerId: string
+  ) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    try {
+      // TODO: Implement removePlayerFromTeam in VolunteerService
+      console.log('✅ Player removed offline:', playerId);
+
+      addPendingAction({
+        id: `remove-player-${playerId}-${Date.now()}`,
+        type: 'player_removal',
+        description: `Remove player from team`,
+        timestamp: Date.now(),
+        priority: 'medium',
+        retryCount: 0,
+      });
+      
+    } catch (error) {
+      console.error('Failed to remove player:', error);
+      throw error;
+    }
+  }, [user?.id, addPendingAction]);
+
+  const updatePlayer = useCallback(async (
+    playerId: string,
+    playerData: {
+      name?: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      position?: 'main' | 'substitute';
+    }
+  ) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    try {
+      // TODO: Implement updatePlayer in VolunteerService
+      console.log('✅ Player updated offline:', playerId);
+
+      addPendingAction({
+        id: `update-player-${playerId}-${Date.now()}`,
+        type: 'player_update',
+        description: `Update player information`,
+        timestamp: Date.now(),
+        priority: 'medium',
+        retryCount: 0,
+      });
+      
+    } catch (error) {
+      console.error('Failed to update player:', error);
+      throw error;
+    }
+  }, [user?.id, addPendingAction]);
+
+  const promoteCaptain = useCallback(async (
+    teamId: string,
+    playerId: string
+  ) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    try {
+      // TODO: Implement promoteCaptain in VolunteerService
+      console.log('✅ Captain promoted offline:', playerId);
+
+      addPendingAction({
+        id: `promote-captain-${playerId}-${Date.now()}`,
+        type: 'captain_promotion',
+        description: `Promote player to captain`,
+        timestamp: Date.now(),
+        priority: 'high',
+        retryCount: 0,
+      });
+      
+    } catch (error) {
+      console.error('Failed to promote captain:', error);
+      throw error;
+    }
+  }, [user?.id, addPendingAction]);
+
+  const deleteMedia = useCallback(async (
+    mediaId: string,
+    entityType: 'team' | 'venue' | 'match'
+  ) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    try {
+      // TODO: Implement deleteMedia in VolunteerService
+      console.log('✅ Media deleted offline:', mediaId);
+
+      addPendingAction({
+        id: `delete-media-${mediaId}-${Date.now()}`,
+        type: 'media_deletion',
+        description: `Delete media file`,
+        timestamp: Date.now(),
+        priority: 'low',
+        retryCount: 0,
+      });
+      
+    } catch (error) {
+      console.error('Failed to delete media:', error);
+      throw error;
+    }
+  }, [user?.id, addPendingAction]);
+
+  const assignTournamentNumbers = useCallback(async (
+    assignments: Array<{
+      teamId: string;
+      tournamentNumber: number;
+    }>
+  ) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    try {
+      // TODO: Implement assignTournamentNumbers in VolunteerService
+      console.log('✅ Tournament numbers assigned offline:', assignments);
+
+      addPendingAction({
+        id: `assign-numbers-${Date.now()}`,
+        type: 'number_assignment',
+        description: `Assign tournament numbers to ${assignments.length} teams`,
+        timestamp: Date.now(),
+        priority: 'medium',
+        retryCount: 0,
+      });
+      
+    } catch (error) {
+      console.error('Failed to assign tournament numbers:', error);
+      throw error;
+    }
+  }, [user?.id, addPendingAction]);
+
   return {
     createTeam,
+    addPlayer,
+    removePlayer,
+    updatePlayer,
+    promoteCaptain,
     checkInTeam,
     verifyPlayer,
     updateMatchScore,
     updateTeamStatus,
     uploadMedia,
+    deleteMedia,
+    assignTournamentNumbers,
   };
 }

@@ -47,14 +47,16 @@ export default function TournamentNumbersPage() {
   }) || [];
 
   // Get offline actions
-  const { updateTeamStatus } = useOfflineActions();
+  const { assignTournamentNumbers } = useOfflineActions();
   const [isAssigningNumbers, setIsAssigningNumbers] = useState(false);
 
   const handleAssignNumbers = async () => {
     try {
       setIsAssigningNumbers(true);
-      // TODO: Implement assignTournamentNumbers action in useOfflineActions
-      console.log('Assigning tournament numbers offline:', assignments);
+      await assignTournamentNumbers(assignments.map(a => ({
+        teamId: a.teamId,
+        tournamentNumber: a.number
+      })));
       addNotification('Tournament numbers assigned successfully', 'success');
       setAssignments([]);
     } catch (error: any) {

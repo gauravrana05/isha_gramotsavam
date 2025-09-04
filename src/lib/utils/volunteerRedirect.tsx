@@ -1,3 +1,4 @@
+import React from 'react';
 import { api } from '@/server/trpc/react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -45,11 +46,13 @@ export const useVolunteerRedirect = (lang: string) => {
 /**
  * Full page loader component for volunteer redirects
  */
-export const VolunteerRedirectLoader = ({ message = "Loading your assignment..." }: { message?: string }) => (
-  <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
-    <div className="text-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38] mx-auto mb-4"></div>
-      <p className="text-gray-600">{message}</p>
+export const VolunteerRedirectLoader = ({ message = "Loading your assignment..." }: { message?: string }) => {
+  return (
+    <div className="min-h-screen bg-[#F3F0E5] flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F28C38] mx-auto mb-4"></div>
+        <p className="text-gray-600">{message}</p>
+      </div>
     </div>
-  </div>
-);
+  );
+};

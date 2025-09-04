@@ -84,7 +84,7 @@ export class VolunteerService {
       });
       
       const storagePromise = getVolunteerStorage();
-      this.storage = await Promise.race([storagePromise, timeoutPromise]);
+      this.storage = await Promise.race([storagePromise, timeoutPromise]) as VolunteerStorageManager;
       this.initialized = true;
       console.log('✅ Volunteer service initialized');
     } catch (error) {
@@ -405,12 +405,20 @@ export class VolunteerService {
     const mediaId = `media_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Store file in binary data store
-    const binaryData = {
+    const binaryData: VolunteerDocument = {
       id: `binary_${mediaId}`,
-      mediaId,
-      data: await data.file.arrayBuffer(),
+      data: {
+        mediaId,
+        data: await data.file.arrayBuffer(),
+        size: data.file.size,
+        createdAt: Date.now(),
+      },
+      timestamp: Date.now(),
+      lastModified: Date.now(),
+      version: 1,
+      synced: false,
+      priority: 'medium',
       size: data.file.size,
-      createdAt: Date.now(),
     };
 
     // Store binary data
@@ -645,7 +653,7 @@ export class VolunteerService {
         filter: (assignment: any) => assignment.userId === userId
       });
       
-      return assignments.map(a => a.data);
+      return assignments.map(a => (a as any).data);
     } catch (error) {
       console.error('Failed to get volunteer assignments:', error);
       return [];
@@ -679,7 +687,7 @@ export class VolunteerService {
     // Generate unique team ID
     const teamId = `team_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const newTeam = {
+    const newTeam: VolunteerDocument = {
       id: teamId,
       data: {
         id: teamId,
@@ -699,8 +707,12 @@ export class VolunteerService {
       },
       userId,
       venueId: data.venueId,
+      timestamp: Date.now(),
       lastModified: Date.now(),
+      version: 1,
       synced: false,
+      priority: 'medium',
+      size: JSON.stringify(data).length,
     };
 
     // Store team in IndexedDB
@@ -735,7 +747,7 @@ export class VolunteerService {
   }, userId: string): Promise<void> {
     await this.ensureInitialized(userId);
 
-    const playerRecord = {
+    const playerRecord: VolunteerDocument = {
       id: `${data.teamId}_${data.playerId}`,
       data: {
         id: data.playerId,
@@ -746,12 +758,161 @@ export class VolunteerService {
         addedAt: new Date(data.timestamp),
       },
       userId,
-      teamId: data.teamId,
+      timestamp: Date.now(),
       lastModified: Date.now(),
+      version: 1,
       synced: false,
+      priority: 'medium',
+      size: JSON.stringify(data).length,
     };
 
     await this.storage!.store('players', playerRecord);
+  }
+
+  /**
+   * Remove player from team
+   */
+  async removePlayerFromTeam(teamId: string, playerId: string, userId: string): Promise<void> {
+    await this.ensureInitialized(userId);
+
+    try {
+      // Remove player record
+      await this.storage!.delete('players', `${teamId}_${playerId}`);
+      
+      console.log('✅ Player removed from team offline:', playerId);
+    } catch (error) {
+      console.error('Failed to remove player from team:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update player information
+   */
+  async updatePlayer(playerId: string, updates: any, userId: string): Promise<void> {
+    await this.ensureInitialized(userId);
+
+    try {
+      const existingPlayer = await this.storage!.get('players', playerId);
+      if (!existingPlayer) {
+        throw new Error('Player not found');
+      }
+
+      const updatedPlayer = {
+        ...existingPlayer,
+        data: {
+          ...existingPlayer.data,
+          ...updates,
+          updatedAt: new Date(),
+        },
+        lastModified: Date.now(),
+        synced: false,
+      };
+
+      await this.storage!.put('players', updatedPlayer);
+      
+      console.log('✅ Player updated offline:', playerId);
+    } catch (error) {
+      console.error('Failed to update player:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Promote player to captain
+   */
+  async promoteCaptain(teamId: string, playerId: string, userId: string): Promise<void> {
+    await this.ensureInitialized(userId);
+
+    try {
+      const team = await this.storage!.get('teams', teamId);
+      if (!team) {
+        throw new Error('Team not found');
+      }
+
+      const updatedTeam = {
+        ...team,
+        data: {
+          ...team.data,
+          captainId: playerId,
+          updatedAt: new Date(),
+        },
+        lastModified: Date.now(),
+        synced: false,
+      };
+
+      await this.storage!.put('teams', updatedTeam);
+      
+      console.log('✅ Captain promoted offline:', playerId);
+    } catch (error) {
+      console.error('Failed to promote captain:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete media file
+   */
+  async deleteMedia(mediaId: string, userId: string): Promise<void> {
+    await this.ensureInitialized(userId);
+
+    try {
+      // Remove from media queue and binary data
+      await this.storage!.delete('mediaQueue', mediaId);
+      await this.storage!.delete('binaryData', mediaId);
+      
+      console.log('✅ Media deleted offline:', mediaId);
+    } catch (error) {
+      console.error('Failed to delete media:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Assign tournament numbers to teams
+   */
+  async assignTournamentNumbers(assignments: Array<{teamId: string; tournamentNumber: number}>, userId: string): Promise<void> {
+    await this.ensureInitialized(userId);
+
+    try {
+      for (const assignment of assignments) {
+        const team = await this.storage!.get('teams', assignment.teamId);
+        if (team) {
+          const updatedTeam = {
+            ...team,
+            data: {
+              ...team.data,
+              tournamentNumber: assignment.tournamentNumber,
+              updatedAt: new Date(),
+            },
+            lastModified: Date.now(),
+            synced: false,
+          };
+
+          await this.storage!.put('teams', updatedTeam);
+        }
+      }
+      
+      console.log('✅ Tournament numbers assigned offline:', assignments.length);
+    } catch (error) {
+      console.error('Failed to assign tournament numbers:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get individual match details
+   */
+  async getMatch(matchId: string, userId: string): Promise<any> {
+    await this.ensureInitialized(userId);
+
+    try {
+      const match = await this.storage!.get('matches', matchId);
+      return match?.data || null;
+    } catch (error) {
+      console.error('Failed to get match:', error);
+      return null;
+    }
   }
 
   /**
@@ -791,7 +952,7 @@ export class VolunteerService {
       const venuePromise = this.storage!.get('venueConfigs', venueId);
       const venue = await Promise.race([venuePromise, timeoutPromise]);
       
-      return venue?.data || null;
+      return (venue as any)?.data || null;
     } catch (error) {
       console.error('Failed to get venue details:', error);
       return null;
@@ -1014,7 +1175,12 @@ export class VolunteerService {
       await this.storage!.store('venueConfigs', {
         id: venueData.id,
         data: venueData,
-        lastUpdated: Date.now(),
+        timestamp: Date.now(),
+        lastModified: Date.now(),
+        version: 1,
+        synced: false,
+        priority: 'medium' as const,
+        size: JSON.stringify(venueData).length,
         userId,
       });
       
@@ -1045,7 +1211,12 @@ export class VolunteerService {
       await this.storage!.store('teams', {
         id: teamData.id,
         data: teamData,
-        lastUpdated: Date.now(),
+        timestamp: Date.now(),
+        lastModified: Date.now(),
+        version: 1,
+        synced: false,
+        priority: 'medium' as const,
+        size: JSON.stringify(teamData).length,
         userId,
         venueId: teamData.venueId,
       });
@@ -1070,7 +1241,12 @@ export class VolunteerService {
       await this.storage!.store('matches', {
         id: matchData.id,
         data: matchData,
-        lastUpdated: Date.now(),
+        timestamp: Date.now(),
+        lastModified: Date.now(),
+        version: 1,
+        synced: false,
+        priority: 'medium' as const,
+        size: JSON.stringify(matchData).length,
         userId,
         venueId: matchData.venueId,
       });
@@ -1088,7 +1264,12 @@ export class VolunteerService {
       await this.storage!.store('players', {
         id: playerData.id,
         data: playerData,
-        lastUpdated: Date.now(),
+        timestamp: Date.now(),
+        lastModified: Date.now(),
+        version: 1,
+        synced: false,
+        priority: 'medium' as const,
+        size: JSON.stringify(playerData).length,
         userId,
         teamId: playerData.teamId,
       });
@@ -1106,7 +1287,12 @@ export class VolunteerService {
       await this.storage!.store('matches', {
         id: fixtureData.id,
         data: fixtureData,
-        lastUpdated: Date.now(),
+        timestamp: Date.now(),
+        lastModified: Date.now(),
+        version: 1,
+        synced: false,
+        priority: 'medium' as const,
+        size: JSON.stringify(fixtureData).length,
         userId,
         venueId: fixtureData.venueId,
       });

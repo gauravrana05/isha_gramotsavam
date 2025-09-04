@@ -69,25 +69,15 @@ function VolunteerFixturesPage() {
   React.useEffect(() => {
     if (!venueData?.tournament || venueData.tournament.status !== 'in_progress') return;
 
+    const currentRefetch = refetch; // Capture current refetch function
     const interval = setInterval(() => {
-      refetch();
+      currentRefetch();
     }, 30000); // Poll every 30 seconds during active tournaments only
 
     return () => clearInterval(interval);
-  }, [venueData?.tournament?.status, refetch]);
+  }, [venueData?.tournament?.status]);
 
-  // Debug logging to track when and why tRPC loading triggers
-  React.useEffect(() => {
-    console.log('🔄 tRPC Query State:', {
-      loading,
-      enabled: isQueryEnabled(),
-      hasUser: !!user?.id,
-      hasVenueId: !!venueId,
-      userId: user?.id,
-      venueId,
-      timestamp: new Date().toISOString()
-    });
-  }, [loading, user?.id, venueId, isQueryEnabled]);
+  // Debug logging removed to prevent console spam during loading
 
   // Memoize data before any early returns
   const tournament = React.useMemo(() => {

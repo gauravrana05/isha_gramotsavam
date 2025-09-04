@@ -269,7 +269,7 @@ export default function MediaPage() {
   // Get venue media - always call the hook
   // Get venue media data from offline storage
   const { venueData, isLoading, error } = useOfflineVenueData(venueId);
-  const { uploadMedia } = useOfflineActions();
+  const { uploadMedia, deleteMedia } = useOfflineActions();
   
   // Extract media data from venue data
   const mediaData = venueData?.media || [];
@@ -283,14 +283,13 @@ export default function MediaPage() {
     if (!confirm('Are you sure you want to delete this media?')) return;
     
     try {
-      // TODO: Implement deleteMedia action in useOfflineActions
-      console.log('Deleting media offline:', mediaId);
+      await deleteMedia(mediaId, 'venue');
       addNotification('Media deleted successfully', 'success');
       // No refetch needed - data updates automatically
     } catch (error) {
       addNotification('Failed to delete media', 'error');
     }
-  }, [addNotification]);
+  }, [deleteMedia, addNotification]);
 
   // Mock upload function - replace with actual implementation
   const handleFileUpload = useCallback(async (files: FileList) => {

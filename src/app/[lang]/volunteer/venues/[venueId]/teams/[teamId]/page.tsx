@@ -139,16 +139,21 @@ export default function TeamMatchDayVerificationPage() {
   );
 
   // Get offline actions
-  const { verifyPlayer: verifyPlayerAction, uploadMedia } = useOfflineActions();
+  const { 
+    verifyPlayer: verifyPlayerAction, 
+    uploadMedia, 
+    addPlayer: addPlayerAction,
+    removePlayer: removePlayerAction,
+    updatePlayer: updatePlayerAction,
+    promoteCaptain: promoteCaptainAction
+  } = useOfflineActions();
   const [isAddingPlayer, setIsAddingPlayer] = useState(false);
 
   // Replace addPlayerMutation with offline action
   const handleAddPlayer = async (playerData: any) => {
     try {
       setIsAddingPlayer(true);
-      // Note: addPlayer action needs to be implemented in useOfflineActions
-      // For now, we'll use a placeholder
-      console.log('Adding player offline:', playerData);
+      await addPlayerAction(team.id, playerData);
       setShowAddPlayerModal(false);
       setPlayerFormData({ phone: '', firstName: '', lastName: '', dob: '', whatsappNumber: '', village: '', position: 'main' });
       showSuccess('Player added successfully!');
