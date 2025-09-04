@@ -45,10 +45,7 @@ export function useOfflineVenueData(venueId?: string) {
   );
 
   const loadVenueData = useCallback(async (force = false) => {
-    console.log('🔄 loadVenueData called', { venueId, stableUserId, force, timestamp: new Date().toISOString() });
-    
     if (!venueId || !stableUserId) {
-      console.log('❌ loadVenueData early return - missing venueId or userId', { venueId, stableUserId });
       setIsLoading(false);
       return;
     }
@@ -59,11 +56,6 @@ export function useOfflineVenueData(venueId?: string) {
       const isDataFresh = venueData && lastFetchTime && (now - lastFetchTime) < 5 * 60 * 1000;
       
       if (venueData && isDataFresh) {
-        console.log('⏭️ Skipping loadVenueData - data exists and is fresh', { 
-          hasData: !!venueData, 
-          lastFetchTime: new Date(lastFetchTime).toISOString(),
-          ageMinutes: Math.round((now - lastFetchTime) / 1000 / 60)
-        });
         setIsLoading(false);
         return;
       }
@@ -85,7 +77,7 @@ export function useOfflineVenueData(venueId?: string) {
           service.getVenueFixtures(venueId, stableUserId),
         ]);
       } catch (offlineError) {
-        console.log('📱 Offline storage empty, will use API fallback');
+        // Offline storage empty, will use API fallback
       }
 
       // Use offline data if available
@@ -93,8 +85,6 @@ export function useOfflineVenueData(venueId?: string) {
       const fixturesData = fixtures?.map(f => f.data || f) || [];
       
       if (teamsData.length > 0 || fixturesData.length > 0) {
-        console.log('✅ Using offline venue data', { teams: teamsData.length, fixtures: fixturesData.length });
-        
         const stats = {
           totalTeams: teamsData.length,
           checkedInTeams: teamsData.filter(t => t.status === 'checked_in').length,
@@ -112,7 +102,7 @@ export function useOfflineVenueData(venueId?: string) {
         setLastFetchTime(Date.now());
         hasInitialized.current = true;
       } else {
-        console.log('ℹ️ No offline venue data available');
+        // No offline data - set empty data and let API fallback handle it
         setVenueData({
           venue: null,
           teams: [],
@@ -125,7 +115,6 @@ export function useOfflineVenueData(venueId?: string) {
       }
       
     } catch (err) {
-      console.error('❌ loadVenueData failed:', err);
       setError(err as Error);
       // Set empty data on error to prevent UI hanging
       setVenueData({
@@ -138,24 +127,22 @@ export function useOfflineVenueData(venueId?: string) {
       setLastFetchTime(Date.now());
       hasInitialized.current = true;
     } finally {
-      console.log('🏁 loadVenueData finished, setting isLoading to false');
       setIsLoading(false);
     }
   }, [venueId, stableUserId]);
 
   // Initial load effect - only runs once when dependencies change
   useEffect(() => {
-    console.log('🔄 useEffect triggered - calling loadVenueData', { hasInitialized: hasInitialized.current });
     if (!hasInitialized.current) {
       loadVenueData();
     }
   }, [loadVenueData]);
 
   // API fallback effect - handles API data when offline data is not available
+  // FIXED: Stabilize dependencies and ensure loading is set to false
   useEffect(() => {
-    if ((apiTeams?.length || apiFixtures?.length) && (!venueData || (venueData.teams.length === 0 && venueData.fixtures.length === 0))) {
-      console.log('🔄 Using API fallback data', { teams: apiTeams?.length || 0, fixtures: apiFixtures?.length || 0 });
-      
+    // Only run if we have API data and no venue data yet
+    if ((apiTeams?.length || apiFixtures?.length) && hasInitialized.current && venueData && venueData.teams.length === 0 && venueData.fixtures.length === 0) {
       const teamsData = apiTeams?.map(t => ({ ...t })) || [];
       const fixturesData = apiFixtures?.map(f => ({ ...f })) || [];
       
@@ -174,13 +161,12 @@ export function useOfflineVenueData(venueId?: string) {
         stats,
       });
       setLastFetchTime(Date.now());
-      hasInitialized.current = true;
+      setIsLoading(false); // FIXED: Ensure loading is set to false
     }
-  }, [apiTeams, apiFixtures]);
+  }, [apiTeams?.length, apiFixtures?.length, hasInitialized.current]); // FIXED: Stable dependencies
 
   // Manual refetch function that forces a refresh
   const refetch = useCallback(() => {
-    console.log('🔄 Manual venue data refetch requested');
     hasInitialized.current = false; // Reset to allow fresh load
     return loadVenueData(true);
   }, [loadVenueData]);

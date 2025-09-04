@@ -749,7 +749,7 @@ export class VolunteerStorageManager {
       const existing = await this.get('storageMetadata', key);
       
       const metadata = {
-        id: key,
+        key: key, // FIXED: Use 'key' instead of 'id' to match keyPath
         data: {
           category: storeName,
           size: (existing?.data?.size || 0) + sizeChange,
@@ -777,7 +777,7 @@ export class VolunteerStorageManager {
     try {
       const key = `access_${storeName}_${docId}`;
       const metadata = {
-        id: key,
+        key: key, // FIXED: Use 'key' instead of 'id' to match keyPath
         data: {
           storeName,
           documentId: docId,

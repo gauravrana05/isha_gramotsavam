@@ -94,7 +94,11 @@ function VolunteerFixturesPage() {
 
   // Add controlled polling only for active tournaments
   const refetchRef = React.useRef(refetch);
-  refetchRef.current = refetch;
+  
+  // FIXED: Only update ref when refetch actually changes, not on every render
+  React.useEffect(() => {
+    refetchRef.current = refetch;
+  }, [refetch]);
 
   React.useEffect(() => {
     if (!venueData?.tournament || venueData.tournament.status !== 'in_progress') return;
@@ -104,22 +108,27 @@ function VolunteerFixturesPage() {
     }, 30000); // Poll every 30 seconds during active tournaments only
 
     return () => clearInterval(interval);
-  }, [venueData?.tournament?.status]); // Remove refetch from dependencies
+  }, [venueData?.tournament?.status]);
 
-  // Debug logging removed to prevent console spam during loading
+  // FIXED: Stabilize venueData dependencies to prevent infinite re-renders
+  const stableVenueData = React.useMemo(() => venueData, [
+    venueData?.tournament?.id,
+    venueData?.fixtures?.length,
+    venueData?.teamsBySport?.length
+  ]);
 
   // Memoize data before any early returns
   const tournament = React.useMemo(() => {
-    return venueData?.tournament || venueData?.fixtures?.[0] || null;
-  }, [venueData?.tournament, venueData?.fixtures]);
+    return stableVenueData?.tournament || stableVenueData?.fixtures?.[0] || null;
+  }, [stableVenueData?.tournament, stableVenueData?.fixtures]);
   
   // Stabilize teamsData to prevent infinite re-renders
   const stableTeamsData = React.useMemo(() => teamsData, [teamsData?.length]);
   
   const teamsBySport = React.useMemo(() => {
     // If we have pre-grouped data, use it
-    if (venueData?.teamsBySport) {
-      return venueData.teamsBySport;
+    if (stableVenueData?.teamsBySport) {
+      return stableVenueData.teamsBySport;
     }
     
     // Otherwise, group teams by sport from teamsData
@@ -147,7 +156,7 @@ function VolunteerFixturesPage() {
     }
     
     return [];
-  }, [venueData?.teamsBySport, stableTeamsData]);
+  }, [stableVenueData?.teamsBySport, stableTeamsData]);
   
   const stats = React.useMemo(() => {
     // Calculate stats from actual teams data (same pattern as dashboard)
@@ -155,21 +164,12 @@ function VolunteerFixturesPage() {
     const checkedInTeams = stableTeamsData?.filter(team => team.status === 'checked_in').length || 0;
     
     // Calculate matches stats from fixtures if available
-    const fixtures = venueData?.fixtures || [];
+    const fixtures = stableVenueData?.fixtures || [];
     const totalMatches = fixtures.reduce((sum: number, fixture: any) => sum + (fixture.matches?.length || 0), 0);
     const completedMatches = fixtures.reduce((sum: number, fixture: any) => 
       sum + (fixture.matches?.filter((m: any) => m.status === 'completed').length || 0), 0);
     
     const progress = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0;
-    
-    // Remove console.log that runs on every render
-    // console.log('📊 Calculated stats from teams data:', {
-    //   totalTeams,
-    //   checkedInTeams,
-    //   totalMatches,
-    //   completedMatches,
-    //   progress
-    // });
     
     return {
       totalTeams,
@@ -177,7 +177,7 @@ function VolunteerFixturesPage() {
       matchesTotal: totalMatches,
       progress
     };
-  }, [stableTeamsData, venueData?.fixtures]);
+  }, [stableTeamsData, stableVenueData?.fixtures]);
 
   // Helper functions
   const getStatusColor = (status: string) => {
@@ -201,16 +201,22 @@ function VolunteerFixturesPage() {
   };
 
   // Content loading state (keeps sidebar visible) - only check data loading, not auth
-  // Add timeout to prevent infinite loading
+  // FIXED: Add timeout to prevent infinite loading with proper cleanup
   const [loadingTimeout, setLoadingTimeout] = React.useState(false);
   
   React.useEffect(() => {
+    // Reset timeout when loading states change
+    if (!loading && !teamsLoading) {
+      setLoadingTimeout(false);
+      return;
+    }
+    
     const timer = setTimeout(() => {
       setLoadingTimeout(true);
-    }, 10000); // 10 second timeout
+    }, 5000); // REDUCED: 5 second timeout instead of 10
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [loading, teamsLoading]); // FIXED: Depend on actual loading states
   
   // Show loading only if both hooks are loading and timeout hasn't occurred
   const isActuallyLoading = (loading || teamsLoading) && !loadingTimeout;
