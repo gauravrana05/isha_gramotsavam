@@ -32,6 +32,17 @@ export function useOfflineTeams(venueId?: string) {
       if (apiTeams?.length) {
         setTeams(apiTeams);
         console.log('✅ Using API teams data with relations');
+        
+        // Cache API response for future offline use
+        try {
+          const service = getVolunteerService();
+          for (const team of apiTeams) {
+            await service.cacheTeamData(user.id, { ...team, venueId });
+          }
+          console.log('💾 Cached API teams data for offline use');
+        } catch (cacheError) {
+          console.warn('Failed to cache teams data:', cacheError);
+        }
       } else {
         // Fallback to offline storage
         const service = getVolunteerService();

@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { createTRPCRouter, protectedProcedure } from '../../trpc'
+import { updateOfflineCache, batchUpdateCache } from '@/lib/utils/cacheUpdater'
 import type { Team, User, Sport } from '@prisma/client'
 
 // Define proper types for the response data
@@ -447,7 +448,7 @@ export const volunteersVenueRouter = createTRPCRouter({
         verifiedPlayersCounts.map(item => [item.teamId, item._count.id])
       );
 
-      return teams.map(team => ({
+      const teamsWithCounts = teams.map(team => ({
         id: team.id,
         name: team.name,
         status: team.status,
@@ -455,7 +456,17 @@ export const volunteersVenueRouter = createTRPCRouter({
         sport: team.sport,
         currentPlayers: team.currentPlayers,
         verifiedPlayersCount: verifiedCountsMap.get(team.id) || 0,
+        venueId: input.venueId, // Add venueId for cache
       }));
+
+      // Update offline cache
+      try {
+        await batchUpdateCache(ctx.user.id, teamsWithCounts, 'team');
+      } catch (error) {
+        console.warn('Failed to update offline cache for venue teams:', error);
+      }
+
+      return teamsWithCounts;
     }),
 
   getVenueFixtures: protectedProcedure

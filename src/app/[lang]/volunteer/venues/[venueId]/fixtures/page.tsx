@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useOfflineVenueData } from '@/hooks/useOfflineVenueData';
+import { useOfflineTeams } from '@/hooks/useOfflineTeams';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/lib/utils/i18n';
@@ -46,18 +47,29 @@ interface SportGroup {
 }
 
 function VolunteerFixturesPage() {
+  // Remove console.log that runs on every render
+  // console.log('🎭 VolunteerFixturesPage render started');
+  
   const params = useParams();
   const router = useRouter();
   const { venueId, lang } = params as { venueId: string; lang: string };
   const { user } = useAuth();
   const { t } = useTranslation();
+  
+  // Remove console.logs that run on every render
+  // console.log('📍 Fixtures page params:', { venueId, lang, userId: user?.id });
+  // console.log('👤 User object details:', { 
+  //   userId: user?.id, 
+  //   userRole: user?.role,
+  //   userEmail: user?.email,
+  //   hasUser: !!user,
+  //   userObjectHash: user ? JSON.stringify(user).substring(0, 50) + '...' : null
+  // });
 
-  // Stabilize the enabled condition to prevent unnecessary re-triggers
-  const isQueryEnabled = React.useCallback(() => {
-    return !!user?.id && !!venueId;
-  }, [user?.id, venueId]);
+  // Removed unused isQueryEnabled function
 
   // Get venue tournament data from offline storage
+  // console.log('🎣 Calling useOfflineVenueData with venueId:', venueId);
   const { 
     venueData, 
     isLoading: loading, 
@@ -65,17 +77,34 @@ function VolunteerFixturesPage() {
     refetch
   } = useOfflineVenueData(venueId);
 
+  // Get teams data for accurate stats (same pattern as dashboard)
+  const { 
+    teams: teamsData, 
+    isLoading: teamsLoading, 
+    error: teamsError 
+  } = useOfflineTeams(venueId);
+  
+  // Remove console.log that runs on every render
+  // console.log('🎯 useOfflineVenueData result:', { 
+  //   hasVenueData: !!venueData, 
+  //   loading, 
+  //   hasError: !!error,
+  //   timestamp: new Date().toISOString()
+  // });
+
   // Add controlled polling only for active tournaments
+  const refetchRef = React.useRef(refetch);
+  refetchRef.current = refetch;
+
   React.useEffect(() => {
     if (!venueData?.tournament || venueData.tournament.status !== 'in_progress') return;
 
-    const currentRefetch = refetch; // Capture current refetch function
     const interval = setInterval(() => {
-      currentRefetch();
+      refetchRef.current();
     }, 30000); // Poll every 30 seconds during active tournaments only
 
     return () => clearInterval(interval);
-  }, [venueData?.tournament?.status]);
+  }, [venueData?.tournament?.status]); // Remove refetch from dependencies
 
   // Debug logging removed to prevent console spam during loading
 
@@ -84,14 +113,71 @@ function VolunteerFixturesPage() {
     return venueData?.tournament || venueData?.fixtures?.[0] || null;
   }, [venueData?.tournament, venueData?.fixtures]);
   
+  // Stabilize teamsData to prevent infinite re-renders
+  const stableTeamsData = React.useMemo(() => teamsData, [teamsData?.length]);
+  
   const teamsBySport = React.useMemo(() => {
-    return venueData?.teamsBySport || venueData?.teams || [];
-  }, [venueData?.teamsBySport, venueData?.teams]);
+    // If we have pre-grouped data, use it
+    if (venueData?.teamsBySport) {
+      return venueData.teamsBySport;
+    }
+    
+    // Otherwise, group teams by sport from teamsData
+    if (stableTeamsData?.length) {
+      const grouped = stableTeamsData.reduce((acc: SportGroup[], team: any) => {
+        const sportName = team.sport?.name || 'Unknown Sport';
+        const genderCategory = team.genderCategory || 'mixed';
+        
+        let sportGroup = acc.find(g => g.sportName === sportName && g.genderCategory === genderCategory);
+        
+        if (!sportGroup) {
+          sportGroup = {
+            sportName,
+            genderCategory,
+            teams: []
+          };
+          acc.push(sportGroup);
+        }
+        
+        sportGroup.teams.push(team);
+        return acc;
+      }, []);
+      
+      return grouped;
+    }
+    
+    return [];
+  }, [venueData?.teamsBySport, stableTeamsData]);
   
   const stats = React.useMemo(() => {
-    const defaultStats = { totalTeams: 0, matchesCompleted: 0, matchesTotal: 0, progress: 0 };
-    return venueData?.stats || defaultStats;
-  }, [venueData?.stats]);
+    // Calculate stats from actual teams data (same pattern as dashboard)
+    const totalTeams = stableTeamsData?.length || 0;
+    const checkedInTeams = stableTeamsData?.filter(team => team.status === 'checked_in').length || 0;
+    
+    // Calculate matches stats from fixtures if available
+    const fixtures = venueData?.fixtures || [];
+    const totalMatches = fixtures.reduce((sum: number, fixture: any) => sum + (fixture.matches?.length || 0), 0);
+    const completedMatches = fixtures.reduce((sum: number, fixture: any) => 
+      sum + (fixture.matches?.filter((m: any) => m.status === 'completed').length || 0), 0);
+    
+    const progress = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0;
+    
+    // Remove console.log that runs on every render
+    // console.log('📊 Calculated stats from teams data:', {
+    //   totalTeams,
+    //   checkedInTeams,
+    //   totalMatches,
+    //   completedMatches,
+    //   progress
+    // });
+    
+    return {
+      totalTeams,
+      matchesCompleted: completedMatches,
+      matchesTotal: totalMatches,
+      progress
+    };
+  }, [stableTeamsData, venueData?.fixtures]);
 
   // Helper functions
   const getStatusColor = (status: string) => {
@@ -115,7 +201,21 @@ function VolunteerFixturesPage() {
   };
 
   // Content loading state (keeps sidebar visible) - only check data loading, not auth
-  if (loading) {
+  // Add timeout to prevent infinite loading
+  const [loadingTimeout, setLoadingTimeout] = React.useState(false);
+  
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoadingTimeout(true);
+    }, 10000); // 10 second timeout
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  // Show loading only if both hooks are loading and timeout hasn't occurred
+  const isActuallyLoading = (loading || teamsLoading) && !loadingTimeout;
+  
+  if (isActuallyLoading) {
     return (
       <div className="min-h-screen bg-[#F3F0E5] py-4 sm:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -361,11 +461,11 @@ function VolunteerFixturesPage() {
               <div className="space-y-4">
                 <h4 className="text-lg font-semibold text-gray-900 mb-4">Available Sports</h4>
                 {teamsBySport.map((sportGroup: SportGroup) => {
-                  const canCreateTournament = sportGroup.teams.length >= 2;
+                  const canCreateTournament = (sportGroup.teams || []).length >= 2;
                   
                   return (
                     <div 
-                      key={`${sportGroup.sportId}_${sportGroup.genderCategory}`} 
+                      key={`${sportGroup.sportName}_${sportGroup.genderCategory}`} 
                       className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-center">
@@ -375,7 +475,7 @@ function VolunteerFixturesPage() {
                             {sportGroup.sportName} - {sportGroup.genderCategory}
                           </h5>
                           <p className="text-sm text-gray-600">
-                            {sportGroup.teams.length} teams ready
+                            {(sportGroup.teams || []).length} teams ready
                           </p>
                         </div>
                       </div>

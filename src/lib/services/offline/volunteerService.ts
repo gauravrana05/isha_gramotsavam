@@ -901,6 +901,26 @@ export class VolunteerService {
   }
 
   /**
+   * Get matches for venue with optional filtering
+   */
+  async getMatchesForVenue(venueId: string, filters?: any, userId?: string): Promise<any[]> {
+    if (userId) {
+      await this.ensureInitialized(userId);
+    }
+
+    try {
+      const matches = await this.storage!.query('matches', {
+        filter: (match: any) => match.venueId === venueId
+      });
+      
+      return matches.map(m => m.data);
+    } catch (error) {
+      console.error('Failed to get matches for venue:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get individual match details
    */
   async getMatch(matchId: string, userId: string): Promise<any> {
@@ -913,6 +933,93 @@ export class VolunteerService {
       console.error('Failed to get match:', error);
       return null;
     }
+  }
+
+  /**
+   * Cache management methods for backend integration
+   */
+  async cacheVenueData(userId: string, venueData: any): Promise<void> {
+    await this.ensureInitialized(userId);
+    
+    if (!venueData) return;
+    
+    try {
+      await this.storage!.put('venues', {
+        id: venueData.id,
+        data: venueData,
+        lastUpdated: Date.now(),
+        userId,
+        synced: true,
+      });
+      
+      console.log('✅ Venue data cached:', venueData.id);
+    } catch (error) {
+      console.error('Failed to cache venue data:', error);
+    }
+  }
+
+  async cacheTeamData(userId: string, teamData: any): Promise<void> {
+    await this.ensureInitialized(userId);
+    
+    try {
+      await this.storage!.put('teams', {
+        id: teamData.id,
+        data: teamData,
+        lastUpdated: Date.now(),
+        userId,
+        venueId: teamData.venueId,
+        synced: true,
+      });
+      
+      console.log('✅ Team data cached:', teamData.id);
+    } catch (error) {
+      console.error('Failed to cache team data:', error);
+    }
+  }
+
+  async cacheMatchData(userId: string, matchData: any): Promise<void> {
+    await this.ensureInitialized(userId);
+    
+    try {
+      await this.storage!.put('matches', {
+        id: matchData.id,
+        data: matchData,
+        lastUpdated: Date.now(),
+        userId,
+        venueId: matchData.venueId,
+        synced: true,
+      });
+      
+      console.log('✅ Match data cached:', matchData.id);
+    } catch (error) {
+      console.error('Failed to cache match data:', error);
+    }
+  }
+
+  async cachePlayerData(userId: string, playerData: any): Promise<void> {
+    await this.ensureInitialized(userId);
+    
+    try {
+      await this.storage!.put('players', {
+        id: playerData.id,
+        data: playerData,
+        lastUpdated: Date.now(),
+        userId,
+        teamId: playerData.teamId,
+        synced: true,
+      });
+      
+      console.log('✅ Player data cached:', playerData.id);
+    } catch (error) {
+      console.error('Failed to cache player data:', error);
+    }
+  }
+
+  /**
+   * Get service instance for backend cache updates
+   */
+  static async getServiceForBackend(): Promise<VolunteerService> {
+    return new VolunteerService();
   }
 
   /**
@@ -972,21 +1079,30 @@ export class VolunteerService {
       });
       
       const statsPromise = (async () => {
+        console.log('🔍 getVenueStats: Starting stats calculation for venueId:', venueId);
         const teams = await this.getVenueTeams(venueId, userId);
         const matches = await this.getVenueMatches(venueId, userId);
         
+        console.log('📊 getVenueStats: Retrieved teams:', teams?.length, 'matches:', matches?.length);
+        console.log('📊 Teams data sample:', teams?.slice(0, 2));
+        
+        const totalTeams = teams?.length || 0;
+        const checkedInTeams = teams?.filter(t => t.status === 'checked_in' || t.verificationStatus === 'checked_in')?.length || 0;
         const totalMatches = matches?.length || 0;
         const completedMatches = matches?.filter(m => m.status === 'completed')?.length || 0;
         
-        return {
-          totalTeams: teams?.length || 0,
-          checkedInTeams: teams?.filter(t => t.checkedIn)?.length || 0,
+        const stats = {
+          totalTeams,
+          checkedInTeams,
           totalMatches,
           completedMatches,
           progress: totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0,
           matchesCompleted: completedMatches,
           matchesTotal: totalMatches,
         };
+        
+        console.log('📊 getVenueStats: Calculated stats:', stats);
+        return stats;
       })();
       
       return await Promise.race([statsPromise, timeoutPromise]);
@@ -1003,18 +1119,96 @@ export class VolunteerService {
     await this.ensureInitialized(userId);
     
     try {
+      console.log('🔍 getVenueTeams: Searching for teams with venueId:', venueId, 'userId:', userId);
+      
       const timeoutPromise = new Promise<any[]>((resolve) => {
-        setTimeout(() => resolve([]), 3000);
+        setTimeout(() => {
+          console.log('⏰ getVenueTeams: Timeout reached, returning empty array');
+          resolve([]);
+        }, 3000);
       });
       
-      const teamsPromise = this.storage!.query('teams', {
-        filter: (team: any) => team.userId === userId && team.data?.venueId === venueId
-      });
+      const teamsPromise = (async () => {
+        // Check if storage is available
+        if (!this.storage) {
+          console.log('❌ Storage not initialized');
+          return [];
+        }
+
+        // Check all available collections
+        console.log('🔍 Checking available storage collections...');
+        try {
+          const collections = ['teams', 'venues', 'matches', 'fixtures'];
+          for (const collection of collections) {
+            try {
+              const allItems = await this.storage.query(collection, {});
+              console.log(`📊 Collection '${collection}': ${allItems?.length || 0} items`);
+            } catch (e) {
+              console.log(`📊 Collection '${collection}': error accessing - ${e}`);
+            }
+          }
+        } catch (e) {
+          console.log('❌ Error checking collections:', e);
+        }
+        
+        // First, let's see all teams for this user to understand the data structure
+        const allTeams = await this.storage.query('teams', {
+          filter: (team: any) => team.userId === userId
+        });
+        
+        console.log('📋 getVenueTeams: Found', allTeams?.length || 0, 'total teams for user', userId);
+        
+        // Also check teams without user filter to see if there are any teams at all
+        const allTeamsAnyUser = await this.storage.query('teams', {});
+        console.log('📋 Total teams in storage (any user):', allTeamsAnyUser?.length || 0);
+        
+        if (allTeamsAnyUser?.length > 0) {
+          console.log('📋 Sample teams (any user):', allTeamsAnyUser.slice(0, 3).map(t => ({
+            id: t.id,
+            userId: t.userId,
+            venueId: t.data?.venueId || t.venueId,
+            teamName: t.data?.name || t.name,
+            status: t.data?.status || t.status,
+            verificationStatus: t.data?.verificationStatus || t.verificationStatus,
+            structure: Object.keys(t)
+          })));
+        }
+        
+        if (allTeams?.length > 0) {
+          console.log('📋 All teams sample (this user):', allTeams.slice(0, 3).map(t => ({
+            id: t.id,
+            venueId: t.data?.venueId || t.venueId,
+            teamName: t.data?.name || t.name,
+            status: t.data?.status || t.status,
+            verificationStatus: t.data?.verificationStatus || t.verificationStatus,
+            structure: Object.keys(t)
+          })));
+        }
+        
+        // Try multiple venue ID matching patterns
+        const venueTeams = allTeams?.filter((team: any) => {
+          const teamVenueId = team.data?.venueId || team.venueId || team.data?.venue_id || team.venue_id;
+          const matches = teamVenueId === venueId || teamVenueId === parseInt(venueId);
+          if (matches) {
+            console.log('✅ Team matches venue:', {
+              teamId: team.id,
+              teamVenueId,
+              searchVenueId: venueId,
+              teamName: team.data?.name || team.name
+            });
+          }
+          return matches;
+        }) || [];
+        
+        console.log('🎯 getVenueTeams: Found', venueTeams.length, 'teams for venue', venueId);
+        return venueTeams.map(team => team.data || team);
+      })();
       
       const teams = await Promise.race([teamsPromise, timeoutPromise]);
-      return Array.isArray(teams) ? teams.map(team => team.data || team) : [];
+      console.log('✅ getVenueTeams: Returning', teams.length, 'teams');
+      return Array.isArray(teams) ? teams : [];
     } catch (error) {
-      console.error('Failed to get venue teams:', error);
+      console.error('❌ Failed to get venue teams:', error);
       return [];
     }
   }

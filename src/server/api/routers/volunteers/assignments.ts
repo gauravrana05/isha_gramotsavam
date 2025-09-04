@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { createTRPCRouter, protectedProcedure } from '../../trpc'
+import { updateOfflineCache, batchUpdateCache } from '@/lib/utils/cacheUpdater'
 
 export const volunteersAssignmentsRouter = createTRPCRouter({
   // Get volunteer assignments for dashboard
@@ -107,6 +108,57 @@ export const volunteersAssignmentsRouter = createTRPCRouter({
         status: a.status
       }))
     });
+
+    // Preload venue data for offline use
+    try {
+      for (const assignment of assignments) {
+        if (assignment.venueLevelMapping?.venue) {
+          const venue = assignment.venueLevelMapping.venue;
+          await updateOfflineCache(ctx.user.id, venue, 'venue');
+          
+          // Preload teams for this venue
+          const teams = await db.team.findMany({
+            where: { 
+              teamVenueAssignments: {
+                some: {
+                  OR: [
+                    { clusterVenueMapping: { venueId: venue.id } },
+                    { divisionVenueMapping: { venueId: venue.id } },
+                    { finalVenueMapping: { venueId: venue.id } }
+                  ]
+                }
+              }
+            },
+            include: {
+              sport: true,
+              captainUser: true,
+              players: true,
+            }
+          });
+          
+          if (teams.length > 0) {
+            await batchUpdateCache(ctx.user.id, teams, 'team');
+          }
+          
+          // Preload matches for this venue
+          const matches = await db.match.findMany({
+            where: { venueId: venue.id },
+            include: {
+              teams: true,
+              fixture: true,
+            }
+          });
+          
+          if (matches.length > 0) {
+            await batchUpdateCache(ctx.user.id, matches, 'match');
+          }
+        }
+      }
+      
+      console.log('✅ Preloaded offline data for user assignments:', ctx.user.id);
+    } catch (error) {
+      console.warn('Failed to preload offline data:', error);
+    }
 
     return assignments;
   }),

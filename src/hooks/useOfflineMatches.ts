@@ -1,3 +1,4 @@
+import React from 'react';
 import { useCallback, useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { getVolunteerService } from '@/lib/services/offline/volunteerService';
@@ -6,9 +7,18 @@ import { api } from '@/server/trpc/react';
 
 export function useOfflineMatches(venueId?: string, filters?: any) {
   const { user } = useAuth();
-  const [matches, setMatches] = useState<any[]>([]);
+  const [matchData, setMatchData] = useState<{ matches: any[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [forceRefetch, setForceRefetch] = useState(false);
+  const hasInitialized = React.useRef(false);
+
+  // Stabilize userId and filters to prevent infinite loops
+  const stableUserId = React.useMemo(() => user?.id, [user?.id]);
+  const stableFiltersStr = React.useMemo(() => {
+    return filters ? JSON.stringify(filters) : '';
+  }, [filters]);
 
   // API fallback
   const { data: apiMatches } = api.volunteers.venue.getVenueMatches.useQuery(
@@ -16,13 +26,33 @@ export function useOfflineMatches(venueId?: string, filters?: any) {
     { enabled: !!venueId && !!user?.id, retry: false }
   );
 
-  const loadMatches = useCallback(async () => {
-    if (!venueId || !user?.id) {
+  const loadMatches = useCallback(async (force = false) => {
+    console.log('🔄 loadMatches called', { venueId, stableUserId, force, timestamp: new Date().toISOString() });
+    
+    if (!venueId || !stableUserId) {
+      console.log('❌ loadMatches early return - missing venueId or userId', { venueId, stableUserId });
       setIsLoading(false);
       return;
     }
 
+    // Check if data already exists and is fresh (within 5 minutes) - only if not forced
+    if (!force && hasInitialized.current) {
+      const now = Date.now();
+      const isDataFresh = matchData && lastFetchTime && (now - lastFetchTime) < 5 * 60 * 1000;
+      
+      if (matchData && isDataFresh) {
+        console.log('⏭️ Skipping loadMatches - data exists and is fresh', { 
+          matchCount: matchData.matches.length, 
+          lastFetchTime: new Date(lastFetchTime).toISOString(),
+          ageMinutes: Math.round((now - lastFetchTime) / 1000 / 60)
+        });
+        setIsLoading(false);
+        return;
+      }
+    }
+
     try {
+      console.log('🚀 loadMatches starting data fetch');
       setIsLoading(true);
       setError(null);
       
@@ -30,39 +60,69 @@ export function useOfflineMatches(venueId?: string, filters?: any) {
       const matchesData = await service.getMatchesForVenue(
         venueId, 
         filters?.date, 
-        user.id
+        stableUserId
       );
       
-      // Use offline data if available, otherwise fallback to API
+      // Use offline data if available
       if (matchesData.length > 0) {
-        setMatches(matchesData);
-      } else if (apiMatches?.length) {
-        setMatches(apiMatches);
+        console.log('✅ Using offline matches data', { count: matchesData.length });
+        setMatchData({ matches: matchesData });
+        setLastFetchTime(Date.now());
+        hasInitialized.current = true;
       } else {
-        setMatches([]);
+        console.log('ℹ️ No offline matches data available');
+        setMatchData({ matches: [] });
+        setLastFetchTime(Date.now());
+        hasInitialized.current = true;
       }
       
     } catch (err) {
-      console.error('Failed to load matches:', err);
-      // Fallback to API data on error
-      if (apiMatches?.length) {
-        setMatches(apiMatches);
-      }
+      console.error('❌ loadMatches failed:', err);
       setError(err as Error);
+      // Set empty data on error to prevent UI hanging
+      setMatchData({ matches: [] });
+      setLastFetchTime(Date.now());
+      hasInitialized.current = true;
     } finally {
+      console.log('🏁 loadMatches finished, setting isLoading to false');
       setIsLoading(false);
     }
-  }, [venueId, user?.id, JSON.stringify(filters), apiMatches]);
+  }, [venueId, stableUserId, stableFiltersStr]);
 
+  // Initial load effect - only runs once when dependencies change
   useEffect(() => {
-    loadMatches();
+    console.log('🔄 useEffect triggered - calling loadMatches', { hasInitialized: hasInitialized.current });
+    if (!hasInitialized.current) {
+      loadMatches();
+    }
   }, [loadMatches]);
 
+  // API fallback effect - handles API data when offline data is not available
+  useEffect(() => {
+    if (apiMatches && apiMatches.length > 0 && (!matchData || !Array.isArray(matchData.matches) || matchData.matches.length === 0)) {
+      console.log('🔄 Using API fallback data', { count: apiMatches.length });
+      setMatchData({ matches: apiMatches });
+      setLastFetchTime(Date.now());
+      hasInitialized.current = true;
+    }
+  }, [apiMatches]);
+
+  // Manual refetch function that forces a refresh
+  const refetchData = useCallback(() => {
+    console.log('🔄 Manual matches refetch requested');
+    hasInitialized.current = false; // Reset to allow fresh load
+    return loadMatches(true);
+  }, [loadMatches]);
+
+  // Ensure we always return a valid structure with an array
+  const safeMatchData = matchData || { matches: [] };
+  const safeMatches = Array.isArray(safeMatchData.matches) ? safeMatchData.matches : [];
+  
   return {
-    matches,
+    matches: { matches: safeMatches },
     isLoading,
     error,
-    refetch: loadMatches,
+    refetch: refetchData,
   };
 }
 

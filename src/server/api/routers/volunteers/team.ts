@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '../../trpc';
 import { TRPCError } from '@trpc/server';
+import { updateOfflineCache, batchUpdateCache } from '@/lib/utils/cacheUpdater';
 
 export const volunteersTeamRouter = createTRPCRouter({
   // Get teams assigned to venue
@@ -77,8 +78,20 @@ export const volunteersTeamRouter = createTRPCRouter({
           status: 'checked_in',
           checkedInAt: new Date(),
           checkedInBy: ctx.user.id
+        },
+        include: {
+          sport: true,
+          captainUser: true,
+          players: true,
         }
       });
+
+      // Update offline cache with fresh team data
+      try {
+        await updateOfflineCache(ctx.user.id, updatedTeam, 'team');
+      } catch (error) {
+        console.warn('Failed to update offline cache for team check-in:', error);
+      }
 
       return { success: true, team: updatedTeam };
     }),

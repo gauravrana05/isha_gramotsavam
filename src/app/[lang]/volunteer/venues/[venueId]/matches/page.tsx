@@ -80,12 +80,13 @@ export default function MatchesPage() {
     const hasActiveMatches = matchData?.matches?.some(m => m.status === 'in_progress') || false;
     if (!hasActiveMatches) return;
 
+    const currentRefetch = refetch; // Capture current refetch function
     const interval = setInterval(() => {
-      refetch();
+      currentRefetch();
     }, 10000); // Poll every 10 seconds when matches are in progress
 
     return () => clearInterval(interval);
-  }, [matchData?.matches, refetch]);
+  }, [matchData?.matches]);
 
   // Filter configuration for AdvancedTable
   const filters: FilterField[] = useMemo(() => [
@@ -106,7 +107,7 @@ export default function MatchesPage() {
       label: 'Tournament',
       type: 'select',
       category: 'Tournament',
-      options: matchData?.matches ? 
+      options: matchData?.matches && Array.isArray(matchData.matches) ? 
         [...new Set(matchData.matches.map(m => m.fixture.name))]
           .map(name => ({ label: name, value: name })) : []
     }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure } from '../../trpc';
 import { TRPCError } from '@trpc/server';
+import { updateOfflineCache } from '@/lib/utils/cacheUpdater';
 
 export const volunteersMatchRouter = createTRPCRouter({
   // Get match details
@@ -31,6 +32,13 @@ export const volunteersMatchRouter = createTRPCRouter({
 
       if (!match) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Match not found' });
+      }
+
+      // Update offline cache
+      try {
+        await updateOfflineCache(ctx.user.id, match, 'match');
+      } catch (error) {
+        console.warn('Failed to update offline cache for match details:', error);
       }
 
       return match;
@@ -282,12 +290,21 @@ export const volunteersMatchRouter = createTRPCRouter({
           }
         }
 
-        return { 
+        const result = { 
           success: true, 
           match: updatedMatch,
           tournamentCompleted: remainingMatches === 0,
           levelProgression: levelProgressionInfo
         };
+
+        // Update offline cache with fresh match data
+        try {
+          await updateOfflineCache(ctx.user.id, updatedMatch, 'match');
+        } catch (error) {
+          console.warn('Failed to update offline cache for match result:', error);
+        }
+
+        return result;
       });
     }),
 
